@@ -315,6 +315,99 @@ export function parseCodXlsx(buf: Buffer | ArrayBuffer, filename: string): Parse
   throw new Error("COD statement: no header row with a recognizable amount column found.");
 }
 
+// ── Checkout.com: Interchange++ settlement export ─────────────────────────
+// Every row is a breakdown line (a charge, a fee, a tax) for one Payment ID,
+// already in "Holding Currency" — which the founder confirmed is the exact
+// figure Checkout wires to the bank. Fee/tax rows carry a negative amount,
+// so summing every row in a group already nets fees out — no FX derivation,
+// no batch_fx, unlike Tabby/Tamara. Real exports have an empty "Payout ID"
+// column per-row (confirmed against the founder's sample) — group by
+// (Currency Account ID, Processed On date) in that case, but prefer a
+// populated Payout ID when a future export has one.
+export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[] {
+  const records = toRecords(parseCsv(text));
+  if (records.length === 0) throw new Error("Empty Checkout CSV");
+  const cols = Object.keys(records[0]);
+  const required = ["holding currency amount", "holding currency", "processed on", "currency account id", "payment id", "action type"];
+  const missing = required.filter((c) => !cols.includes(c));
+  if (missing.length > 0) {
+    throw new Error(`Checkout CSV missing column(s) [${missing.join(", ")}] — expected the Interchange++ settlement export.`);
+  }
+
+  type Row = { key: string; paymentId: string; ref: string; amount: number; isRefund: boolean; holdingCcy: string };
+  const rows: Row[] = [];
+  for (const r of records) {
+    const amount = parseFloat((r["holding currency amount"] || "0").replace(/,/g, ""));
+    if (Number.isNaN(amount)) continue;
+    const payoutIdRaw = (r["payout id"] || "").trim();
+    const account = (r["currency account id"] || "").trim();
+    const date = (r["processed on"] || r["requested on"] || "").slice(0, 10);
+    const key = payoutIdRaw || `${account}_${date}`;
+    rows.push({
+      key,
+      paymentId: (r["payment id"] || "").trim(),
+      ref: (r["reference"] || "").trim().replace(/^#/, ""),
+      amount,
+      isRefund: /refund/i.test(r["action type"] || ""),
+      holdingCcy: (r["holding currency"] || "AED").trim().toUpperCase(),
+    });
+  }
+  if (rows.length === 0) throw new Error("Checkout CSV: no rows with a numeric Holding Currency Amount found.");
+
+  const byGroup = new Map<string, Row[]>();
+  for (const r of rows) {
+    const g = byGroup.get(r.key) ?? [];
+    g.push(r);
+    byGroup.set(r.key, g);
+  }
+
+  const payouts: ParsedPayout[] = [];
+  for (const [key, groupRows] of byGroup) {
+    const holdingCcys = new Set(groupRows.map((r) => r.holdingCcy));
+    if (holdingCcys.size > 1) {
+      throw new Error(`Checkout CSV: payout group "${key}" mixes holding currencies (${[...holdingCcys].join(", ")}) — expected exactly one settlement currency per batch.`);
+    }
+    const net = groupRows.reduce((s, r) => s + r.amount, 0);
+    const grossTotal = groupRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+    const feeTotal = Math.abs(groupRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0));
+
+    const byPayment = new Map<string, Row[]>();
+    for (const r of groupRows) {
+      const g = byPayment.get(r.paymentId) ?? [];
+      g.push(r);
+      byPayment.set(r.paymentId, g);
+    }
+
+    const orderRefs: string[] = [];
+    const transactions: PayoutTransactionShare[] = [];
+    for (const paymentRows of byPayment.values()) {
+      const refs = [...new Set(paymentRows.map((r) => r.ref).filter(Boolean))];
+      if (refs.length === 0) continue; // fee-only maintenance rows (e.g. Network Token Update) carry no reference by design — they still count toward net above, just unattributed to an order.
+      const netShare = +paymentRows.reduce((s, r) => s + r.amount, 0).toFixed(2);
+      const grossShare = +paymentRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0).toFixed(2);
+      const feeShare = +Math.abs(paymentRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0)).toFixed(2);
+      const isRefund = paymentRows.some((r) => r.isRefund) || netShare < 0;
+      const quality: StripeQuality = refs.length > 1 ? "multi" : isRefund ? "refund" : "clean";
+      const ref = refs[0];
+      if (!orderRefs.includes(ref)) orderRefs.push(ref);
+      transactions.push({ ref, netShare, grossShare, feeShare, isRefund, quality });
+    }
+
+    payouts.push({
+      id: `CKO-${key}`,
+      provider: "Checkout",
+      net: +net.toFixed(2),
+      gross: +grossTotal.toFixed(2),
+      fees: +feeTotal.toFixed(2),
+      orderRefs,
+      source: filename,
+      notes: `${groupRows.length} breakdown rows across ${byPayment.size} payments`,
+      transactions,
+    });
+  }
+  return payouts;
+}
+
 // ── Stripe: dashboard "transfers" export (ch_… rows, Net in converted ccy) ───
 function parseStripeTransfersCsv(records: Record<string, string>[], filename: string): ParsedPayout[] {
   let net = 0, gross = 0, fees = 0, charges = 0, refunds = 0;
