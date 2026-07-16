@@ -383,14 +383,23 @@ export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[]
     for (const paymentRows of byPayment.values()) {
       const refs = [...new Set(paymentRows.map((r) => r.ref).filter(Boolean))];
       if (refs.length === 0) continue; // fee-only maintenance rows (e.g. Network Token Update) carry no reference by design — they still count toward net above, just unattributed to an order.
-      const netShare = +paymentRows.reduce((s, r) => s + r.amount, 0).toFixed(2);
-      const grossShare = +paymentRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0).toFixed(2);
-      const feeShare = +Math.abs(paymentRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0)).toFixed(2);
-      const isRefund = paymentRows.some((r) => r.isRefund) || netShare < 0;
+      const groupNet = paymentRows.reduce((s, r) => s + r.amount, 0);
+      const groupGross = paymentRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+      const groupFee = Math.abs(paymentRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0));
+      const isRefund = paymentRows.some((r) => r.isRefund) || groupNet < 0;
       const quality: StripeQuality = refs.length > 1 ? "multi" : isRefund ? "refund" : "clean";
-      const ref = refs[0];
-      if (!orderRefs.includes(ref)) orderRefs.push(ref);
-      transactions.push({ ref, netShare, grossShare, feeShare, isRefund, quality });
+      const n = refs.length;
+      for (const ref of refs) {
+        if (!orderRefs.includes(ref)) orderRefs.push(ref);
+        transactions.push({
+          ref,
+          netShare: +(groupNet / n).toFixed(2),
+          grossShare: +(groupGross / n).toFixed(2),
+          feeShare: +(groupFee / n).toFixed(2),
+          isRefund,
+          quality,
+        });
+      }
     }
 
     payouts.push({

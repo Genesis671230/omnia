@@ -91,9 +91,13 @@ test("parseCheckoutCsv: flags multi quality when two References land under one P
   const csv = [HEADER, ...rows].join("\n");
 
   const [payout] = parseCheckoutCsv(csv, "checkout.csv");
-  const tx = payout.transactions!.find((t) => t.ref === "7002")!;
-  assert.equal(tx.quality, "multi");
-  assert.equal(tx.netShare, 80.00);
+  const tx7002 = payout.transactions!.find((t) => t.ref === "7002")!;
+  const tx7003 = payout.transactions!.find((t) => t.ref === "7003")!;
+  assert.equal(tx7002.quality, "multi");
+  assert.equal(tx7003.quality, "multi");
+  assert.equal(tx7002.netShare, 40.00);
+  assert.equal(tx7003.netShare, 40.00);
+  assert.deepEqual(payout.orderRefs.slice().sort(), ["7002", "7003"]);
 });
 
 test("parseCheckoutCsv: throws on a mixed holding currency within one payout group instead of averaging", () => {
