@@ -20,6 +20,13 @@ create unique index if not exists bank_lines_dedupe_key_idx on bank_lines (dedup
 -- payouts: keep the uploaded filename for provenance
 alter table payouts add column if not exists source text;
 
+-- payouts: pre-AED-conversion total, for currencies quoted uniformly across
+-- the whole statement (Tabby/Tamara SAR & KWD files). Lets the reconciliation
+-- engine re-derive the AED amount using the bank's own quoted wire rate
+-- (parsed from the credit narration) instead of a static, drifting estimate.
+alter table payouts add column if not exists original_currency text;
+alter table payouts add column if not exists net_original      numeric;
+
 -- recon_lines: reconciliation engine state + audit fields.
 -- A credit AWAITING_PAYOUT has no payout yet — payout fields must be nullable.
 alter table recon_lines alter column payout_id drop not null;

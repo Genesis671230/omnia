@@ -23,6 +23,8 @@ export const PayoutsRepository = {
       txn_count: p.orderRefs.length,
       status: "uploaded",
       source: p.source,
+      original_currency: p.originalCurrency ?? null,
+      net_original: p.netOriginal ?? null,
     }));
     const { error } = await supabase.from("payouts").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(`payouts upsert failed: ${error.message}`);
@@ -68,12 +70,13 @@ export const PayoutsRepository = {
     {
       id: string; gateway: string; net_amount: number; gross_amount: number | null; fee_amount: number | null;
       source: string | null; status: string; order_refs: string[];
+      original_currency: string | null; net_original: number | null;
       transactions: { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number }[];
     }[]
   > {
     const { data: payouts, error } = await supabase
       .from("payouts")
-      .select("id, gateway, net_amount, gross_amount, fee_amount, source, status");
+      .select("id, gateway, net_amount, gross_amount, fee_amount, source, status, original_currency, net_original");
     if (error) throw new Error(`payouts select failed: ${error.message}`);
 
     const { data: txs, error: txErr } = await supabase

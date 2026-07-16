@@ -35,6 +35,13 @@ export type ParsedPayout = {
   source: string;
   notes: string;
   transactions?: PayoutTransactionShare[];
+  // Pre-AED-conversion total, kept only when the whole file was quoted in one
+  // non-AED currency (Tabby/Tamara SAR & KWD statements). The reconciliation
+  // engine uses this alongside the bank's own quoted wire rate — visible in
+  // the credit's narration — instead of trusting our static toAed() estimate,
+  // which can't track the bank's actual daily conversion spread.
+  originalCurrency?: string;
+  netOriginal?: number;
 };
 
 // ── Stripe: payout RECONCILIATION report (has automatic_payout_id) ───────────
@@ -305,6 +312,13 @@ function labelledValue(rows: SheetRows, label: RegExp): string {
 
 // ── Tamara: merchant statement .xlsx ─────────────────────────────────────────
 // Transaction block header: "Merchant Order ID" + "Total Payable to Merchant".
+// The KSA-store statement layout (sa.omniastores.ae) adds a separate
+// "Merchant Order Number" column carrying the real ref ("#SA3507"); its
+// "Merchant Order ID" instead holds Tamara's internal numeric id, which Excel
+// mangles into unusable scientific notation ("6.61169E+12") for large values.
+// The UAE-store layout has no such column, and "Merchant Order ID" there IS
+// the plain order number — so prefer "Merchant Order Number" when present,
+// falling back to "Merchant Order ID" otherwise.
 export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): ParsedPayout[] {
   for (const rows of sheetRows(buf)) {
     const h = rows.findIndex((r) => {
@@ -315,23 +329,31 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
     if (h === -1) continue;
 
     const header = rows[h].map((c) => c.trim().toLowerCase());
-    const jRef = header.findIndex((c) => c === "merchant order id");
+    const jRefNumber = header.findIndex((c) => c === "merchant order number");
+    const jRefId = header.findIndex((c) => c === "merchant order id");
+    const jRef = jRefNumber >= 0 ? jRefNumber : jRefId;
     const jNet = header.findIndex((c) => c.startsWith("total payable"));
     const jGross = header.findIndex((c) => c === "order amount");
     const jFees = header.findIndex((c) => c === "total fees");
     const jCcy = header.findIndex((c) => c === "currency");
     const jTamaraId = header.findIndex((c) => c === "tamara order id");
+    const jRefundId = header.findIndex((c) => c === "merchant refund id");
 
-    let net = 0, gross = 0, fees = 0, tx = 0;
+    let net = 0, gross = 0, fees = 0, tx = 0, netOriginal = 0;
     const orderRefs: string[] = [];
+    const currencies = new Set<string>();
     for (const r of rows.slice(h + 1)) {
       const ref = String(r[jRef] ?? "").trim();
       const tamaraId = jTamaraId >= 0 ? String(r[jTamaraId] ?? "").trim() : "";
       if (!ref || !tamaraId) continue; // skips blank + "Total" footer rows
-      const ccy = (jCcy >= 0 && r[jCcy]?.trim()) || "AED";
-      net += toAed(num(r[jNet]), ccy);
-      if (jGross >= 0) gross += toAed(num(r[jGross]), ccy);
-      if (jFees >= 0) fees += toAed(num(r[jFees]), ccy);
+      const isRefund = jRefundId >= 0 && String(r[jRefundId] ?? "").trim() !== "";
+      const sign = isRefund ? -1 : 1;
+      const ccy = ((jCcy >= 0 && r[jCcy]?.trim()) || "AED").toUpperCase();
+      currencies.add(ccy);
+      netOriginal += sign * Math.abs(num(r[jNet]));
+      net += sign * Math.abs(toAed(num(r[jNet]), ccy));
+      if (jGross >= 0) gross += sign * Math.abs(toAed(num(r[jGross]), ccy));
+      if (jFees >= 0) fees += Math.abs(toAed(num(r[jFees]), ccy));
       tx += 1;
       const clean = ref.replace(/^#/, "");
       if (clean && !orderRefs.includes(clean)) orderRefs.push(clean);
@@ -341,6 +363,7 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
     const statementId = labelledValue(rows, /^statement id$/i) ||
       filename.match(/([0-9a-f]{8}-[0-9a-f-]{27,})/i)?.[1] ||
       filename.replace(/\.[a-z]+$/i, "");
+    const originalCurrency = currencies.size === 1 ? [...currencies][0] : undefined;
     return [{
       id: `TAMARA-${statementId}`,
       provider: "Tamara",
@@ -350,6 +373,8 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       orderRefs,
       source: filename,
       notes: `${tx} captured events · statement ${labelledValue(rows, /^statement period$/i) || statementId}`,
+      originalCurrency: originalCurrency && originalCurrency !== "AED" ? originalCurrency : undefined,
+      netOriginal: originalCurrency && originalCurrency !== "AED" ? +netOriginal.toFixed(2) : undefined,
     }];
   }
   throw new Error("Tamara statement: transaction table (Merchant Order ID / Total Payable to Merchant) not found.");
@@ -374,17 +399,20 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
     const jCcy = header.findIndex((c) => c === "currency");
     const jType = header.findIndex((c) => c === "type");
 
-    let net = 0, gross = 0, fees = 0, sales = 0, refunds = 0;
+    let net = 0, gross = 0, fees = 0, sales = 0, refunds = 0, netOriginal = 0;
     const orderRefs: string[] = [];
+    const currencies = new Set<string>();
     for (const r of rows.slice(h + 1)) {
       const ref = String(r[jRef] ?? "").trim();
       // real rows: a short order-number token + a numeric net cell. Trailing
       // totals/disclaimer rows carry sentence text or an empty net — skip them.
       if (!ref || !/^#?[A-Za-z0-9-]{1,20}$/.test(ref)) continue;
       if (!/\d/.test(String(r[jNet] ?? ""))) continue;
-      const ccy = (jCcy >= 0 && r[jCcy]?.trim()) || "AED";
+      const ccy = ((jCcy >= 0 && r[jCcy]?.trim()) || "AED").toUpperCase();
+      currencies.add(ccy);
       const isRefund = jType >= 0 && /refund/i.test(String(r[jType] ?? ""));
       const sign = isRefund ? -1 : 1;
+      netOriginal += sign * Math.abs(num(r[jNet]));
       net += sign * Math.abs(toAed(num(r[jNet]), ccy));
       if (jGross >= 0) gross += sign * Math.abs(toAed(num(r[jGross]), ccy));
       if (jFees >= 0) fees += Math.abs(toAed(num(r[jFees]), ccy));
@@ -395,6 +423,7 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
     if (sales + refunds === 0) continue;
 
     const statementId = labelledValue(rows, /^statement\s*#$/i) || filename.replace(/\.[a-z]+$/i, "");
+    const originalCurrency = currencies.size === 1 ? [...currencies][0] : undefined;
     return [{
       id: statementId.toUpperCase().startsWith("TABBY") ? statementId : `TABBY-${statementId}`,
       provider: "Tabby",
@@ -404,6 +433,8 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       orderRefs,
       source: filename,
       notes: `${sales} sales, ${refunds} refunds · amounts converted to AED`,
+      originalCurrency: originalCurrency && originalCurrency !== "AED" ? originalCurrency : undefined,
+      netOriginal: originalCurrency && originalCurrency !== "AED" ? +netOriginal.toFixed(2) : undefined,
     }];
   }
   throw new Error("Tabby settlement report: table (Order Number / Transferred amount) not found.");

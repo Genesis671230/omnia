@@ -60,7 +60,10 @@ type ReconLine = {
   provider: string;
   confidence: string;
   bankAmount: number;
-  payout: { id: string; net: number; source: string | null } | null;
+  payout: {
+    id: string; net: number; source: string | null;
+    currency: string | null; fxRate: number | null; fxSource: "bank" | "estimate" | null;
+  } | null;
   variance: number;
   resolvedOrders: string[];
   unresolvedRefs: string[];
@@ -75,6 +78,7 @@ type ReconPayload = {
   documents: {
     bankStatement: boolean;
     missingPayouts: { provider: string; awaitingAmount: number }[];
+    range: { from: string | null; to: string | null; noStatementForRange: boolean } | null;
   };
 };
 
@@ -248,9 +252,25 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
         <div className="row-body">
           <p className="narr">{r.narration}</p>
           <div className="detail-grid">
+            <div><span>Date</span><b>{r.date}</b></div>
             <div><span>Bank credit</span><b>{aed2(r.bankAmount)}</b></div>
             <div><span>Payout net</span><b>{r.payout ? aed2(r.payout.net) : "—"}</b></div>
             <div><span>Variance</span><b style={{ color: Math.abs(r.variance) > 1 ? "var(--bad)" : "inherit" }}>{aed2(r.variance)}</b></div>
+            {r.payout?.currency && (
+              <div>
+                <span>FX rate applied</span>
+                <b>
+                  1 {r.payout.currency} = {r.payout.fxRate ?? "—"} AED
+                  {r.payout.fxSource && (
+                    <em className="conf" title={r.payout.fxSource === "bank"
+                      ? "Read straight from the bank's wire narration for this credit — the rate the bank actually applied"
+                      : "No rate quoted in the bank narration — falling back to our static estimate, which can drift from what the bank actually applied"}>
+                      {" "}{r.payout.fxSource === "bank" ? "bank-quoted" : "estimate"}
+                    </em>
+                  )}
+                </b>
+              </div>
+            )}
             <div><span>Orders resolved</span><b>{r.resolvedOrders.length ? r.resolvedOrders.map((o) => "#" + o).join(", ") : "—"}</b></div>
             {r.refundedOrders.length > 0 && (
               <div><span>Refunded (excluded from settled)</span><b>{r.refundedOrders.map((o) => "#" + o).join(", ")}</b></div>
@@ -397,12 +417,21 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
   const [syncing, setSyncing] = useState(false);
   const [tab, setTab] = useState("all");
   const [dashVersion, setDashVersion] = useState(0);
+  // Date-range filter for the reconciliation view + export — bank credit
+  // matching still runs over ALL data (a payout can straddle the boundary),
+  // only the displayed/exported lines are scoped to the window.
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const refresh = useCallback(async () => {
     setDashVersion((v) => v + 1);
     try {
+      const params = new URLSearchParams();
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
+      const qs = params.toString();
       const [r, o] = await Promise.all([
-        fetch("/api/reconcile").then((x) => x.json()),
+        fetch(`/api/reconcile${qs ? `?${qs}` : ""}`).then((x) => x.json()),
         fetch("/api/orders").then((x) => x.json()),
       ]);
       if (r.error) throw new Error(r.error);
@@ -413,7 +442,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fromDate, toDate]);
 
   // Bank credits and order status change as the persistent payout-sync
   // scheduler runs — poll so a founder watching this view sees settlements
@@ -513,19 +542,48 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         </div>
       </header>
 
+      {showReconContext && (
+        <div className="range-bar">
+          <label>From <input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} /></label>
+          <label>To <input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} /></label>
+          {(fromDate || toDate) && (
+            <button className="btn ghost" onClick={() => { setFromDate(""); setToDate(""); }}>Clear range</button>
+          )}
+          <a className="btn ghost" href={`/api/reconcile/export${(() => {
+            const p = new URLSearchParams();
+            if (fromDate) p.set("from", fromDate);
+            if (toDate) p.set("to", toDate);
+            const qs = p.toString();
+            return qs ? `?${qs}` : "";
+          })()}`}>
+            <FileChartColumn size={14} /> Export reconciliation
+          </a>
+        </div>
+      )}
+
       {/* Document checklist — what's missing before things can settle */}
-      {showReconContext && recon && (!recon.documents.bankStatement || recon.documents.missingPayouts.length > 0) && (
+      {showReconContext && recon && (
+        !recon.documents.bankStatement ||
+        recon.documents.missingPayouts.length > 0 ||
+        recon.documents.range?.noStatementForRange
+      ) && (
         <div className="docs">
           <span className="docs-title"><FileSpreadsheet size={13} /> Documents required</span>
           {!recon.documents.bankStatement && (
             <span className="doc-chip bad">✕ Bank statement — upload the daily statement (PDF or CSV, any bank) to start</span>
+          )}
+          {recon.documents.range?.noStatementForRange && (
+            <span className="doc-chip bad">
+              ✕ No bank statement covers {recon.documents.range.from ?? "the start"} → {recon.documents.range.to ?? "the end"} —
+              upload that period's statement, or widen the range
+            </span>
           )}
           {recon.documents.missingPayouts.map((d) => (
             <span key={d.provider} className="doc-chip warn">
               ✕ {d.provider} payout file · {aed(d.awaitingAmount)} waiting to be explained
             </span>
           ))}
-          {recon.documents.bankStatement && recon.documents.missingPayouts.length === 0 && (
+          {recon.documents.bankStatement && recon.documents.missingPayouts.length === 0 && !recon.documents.range?.noStatementForRange && (
             <span className="doc-chip ok">✓ All documents present</span>
           )}
         </div>
@@ -644,6 +702,11 @@ const CSS = `
   .doc-chip.bad { background: var(--bad-wash); color: var(--bad); }
   .doc-chip.warn { background: var(--warn-wash); color: var(--warn); }
   .doc-chip.ok { background: var(--ok-wash); color: var(--ok); }
+
+  .range-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+  .range-bar label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .range-bar input[type="date"] { border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; background: var(--card); color: var(--ink); }
+  .range-bar .btn { padding: 7px 12px; font-size: 12.5px; text-decoration: none; }
 
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }

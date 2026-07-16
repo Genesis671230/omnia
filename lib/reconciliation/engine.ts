@@ -16,6 +16,7 @@ import { BankRepository } from "@/lib/repositories/bank.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
+import { FX_TO_AED } from "@/lib/fx";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 const TOLERANCE_AED = 1.0;
@@ -32,7 +33,18 @@ export type ReconLine = {
   provider: string;
   confidence: string;
   bankAmount: number;
-  payout: { id: string; net: number; source: string | null } | null;
+  payout: {
+    id: string; net: number; source: string | null;
+    // Original-currency traceability (SAR/KWD Tabby & Tamara statements):
+    // which rate turned the payout's original-currency total into the AED
+    // `net` above, and whether it came from the bank's own quoted wire rate
+    // (authoritative — read from the matched credit's narration) or our
+    // static parse-time estimate (lib/fx.ts, used only when the narration
+    // doesn't quote one).
+    currency: string | null;
+    fxRate: number | null;
+    fxSource: "bank" | "estimate" | null;
+  } | null;
   variance: number;
   resolvedOrders: string[];
   unresolvedRefs: string[];
@@ -52,6 +64,47 @@ export type ReconLine = {
 function refCandidates(ref: string): string[] {
   const bare = ref.replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
   return bare === ref ? [ref] : [ref, bare];
+}
+
+// Cross-currency payouts (Tabby/Tamara SAR & KWD statements) are converted to
+// AED at parse time with a static estimate (lib/fx.ts) that can't track the
+// remitting bank's actual daily wire rate — a gap large enough to blow past
+// the amount-matching tolerance below and leave a real payout permanently
+// AWAITING_PAYOUT. Telex/wire narrations quote the rate the bank actually
+// used right in the text (e.g. "SAR/AED 0.958791"), so pull it from there and
+// prefer it over the static estimate whenever it's present.
+const BANK_FX_RATE_RE = /\b([A-Z]{3})\s*\/\s*AED\s*([\d.]+)/i;
+
+function bankQuotedRate(description: string, currency: string): number | null {
+  const m = BANK_FX_RATE_RE.exec(description || "");
+  if (!m || m[1].toUpperCase() !== currency.toUpperCase()) return null;
+  const rate = parseFloat(m[2]);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
+type PayoutWithRefs = Awaited<ReturnType<typeof PayoutsRepository.listWithRefs>>[number];
+
+type ExpectedNet = { net: number; currency: string | null; fxRate: number | null; fxSource: "bank" | "estimate" | null };
+
+// Expected AED net for this specific bank credit: the bank-quoted rate when
+// the credit's narration names one for the payout's original currency, else
+// the pre-converted static estimate (unchanged behavior for AED-native
+// payouts, or narrations without an embedded rate).
+function expectedNetFor(payout: PayoutWithRefs, credit: { description: string }): ExpectedNet {
+  if (payout.original_currency && payout.original_currency !== "AED" && payout.net_original != null) {
+    const rate = bankQuotedRate(credit.description, payout.original_currency);
+    if (rate) {
+      return { net: +(payout.net_original * rate).toFixed(2), currency: payout.original_currency, fxRate: rate, fxSource: "bank" };
+    }
+    const estimate = FX_TO_AED[payout.original_currency.toUpperCase()] ?? null;
+    return {
+      net: payout.net_amount,
+      currency: payout.original_currency,
+      fxRate: estimate,
+      fxSource: estimate != null ? "estimate" : null,
+    };
+  }
+  return { net: payout.net_amount, currency: null, fxRate: null, fxSource: null };
 }
 
 export async function runReconciliation(): Promise<ReconLine[]> {
@@ -80,11 +133,13 @@ export async function runReconciliation(): Promise<ReconLine[]> {
     const provider = credit.gateway_guess || "Unclassified";
 
     // a payout explains a credit when provider agrees AND net ≈ bank amount
+    // (expectedNetFor prefers the bank's own quoted wire rate over our static
+    // FX estimate, so cross-currency payouts still match precisely)
     const payout = payouts.find(
       (p) =>
         !claimedPayouts.has(p.id) &&
         p.gateway === provider &&
-        Math.abs(p.net_amount - credit.amount) <=
+        Math.abs(expectedNetFor(p, credit).net - credit.amount) <=
           Math.max(TOLERANCE_AED, credit.amount * 0.02),
     );
 
@@ -116,7 +171,8 @@ export async function runReconciliation(): Promise<ReconLine[]> {
     }
 
     claimedPayouts.add(payout.id);
-    const variance = +(Number(credit.amount) - Number(payout.net_amount)).toFixed(2);
+    const expected = expectedNetFor(payout, credit);
+    const variance = +(Number(credit.amount) - expected.net).toFixed(2);
 
     // per-ref refund/quality info, when the parser produced it (Stripe live
     // API + CSV uploads) — absent for older parsers (Telr/Tamara/Tabby/
@@ -158,7 +214,10 @@ export async function runReconciliation(): Promise<ReconLine[]> {
 
     lines.push({
       ...base,
-      payout: { id: payout.id, net: Number(payout.net_amount), source: payout.source },
+      payout: {
+        id: payout.id, net: expected.net, source: payout.source,
+        currency: expected.currency, fxRate: expected.fxRate, fxSource: expected.fxSource,
+      },
       variance,
       resolvedOrders,
       unresolvedRefs,
