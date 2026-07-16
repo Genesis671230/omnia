@@ -524,6 +524,7 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
     let net = 0, gross = 0, fees = 0, tx = 0, netOriginal = 0;
     const orderRefs: string[] = [];
     const currencies = new Set<string>();
+    const shareByRef = new Map<string, PayoutTransactionShare>();
     for (const r of rows.slice(h + 1)) {
       const ref = String(r[jRef] ?? "").trim();
       const tamaraId = jTamaraId >= 0 ? String(r[jTamaraId] ?? "").trim() : "";
@@ -532,13 +533,37 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       const sign = isRefund ? -1 : 1;
       const ccy = ((jCcy >= 0 && r[jCcy]?.trim()) || "AED").toUpperCase();
       currencies.add(ccy);
+      const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
+      const rowGrossAed = jGross >= 0 ? sign * Math.abs(toAed(num(r[jGross]), ccy)) : 0;
+      const rowFeeAed = jFees >= 0 ? Math.abs(toAed(num(r[jFees]), ccy)) : 0;
       netOriginal += sign * Math.abs(num(r[jNet]));
-      net += sign * Math.abs(toAed(num(r[jNet]), ccy));
-      if (jGross >= 0) gross += sign * Math.abs(toAed(num(r[jGross]), ccy));
-      if (jFees >= 0) fees += Math.abs(toAed(num(r[jFees]), ccy));
+      net += rowNetAed;
+      if (jGross >= 0) gross += rowGrossAed;
+      if (jFees >= 0) fees += rowFeeAed;
       tx += 1;
       const clean = ref.replace(/^#/, "");
       if (clean && !orderRefs.includes(clean)) orderRefs.push(clean);
+
+      if (clean) {
+        const prior = shareByRef.get(clean);
+        shareByRef.set(clean, prior
+          ? {
+              ref: clean,
+              netShare: +(prior.netShare + rowNetAed).toFixed(2),
+              grossShare: +(prior.grossShare + rowGrossAed).toFixed(2),
+              feeShare: +(prior.feeShare + rowFeeAed).toFixed(2),
+              isRefund: prior.isRefund || isRefund,
+              quality: "multi",
+            }
+          : {
+              ref: clean,
+              netShare: +rowNetAed.toFixed(2),
+              grossShare: +rowGrossAed.toFixed(2),
+              feeShare: +rowFeeAed.toFixed(2),
+              isRefund,
+              quality: isRefund ? "refund" : "clean",
+            });
+      }
     }
     if (tx === 0) continue;
 
@@ -555,6 +580,7 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       orderRefs,
       source: filename,
       notes: `${tx} captured events · statement ${labelledValue(rows, /^statement period$/i) || statementId}`,
+      transactions: [...shareByRef.values()],
       originalCurrency: originalCurrency && originalCurrency !== "AED" ? originalCurrency : undefined,
       netOriginal: originalCurrency && originalCurrency !== "AED" ? +netOriginal.toFixed(2) : undefined,
     }];
@@ -584,6 +610,7 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
     let net = 0, gross = 0, fees = 0, sales = 0, refunds = 0, netOriginal = 0;
     const orderRefs: string[] = [];
     const currencies = new Set<string>();
+    const shareByRef = new Map<string, PayoutTransactionShare>();
     for (const r of rows.slice(h + 1)) {
       const ref = String(r[jRef] ?? "").trim();
       // real rows: a short order-number token + a numeric net cell. Trailing
@@ -594,13 +621,37 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       currencies.add(ccy);
       const isRefund = jType >= 0 && /refund/i.test(String(r[jType] ?? ""));
       const sign = isRefund ? -1 : 1;
+      const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
+      const rowGrossAed = jGross >= 0 ? sign * Math.abs(toAed(num(r[jGross]), ccy)) : 0;
+      const rowFeeAed = jFees >= 0 ? Math.abs(toAed(num(r[jFees]), ccy)) : 0;
       netOriginal += sign * Math.abs(num(r[jNet]));
-      net += sign * Math.abs(toAed(num(r[jNet]), ccy));
-      if (jGross >= 0) gross += sign * Math.abs(toAed(num(r[jGross]), ccy));
-      if (jFees >= 0) fees += Math.abs(toAed(num(r[jFees]), ccy));
+      net += rowNetAed;
+      if (jGross >= 0) gross += rowGrossAed;
+      if (jFees >= 0) fees += rowFeeAed;
       if (isRefund) refunds += 1; else sales += 1;
       const clean = ref.replace(/^#/, "");
       if (clean && !orderRefs.includes(clean)) orderRefs.push(clean);
+
+      if (clean) {
+        const prior = shareByRef.get(clean);
+        shareByRef.set(clean, prior
+          ? {
+              ref: clean,
+              netShare: +(prior.netShare + rowNetAed).toFixed(2),
+              grossShare: +(prior.grossShare + rowGrossAed).toFixed(2),
+              feeShare: +(prior.feeShare + rowFeeAed).toFixed(2),
+              isRefund: prior.isRefund || isRefund,
+              quality: "multi",
+            }
+          : {
+              ref: clean,
+              netShare: +rowNetAed.toFixed(2),
+              grossShare: +rowGrossAed.toFixed(2),
+              feeShare: +rowFeeAed.toFixed(2),
+              isRefund,
+              quality: isRefund ? "refund" : "clean",
+            });
+      }
     }
     if (sales + refunds === 0) continue;
 
@@ -615,6 +666,7 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       orderRefs,
       source: filename,
       notes: `${sales} sales, ${refunds} refunds · amounts converted to AED`,
+      transactions: [...shareByRef.values()],
       originalCurrency: originalCurrency && originalCurrency !== "AED" ? originalCurrency : undefined,
       netOriginal: originalCurrency && originalCurrency !== "AED" ? +netOriginal.toFixed(2) : undefined,
     }];
