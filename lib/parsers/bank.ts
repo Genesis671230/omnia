@@ -37,6 +37,20 @@ const DEBIT_KINDS: [string, ParsedBankLine["kind"]][] = [
 ];
 
 const REF_RE = /\b((?:FT|DSZ|INSTQ)[A-Z0-9]{6,})\b/;
+const INVOICE_RE = /\bINVOICE\s*#?\s*(\d{3,})\b/i;
+
+// REF_RE (a bank wire code) wins when both are present — it's the bank's own
+// transaction id. INVOICE_RE is a fallback for narrations (COD/courier
+// remittances) that carry a human-legible invoice number but no wire code,
+// so the reconciliation UI shows something a founder recognizes instead of
+// an opaque row id.
+function extractReference(text: string): string {
+  const wire = REF_RE.exec(text)?.[1];
+  if (wire) return wire;
+  const inv = INVOICE_RE.exec(text)?.[1];
+  return inv ? `INV${inv}` : "";
+}
+
 const DATE_TOKEN_RE = /\b(\d{2})[/-](\d{2})[/-](\d{4})\b|\b(\d{4})-(\d{2})-(\d{2})\b/g;
 // amount then balance: amount may be signed and short ("-50", "-2.5"),
 // balance always carries exactly two decimals. Guard both sides so digits
@@ -153,7 +167,7 @@ function tryParseCsvStatement(text: string): ParsedStatement | null {
     const refCell = cols.reference != null ? (row[cols.reference] ?? "") : "";
     const reference =
       refCell.replace(/['"\s]/g, "").replace(/\\HCP$/i, "") ||
-      (REF_RE.exec(narration)?.[1] ?? "");
+      extractReference(narration);
 
     const debitRaw = cols.debit != null ? (row[cols.debit] ?? "").trim() : "";
     const creditRaw = cols.credit != null ? (row[cols.credit] ?? "").trim() : "";
@@ -208,7 +222,7 @@ function parseMergedText(raw: string): ParsedStatement | null {
       .replace(/^[ /|'-]+|[ /|'-]+$/g, "")
       .replace(/\s{2,}/g, " ")
       .trim();
-    const reference = REF_RE.exec(seg.slice(0, last.index))?.[1] ?? "";
+    const reference = extractReference(seg.slice(0, last.index));
     txs.push({ date, narration, reference, amount, raw: amountRaw });
   }
 
@@ -257,7 +271,7 @@ function parseLineOriented(raw: string): ParsedStatement | null {
     pending.push({
       date: toIsoDate(block),
       narration,
-      reference: REF_RE.exec(block)?.[1] ?? "",
+      reference: extractReference(block),
       amount,
       raw: m[1],
     });
