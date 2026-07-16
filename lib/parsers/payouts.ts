@@ -686,7 +686,6 @@ export function parsePayoutFile(
   const name = filename.toLowerCase();
   const isSheet = /\.(xls|xlsx)$/.test(name);
 
-  // sniff the first rows regardless of container format
   let sniff = "";
   try {
     sniff = sheetRows(buffer)
@@ -699,10 +698,16 @@ export function parsePayoutFile(
   }
 
   if (/PAYOUT\s*ID\s*\d/.test(sniff) || (sniff.includes("CARTID") && sniff.includes("NET"))) {
-    return parseTelrXls(buffer, filename); // XLSX.read handles the CSV rendering too
+    return parseTelrXls(buffer, filename);
   }
   if (sniff.includes("TAMARA")) return parseTamaraXlsx(buffer, filename);
   if (sniff.includes("TABBY") || sniff.includes("TRANSFERRED AMOUNT")) return parseTabbyXlsx(buffer, filename);
+  if (sniff.includes("ON TRACK DELIVERY") || hint === "COD") {
+    return isSheet ? parseCodXlsx(buffer, filename) : parseCodCsv(buffer.toString("utf8"), filename);
+  }
+  if ((sniff.includes("CLIENT ENTITY NAME") && sniff.includes("BREAKDOWN TYPE")) || hint === "Checkout") {
+    return parseCheckoutCsv(buffer.toString("utf8"), filename);
+  }
 
   if (!isSheet) {
     const text = buffer.toString("utf8");
@@ -711,11 +716,11 @@ export function parsePayoutFile(
       return parseStripeCsv(text, filename);
     }
     if (hint && hint !== "Unclassified") return parseGenericPayoutCsv(text, filename, hint);
-    throw new Error("Could not detect the payout format — pass a provider or use a Telr/Tamara/Tabby/Stripe export.");
+    throw new Error("Could not detect the payout format — pass a provider or use a Telr/Tamara/Tabby/Stripe/Checkout/COD export.");
   }
 
   if (hint === "Telr") return parseTelrXls(buffer, filename);
   if (hint === "Tamara") return parseTamaraXlsx(buffer, filename);
   if (hint === "Tabby") return parseTabbyXlsx(buffer, filename);
-  throw new Error("Unrecognised spreadsheet — expected a Telr payout, Tamara statement, or Tabby settlement report.");
+  throw new Error("Unrecognised spreadsheet — expected a Telr payout, Tamara statement, Tabby settlement report, or COD statement.");
 }
