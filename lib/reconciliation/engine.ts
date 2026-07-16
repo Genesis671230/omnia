@@ -107,25 +107,31 @@ function expectedNetFor(payout: PayoutWithRefs, credit: { description: string })
   return { net: payout.net_amount, currency: null, fxRate: null, fxSource: null };
 }
 
-export async function runReconciliation(): Promise<ReconLine[]> {
-  const [credits, payouts, orders] = await Promise.all([
-    BankRepository.listCredits(),
-    PayoutsRepository.listWithRefs(),
-    OrdersRepository.listAll(),
-  ]);
+export type BankCreditInput = {
+  id: string;
+  statement_date: string | null;
+  description: string;
+  reference: string;
+  amount: number;
+  gateway_guess: string | null;
+  confidence: string | null;
+};
 
+export type ComputeReconOrderInput = { order_number: string };
+
+export type ComputeReconInputs = {
+  credits: BankCreditInput[];
+  payouts: PayoutWithRefs[];
+  orders: ComputeReconOrderInput[];
+  confirmations: Map<string, { by: string; at: string }>;
+};
+
+// Pure: bank → payout → orders matching, no I/O. Split out of
+// runReconciliation() so it can be fixture-tested without a live database —
+// see tests/reconciliation/engine.test.ts.
+export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
+  const { credits, payouts, orders, confirmations } = inputs;
   const orderNumbers = new Set(orders.map((o) => o.order_number));
-
-  // existing confirmations survive recompute
-  const { data: existing } = await supabase
-    .from("recon_lines")
-    .select("bank_line_id, confirmed_by, confirmed_at");
-  const confirmations = new Map(
-    (existing ?? [])
-      .filter((r) => r.confirmed_by)
-      .map((r) => [r.bank_line_id, { by: r.confirmed_by, at: r.confirmed_at }]),
-  );
-
   const claimedPayouts = new Set<string>();
   const lines: ReconLine[] = [];
 
@@ -227,6 +233,26 @@ export async function runReconciliation(): Promise<ReconLine[]> {
     });
   }
 
+  return lines;
+}
+
+export async function runReconciliation(): Promise<ReconLine[]> {
+  const [credits, payouts, orders] = await Promise.all([
+    BankRepository.listCredits(),
+    PayoutsRepository.listWithRefs(),
+    OrdersRepository.listAll(),
+  ]);
+
+  const { data: existing } = await supabase
+    .from("recon_lines")
+    .select("bank_line_id, confirmed_by, confirmed_at");
+  const confirmations = new Map(
+    (existing ?? [])
+      .filter((r) => r.confirmed_by)
+      .map((r) => [r.bank_line_id, { by: r.confirmed_by, at: r.confirmed_at }]),
+  );
+
+  const lines = computeReconLines({ credits, payouts, orders, confirmations });
   await persistResults(lines, orders);
   return lines;
 }
