@@ -235,6 +235,86 @@ export function parseGenericPayoutCsv(text: string, filename: string, provider: 
   }];
 }
 
+// ── COD (On Track Delivery courier remittance): CSV or XLSX ──────────────
+// Column names vary by courier — kept generous on purpose, same spirit as
+// parseGenericPayoutCsv, but tuned to COD-specific vocabulary and able to
+// recover the invoice number from a banner row (couriers print "INVOICE
+// #16964" above the table, not in a clean column) or from the filename —
+// matching the bank narration's own "invoice 16964" reference so the two
+// sides can be matched by a founder at a glance.
+const COD_INVOICE_COL_RE = /^invoice\s*(no\.?|number|#)?$/i;
+const COD_INVOICE_BANNER_RE = /INVOICE\s*#?\s*(\d{3,})/i;
+const COD_REF_COL_RE = /^(order|order\s*no\.?|order\s*number|order\s*id|awb|awb\s*no\.?|tracking|tracking\s*no\.?|reference)$/i;
+const COD_AMOUNT_COL_RE = /^(cod\s*amount|amount\s*collected|collection\s*amount|net\s*amount|net|amount)$/i;
+
+function codInvoiceNumber(rawText: string, filename: string): string {
+  const banner = COD_INVOICE_BANNER_RE.exec(rawText)?.[1];
+  if (banner) return banner;
+  const fname = /(\d{3,})/.exec(filename)?.[1];
+  return fname ?? "UNKNOWN";
+}
+
+function parseCodRecords(records: Record<string, string>[], rawText: string, filename: string): ParsedPayout[] {
+  if (records.length === 0) throw new Error("Empty COD file");
+  const cols = Object.keys(records[0]);
+  const cInvoice = cols.find((c) => COD_INVOICE_COL_RE.test(c.trim()));
+  const cRef = cols.find((c) => COD_REF_COL_RE.test(c.trim()));
+  const cAmount = cols.find((c) => COD_AMOUNT_COL_RE.test(c.trim()));
+  if (!cAmount) throw new Error(`COD file: no amount column found in [${cols.join(", ")}]`);
+
+  let net = 0;
+  const orderRefs: string[] = [];
+  let invoiceFromColumn = "";
+  for (const row of records) {
+    const n = parseFloat((row[cAmount] || "0").replace(/,/g, ""));
+    if (!Number.isNaN(n)) net += n;
+    if (cRef && row[cRef]) {
+      const ref = row[cRef].replace(/^#/, "").trim();
+      if (ref && !orderRefs.includes(ref)) orderRefs.push(ref);
+    }
+    if (!invoiceFromColumn && cInvoice && row[cInvoice]) invoiceFromColumn = row[cInvoice].trim();
+  }
+
+  const invoiceNo = invoiceFromColumn || codInvoiceNumber(rawText.toUpperCase(), filename);
+  return [{
+    id: `COD-${invoiceNo}`,
+    provider: "COD",
+    net: +net.toFixed(2),
+    orderRefs,
+    source: filename,
+    notes: `${records.length} rows; amount column: ${cAmount}${cRef ? `, refs: ${cRef}` : ", no ref column found"}`,
+  }];
+}
+
+export function parseCodCsv(text: string, filename: string): ParsedPayout[] {
+  const records = toRecords(parseCsv(text));
+  return parseCodRecords(records, text, filename);
+}
+
+export function parseCodXlsx(buf: Buffer | ArrayBuffer, filename: string): ParsedPayout[] {
+  const buffer = buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
+  for (const rows of sheetRows(buffer)) {
+    const rawText = rows.slice(0, 40).map((r) => r.join(" ")).join("\n");
+    const headerIdx = rows.findIndex((r) => r.some((c) => COD_AMOUNT_COL_RE.test(c.trim())));
+    if (headerIdx === -1) continue;
+    const header = rows[headerIdx].map((c) => c.trim());
+    const records = rows.slice(headerIdx + 1)
+      .filter((r) => r.some((c) => c.trim() !== ""))
+      .map((r) => {
+        const rec: Record<string, string> = {};
+        header.forEach((h, i) => { rec[h] = r[i] ?? ""; });
+        return rec;
+      });
+    if (records.length === 0) continue;
+    try {
+      return parseCodRecords(records, rawText, filename);
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("COD statement: no header row with a recognizable amount column found.");
+}
+
 // ── Stripe: dashboard "transfers" export (ch_… rows, Net in converted ccy) ───
 function parseStripeTransfersCsv(records: Record<string, string>[], filename: string): ParsedPayout[] {
   let net = 0, gross = 0, fees = 0, charges = 0, refunds = 0;
