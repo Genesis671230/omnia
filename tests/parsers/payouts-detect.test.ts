@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as XLSX from "xlsx";
 import { parsePayoutFile } from "@/lib/parsers/payouts";
+
+function xlsxBuffer(rows: (string | number)[][]): Buffer {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
 
 test("parsePayoutFile: detects a COD file by 'ON TRACK DELIVERY' content even without a hint", () => {
   const csv = [
@@ -30,6 +38,29 @@ test("parsePayoutFile: detects a Checkout.com export by its header shape even wi
   const buf = Buffer.from(csv, "utf8");
 
   const [payout] = parsePayoutFile(buf, "checkout.csv");
+  assert.equal(payout.provider, "Checkout");
+});
+
+test("parsePayoutFile: a Checkout-shaped .xlsx throws an explicit 'must be a CSV' error instead of a confusing column error", () => {
+  const buf = xlsxBuffer([
+    ["Client Entity Name", "Currency Account ID", "Action Type", "Payment ID", "Processed On", "Holding Currency", "Holding Currency Amount", "Breakdown Type", "Reference"],
+    ["OmniaStores LLC", "ca_1", "Authorization", "pay_x", "2026-07-10 10:00:00", "AED", "100.00", "Authorization Fixed Fee", "#8001"],
+  ]);
+
+  assert.throws(
+    () => parsePayoutFile(buf, "checkout.xlsx"),
+    /must be a CSV/,
+  );
+});
+
+test("parsePayoutFile: routes to the Checkout parser via hint", () => {
+  const csv = [
+    "Client Entity Name,Currency Account ID,Action Type,Payment ID,Processed On,Holding Currency,Holding Currency Amount,Breakdown Type,Reference",
+    "OmniaStores LLC,ca_1,Authorization,pay_x,2026-07-10 10:00:00,AED,100.00,Authorization Fixed Fee,#8001",
+  ].join("\n");
+  const buf = Buffer.from(csv, "utf8");
+
+  const [payout] = parsePayoutFile(buf, "checkout.csv", "Checkout");
   assert.equal(payout.provider, "Checkout");
 });
 

@@ -56,6 +56,21 @@ test("parseCodXlsx: falls back to the filename for the invoice number when no ba
   assert.equal(payout.net, 500);
 });
 
+test("parseCodCsv: finds the header row after a banner line, extracts invoice number from the banner text", () => {
+  const csv = [
+    "ON TRACK DELIVERY SERVICES — INVOICE #16964",
+    "Order Number,COD Amount",
+    "5001,1230.50",
+    "5002,1231.50",
+  ].join("\n");
+
+  const [payout] = parseCodCsv(csv, "on-track-delivery.csv");
+
+  assert.equal(payout.id, "COD-16964");
+  assert.equal(payout.net, 2462.00); // hand-computed: 1230.50 + 1231.50
+  assert.deepEqual(payout.orderRefs, ["5001", "5002"]);
+});
+
 test("parseCodCsv: throws with the seen columns when no amount column is found", () => {
   const csv = ["Order Number,Notes", "5001,foo"].join("\n");
   assert.throws(

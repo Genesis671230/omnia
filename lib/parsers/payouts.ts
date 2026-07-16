@@ -287,7 +287,20 @@ function parseCodRecords(records: Record<string, string>[], rawText: string, fil
 }
 
 export function parseCodCsv(text: string, filename: string): ParsedPayout[] {
-  const records = toRecords(parseCsv(text));
+  const rows = parseCsv(text);
+  // Real courier CSVs sometimes carry a banner line ("...INVOICE #16964")
+  // above the real header row — find the row that actually looks like the
+  // header (has an amount-like column) instead of assuming row 0, mirroring
+  // parseCodXlsx's header-row scan. Falls back to row 0 so the "no amount
+  // column found" error still names whatever columns row 0 actually has.
+  const headerIdx = rows.findIndex((r) => r.some((c) => COD_AMOUNT_COL_RE.test(c.trim())));
+  const startIdx = headerIdx === -1 ? 0 : headerIdx;
+  const header = (rows[startIdx] ?? []).map((c) => c.trim().toLowerCase());
+  const records = rows.slice(startIdx + 1).map((r) => {
+    const rec: Record<string, string> = {};
+    header.forEach((h, i) => { rec[h] = (r[i] ?? "").trim(); });
+    return rec;
+  });
   return parseCodRecords(records, text, filename);
 }
 
@@ -706,6 +719,9 @@ export function parsePayoutFile(
     return isSheet ? parseCodXlsx(buffer, filename) : parseCodCsv(buffer.toString("utf8"), filename);
   }
   if ((sniff.includes("CLIENT ENTITY NAME") && sniff.includes("BREAKDOWN TYPE")) || hint === "Checkout") {
+    if (isSheet) {
+      throw new Error("Checkout settlement export must be a CSV — re-export it as CSV from the Checkout.com dashboard (spreadsheet parsing isn't supported for Checkout yet).");
+    }
     return parseCheckoutCsv(buffer.toString("utf8"), filename);
   }
 
