@@ -2,10 +2,15 @@
 
 /* Ad platform performance — campaign spend/conversions pulled from Meta,
    Google Ads, TikTok, and Snapchat (see lib/ad-sync.ts), shown per store next
-   to actual store revenue for the same window. Spend/conversions and store
-   revenue are two distinct, honestly-labeled numbers — never blended into a
-   single computed "true ROAS" (see docs/superpowers/specs/
-   2026-07-15-ad-platform-connectors-design.md). */
+   to actual store revenue for the same window.
+
+   Two ROAS figures are shown side by side and never averaged into one:
+   pixel ROAS is Meta's self-reported attribution, settled ROAS is money that
+   actually reached the store. The gap between them is the signal — this
+   connector was overcounting conversions 8x and would have reported 28.55x
+   against a real 4.76x (founder-approved reversal of the 2026-07-15 spec's
+   "never compute a true ROAS" rule; see
+   docs/superpowers/specs/2026-07-17-meta-ads-correctness-design.md). */
 
 import { CheckCircle2, Loader2, Megaphone, MousePointerClick, RefreshCcw, ShoppingCart, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -25,6 +30,16 @@ type StoreSummary = {
   conversion_value_aed: number;
   store_revenue_aed: number;
   order_count: number;
+  funnel: {
+    landing_page_views: number;
+    view_content: number;
+    add_to_cart: number;
+    initiate_checkout: number;
+    purchase: number;
+  };
+  cost_per_purchase_aed: number | null;
+  pixel_roas: number | null;
+  settled_roas: number | null;
 };
 
 type CampaignRow = {
@@ -152,6 +167,46 @@ function AdSyncBadge() {
   );
 }
 
+// The purchase funnel, with the drop-off between each stage. A stage that
+// loses 90%+ of the previous one is flagged — on live data view_content ->
+// add_to_cart drops 92%, which is where the AED 280/purchase is really going.
+function FunnelStrip({ s }: { s: StoreSummary }) {
+  const f = s.funnel;
+  const stages = [
+    { label: "Landing", value: f.landing_page_views },
+    { label: "Viewed", value: f.view_content },
+    { label: "Add to cart", value: f.add_to_cart },
+    { label: "Checkout", value: f.initiate_checkout },
+    { label: "Purchase", value: f.purchase },
+  ];
+  if (stages.every((st) => st.value === 0)) return null;
+
+  return (
+    <div className="funnel">
+      <div className="funnel-stages">
+        {stages.map((stage, idx) => {
+          const prev = idx > 0 ? stages[idx - 1].value : null;
+          const drop = prev && prev > 0 ? 1 - stage.value / prev : null;
+          return (
+            <div key={stage.label} className="funnel-stage">
+              <span className="funnel-label">{stage.label}</span>
+              <b className="mono">{num(stage.value)}</b>
+              {drop !== null && drop > 0 && (
+                <span className={drop >= 0.9 ? "funnel-drop bad" : "funnel-drop"}>−{(drop * 100).toFixed(0)}%</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="funnel-roas">
+        <span>Cost / purchase <b className="mono">{s.cost_per_purchase_aed !== null ? aed(s.cost_per_purchase_aed) : "—"}</b></span>
+        <span>ROAS (Meta pixel) <b className="mono">{s.pixel_roas !== null ? `${s.pixel_roas.toFixed(2)}x` : "—"}</b></span>
+        <span>ROAS (settled revenue) <b className="mono">{s.settled_roas !== null ? `${s.settled_roas.toFixed(2)}x` : "—"}</b></span>
+      </div>
+    </div>
+  );
+}
+
 export function MarketingPanel() {
   const [store, setStore] = useState("ALL");
   const [days, setDays] = useState(30);
@@ -219,6 +274,7 @@ export function MarketingPanel() {
                   <span className="metric-label"><ShoppingCart size={12} /> Actual store revenue</span>
                   <b>{aed(s.store_revenue_aed)} · {s.order_count} orders</b>
                 </div>
+                <FunnelStrip s={s} />
               </div>
             ))}
           </div>
@@ -288,6 +344,15 @@ const MARKETING_CSS = `
   .metric-label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
   .metric-row b { font-size: 13px; }
   .metric-row.revenue { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 2px; }
+  .funnel { border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 2px; display: flex; flex-direction: column; gap: 8px; }
+  .funnel-stages { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+  .funnel-stage { display: flex; flex-direction: column; gap: 1px; min-width: 60px; }
+  .funnel-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .funnel-stage b { font-size: 12.5px; }
+  .funnel-drop { font-size: 9.5px; color: var(--muted); }
+  .funnel-drop.bad { color: #c26a00; font-weight: 600; }
+  .funnel-roas { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--muted); }
+  .funnel-roas b { color: var(--ink); font-size: 12px; margin-left: 3px; }
   .panel { border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; background: var(--card); }
   .panel header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
   .panel header h2 { font-size: 16px; margin: 0; }
