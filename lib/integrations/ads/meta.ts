@@ -15,6 +15,7 @@
 // account/pixel setup and there is no single canonical "the" purchase type.
 
 import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
+import { normalizeAdAccountId } from "./account-id";
 
 const API_VERSION = "v21.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
@@ -27,14 +28,14 @@ function accountGroups(): MetaAccountGroup[] {
     groups.push({
       label: "main",
       accessToken: process.env.META_MAIN_ACCESS_TOKEN,
-      adAccountIds: process.env.META_MAIN_AD_ACCOUNT_IDS.split(",").map((s) => s.trim()).filter(Boolean),
+      adAccountIds: process.env.META_MAIN_AD_ACCOUNT_IDS.split(",").map(normalizeAdAccountId).filter(Boolean),
     });
   }
   if (process.env.META_KSA_ACCESS_TOKEN && process.env.META_KSA_AD_ACCOUNT_ID) {
     groups.push({
       label: "ksa",
       accessToken: process.env.META_KSA_ACCESS_TOKEN,
-      adAccountIds: [process.env.META_KSA_AD_ACCOUNT_ID],
+      adAccountIds: [normalizeAdAccountId(process.env.META_KSA_AD_ACCOUNT_ID)],
     });
   }
   return groups;
