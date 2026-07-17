@@ -17,6 +17,13 @@ export type NormalizedInsight = {
   clicks: number;
   conversions: number;
   conversionValue: number;
+  // Purchase-funnel stages. Optional because only Meta reports them today —
+  // Google/TikTok/Snap leave them undefined rather than fake a zero, and the
+  // repository coerces to 0 at the storage boundary.
+  landingPageViews?: number;
+  viewContent?: number;
+  addToCart?: number;
+  initiateCheckout?: number;
 };
 
 export type DateRange = { from: string; to: string }; // YYYY-MM-DD, inclusive

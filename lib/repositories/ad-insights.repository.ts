@@ -17,6 +17,10 @@ export type AdInsightRow = {
   clicks: number;
   conversions: number;
   conversion_value: number;
+  landing_page_views: number;
+  view_content: number;
+  add_to_cart: number;
+  initiate_checkout: number;
 };
 
 export const AdInsightsRepository = {
@@ -55,6 +59,10 @@ export const AdInsightsRepository = {
         clicks: r.clicks,
         conversions: r.conversions,
         conversion_value: r.conversionValue,
+        landing_page_views: r.landingPageViews ?? 0,
+        view_content: r.viewContent ?? 0,
+        add_to_cart: r.addToCart ?? 0,
+        initiate_checkout: r.initiateCheckout ?? 0,
         synced_at: new Date().toISOString(),
       };
     });
@@ -74,7 +82,7 @@ export const AdInsightsRepository = {
       supabase.from("ad_campaigns").select("id, platform, account_id, store_id, name, status"),
       supabase
         .from("ad_insights")
-        .select("campaign_id, date, spend, currency, impressions, clicks, conversions, conversion_value")
+        .select("campaign_id, date, spend, currency, impressions, clicks, conversions, conversion_value, landing_page_views, view_content, add_to_cart, initiate_checkout")
         .gte("date", fromDate)
         .lte("date", toDate)
         .limit(5000),
@@ -101,6 +109,10 @@ export const AdInsightsRepository = {
         clicks: Number(ins.clicks || 0),
         conversions: Number(ins.conversions || 0),
         conversion_value: Number(ins.conversion_value || 0),
+        landing_page_views: Number(ins.landing_page_views || 0),
+        view_content: Number(ins.view_content || 0),
+        add_to_cart: Number(ins.add_to_cart || 0),
+        initiate_checkout: Number(ins.initiate_checkout || 0),
       });
     }
     return rows;

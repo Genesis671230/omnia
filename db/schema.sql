@@ -223,3 +223,15 @@ create table if not exists zoho_sync_runs (
   error            text
 );
 create index if not exists zoho_sync_runs_started_idx on zoho_sync_runs (started_at desc);
+
+-- ad_insights: purchase-funnel stages. The founder's "actual money leads"
+-- means this funnel — the Meta accounts run no lead-gen campaigns at all
+-- (objectives are only OUTCOME_AWARENESS / LINK_CLICKS / OUTCOME_SALES).
+-- Live 30d shape: LPV 24,455 -> view_content 30,964 -> add_to_cart 2,442 ->
+-- initiate_checkout 756 -> purchase 653; the view_content -> add_to_cart step
+-- drops 92%, the largest weak spot. `purchase` maps to the existing
+-- conversions column. Only Meta populates these; other platforms store 0.
+alter table ad_insights add column if not exists landing_page_views integer not null default 0;
+alter table ad_insights add column if not exists view_content       integer not null default 0;
+alter table ad_insights add column if not exists add_to_cart        integer not null default 0;
+alter table ad_insights add column if not exists initiate_checkout  integer not null default 0;

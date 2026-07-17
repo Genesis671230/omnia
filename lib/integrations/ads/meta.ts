@@ -163,6 +163,10 @@ export async function fetchInsights(range: DateRange): Promise<NormalizedInsight
           clicks: Number(r.clicks || 0),
           conversions: pickCanonical(r.actions, FUNNEL_STAGES.purchase),
           conversionValue: pickCanonical(r.action_values, FUNNEL_STAGES.purchase),
+          landingPageViews: pickCanonical(r.actions, FUNNEL_STAGES.landing_page_views),
+          viewContent: pickCanonical(r.actions, FUNNEL_STAGES.view_content),
+          addToCart: pickCanonical(r.actions, FUNNEL_STAGES.add_to_cart),
+          initiateCheckout: pickCanonical(r.actions, FUNNEL_STAGES.initiate_checkout),
         });
       }
     }
