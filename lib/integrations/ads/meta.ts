@@ -13,7 +13,7 @@
 // the SAME conversion under many aliases, so we take the first canonical
 // alias present and never sum them — see FUNNEL_STAGES below for why.
 
-import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
+import type { AdPlatform, DateRange, NormalizedInsight, PlatformFetchResult } from "./types";
 import { normalizeAdAccountId } from "./account-id";
 
 const API_VERSION = "v21.0";
@@ -139,37 +139,52 @@ async function fetchCampaignStatuses(adAccountId: string, accessToken: string): 
   return map;
 }
 
-export async function fetchInsights(range: DateRange): Promise<NormalizedInsight[]> {
+export async function fetchInsights(range: DateRange): Promise<PlatformFetchResult> {
   const platform: AdPlatform = "meta";
   const out: NormalizedInsight[] = [];
+  const errors: string[] = [];
+  let attempted = 0;
 
   for (const group of accountGroups()) {
     for (const adAccountId of group.adAccountIds) {
-      const [rows, statuses] = await Promise.all([
-        fetchAdAccountInsights(adAccountId, group.accessToken, range),
-        fetchCampaignStatuses(adAccountId, group.accessToken),
-      ]);
-      for (const r of rows) {
-        out.push({
-          platform,
-          accountId: adAccountId,
-          campaignId: r.campaign_id,
-          campaignName: r.campaign_name,
-          campaignStatus: statuses.get(r.campaign_id) ?? "unknown",
-          date: r.date_start,
-          spend: Number(r.spend || 0),
-          currency: r.account_currency || "AED",
-          impressions: Number(r.impressions || 0),
-          clicks: Number(r.clicks || 0),
-          conversions: pickCanonical(r.actions, FUNNEL_STAGES.purchase),
-          conversionValue: pickCanonical(r.action_values, FUNNEL_STAGES.purchase),
-          landingPageViews: pickCanonical(r.actions, FUNNEL_STAGES.landing_page_views),
-          viewContent: pickCanonical(r.actions, FUNNEL_STAGES.view_content),
-          addToCart: pickCanonical(r.actions, FUNNEL_STAGES.add_to_cart),
-          initiateCheckout: pickCanonical(r.actions, FUNNEL_STAGES.initiate_checkout),
-        });
+      attempted++;
+      try {
+        const [rows, statuses] = await Promise.all([
+          fetchAdAccountInsights(adAccountId, group.accessToken, range),
+          fetchCampaignStatuses(adAccountId, group.accessToken),
+        ]);
+        for (const r of rows) {
+          out.push({
+            platform,
+            accountId: adAccountId,
+            campaignId: r.campaign_id,
+            campaignName: r.campaign_name,
+            campaignStatus: statuses.get(r.campaign_id) ?? "unknown",
+            date: r.date_start,
+            spend: Number(r.spend || 0),
+            currency: r.account_currency || "AED",
+            impressions: Number(r.impressions || 0),
+            clicks: Number(r.clicks || 0),
+            conversions: pickCanonical(r.actions, FUNNEL_STAGES.purchase),
+            conversionValue: pickCanonical(r.action_values, FUNNEL_STAGES.purchase),
+            landingPageViews: pickCanonical(r.actions, FUNNEL_STAGES.landing_page_views),
+            viewContent: pickCanonical(r.actions, FUNNEL_STAGES.view_content),
+            addToCart: pickCanonical(r.actions, FUNNEL_STAGES.add_to_cart),
+            initiateCheckout: pickCanonical(r.actions, FUNNEL_STAGES.initiate_checkout),
+          });
+        }
+      } catch (e) {
+        // One account's failure must never blank the others. act_3216294595244505
+        // is expected to fail until it's granted to the Main system user in
+        // Business Manager — the AED 182k account must keep flowing regardless.
+        errors.push(`act_${adAccountId}: ${(e as Error).message}`);
       }
     }
   }
-  return out;
+
+  // Every account failing is a real platform outage — surface it as a throw so
+  // the sync run records it, matching how the other connectors report failure.
+  if (attempted > 0 && errors.length === attempted) throw new Error(errors.join("; "));
+
+  return { insights: out, errors };
 }

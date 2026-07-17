@@ -3,7 +3,7 @@
 // Reference: https://business-api.tiktok.com/portal/docs?id=1738864928123970
 // (Reporting > Integrated Report). Long-lived access token, no refresh flow.
 
-import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
+import type { AdPlatform, DateRange, NormalizedInsight, PlatformFetchResult } from "./types";
 
 const BASE = "https://business-api.tiktok.com/open_api/v1.3";
 
@@ -49,8 +49,8 @@ async function fetchCampaignStatuses(advertiserId: string, accessToken: string):
   return map;
 }
 
-export async function fetchInsights(range: DateRange): Promise<NormalizedInsight[]> {
-  if (!tiktokConfigured()) return [];
+export async function fetchInsights(range: DateRange): Promise<PlatformFetchResult> {
+  if (!tiktokConfigured()) return { insights: [], errors: [] };
   const platform: AdPlatform = "tiktok";
   const advertiserId = process.env.TIKTOK_ADVERTISER_ID!;
   const accessToken = process.env.TIKTOK_ACCESS_TOKEN!;
@@ -107,5 +107,7 @@ export async function fetchInsights(range: DateRange): Promise<NormalizedInsight
     if (page >= totalPages || items.length === 0) break;
     page += 1;
   }
-  return out;
+    // Single-account platform: a failure here is a total platform failure, which
+  // this connector already signals by throwing. Hence errors is always empty.
+  return { insights: out, errors: [] };
 }

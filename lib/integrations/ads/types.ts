@@ -27,3 +27,14 @@ export type NormalizedInsight = {
 };
 
 export type DateRange = { from: string; to: string }; // YYYY-MM-DD, inclusive
+
+// A platform fetch can partially succeed: one ad account may fail (expired
+// permission, transient "Service temporarily unavailable" — both of which
+// Meta returns under normal operation) while its siblings return fine.
+// Errors travel alongside the rows so a single bad account cannot blank a
+// whole platform's data, and so the founder can still SEE which account
+// failed rather than silently losing it.
+export type PlatformFetchResult = {
+  insights: NormalizedInsight[];
+  errors: string[];
+};

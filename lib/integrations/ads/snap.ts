@@ -10,7 +10,7 @@
 // across Snap API versions before — verify against a live response during
 // setup rather than trusting this blindly.
 
-import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
+import type { AdPlatform, DateRange, NormalizedInsight, PlatformFetchResult } from "./types";
 
 const BASE = "https://adsapi.snapchat.com/v1";
 
@@ -55,8 +55,8 @@ async function fetchCampaignMeta(adAccountId: string, accessToken: string): Prom
   return map;
 }
 
-export async function fetchInsights(range: DateRange): Promise<NormalizedInsight[]> {
-  if (!snapConfigured()) return [];
+export async function fetchInsights(range: DateRange): Promise<PlatformFetchResult> {
+  if (!snapConfigured()) return { insights: [], errors: [] };
   const platform: AdPlatform = "snap";
   const adAccountId = process.env.SNAP_AD_ACCOUNT_ID!;
   const accessToken = process.env.SNAP_ACCESS_TOKEN!;
@@ -104,5 +104,7 @@ export async function fetchInsights(range: DateRange): Promise<NormalizedInsight
       });
     }
   }
-  return out;
+    // Single-account platform: a failure here is a total platform failure, which
+  // this connector already signals by throwing. Hence errors is always empty.
+  return { insights: out, errors: [] };
 }

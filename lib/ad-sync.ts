@@ -10,14 +10,14 @@ import { tiktokConfigured, fetchInsights as fetchTiktokInsights } from "@/lib/in
 import { snapConfigured, fetchInsights as fetchSnapInsights } from "@/lib/integrations/ads/snap";
 import { storeForAccount } from "@/lib/ads-accounts";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
-import type { NormalizedInsight, DateRange } from "@/lib/integrations/ads/types";
+import type { DateRange, PlatformFetchResult } from "@/lib/integrations/ads/types";
 
 export type AdPlatformSyncResult = { platform: string; fetched: number; saved: number; error?: string };
 
 type PlatformClient = {
   name: string;
   configured: () => boolean;
-  fetch: (range: DateRange) => Promise<NormalizedInsight[]>;
+  fetch: (range: DateRange) => Promise<PlatformFetchResult>;
 };
 
 const PLATFORMS: PlatformClient[] = [
@@ -39,10 +39,18 @@ export async function syncAdInsights(days = 2): Promise<AdPlatformSyncResult[]> 
   for (const platform of PLATFORMS) {
     if (!platform.configured()) continue;
     try {
-      const insights = await platform.fetch(range);
+      const { insights, errors } = await platform.fetch(range);
       const withStore = insights.map((i) => ({ ...i, store: storeForAccount(i.platform, i.accountId) }));
       const saved = await AdInsightsRepository.upsertInsights(withStore);
-      results.push({ platform: platform.name, fetched: insights.length, saved });
+      // Partial failures still save what worked, but the error rides along so
+      // the founder can see which account is broken instead of silently
+      // losing it from the totals.
+      results.push({
+        platform: platform.name,
+        fetched: insights.length,
+        saved,
+        error: errors.length > 0 ? errors.join("; ") : undefined,
+      });
     } catch (e) {
       results.push({ platform: platform.name, fetched: 0, saved: 0, error: (e as Error).message });
     }

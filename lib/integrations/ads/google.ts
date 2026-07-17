@@ -8,7 +8,7 @@
 // OAuth-shaped step in this connector; everything else is the same
 // "set it in .env once" model as the other platforms.
 
-import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
+import type { AdPlatform, DateRange, NormalizedInsight, PlatformFetchResult } from "./types";
 
 const API_VERSION = "v18";
 const BASE = `https://googleads.googleapis.com/${API_VERSION}`;
@@ -55,8 +55,8 @@ type GoogleAdsRow = {
   };
 };
 
-export async function fetchInsights(range: DateRange): Promise<NormalizedInsight[]> {
-  if (!googleAdsConfigured()) return [];
+export async function fetchInsights(range: DateRange): Promise<PlatformFetchResult> {
+  if (!googleAdsConfigured()) return { insights: [], errors: [] };
   const platform: AdPlatform = "google";
   const customerId = process.env.GOOGLE_ADS_CUSTOMER_ID!.replace(/-/g, "");
   const accessToken = await getAccessToken();
@@ -86,18 +86,23 @@ export async function fetchInsights(range: DateRange): Promise<NormalizedInsight
   const json = await res.json();
   const rows: GoogleAdsRow[] = json.results ?? [];
 
-  return rows.map((r) => ({
-    platform,
-    accountId: customerId,
-    campaignId: String(r.campaign.id),
-    campaignName: r.campaign.name,
-    campaignStatus: String(r.campaign.status || "unknown").toLowerCase(),
-    date: r.segments.date,
-    spend: Number(r.metrics.costMicros || 0) / 1_000_000,
-    currency: "AED",
-    impressions: Number(r.metrics.impressions || 0),
-    clicks: Number(r.metrics.clicks || 0),
-    conversions: Number(r.metrics.conversions || 0),
-    conversionValue: Number(r.metrics.conversionsValue || 0),
-  }));
+  // Single-account platform: a failure here is a total platform failure, which
+  // this connector already signals by throwing. Hence errors is always empty.
+  return {
+    insights: rows.map((r) => ({
+      platform,
+      accountId: customerId,
+      campaignId: String(r.campaign.id),
+      campaignName: r.campaign.name,
+      campaignStatus: String(r.campaign.status || "unknown").toLowerCase(),
+      date: r.segments.date,
+      spend: Number(r.metrics.costMicros || 0) / 1_000_000,
+      currency: "AED",
+      impressions: Number(r.metrics.impressions || 0),
+      clicks: Number(r.metrics.clicks || 0),
+      conversions: Number(r.metrics.conversions || 0),
+      conversionValue: Number(r.metrics.conversionsValue || 0),
+    })),
+    errors: [],
+  };
 }
