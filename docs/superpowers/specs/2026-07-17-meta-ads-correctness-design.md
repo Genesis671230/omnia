@@ -1,8 +1,22 @@
 # Meta Ads — Correctness & Funnel (Phase 1)
 
 Date: 2026-07-17
-Status: approved by founder, ready for implementation plan
+Status: **implemented and verified against live Meta** (commits 164b848..ae3f043)
+Plan: `docs/superpowers/plans/2026-07-17-meta-ads-correctness.md`
 Supersedes parts of: `2026-07-15-ad-platform-connectors-design.md`
+
+## Outcome (2026-07-17)
+
+First successful Meta sync in this project's history: **174 campaign-days saved**
+across all three accounts, every one store-mapped (no `UNKNOWN`). Verified numbers on
+a 7-day window — WOO **5.51x** pixel ROAS at AED 263.71/purchase, KSA **5.60x** at
+AED 235.36 — against the ~28x the old alias-summing would have reported. The 92%
+view→cart drop predicted from the 30-day probe reproduced at **93% (WOO) / 87% (KSA)**,
+confirming it is structural rather than one campaign misfiring.
+
+Two predictions in this spec proved wrong and are corrected in place below: the
+Business Manager grant was **not** needed, and TikTok remains dark (still the wrong
+credential, as expected). 41/41 tests pass; production build clean.
 
 ## Why this spec exists
 
@@ -142,10 +156,14 @@ remains minting KSA the same way.)
 `act_3216294595244505` ("OmniaStores 2026") is live — AED 1,586.71/30d — and tracked
 nowhere. Founder confirmed it maps to **WOO** as the second Main account.
 
-**Caveat:** the Main system-user token cannot reach it (it sees only its own account).
-It requires a Business Manager grant to the Main system user. With error isolation in
-place this is safe to attempt: without the grant that account reports an error and the
-other two keep flowing.
+**Caveat — predicted, then disproven (2026-07-17):** this spec expected the Main
+system-user token could not reach `act_3216294595244505`, because `/me/adaccounts`
+listed only one account for that token, and therefore that a Business Manager grant
+was needed. **That was wrong.** The account synced with no admin work at all:
+`/me/adaccounts` lists accounts the token's user *owns*, not every account it can read
+insights for. Reachability must be tested by calling the account's `/insights`
+endpoint directly. The error isolation in this spec is still warranted on its own
+merits (transient Meta failures are routine) — but it was not needed for this.
 
 Live accounts, last 30 days:
 
