@@ -1,101 +1,102 @@
-// Minimal order invoice PDF — generated on demand from Supabase order data,
-// not stored. Good enough for the founder to hand to a customer or courier.
+// Ontrack-style shipping invoice — a two-up label (the same block printed
+// twice per A4 page, matching the founder's own courier paperwork), not a
+// itemized tax invoice. Generated on demand, not stored; the founder edits
+// the prefilled fields in the UI before generating since street address and
+// a customer ID aren't captured anywhere in the synced order data today.
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-export type InvoiceOrder = {
-  order_number: string;
-  store_id: string;
-  order_date: string | null;
-  currency: string;
-  gross_original: number;
-  gross_aed: number;
-  gateway: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  city: string;
-  country: string;
+export type InvoiceFields = {
+  orderNumber: string;
+  invoiceNo: string;
+  customerId: string;
+  date: string; // display string, already formatted by the caller
+  customerName: string;
+  address1: string;
+  address2: string;
+  mobile: string;
+  additionalNotes: string;
+  remarks: string;
+  orderValue: number;
+  shipping: number;
+  total: number;
+  paid: string; // "Yes" / "No" / "COD" — free text, not a boolean, matches the source label
   courier: string;
-  tracking_number: string;
-  line_items: { title: string; sku: string; qty: number; total_aed: number }[];
+  currency: string;
 };
 
 // Helvetica/WinAnsi can only encode Latin-1-ish text — Omnia's customer
 // names and cities are often Arabic. Strip anything outside that range
 // rather than crash the whole invoice; the founder still gets a usable PDF.
 function winAnsiSafe(text: string): string {
-  const kept = Array.from(text).filter((ch) => ch.codePointAt(0)! <= 0xff).join("");
+  const kept = Array.from(text || "").filter((ch) => ch.codePointAt(0)! <= 0xff).join("");
   return kept.trim() || "—";
 }
 
-export async function buildInvoicePdf(o: InvoiceOrder): Promise<Uint8Array> {
+function drawBlock(page: import("pdf-lib").PDFPage, top: number, f: InvoiceFields, fonts: { bold: any; font: any }) {
+  const { bold, font } = fonts;
+  const ink = rgb(0.12, 0.11, 0.09);
+  const muted = rgb(0.5, 0.47, 0.43);
+  const gold = rgb(0.69, 0.51, 0.26);
+  const left = 48;
+  let y = top;
+
+  const draw = (text: string, opts: { size?: number; f?: any; color?: any; x?: number } = {}) => {
+    page.drawText(winAnsiSafe(text), { x: opts.x ?? left, y, size: opts.size ?? 10.5, font: opts.f ?? font, color: opts.color ?? ink });
+  };
+  const row = (label: string, value: string, opts: { size?: number } = {}) => {
+    draw(label, { f: bold, size: opts.size, color: muted });
+    draw(value, { x: left + 110, size: opts.size });
+    y -= 18;
+  };
+
+  draw("OMNIA STORES", { size: 16, f: bold, color: gold });
+  y -= 22;
+
+  row("Date:", f.date);
+  row("Customer ID:", f.customerId || "—");
+  row("Invoice No#", f.invoiceNo);
+  y -= 6;
+
+  draw("SHIP TO:", { f: bold, size: 9.5, color: muted });
+  y -= 16;
+  row("Name:", f.customerName || "—");
+  row("Address:", f.address1 || "—");
+  row("Address:", f.address2 || "—");
+  row("Mobile:", f.mobile || "—");
+  row("Courier:", f.courier || "—");
+  y -= 4;
+
+  draw("Additional Notes:", { f: bold, size: 9.5, color: muted });
+  y -= 14;
+  draw(f.additionalNotes || "—", { size: 9.5 });
+  y -= 22;
+
+  page.drawLine({ start: { x: left, y }, end: { x: 300, y }, thickness: 0.75, color: rgb(0.85, 0.81, 0.73) });
+  y -= 16;
+
+  const money = (v: number) => `${f.currency} ${v.toFixed(2)}`;
+  row("REMARKS", f.remarks || "—", { size: 9.5 });
+  row("ORDER VALUE", money(f.orderValue));
+  row("SHIPPING", money(f.shipping));
+  draw("TOTAL", { f: bold, color: ink });
+  draw(money(f.total), { x: left + 110, f: bold, color: gold });
+  y -= 18;
+  row("PAID", f.paid || "—");
+}
+
+export async function buildInvoicePdf(fields: InvoiceFields): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]); // A4
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  const ink = rgb(0.12, 0.11, 0.09);
-  const muted = rgb(0.54, 0.51, 0.46);
-  const gold = rgb(0.69, 0.51, 0.26);
 
-  let y = 800;
-  const left = 48;
-  const draw = (text: string, opts: { size?: number; f?: typeof font; color?: typeof ink; x?: number } = {}) => {
-    page.drawText(winAnsiSafe(text), { x: opts.x ?? left, y, size: opts.size ?? 10, font: opts.f ?? font, color: opts.color ?? ink });
-  };
-
-  draw("OMNIA STORES", { size: 20, f: bold, color: gold });
-  y -= 18;
-  draw(`Invoice · Order #${o.order_number}`, { size: 12, f: bold });
-  y -= 16;
-  draw(`Store ${o.store_id} · ${o.order_date ? new Date(o.order_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}`, { size: 9.5, color: muted });
-  y -= 30;
-
-  draw("Bill to", { size: 8.5, f: bold, color: muted });
-  y -= 13;
-  draw(o.customer_name || "—", { size: 11 });
-  y -= 13;
-  if (o.customer_email) { draw(o.customer_email, { size: 9.5, color: muted }); y -= 12; }
-  if (o.customer_phone) { draw(o.customer_phone, { size: 9.5, color: muted }); y -= 12; }
-  const place = [o.city, o.country].filter(Boolean).join(", ");
-  if (place) { draw(place, { size: 9.5, color: muted }); y -= 12; }
-  y -= 12;
-
-  draw("Payment", { size: 8.5, f: bold, color: muted, x: 340 });
-  page.drawText(winAnsiSafe(o.gateway), { x: 340, y: y + 12, size: 10, font, color: ink });
-  if (o.courier) {
-    page.drawText("Courier", { x: 340, y: y - 2, size: 8.5, font: bold, color: muted });
-    page.drawText(winAnsiSafe(`${o.courier}${o.tracking_number ? ` · ${o.tracking_number}` : ""}`), { x: 340, y: y - 14, size: 9.5, font, color: ink });
-  }
-  y -= 30;
-
-  // table header
-  page.drawLine({ start: { x: left, y }, end: { x: 547, y }, thickness: 0.75, color: rgb(0.85, 0.81, 0.73) });
-  y -= 16;
-  draw("ITEM", { size: 8, f: bold, color: muted });
-  draw("QTY", { size: 8, f: bold, color: muted, x: 430 });
-  draw("TOTAL (AED)", { size: 8, f: bold, color: muted, x: 470 });
-  y -= 12;
-  page.drawLine({ start: { x: left, y }, end: { x: 547, y }, thickness: 0.75, color: rgb(0.85, 0.81, 0.73) });
-  y -= 16;
-
-  for (const li of o.line_items.slice(0, 20)) {
-    const title = li.title.length > 55 ? li.title.slice(0, 52) + "…" : li.title;
-    draw(title, { size: 9.5 });
-    draw(String(li.qty), { size: 9.5, x: 430 });
-    draw(li.total_aed.toFixed(2), { size: 9.5, x: 470 });
-    y -= 16;
-    if (y < 100) break;
-  }
-
-  y -= 8;
-  page.drawLine({ start: { x: 340, y }, end: { x: 547, y }, thickness: 0.75, color: rgb(0.85, 0.81, 0.73) });
-  y -= 18;
-  draw("TOTAL", { size: 11, f: bold, x: 340 });
-  draw(`AED ${o.gross_aed.toFixed(2)}`, { size: 13, f: bold, x: 430, color: gold });
-
-  y = 60;
-  draw("Generated by Omnia Finance OS — bank-grounded settlement records.", { size: 7.5, color: muted });
+  // Two-up: the identical block printed twice per page, top and bottom half,
+  // matching the founder's existing Ontrack courier paperwork so it can be
+  // cut in half and one copy kept, one copy travels with the shipment.
+  drawBlock(page, 800, fields, { bold, font });
+  page.drawLine({ start: { x: 20, y: 421 }, end: { x: 575, y: 421 }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8), dashArray: [3, 3] });
+  drawBlock(page, 400, fields, { bold, font });
 
   return doc.save();
 }

@@ -33,6 +33,8 @@ import { DocumentsPanel } from "@/components/finance/documents-panel";
 import { ReportsPanel } from "@/components/finance/reports-panel";
 import { MarketingPanel } from "@/components/finance/marketing-panel";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
+import { OrdersLedger } from "@/components/finance/orders-ledger";
+import type { OrderRow } from "@/lib/types/orders";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
@@ -82,40 +84,12 @@ type ReconPayload = {
   };
 };
 
-type OrderRow = {
-  uid: string;
-  store_id: string;
-  order_number: string;
-  order_date: string | null;
-  customer_name: string;
-  city: string;
-  country: string;
-  currency: string;
-  gross_original: number;
-  gross_aed: number;
-  gateway: string;
-  gateway_raw: string;
-  financial_status: string;
-  fulfillment_status: string;
-  payout_id: string | null;
-  payout_status: string;
-  in_payout_file: boolean;
-  finance_status: "SETTLED" | "AWAITING_BANK" | "MISSING_PAYOUT" | "COD_PENDING";
-};
-
 const STATE_META = {
   SETTLED: { label: "Settled", tone: "ok", icon: Check },
   PAYOUT_VARIANCE: { label: "Variance", tone: "bad", icon: AlertTriangle },
   ORDERS_UNRESOLVED: { label: "Orders unresolved", tone: "warn", icon: HelpCircle },
-  AWAITING_PAYOUT: { label: "Awaiting payout", tone: "muted", icon: Clock },
+  AWAITING_PAYOUT: { label: "Awaiting payout", tone: "info", icon: Clock },
 } as const;
-
-const ORDER_STATUS_META: Record<OrderRow["finance_status"], { label: string; tone: string }> = {
-  SETTLED: { label: "Settled", tone: "ok" },
-  AWAITING_BANK: { label: "Awaiting bank", tone: "warn" },
-  MISSING_PAYOUT: { label: "Missing payout", tone: "muted" },
-  COD_PENDING: { label: "COD pending", tone: "muted" },
-};
 
 const aed = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(v);
@@ -286,19 +260,68 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
             </div>
           )}
 
+          {r.state === "PAYOUT_VARIANCE" && r.payout && (
+            <div className="note bad">
+              {(() => {
+                const surplus = r.variance > 0;
+                let cause: string;
+                if (r.payout.fxSource === "estimate") {
+                  cause = "the FX estimate used to convert this payout likely drifted from the bank's actual wire rate";
+                } else if (r.refundedOrders.length > 0) {
+                  cause = `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} on this payout may not net out the way expected`;
+                } else {
+                  cause = "a bank fee, rounding, or a partial settlement not reflected in the payout file";
+                }
+                return (
+                  <>
+                    Bank credited <b>{aed2(r.bankAmount)}</b> but the {r.provider} payout ({r.payout.id}) says <b>{aed2(r.payout.net)}</b> —
+                    a {surplus ? "surplus" : "shortfall"} of <b>{aed2(Math.abs(r.variance))}</b>. Likely cause: {cause}.
+                    Re-check the payout file's totals, or confirm this is expected before treating the credit as settled.
+                  </>
+                );
+              })()}
+            </div>
+          )}
           {r.state === "ORDERS_UNRESOLVED" && (
             <div className="note bad">
-              Payout net matches the bank, but order <b>#{r.unresolvedRefs.join(", #")}</b> {r.unresolvedRefs.length > 1 ? "aren't" : "isn't"} in the synced orders.
-              Run a sync (or widen the window) — this credit can't be called Settled until every order it pays for is accounted for.
+              {r.unresolvedRefs.length > 0 ? (
+                <>
+                  The {r.provider} payout {r.payout ? `(${r.payout.id}) ` : ""}net matches the bank, but order <b>#{r.unresolvedRefs.join(", #")}</b> {r.unresolvedRefs.length > 1 ? "aren't" : "isn't"} in the synced orders.
+                  Run a sync (or widen the window) — this credit can't be called Settled until every order it pays for is accounted for.
+                </>
+              ) : (
+                <>
+                  The {r.provider} payout {r.payout ? `(${r.payout.id}) ` : ""}net matches the bank, but it carries no chargeable order references —
+                  nothing to settle from this credit yet.
+                </>
+              )}
+            </div>
+          )}
+          {r.state === "SETTLED" && r.payout && (
+            <div className="note ok">
+              The {r.provider} payout ({r.payout.id}) net matches the bank credit exactly, and all {r.resolvedOrders.length} order{r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for.
+              {r.confirmedBy ? " Confirmed by the founder." : " Ready for founder confirmation."}
             </div>
           )}
           {r.state === "AWAITING_PAYOUT" && (
-            <div className="note muted">
+            <div className="note info">
               {r.confidence === "unknown"
                 ? "No classification rule matches this narration. Add a descriptor rule, then upload the payout file that explains it."
                 : r.confidence === "inferred"
                   ? `Provider inferred from the settlement bank, not confirmed. Upload the ${r.provider} payout file to prove which gateway and which orders this pays for.`
-                  : `Bank credit confirmed. Upload the ${r.provider} payout file to explain it and resolve its orders.`}
+                  : (() => {
+                      const statementNoun: Record<string, string> = {
+                        Tabby: "settlement report", Tamara: "merchant statement", COD: "remittance invoice",
+                        Stripe: "payout reconciliation report", Checkout: "settlement export", Telr: "payout file",
+                      };
+                      const noun = statementNoun[r.provider] ?? "payout file";
+                      return (
+                        <>
+                          Bank credit confirmed as {r.provider}
+                          {r.reference ? <> (ref <b>{r.reference}</b>)</> : null}. Upload the {r.provider} {noun} that explains it — the invoice/reference number visible here should match the file.
+                        </>
+                      );
+                    })()}
             </div>
           )}
 
@@ -326,69 +349,6 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
         </div>
       )}
     </div>
-  );
-}
-
-/* ── Orders ledger ──────────────────────────────────────────────────────── */
-
-function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading: boolean }) {
-  const [store, setStore] = useState("All");
-  const [q, setQ] = useState("");
-  const stores = ["All", "WA", "UAE", "KSA", "WOO"];
-  const rows = orders.filter((o) =>
-    (store === "All" || o.store_id === store) &&
-    `${o.order_number} ${o.customer_name} ${o.gateway}`.toLowerCase().includes(q.toLowerCase()),
-  );
-
-  if (loading) return <div className="empty"><Loader2 size={18} className="spin" /> Loading orders…</div>;
-  if (orders.length === 0) {
-    return (
-      <div className="empty">
-        No orders in Supabase yet. Hit <b>Sync stores</b> to pull WA / UAE / KSA Shopify and WooCommerce orders.
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="filters">
-        <input className="search" placeholder="Search number, customer, gateway…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="tabs" style={{ margin: 0 }}>
-          {stores.map((s, index) => (
-            <button key={`${s} ${index}`} className={store === s ? "tab on" : "tab"} onClick={() => setStore(s)}>{s}</button>
-          ))}
-        </div>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Order</th><th>Store</th><th>Customer</th><th>Gateway</th>
-              <th>Payout file</th><th>Bank</th><th>Status</th>
-              <th style={{ textAlign: "right" }}>AED</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((o) => {
-              const m = ORDER_STATUS_META[o.finance_status];
-              return (
-                <tr key={o.uid}>
-                  <td className="mono">#{o.order_number}</td>
-                  <td><span className="store-badge">{o.store_id}</span></td>
-                  <td dir="auto">{o.customer_name || "—"}</td>
-                  <td>{o.gateway}</td>
-                  <td>{o.in_payout_file ? <Check size={14} className="tick" /> : <span className="cross">✕</span>}</td>
-                  <td>{o.finance_status === "SETTLED" ? <Check size={14} className="tick" /> : <span className="cross">✕</span>}</td>
-                  <td><span className={`pill ${m.tone}`}>{m.label}</span></td>
-                  <td className="mono" style={{ textAlign: "right" }}>{aed2(Number(o.gross_aed))}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="table-note">{rows.length} of {orders.length} orders · settlement comes only from a bank-confirmed payout, never from the store's own "paid" flag.</p>
-    </>
   );
 }
 
@@ -592,7 +552,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       {showReconContext && (
         <div className="kpis">
           <Kpi label="Bank-confirmed settled" value={aed(sum(settled))} note={`${settled.length} of ${lines.length} credit lines`} tone="ok" />
-          <Kpi label="Awaiting payout file" value={aed(sum(buckets.awaiting))} note={`${buckets.awaiting.length} lines · money in transit`} tone="muted" />
+          <Kpi label="Awaiting payout file" value={aed(sum(buckets.awaiting))} note={`${buckets.awaiting.length} lines · money in transit`} tone="info" />
           <Kpi label="Orders settled" value={`${orders.filter((o) => o.finance_status === "SETTLED").length} / ${orders.length}`} note="stamped by bank-confirmed payouts" tone="ok" />
           <Kpi label="Exceptions" value={String(buckets.variance.length + buckets.unresolved.length)} note="variance or unresolved orders" tone={buckets.variance.length + buckets.unresolved.length ? "bad" : "muted"} />
         </div>
@@ -674,6 +634,7 @@ const CSS = `
     --gold: #B08343; --gold-deep: #6F5325; --gold-wash: #FBF3E6;
     --ok: #4B7A54; --ok-wash: #F0F5EF;
     --warn: #B0742E; --warn-wash: #FBF2E6;
+    --info: #2E6B7A; --info-wash: #E8F1F3;
     --bad: #A6472F; --bad-wash: #F9ECE7;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     color: var(--ink); background: var(--cream);
@@ -702,6 +663,7 @@ const CSS = `
   .doc-chip.bad { background: var(--bad-wash); color: var(--bad); }
   .doc-chip.warn { background: var(--warn-wash); color: var(--warn); }
   .doc-chip.ok { background: var(--ok-wash); color: var(--ok); }
+  .doc-chip.info { background: var(--info-wash); color: var(--info); }
 
   .range-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 22px; }
   .range-bar label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 500; }
@@ -714,6 +676,7 @@ const CSS = `
   .kpi-value { font-family: Georgia, serif; font-size: 26px; }
   .kpi-note { font-size: 11px; color: var(--muted); }
   .kpi.ok .kpi-value { color: var(--ok); } .kpi.bad .kpi-value { color: var(--bad); } .kpi.warn .kpi-value { color: var(--warn); }
+  .kpi.info .kpi-value { color: var(--info); }
 
   .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   .tab { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 15px; font-size: 13px; cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 7px; }
@@ -729,6 +692,7 @@ const CSS = `
   .row { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; transition: border-color .15s; }
   .row.ok { border-left: 3px solid var(--ok); } .row.bad { border-left: 3px solid var(--bad); }
   .row.warn { border-left: 3px solid var(--warn); } .row.muted { border-left: 3px solid var(--line-strong); }
+  .row.info { border-left: 3px solid var(--info); }
   .row-head { width: 100%; border: 0; background: transparent; cursor: pointer; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 20px; text-align: left; }
 
   .chain { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
@@ -743,6 +707,7 @@ const CSS = `
   .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 999px; font-weight: 500; }
   .pill.ok { background: var(--ok-wash); color: var(--ok); } .pill.bad { background: var(--bad-wash); color: var(--bad); }
   .pill.warn { background: var(--warn-wash); color: var(--warn); } .pill.muted { background: #F3EFE7; color: var(--muted); }
+  .pill.info { background: var(--info-wash); color: var(--info); }
   .chev { color: var(--muted); transition: transform .15s; }
 
   .row-body { padding: 4px 18px 18px; border-top: 1px solid var(--line); }
@@ -752,6 +717,8 @@ const CSS = `
   .detail-grid span { font-size: 11px; color: var(--muted); } .detail-grid b { font-size: 14px; font-weight: 600; }
   .note { font-size: 13px; line-height: 1.5; padding: 11px 14px; border-radius: 10px; margin-bottom: 14px; }
   .note.bad { background: var(--bad-wash); color: var(--bad); } .note.muted { background: #F3EFE7; color: var(--gold-deep); }
+  .note.info { background: var(--info-wash); color: var(--gold-deep); }
+  .note.ok { background: var(--ok-wash); color: var(--ok); }
 
   .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .btn { display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); }

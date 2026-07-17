@@ -28,7 +28,7 @@ export const OrdersRepository = {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url",
+          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at",
         )
         .order("order_date", { ascending: false })
         .range(from, from + PAGE - 1);
@@ -45,6 +45,7 @@ export const OrdersRepository = {
       payout_status: string;
       line_items: { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null }[];
       courier: string; tracking_number: string; tracking_url: string;
+      fulfillment_stage: string; fulfillment_stage_updated_at: string | null;
     }[];
   },
 
@@ -52,7 +53,7 @@ export const OrdersRepository = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url",
+        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at",
       )
       .eq("uid", uid)
       .single();
@@ -67,5 +68,16 @@ export const OrdersRepository = {
       .update({ payout_id: payoutId, payout_status: "settled" })
       .in("order_number", orderNumbers);
     if (error) throw new Error(`orders settle stamp failed: ${error.message}`);
+  },
+
+  async setFulfillmentStage(uid: string, stage: string, updatedBy: string) {
+    const { data, error } = await supabase
+      .from("orders")
+      .update({ fulfillment_stage: stage, fulfillment_stage_updated_at: new Date().toISOString(), fulfillment_stage_updated_by: updatedBy })
+      .eq("uid", uid)
+      .select("uid, fulfillment_stage, fulfillment_stage_updated_at")
+      .single();
+    if (error) throw new Error(`fulfillment stage update failed: ${error.message}`);
+    return data;
   },
 };

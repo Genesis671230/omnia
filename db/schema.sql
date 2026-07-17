@@ -50,6 +50,14 @@ alter table orders add column if not exists courier         text not null defaul
 alter table orders add column if not exists tracking_number text not null default '';
 alter table orders add column if not exists tracking_url    text not null default '';
 
+-- internal ops workflow, distinct from the store-synced fulfillment_status
+-- (which reflects Shopify/Woo, not the founder's own pack-and-ship process).
+-- Progression is one-directional in the UI (no back-arrow) but the column
+-- itself allows any value change, since an ops mistake needs to be correctable.
+alter table orders add column if not exists fulfillment_stage            text not null default 'processing';
+alter table orders add column if not exists fulfillment_stage_updated_at timestamptz;
+alter table orders add column if not exists fulfillment_stage_updated_by text not null default '';
+
 -- raw uploaded documents (bank statements + gateway payout files): the founder
 -- can re-download exactly what was ingested. Files are small; base64 in-row.
 create table if not exists uploaded_files (
