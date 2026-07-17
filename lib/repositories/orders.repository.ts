@@ -28,7 +28,7 @@ export const OrdersRepository = {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at",
+          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error",
         )
         .order("order_date", { ascending: false })
         .range(from, from + PAGE - 1);
@@ -46,6 +46,7 @@ export const OrdersRepository = {
       line_items: { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null }[];
       courier: string; tracking_number: string; tracking_url: string;
       fulfillment_stage: string; fulfillment_stage_updated_at: string | null;
+      awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
     }[];
   },
 
@@ -53,7 +54,7 @@ export const OrdersRepository = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at",
+        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error",
       )
       .eq("uid", uid)
       .single();
@@ -79,5 +80,24 @@ export const OrdersRepository = {
       .single();
     if (error) throw new Error(`fulfillment stage update failed: ${error.message}`);
     return data;
+  },
+
+  async recordShipmentSuccess(uid: string, awb: string, courier: string, labelUrl: string) {
+    const { data, error } = await supabase
+      .from("orders")
+      .update({
+        awb_number: awb, courier, label_url: labelUrl, shipped_at: new Date().toISOString(), ship_error: "",
+        fulfillment_stage: "shipped", fulfillment_stage_updated_at: new Date().toISOString(), fulfillment_stage_updated_by: "smsa-ship",
+      })
+      .eq("uid", uid)
+      .select("uid, awb_number, courier, label_url, shipped_at, fulfillment_stage")
+      .single();
+    if (error) throw new Error(`shipment record failed: ${error.message}`);
+    return data;
+  },
+
+  async recordShipmentError(uid: string, message: string) {
+    const { error } = await supabase.from("orders").update({ ship_error: message }).eq("uid", uid);
+    if (error) throw new Error(`ship_error write failed: ${error.message}`);
   },
 };

@@ -23,6 +23,10 @@ export type OrderRow = {
   courier: string;
   tracking_number: string;
   tracking_url: string;
+  awb_number: string;
+  shipped_at: string | null;
+  label_url: string;
+  ship_error: string;
   // line_items is deliberately absent — /api/orders strips it from the list
   // response (3700+ orders × line items is real payload weight). The order
   // ledger lazy-fetches it per-order via GET /api/orders/:uid on row expand.

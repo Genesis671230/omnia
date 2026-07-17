@@ -16,6 +16,17 @@ import { toast } from "sonner";
 import type { OrderRow } from "@/lib/types/orders";
 import { ORDER_STATUS_META } from "@/lib/types/orders";
 import { InvoiceModal, INVOICE_MODAL_CSS } from "@/components/finance/invoice-modal";
+import { ShipModal, SHIP_MODAL_CSS } from "@/components/finance/ship-modal";
+
+// A "Ship" button only makes sense for international orders (SMSA covers
+// KSA-domestic + beyond; Ontrack already handles UAE-local through the
+// store's own courier flow) that don't already have an AWB.
+function isShippable(o: OrderRow): boolean {
+  return (o.country || "").trim().toUpperCase() !== "AE" && !o.awb_number;
+}
+
+const formatOrderDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
 const aed2 = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", minimumFractionDigits: 2 }).format(v);
@@ -117,10 +128,11 @@ function StageTracker({ order, onChanged }: { order: OrderRow; onChanged: (stage
   );
 }
 
-function ExpandedOrder({ order, onStageChanged, onInvoice }: {
+function ExpandedOrder({ order, onStageChanged, onInvoice, onShip }: {
   order: OrderRow;
   onStageChanged: (stage: string) => void;
   onInvoice: () => void;
+  onShip: () => void;
 }) {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -190,9 +202,20 @@ function ExpandedOrder({ order, onStageChanged, onInvoice }: {
 
         <div className="expand-footer">
           <StageTracker order={order} onChanged={onStageChanged} />
-          <button className="btn primary small" onClick={onInvoice}>
-            <Printer size={13} /> Invoice
-          </button>
+          <div className="expand-actions">
+            {order.awb_number ? (
+              <a className="btn small" href={`/api/orders/${order.uid}/label`} target="_blank" rel="noreferrer">
+                <Truck size={13} /> AWB {order.awb_number}
+              </a>
+            ) : isShippable(order) ? (
+              <button className="btn small" onClick={onShip}>
+                <Truck size={13} /> Ship
+              </button>
+            ) : null}
+            <button className="btn primary small" onClick={onInvoice}>
+              <Printer size={13} /> Invoice
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -205,7 +228,10 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<OrderRow | null>(null);
-  const [stageOverrides, setStageOverrides] = useState<Record<string, string>>({});
+  const [shipFor, setShipFor] = useState<OrderRow | null>(null);
+  // Patches from status changes / a completed shipment, applied on top of
+  // the fetched order so the row updates in place without a full refetch.
+  const [overrides, setOverrides] = useState<Record<string, Partial<OrderRow>>>({});
 
   const stores = ["All", "WA", "UAE", "KSA", "WOO"];
   const locations = ["All locations", ...Object.keys(LOCATION_GROUPS)];
@@ -217,8 +243,8 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
     return haystack.includes(q.toLowerCase());
   }), [orders, store, location, q]);
 
-  const handleStageChanged = useCallback((uid: string, stage: string) => {
-    setStageOverrides((prev) => ({ ...prev, [uid]: stage }));
+  const patch = useCallback((uid: string, fields: Partial<OrderRow>) => {
+    setOverrides((prev) => ({ ...prev, [uid]: { ...prev[uid], ...fields } }));
   }, []);
 
   if (loading) return <div className="empty"><Loader2 size={18} className="spin" /> Loading orders…</div>;
@@ -249,8 +275,8 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
 
       <div className="order-cards">
         {rows.map((o) => {
-          const stage = stageOverrides[o.uid] ?? o.fulfillment_stage ?? "processing";
-          const displayOrder = { ...o, fulfillment_stage: stage };
+          const displayOrder = { ...o, ...overrides[o.uid] };
+          const stage = displayOrder.fulfillment_stage ?? "processing";
           const m = ORDER_STATUS_META[o.finance_status];
           const isOpen = expanded === o.uid;
           const group = locationGroupFor(o.city);
@@ -260,6 +286,7 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
                 <div className="oc-order">
                   <span className="mono">#{o.order_number}</span>
                   <span className="store-badge">{o.store_id}</span>
+                  <span className="oc-date">{formatOrderDate(o.order_date)}</span>
                 </div>
                 <div className="oc-customer" dir="auto">{o.customer_name || "—"}</div>
                 <div className="oc-location">
@@ -280,8 +307,9 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
                 {isOpen && (
                   <ExpandedOrder
                     order={displayOrder}
-                    onStageChanged={(newStage) => handleStageChanged(o.uid, newStage)}
+                    onStageChanged={(newStage) => patch(o.uid, { fulfillment_stage: newStage })}
                     onInvoice={() => setInvoiceFor(o)}
+                    onShip={() => setShipFor(displayOrder)}
                   />
                 )}
               </AnimatePresence>
@@ -293,9 +321,17 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
       <p className="table-note">{rows.length} of {orders.length} orders · settlement comes only from a bank-confirmed payout, never from the store's own "paid" flag.</p>
 
       {invoiceFor && <InvoiceModal order={invoiceFor} onClose={() => setInvoiceFor(null)} />}
+      {shipFor && (
+        <ShipModal
+          order={shipFor}
+          onClose={() => setShipFor(null)}
+          onShipped={(awb, labelUrl) => patch(shipFor.uid, { awb_number: awb, label_url: labelUrl, courier: "SMSA", fulfillment_stage: "shipped" })}
+        />
+      )}
 
       <style jsx global>{ORDERS_LEDGER_CSS}</style>
       <style jsx global>{INVOICE_MODAL_CSS}</style>
+      <style jsx global>{SHIP_MODAL_CSS}</style>
     </>
   );
 }
@@ -316,6 +352,7 @@ const ORDERS_LEDGER_CSS = `
   }
   .oc-order { display: flex; flex-direction: column; gap: 2px; }
   .oc-order .store-badge { width: fit-content; }
+  .oc-date { font-size: 10.5px; color: var(--muted); }
   .oc-customer { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .oc-location { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .oc-gateway { color: var(--muted); font-size: 12.5px; }
@@ -344,6 +381,7 @@ const ORDERS_LEDGER_CSS = `
   .quiet-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; padding: 8px 0; }
 
   .expand-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); gap: 16px; flex-wrap: wrap; }
+  .expand-actions { display: flex; gap: 8px; }
 
   .stage-tracker { display: flex; align-items: center; }
   .stage-item { display: flex; align-items: center; }

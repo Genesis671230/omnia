@@ -58,6 +58,15 @@ alter table orders add column if not exists fulfillment_stage            text no
 alter table orders add column if not exists fulfillment_stage_updated_at timestamptz;
 alter table orders add column if not exists fulfillment_stage_updated_by text not null default '';
 
+-- SMSA AWB issuance. `courier` above already exists (Shopify/Woo tracking);
+-- these are set only by the /ship endpoint. shipped_at is distinct from
+-- fulfillment_stage_updated_at — a stage change is a founder click, an AWB
+-- is an external system confirming the label was actually issued.
+alter table orders add column if not exists awb_number text not null default '';
+alter table orders add column if not exists shipped_at  timestamptz;
+alter table orders add column if not exists label_url   text not null default '';
+alter table orders add column if not exists ship_error  text not null default '';
+
 -- raw uploaded documents (bank statements + gateway payout files): the founder
 -- can re-download exactly what was ingested. Files are small; base64 in-row.
 create table if not exists uploaded_files (
