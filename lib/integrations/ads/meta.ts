@@ -9,10 +9,9 @@
 // rolled a new version by the time this runs live.
 //
 // "actions"/"action_values" are Meta's generic conversion-event arrays, keyed
-// by action_type (e.g. "omni_purchase", "onsite_web_purchase"). We sum every
-// action_type containing "purchase" as the pixel-conversion signal — this is
-// deliberately inclusive since Meta's exact action_type naming varies by
-// account/pixel setup and there is no single canonical "the" purchase type.
+// by action_type (e.g. "omni_purchase", "onsite_web_purchase"). Meta reports
+// the SAME conversion under many aliases, so we take the first canonical
+// alias present and never sum them — see FUNNEL_STAGES below for why.
 
 import type { AdPlatform, DateRange, NormalizedInsight } from "./types";
 import { normalizeAdAccountId } from "./account-id";
@@ -58,11 +57,35 @@ type MetaInsightRow = {
   account_currency?: string;
 };
 
-function sumPurchaseActions(actions: MetaAction[] | undefined): number {
+// Meta reports ONE conversion under MANY action_type aliases. On the live
+// account, eight aliases each report the same 653 purchases (verified
+// 2026-07-17). Summing anything matching "purchase" therefore reported 5,224
+// purchases and AED 5,222,860 — a pixel ROAS of 28.55x against a real 4.76x.
+//
+// The previous author's instinct was right (alias naming genuinely varies by
+// account and pixel setup); the remedy was what broke it. So: keep the
+// flexibility via a priority list, but take the FIRST alias present and NEVER
+// sum. omni_* leads every list because it is Meta's own cross-platform
+// DEDUPLICATED metric — their answer to "count this once".
+//
+// Aliases are not even value-identical: web_app_in_store_purchase reports
+// 87.05 where the others report 870462.12. There is no reading under which
+// summing them is correct.
+export const FUNNEL_STAGES = {
+  landing_page_views: ["landing_page_view", "omni_landing_page_view"],
+  view_content: ["omni_view_content", "view_content", "offsite_conversion.fb_pixel_view_content"],
+  add_to_cart: ["omni_add_to_cart", "add_to_cart", "offsite_conversion.fb_pixel_add_to_cart"],
+  initiate_checkout: ["omni_initiated_checkout", "initiate_checkout", "offsite_conversion.fb_pixel_initiate_checkout"],
+  purchase: ["omni_purchase", "offsite_conversion.fb_pixel_purchase", "purchase"],
+} as const;
+
+export function pickCanonical(actions: MetaAction[] | undefined, aliases: readonly string[]): number {
   if (!actions) return 0;
-  return actions
-    .filter((a) => a.action_type.toLowerCase().includes("purchase"))
-    .reduce((s, a) => s + Number(a.value || 0), 0);
+  for (const alias of aliases) {
+    const hit = actions.find((a) => a.action_type === alias);
+    if (hit) return Number(hit.value || 0);
+  }
+  return 0;
 }
 
 async function fetchAdAccountInsights(
@@ -138,8 +161,8 @@ export async function fetchInsights(range: DateRange): Promise<NormalizedInsight
           currency: r.account_currency || "AED",
           impressions: Number(r.impressions || 0),
           clicks: Number(r.clicks || 0),
-          conversions: sumPurchaseActions(r.actions),
-          conversionValue: sumPurchaseActions(r.action_values),
+          conversions: pickCanonical(r.actions, FUNNEL_STAGES.purchase),
+          conversionValue: pickCanonical(r.action_values, FUNNEL_STAGES.purchase),
         });
       }
     }
