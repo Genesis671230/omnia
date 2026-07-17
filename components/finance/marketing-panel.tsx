@@ -42,11 +42,14 @@ type CampaignRow = {
 
 type Summary = { window: { days: number; from: string; to: string; store: string }; stores: StoreSummary[]; campaigns: CampaignRow[] };
 
+type MetaToken = { label: string; type: string; valid: boolean; expiresAt: string | null; daysLeft: number | null };
+
 type SyncStatus = {
   meta: boolean;
   google: boolean;
   tiktok: boolean;
   snap: boolean;
+  metaTokens?: MetaToken[];
   lastRun: {
     trigger: string;
     finished_at: string | null;
@@ -115,18 +118,37 @@ function AdSyncBadge() {
     );
   };
 
+  // A Meta USER token expires on a fixed date and the sync just starts
+  // returning nothing — the KSA token's predecessor lapsed unnoticed and cost
+  // three weeks of data. Warn from 30 days out. SYSTEM_USER tokens never
+  // expire and never surface here.
+  const tokenWarnings = (status.metaTokens ?? []).filter((t) => !t.valid || (t.daysLeft !== null && t.daysLeft <= 30));
+
   return (
-    <div className="sync-badge">
-      <RefreshCcw size={12} />
-      <span>Ad sync {run?.finished_at ? `· last run ${timeAgo(run.finished_at)}` : "· no runs yet"}</span>
-      {chip("meta", status.meta)}
-      {chip("google", status.google)}
-      {chip("tiktok", status.tiktok)}
-      {chip("snap", status.snap)}
-      <button className="btn small" disabled={syncing} onClick={syncNow} style={{ marginLeft: "auto" }}>
-        {syncing ? <Loader2 size={12} className="spin" /> : <RefreshCcw size={12} />} Sync now
-      </button>
-    </div>
+    <>
+      <div className="sync-badge">
+        <RefreshCcw size={12} />
+        <span>Ad sync {run?.finished_at ? `· last run ${timeAgo(run.finished_at)}` : "· no runs yet"}</span>
+        {chip("meta", status.meta)}
+        {chip("google", status.google)}
+        {chip("tiktok", status.tiktok)}
+        {chip("snap", status.snap)}
+        <button className="btn small" disabled={syncing} onClick={syncNow} style={{ marginLeft: "auto" }}>
+          {syncing ? <Loader2 size={12} className="spin" /> : <RefreshCcw size={12} />} Sync now
+        </button>
+      </div>
+      {tokenWarnings.map((t) => (
+        <div key={t.label} className="token-warn">
+          <XCircle size={12} />
+          <span>
+            Meta <b>{t.label.toUpperCase()}</b> token{" "}
+            {!t.valid
+              ? "is invalid — campaign data for this account has stopped."
+              : `expires in ${t.daysLeft} day${t.daysLeft === 1 ? "" : "s"}. It's a ${t.type} token; a SYSTEM_USER token never expires.`}
+          </span>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -251,6 +273,9 @@ const MARKETING_CSS = `
   .sync-chip { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ink); }
   .sync-chip .ok { color: #1baf7a; }
   .sync-chip .bad { color: #d9534f; }
+  .token-warn { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #8a6d00; padding: 8px 12px; border: 1px solid #e8c37a; border-radius: 10px; background: #fdf6e6; }
+  .token-warn > svg { color: #c99700; flex-shrink: 0; }
+  .token-warn b { color: var(--ink); }
   .store-tabs { display: flex; gap: 8px; align-items: center; }
   .storetab { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
   .storetab.on { border-color: var(--gold); background: var(--gold-wash); color: var(--gold-deep); }

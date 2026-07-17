@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { metaConfigured } from "@/lib/integrations/ads/meta";
+import { metaConfigured, metaTokenStatus } from "@/lib/integrations/ads/meta";
 import { googleAdsConfigured } from "@/lib/integrations/ads/google";
 import { tiktokConfigured } from "@/lib/integrations/ads/tiktok";
 import { snapConfigured } from "@/lib/integrations/ads/snap";
@@ -12,12 +12,16 @@ export const maxDuration = 60;
 // the most recent run of the persistent ad-sync scheduler (manual or
 // automatic) so the UI can show founders when campaign data was last pulled.
 export async function GET() {
-  const lastRun = await AdSyncRunsRepository.getLatest();
+  const [lastRun, metaTokens] = await Promise.all([
+    AdSyncRunsRepository.getLatest(),
+    metaConfigured() ? metaTokenStatus() : Promise.resolve([]),
+  ]);
   return NextResponse.json({
     meta: metaConfigured(),
     google: googleAdsConfigured(),
     tiktok: tiktokConfigured(),
     snap: snapConfigured(),
+    metaTokens,
     lastRun,
   });
 }

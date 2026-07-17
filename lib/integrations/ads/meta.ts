@@ -44,6 +44,42 @@ export function metaConfigured(): boolean {
   return accountGroups().length > 0;
 }
 
+export type MetaTokenStatus = {
+  label: string;
+  type: string;
+  valid: boolean;
+  expiresAt: string | null; // null = never expires (SYSTEM_USER)
+  daysLeft: number | null;
+};
+
+// Meta tokens die silently: a USER token expires on a fixed date and the sync
+// simply starts returning nothing. The KSA token's predecessor lapsed on
+// 2026-06-26 and cost three weeks of data before anyone noticed. SYSTEM_USER
+// tokens (like Main's) never expire — that remains the real fix; this exists so
+// the current USER token cannot lapse unannounced.
+export async function metaTokenStatus(): Promise<MetaTokenStatus[]> {
+  const out: MetaTokenStatus[] = [];
+  for (const group of accountGroups()) {
+    try {
+      const qs = new URLSearchParams({ input_token: group.accessToken, access_token: group.accessToken });
+      const res = await fetch(`${BASE}/debug_token?${qs.toString()}`, { cache: "no-store" });
+      const json = await res.json();
+      const d = json.data ?? {};
+      const expiresAt = d.expires_at && d.expires_at > 0 ? new Date(d.expires_at * 1000) : null;
+      out.push({
+        label: group.label,
+        type: String(d.type ?? "unknown"),
+        valid: Boolean(d.is_valid),
+        expiresAt: expiresAt ? expiresAt.toISOString() : null,
+        daysLeft: expiresAt ? Math.floor((expiresAt.getTime() - Date.now()) / 86_400_000) : null,
+      });
+    } catch {
+      out.push({ label: group.label, type: "unknown", valid: false, expiresAt: null, daysLeft: null });
+    }
+  }
+  return out;
+}
+
 type MetaAction = { action_type: string; value: string };
 type MetaInsightRow = {
   campaign_id: string;
