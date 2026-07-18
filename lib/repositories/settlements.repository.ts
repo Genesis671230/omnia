@@ -125,4 +125,11 @@ export const SettlementsRepository = {
       .eq("id", id);
     if (error) throw new Error(`settlement_records publish update failed: ${error.message}`);
   },
+
+  async listByIds(ids: string[]): Promise<SettlementRecord[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase.from("settlement_records").select("*").in("id", ids);
+    if (error) throw new Error(`settlement_records select failed: ${error.message}`);
+    return (data ?? []) as SettlementRecord[];
+  },
 };

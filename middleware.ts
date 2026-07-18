@@ -4,7 +4,7 @@ import { SESSION_COOKIE } from "@/lib/auth-config";
 import { verifySession } from "@/lib/session";
 
 // Anything not matched by `config.matcher` below is public by default.
-const PUBLIC_PATHS = ["/login", "/api/login"];
+const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
