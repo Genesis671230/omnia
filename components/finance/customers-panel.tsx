@@ -15,11 +15,13 @@ import {
   Loader2, Calendar, ShoppingBag, TrendingUp, HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ORDER_STATUS_META, type OrderRow } from "@/lib/types/orders";
 
 type CustomerOrder = {
   uid: string; order_number: string; store_id: string; order_date: string | null;
   gross_aed: number; currency: string; gateway: string;
   financial_status: string; fulfillment_status: string;
+  finance_status: OrderRow["finance_status"]; fulfillment_stage: string;
 };
 
 type Customer = {
@@ -115,13 +117,15 @@ function CustomerDrawer({ c, onClose }: { c: Customer; onClose: () => void }) {
           <div className="cd-orders">
             {c.orders.map((o) => {
               const cancelled = CANCELLED.has(o.financial_status);
+              const financeMeta = ORDER_STATUS_META[o.finance_status];
               return (
                 <div key={o.uid} className="cd-order-row">
                   <span className="mono">#{o.order_number}</span>
                   <span className="store-badge">{o.store_id}</span>
                   <span className="cd-order-date">{dateFmt(o.order_date)}</span>
                   <span className="cd-order-gw">{o.gateway}</span>
-                  <span className={`pill ${cancelled ? "muted" : "ok"}`}>{cancelled ? o.financial_status : "counted"}</span>
+                  <span className="cd-order-stage">{o.fulfillment_stage}</span>
+                  <span className={`pill ${cancelled ? "muted" : financeMeta.tone}`}>{cancelled ? o.financial_status : financeMeta.label}</span>
                   <span className="mono cd-order-amt">{aed2(o.gross_aed)}</span>
                 </div>
               );
@@ -280,8 +284,9 @@ const CUSTOMERS_PANEL_CSS = `
   .cd-stats b { font-size: 15px; font-weight: 600; }
   .cd-h4 { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; padding: 14px 20px 8px; border-top: 1px solid var(--line); }
   .cd-orders { display: flex; flex-direction: column; padding: 0 20px 20px; }
-  .cd-order-row { display: grid; grid-template-columns: 70px 50px 1fr 90px 90px 90px; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .cd-order-row { display: grid; grid-template-columns: 70px 50px 1fr 80px 80px 90px 90px; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
   .cd-order-date { color: var(--muted); }
   .cd-order-gw { color: var(--muted); }
+  .cd-order-stage { color: var(--muted); text-transform: capitalize; font-size: 11.5px; }
   .cd-order-amt { text-align: right; font-weight: 600; }
 `;

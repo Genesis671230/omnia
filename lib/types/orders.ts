@@ -36,9 +36,15 @@ export type OrderRow = {
   finance_status: "SETTLED" | "AWAITING_BANK" | "MISSING_PAYOUT" | "COD_PENDING";
 };
 
+// MISSING_PAYOUT reads as "Processing" here deliberately — most rows in this
+// state are simply too new for a payout file to have arrived yet, and a
+// blunt "Missing payout" pill on every fresh order reads as broken at a
+// glance. The underlying finance_status value is unchanged; expand a row to
+// see the real settlement chain (order placed → payout file seen → bank
+// settled) via the Settlement tracker in ExpandedOrder.
 export const ORDER_STATUS_META: Record<OrderRow["finance_status"], { label: string; tone: string }> = {
   SETTLED: { label: "Settled", tone: "ok" },
   AWAITING_BANK: { label: "Awaiting bank", tone: "warn" },
-  MISSING_PAYOUT: { label: "Missing payout", tone: "muted" },
+  MISSING_PAYOUT: { label: "Processing", tone: "muted" },
   COD_PENDING: { label: "COD pending", tone: "muted" },
 };

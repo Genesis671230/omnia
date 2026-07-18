@@ -132,4 +132,18 @@ export const SettlementsRepository = {
     if (error) throw new Error(`settlement_records select failed: ${error.message}`);
     return (data ?? []) as SettlementRecord[];
   },
+
+  // For the order ledger's row-expand Settlement tracker — a single order
+  // has at most one settlement_records row (id is order_uid + bank_line_id,
+  // but an order settles via exactly one bank credit in practice).
+  async getByOrderUid(orderUid: string): Promise<SettlementRecord | null> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("*")
+      .eq("order_uid", orderUid)
+      .order("settlement_date", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`settlement_records select failed: ${error.message}`);
+    return (data && data[0]) as SettlementRecord | undefined ?? null;
+  },
 };

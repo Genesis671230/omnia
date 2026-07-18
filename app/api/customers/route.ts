@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
+import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
+import { computeFinanceStatuses } from "@/lib/orders-finance-status";
 
 // GET /api/customers — one aggregation pass over every order, grouped into
 // customers by email (fallback: normalized phone), ranked by lifetime spend.
@@ -63,10 +65,14 @@ export async function GET(request: Request) {
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [orders, insights] = await Promise.all([
+  const [orders, insights, payouts] = await Promise.all([
     OrdersRepository.listAll(),
     AdInsightsRepository.listInsights(from, to),
+    PayoutsRepository.listWithRefs(),
   ]);
+  const financeByUid = new Map(
+    computeFinanceStatuses(orders, payouts).map((o) => [o.uid, o]),
+  );
 
   type Group = {
     key: string;
@@ -130,6 +136,8 @@ export async function GET(request: Request) {
           uid: o.uid, order_number: o.order_number, store_id: o.store_id, order_date: o.order_date,
           gross_aed: o.gross_aed, currency: o.currency, gateway: o.gateway,
           financial_status: o.financial_status, fulfillment_status: o.fulfillment_status,
+          finance_status: financeByUid.get(o.uid)?.finance_status ?? "MISSING_PAYOUT",
+          fulfillment_stage: o.fulfillment_stage || "processing",
         })),
     };
   });

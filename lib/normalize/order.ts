@@ -90,7 +90,10 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
     country: raw.shippingAddress?.countryCodeV2 || "",
     customer_name: raw.customer?.displayName || "",
     customer_email: raw.email || "",
-    customer_phone: raw.customer?.phone || "",
+    // shippingAddress.phone (entered at checkout) is filled far more often
+    // than customer.phone (Shopify's marketing-profile phone, opt-in only) —
+    // prefer it, falling back to the profile phone if checkout had none.
+    customer_phone: raw.shippingAddress?.phone || raw.customer?.phone || "",
     source: "shopify",
     payout_status: "awaiting",
     updated_at: new Date().toISOString(),

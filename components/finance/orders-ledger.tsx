@@ -11,7 +11,7 @@
    which this always renders inside — so the --gold/--line/etc. tokens resolve
    in the arbitrary-value classes below. */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check, ChevronDown, Loader2, MapPin, Package, PackageCheck,
@@ -52,7 +52,50 @@ const STAGE_PILL: Record<string, string> = {
 };
 
 type LineItem = { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null };
-type OrderDetail = OrderRow & { line_items: LineItem[] };
+type OrderDetail = OrderRow & { line_items: LineItem[]; settled_at: string | null };
+
+function daysSince(iso: string | null): number {
+  if (!iso) return 0;
+  return Math.max(Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000), 0);
+}
+
+// The real settlement chain, shown on expand instead of a blunt collapsed-row
+// badge — a fresh order awaiting its payout file reads as "waiting Nd", not
+// as broken.
+function SettlementTracker({ order, settledAt }: { order: OrderRow; settledAt: string | null | undefined }) {
+  const payoutSeen = order.in_payout_file;
+  const settled = order.finance_status === "SETTLED";
+  const steps = [
+    { label: "Order placed", done: true, sub: formatOrderDate(order.order_date) },
+    { label: "Payout file seen", done: payoutSeen, sub: payoutSeen ? "✓" : `waiting ${daysSince(order.order_date)}d` },
+    { label: "Bank settled", done: settled, sub: settled && settledAt ? formatOrderDate(settledAt) : "—" },
+  ];
+  return (
+    <div>
+      <h4 className="mb-2.5 text-[10.5px] uppercase tracking-[.06em] text-[var(--muted)]">Settlement</h4>
+      <div className="flex items-center gap-2">
+        {steps.map((s, i) => (
+          <div key={s.label} className="flex items-center">
+            {i > 0 && <div className="mx-1 h-px w-6" style={{ background: s.done || steps[i - 1].done ? "var(--gold)" : "var(--line)" }} />}
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={`flex size-6 items-center justify-center rounded-full border-[1.5px] text-[10.5px] font-semibold ${
+                  s.done
+                    ? "border-[var(--gold)] bg-[var(--gold-wash)] text-[var(--gold-deep)]"
+                    : "border-[var(--line-strong)] bg-[var(--card)] text-[var(--muted)]"
+                }`}
+              >
+                {s.done ? <Check size={12} /> : i + 1}
+              </div>
+              <span className="whitespace-nowrap text-[10px] text-[var(--muted)]">{s.label}</span>
+              <span className="whitespace-nowrap text-[10.5px] font-medium">{s.sub}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StageTracker({ order, onChanged }: { order: OrderRow; onChanged: (stage: string) => void }) {
   const [updating, setUpdating] = useState<string | null>(null);
@@ -197,6 +240,10 @@ function ExpandedOrder({ order, onStageChanged, onInvoice, onShip }: {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="mt-[18px] border-t border-dashed border-[var(--line)] pt-4">
+          <SettlementTracker order={order} settledAt={detail?.settled_at} />
         </div>
 
         <div className="mt-[18px] flex flex-wrap items-center justify-between gap-4 border-t border-dashed border-[var(--line)] pt-4">
