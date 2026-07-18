@@ -19,7 +19,7 @@ export function zohoConfigured(): boolean {
   );
 }
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   const res = await fetch(`${ACCOUNTS_BASE}/oauth/v2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -106,4 +106,62 @@ export type ZohoInvoice = {
 export async function fetchZohoInvoices(): Promise<ZohoInvoice[]> {
   const accessToken = await getAccessToken();
   return zohoGetPaginated<ZohoInvoice>("/invoices", "invoices", accessToken);
+}
+
+const INVENTORY_BASE = API_BASE; // https://www.zohoapis.com/inventory/v1 — same base, customerpayments lives here too
+
+export function zohoPaymentModeFor(gateway: string): string {
+  const map: Record<string, string> = {
+    COD: "Cash on Delivery",
+  };
+  return map[gateway] ?? "Bank Transfer";
+}
+
+export type ZohoCustomerPaymentInput = {
+  invoiceReferenceNumber: string; // matches Omnia's order_number
+  amount: number;
+  gateway: string;
+  bankReference: string;
+};
+
+// Finds the Zoho invoice whose reference_number matches our order_number,
+// then records a Customer Payment against it via the Inventory API (the
+// Books API 401s under this token's ZohoInventory.fullaccess.all scope,
+// but /inventory/v1/customerpayments works — verified live against the org).
+export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput): Promise<{ payment_id: string }> {
+  const accessToken = await getAccessToken();
+  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+
+  const invoiceQs = new URLSearchParams({ organization_id: orgId, reference_number: input.invoiceReferenceNumber });
+  const invoiceRes = await fetch(`${INVENTORY_BASE}/invoices?${invoiceQs}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!invoiceRes.ok) throw new Error(`Zoho invoice lookup HTTP ${invoiceRes.status}`);
+  const invoiceJson = await invoiceRes.json();
+  const matches = invoiceJson.invoices ?? [];
+  if (matches.length === 0) throw new Error(`No Zoho invoice found for reference_number ${input.invoiceReferenceNumber}`);
+  if (matches.length > 1) throw new Error(`Ambiguous Zoho invoice match for reference_number ${input.invoiceReferenceNumber} (${matches.length} results)`);
+  const invoice = matches[0];
+
+  const paymentRes = await fetch(`${INVENTORY_BASE}/customerpayments?organization_id=${orgId}`, {
+    method: "POST",
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      customer_id: invoice.customer_id,
+      payment_mode: zohoPaymentModeFor(input.gateway),
+      amount: input.amount,
+      date: new Date().toISOString().slice(0, 10),
+      reference_number: input.bankReference,
+      invoices: [{ invoice_id: invoice.invoice_id, amount_applied: input.amount }],
+    }),
+    cache: "no-store",
+  });
+  if (!paymentRes.ok) {
+    const body = await paymentRes.text();
+    throw new Error(`Zoho customer payment HTTP ${paymentRes.status}: ${body.slice(0, 300)}`);
+  }
+  const paymentJson = await paymentRes.json();
+  if (paymentJson.code !== 0) throw new Error(`Zoho customer payment error ${paymentJson.code}: ${paymentJson.message}`);
+  return { payment_id: paymentJson.payment.payment_id };
 }
