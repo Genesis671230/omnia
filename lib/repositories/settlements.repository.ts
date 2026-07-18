@@ -118,6 +118,37 @@ export const SettlementsRepository = {
     return (data ?? []) as SettlementRecord[];
   },
 
+  // Atomically claims a settlement for publishing — the fix for the
+  // duplicate-payment race (two concurrent /publish calls, or a retry,
+  // both passing a "not yet published" check before either writes).
+  // Postgres serializes concurrent UPDATEs to the same row: if two calls
+  // race, the loser's WHERE no longer matches once the winner commits
+  // (zoho_payment_id is no longer null), so it gets zero rows back. Returns
+  // true iff THIS call won the race.
+  async claimForPublish(id: string, attemptId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .update({ zoho_payment_id: `CLAIMED:${attemptId}` })
+      .eq("id", id)
+      .eq("evidence_confirmed", true)
+      .is("zoho_payment_id", null)
+      .select("id");
+    if (error) throw new Error(`settlement_records claim failed: ${error.message}`);
+    return (data ?? []).length === 1;
+  },
+
+  // Releases a claim on a clean (non-ambiguous) Zoho failure so the
+  // settlement can be retried. Only clears OUR claim — never clobbers a
+  // completed publish or a different in-flight attempt.
+  async releaseClaim(id: string, attemptId: string): Promise<void> {
+    const { error } = await supabase
+      .from("settlement_records")
+      .update({ zoho_payment_id: null })
+      .eq("id", id)
+      .eq("zoho_payment_id", `CLAIMED:${attemptId}`);
+    if (error) throw new Error(`settlement_records release failed: ${error.message}`);
+  },
+
   async markPublished(id: string, zohoPaymentId: string): Promise<void> {
     const { error } = await supabase
       .from("settlement_records")

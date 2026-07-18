@@ -1,11 +1,16 @@
-// Zoho Inventory API client — read-only. Zoho Inventory and Zoho Books share
-// the same organization's items/sales orders/invoices when both apps are
-// linked to one org (confirmed live: org 721369942 "Omniastores LLC" has
-// AppList ["books","inventory"]), so the Inventory API surfaces both without
-// needing a separately-scoped Books OAuth grant.
+// Zoho Inventory API client. Zoho Inventory and Zoho Books share the same
+// organization's items/sales orders/invoices when both apps are linked to
+// one org (confirmed live: org 721369942 "Omniastores LLC" has AppList
+// ["books","inventory"]), so the Inventory API surfaces both without needing
+// a separately-scoped Books OAuth grant.
 //
-// Deliberately GET-only — there is no create/update/delete function in this
-// file. Reference: https://www.zoho.com/inventory/api/v1/
+// Every function here is read-only EXCEPT createZohoCustomerPayment, which
+// writes a real Customer Payment against a real invoice — callers must go
+// through the idempotency-safe claim flow in
+// app/api/settlements/publish/route.ts, never call it directly from a
+// retry loop. Reference: https://www.zoho.com/inventory/api/v1/
+
+import { normalizeRef } from "@/lib/inventory-compare";
 
 const ACCOUNTS_BASE = "https://accounts.zoho.com";
 const API_BASE = "https://www.zohoapis.com/inventory/v1";
@@ -108,11 +113,13 @@ export async function fetchZohoInvoices(): Promise<ZohoInvoice[]> {
   return zohoGetPaginated<ZohoInvoice>("/invoices", "invoices", accessToken);
 }
 
-const INVENTORY_BASE = API_BASE; // https://www.zohoapis.com/inventory/v1 — same base, customerpayments lives here too
-
 export function zohoPaymentModeFor(gateway: string): string {
   const map: Record<string, string> = {
     COD: "Cash on Delivery",
+    Stripe: "Stripe",
+    Tabby: "Tabby",
+    Tamara: "Tamara",
+    "Checkout.com": "Checkout.com",
   };
   return map[gateway] ?? "Bank Transfer";
 }
@@ -124,27 +131,78 @@ export type ZohoCustomerPaymentInput = {
   bankReference: string;
 };
 
-// Finds the Zoho invoice whose reference_number matches our order_number,
-// then records a Customer Payment against it via the Inventory API (the
-// Books API 401s under this token's ZohoInventory.fullaccess.all scope,
-// but /inventory/v1/customerpayments works — verified live against the org).
-export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput): Promise<{ payment_id: string }> {
-  const accessToken = await getAccessToken();
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+const AMOUNT_TOLERANCE_AED = 0.01; // absorbs FX-conversion rounding drift only
 
-  const invoiceQs = new URLSearchParams({ organization_id: orgId, reference_number: input.invoiceReferenceNumber });
-  const invoiceRes = await fetch(`${INVENTORY_BASE}/invoices?${invoiceQs}`, {
+type ZohoInvoiceListRow = {
+  invoice_id: string;
+  reference_number: string;
+  customer_id: string;
+  balance: number;
+};
+
+// Finds the Zoho invoice matching our order_number, tolerating Zoho's
+// reference-number formatting drift the same way lib/inventory-compare.ts's
+// findOrdersMissingFromZoho does: try Zoho's own server-side filter first
+// (fast path — works whenever formats already agree), and only fall back to
+// pulling the full invoice list and comparing normalizeRef()'d values when
+// the fast path finds nothing.
+async function findZohoInvoice(orderNumber: string, accessToken: string, orgId: string): Promise<ZohoInvoiceListRow> {
+  const normalized = normalizeRef(orderNumber);
+  const invoiceQs = new URLSearchParams({ organization_id: orgId, reference_number: orderNumber });
+  const invoiceRes = await fetch(`${API_BASE}/invoices?${invoiceQs}`, {
     headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
     cache: "no-store",
   });
   if (!invoiceRes.ok) throw new Error(`Zoho invoice lookup HTTP ${invoiceRes.status}`);
   const invoiceJson = await invoiceRes.json();
-  const matches = invoiceJson.invoices ?? [];
-  if (matches.length === 0) throw new Error(`No Zoho invoice found for reference_number ${input.invoiceReferenceNumber}`);
-  if (matches.length > 1) throw new Error(`Ambiguous Zoho invoice match for reference_number ${input.invoiceReferenceNumber} (${matches.length} results)`);
-  const invoice = matches[0];
+  let matches: ZohoInvoiceListRow[] = (invoiceJson.invoices ?? []).filter(
+    (inv: ZohoInvoiceListRow) => normalizeRef(inv.reference_number || "") === normalized,
+  );
+  if (matches.length === 0) {
+    const all = await zohoGetPaginated<ZohoInvoiceListRow>("/invoices", "invoices", accessToken);
+    matches = all.filter((inv) => normalizeRef(inv.reference_number || "") === normalized);
+  }
+  if (matches.length === 0) throw new Error(`No Zoho invoice found for reference_number ${orderNumber}`);
+  if (matches.length > 1) throw new Error(`Ambiguous Zoho invoice match for reference_number ${orderNumber} (${matches.length} results)`);
+  return matches[0];
+}
 
-  const paymentRes = await fetch(`${INVENTORY_BASE}/customerpayments?organization_id=${orgId}`, {
+// Records a Customer Payment against the matched invoice via the Inventory
+// API (the Books API 401s under this token's ZohoInventory.fullaccess.all
+// scope, but /inventory/v1/customerpayments works — verified live against
+// the org). `accessToken` is threaded in by the caller (fetched once per
+// publish batch, not once per settlement) rather than fetched here.
+//
+// Defense-in-depth dedup: checks the matched invoice's own payment history
+// for one already carrying this bank_reference before creating a new
+// payment — covers the case where a prior attempt's Zoho write actually
+// succeeded but the caller's own DB write failed (timeout/5xx), which the
+// route's claim mechanism alone can't distinguish from "never attempted".
+export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput, accessToken: string): Promise<{ payment_id: string }> {
+  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const invoice = await findZohoInvoice(input.invoiceReferenceNumber, accessToken, orgId);
+
+  const detailRes = await fetch(`${API_BASE}/invoices/${invoice.invoice_id}?organization_id=${orgId}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!detailRes.ok) throw new Error(`Zoho invoice detail HTTP ${detailRes.status}`);
+  const detailJson = await detailRes.json();
+  const invoiceDetail = detailJson.invoice ?? invoice;
+  const existingPayment = (invoiceDetail.payments ?? []).find(
+    (p: { reference_number?: string; payment_id: string }) => normalizeRef(p.reference_number || "") === normalizeRef(input.bankReference),
+  );
+  if (existingPayment) return { payment_id: existingPayment.payment_id };
+
+  const balance = typeof invoiceDetail.balance === "number" ? invoiceDetail.balance : invoice.balance;
+  if (typeof balance !== "number") {
+    throw new Error(`Zoho invoice ${invoice.invoice_id} response has no balance field — cannot safely validate amount`);
+  }
+  if (input.amount > balance + AMOUNT_TOLERANCE_AED) {
+    throw new Error(`Amount ${input.amount} exceeds Zoho invoice ${invoice.invoice_id} balance ${balance} — refusing to over-apply`);
+  }
+
+  const paymentRes = await fetch(`${API_BASE}/customerpayments?organization_id=${orgId}`, {
     method: "POST",
     headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({

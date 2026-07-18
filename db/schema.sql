@@ -293,3 +293,17 @@ create table if not exists settlement_document_links (
   settlement_record_id text not null references settlement_records(id),
   primary key (settlement_document_id, settlement_record_id)
 );
+
+-- zoho_publish_runs: audit trail for POST /api/settlements/publish, same
+-- shape as sync_runs/zoho_sync_runs/ad_sync_runs — one row per batch call,
+-- since this route writes real Customer Payments into Zoho Books.
+create table if not exists zoho_publish_runs (
+  id            uuid primary key default gen_random_uuid(),
+  tenant_id     text not null default 'omnia',
+  trigger       text not null default 'manual',
+  started_at    timestamptz not null default now(),
+  finished_at   timestamptz,
+  results       jsonb not null default '[]',  -- [{settlementId, ok, error?, paymentId?, needsManualReview?}]
+  error         text
+);
+create index if not exists zoho_publish_runs_started_idx on zoho_publish_runs (started_at desc);

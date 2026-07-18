@@ -43,7 +43,9 @@ export function findStockMismatches(zohoItems: ZohoItemRow[], storeInventory: St
   return mismatches.sort((a, b) => b.maxDiff - a.maxDiff);
 }
 
-function normalizeRef(s: string): string {
+// Exported for reuse anywhere else Zoho reference-number formatting drift
+// needs absorbing (e.g. the Customer Payment publish invoice lookup).
+export function normalizeRef(s: string): string {
   return s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
