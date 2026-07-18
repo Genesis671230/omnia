@@ -33,8 +33,9 @@ export async function POST(request: Request) {
 
   const saved = await PayoutsRepository.upsertPayouts(payouts);
 
+  let fileId: string | null = null;
   try {
-    await FilesRepository.save({
+    fileId = await FilesRepository.save({
       kind: "payout",
       provider: payouts[0]?.provider ?? provider,
       filename: file.name,
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     saved,
+    fileId,
     payouts: payouts.map((p) => ({
       id: p.id,
       provider: p.provider,
