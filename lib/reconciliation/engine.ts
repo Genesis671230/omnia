@@ -17,6 +17,7 @@ import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 import { FX_TO_AED } from "@/lib/fx";
+import { stripeConfigured, payoutOrderRefs } from "@/lib/integrations/stripe";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 const TOLERANCE_AED = 1.0;
@@ -236,6 +237,11 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
   return lines;
 }
 
+export function stripeEvidencedOrderNumbers(resolvedOrders: string[], stripeRefs: string[]): string[] {
+  const refSet = new Set(stripeRefs);
+  return resolvedOrders.filter((num) => refSet.has(num));
+}
+
 export async function runReconciliation(): Promise<ReconLine[]> {
   const [credits, payouts, orders] = await Promise.all([
     BankRepository.listCredits(),
@@ -323,6 +329,32 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
         })),
     );
   if (settlementRows.length > 0) await SettlementsRepository.upsertMany(settlementRows);
+
+  // Stripe auto-verification: for settled lines on Stripe payouts, check
+  // each order's ref against Stripe's own balance-transaction breakdown —
+  // if Stripe agrees the order was paid out, no human confirmation step is
+  // needed. If the API call fails or the ref is absent, leave the row
+  // unconfirmed (surfaces as "awaiting evidence", same as any other
+  // gateway) rather than assuming success.
+  if (stripeConfigured()) {
+    const stripeLines = lines.filter(
+      (l) => l.state === "SETTLED" && l.provider === "Stripe" && l.payout?.id?.startsWith("STRIPE-") && !l.payout.id.startsWith("STRIPE-TRF-"),
+    );
+    for (const l of stripeLines) {
+      try {
+        const stripePayoutId = l.payout!.id.slice("STRIPE-".length);
+        const { refs } = await payoutOrderRefs(stripePayoutId);
+        const evidenced = stripeEvidencedOrderNumbers(l.resolvedOrders, refs);
+        const ids = evidenced.map((num) => {
+          const order = orderByNumber.get(num);
+          return order ? `${order.uid}_${l.id}` : null;
+        }).filter((id): id is string => Boolean(id));
+        if (ids.length > 0) await SettlementsRepository.markStripeEvidence(ids);
+      } catch (e) {
+        console.error(`Stripe evidence check failed for payout ${l.payout?.id}:`, (e as Error).message);
+      }
+    }
+  }
 }
 
 export function summarizeReconLines(lines: ReconLine[]) {
