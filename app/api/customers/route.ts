@@ -63,7 +63,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const days = Math.min(Math.max(parseInt(url.searchParams.get("days") || "365", 10) || 365, 30), 730);
   const to = new Date().toISOString().slice(0, 10);
-  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  
+
+  const fromDate = new Date();
+  fromDate.setFullYear(fromDate.getFullYear() - 2);
+  const from = fromDate.toISOString().slice(0, 10);
+
 
   const [orders, insights, payouts] = await Promise.all([
     OrdersRepository.listAll(),
@@ -106,6 +112,8 @@ export async function GET(request: Request) {
     if (!CANCELLED.has(o.financial_status)) g.validOrders.push(o);
   }
 
+  console.log("Unique customers:", groups.size);
+console.log("Orders without identity:", unidentifiedCount);
   const customers = [...groups.values()].map((g) => {
     const dated = g.validOrders.filter((o) => o.order_date).sort((a, b) => a.order_date!.localeCompare(b.order_date!));
     const totalSpendAed = +dated.reduce((s, o) => s + Number(o.gross_aed || 0), 0).toFixed(2);

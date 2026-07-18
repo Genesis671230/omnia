@@ -6,9 +6,10 @@
 import { telrConfigured, getPayoutsByAccountIdAndDate, getTransactionsByPayout, normalizeTelrPayouts, normalizeTelrTransactions } from "@/lib/integrations/telr";
 import { stripeConfigured, listRecentPayouts, payoutOrderRefs } from "@/lib/integrations/stripe";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
+import { persistStripeApiSettlements, type PaidStripePayout } from "@/lib/reconciliation/stripe-settlements";
 import type { ParsedPayout } from "@/lib/parsers/payouts";
 
-export type GatewaySyncResult = { provider: string; fetched: number; saved: number; error?: string };
+export type GatewaySyncResult = { provider: string; fetched: number; saved: number; settled?: number; error?: string };
 
 export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]> {
   const toDate = new Date().toISOString().slice(0, 10);
@@ -51,6 +52,7 @@ export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]
       const payouts = await listRecentPayouts(50);
       const cutoff = Date.now() / 1000 - days * 24 * 60 * 60;
       const parsed: ParsedPayout[] = [];
+      const paid: PaidStripePayout[] = [];
       for (const p of payouts) {
         if (p.arrival_date < cutoff) continue;
         const { net, refs, transactions } = await payoutOrderRefs(p.id);
@@ -63,9 +65,27 @@ export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]
           notes: `Fetched live via Stripe API · ${p.status}`,
           transactions,
         });
+        // "paid" is Stripe's terminal state — the transfer has gone out to
+        // the bank. That's settlement evidence from the gateway itself, so
+        // these orders become publishable to Zoho Books without waiting for
+        // the bank statement upload. in_transit/pending payouts don't count.
+        if (p.status === "paid") {
+          paid.push({
+            id: `STRIPE-${p.id}`,
+            arrivalDate: p.arrival_date ? new Date(p.arrival_date * 1000).toISOString().slice(0, 10) : null,
+            transactions,
+          });
+        }
       }
       const saved = await PayoutsRepository.upsertPayouts(parsed);
-      results.push({ provider: "Stripe", fetched: parsed.length, saved });
+      let settled = 0;
+      try {
+        settled = await persistStripeApiSettlements(paid);
+      } catch (e) {
+        // settlement-record creation must never fail the payout sync itself
+        console.error("Stripe API settlement records failed:", (e as Error).message);
+      }
+      results.push({ provider: "Stripe", fetched: parsed.length, saved, settled });
     } catch (e) {
       results.push({ provider: "Stripe", fetched: 0, saved: 0, error: (e as Error).message });
     }

@@ -25,6 +25,10 @@ export type InvoiceFields = {
   orderValue: number;
   shipping: number;
   total: number;
+  // When set, the TOTAL cell renders this text (e.g. "PAID") instead of the
+  // numeric total — the founder's rule for an already-paid order. Absent =
+  // ordinary numeric total.
+  totalLabel?: string;
   paid: string; // "Yes" / "No" / "COD" — free text, not a boolean, matches the source label
   courier: string;
   currency: string;
@@ -33,7 +37,7 @@ export type InvoiceFields = {
 // Helvetica/WinAnsi can only encode Latin-1-ish text — Omnia's customer
 // names and cities are often Arabic. Strip anything outside that range
 // rather than crash the whole invoice; the founder still gets a usable PDF.
-function winAnsiSafe(text: string): string {
+export function winAnsiSafe(text: string): string {
   const kept = Array.from(text || "").filter((ch) => ch.codePointAt(0)! <= 0xff).join("");
   return kept.trim() || "—";
 }
@@ -136,7 +140,7 @@ function drawBlock(page: PDFPage, top: number, f: InvoiceFields, fonts: Fonts) {
   });
   y -= barH;
 
-  const values = [f.remarks || "—", money(f.currency, f.orderValue), money(f.currency, f.shipping), money(f.currency, f.total)];
+  const values = [f.remarks || "—", money(f.currency, f.orderValue), money(f.currency, f.shipping), f.totalLabel || money(f.currency, f.total)];
   const dataRowH = 24;
   values.forEach((v, i) => {
     const cx = LEFT + i * colW;

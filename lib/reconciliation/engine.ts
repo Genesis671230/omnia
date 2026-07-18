@@ -328,7 +328,23 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
           zoho_published_at: null,
         })),
     );
-  if (settlementRows.length > 0) await SettlementsRepository.upsertMany(settlementRows);
+  // One settlement record per order, ever: if the Stripe-API path (or an
+  // earlier bank line) already wrote a record for this order under a
+  // different id, don't add a second one — two evidence-confirmed records
+  // would mean two publishable Zoho Customer Payments for the same order.
+  // Re-upserting the SAME id stays allowed, keeping recompute idempotent.
+  if (settlementRows.length > 0) {
+    const existing = await SettlementsRepository.listExistingByOrderUids(
+      settlementRows.map((r) => r.order_uid),
+    );
+    const foreign = new Set<string>();
+    for (const e of existing) {
+      const candidate = settlementRows.find((r) => r.order_uid === e.order_uid);
+      if (candidate && e.id !== candidate.id) foreign.add(e.order_uid);
+    }
+    const rows = settlementRows.filter((r) => !foreign.has(r.order_uid));
+    if (rows.length > 0) await SettlementsRepository.upsertMany(rows);
+  }
 
   // Stripe auto-verification: for settled lines on Stripe payouts, check
   // each order's ref against Stripe's own balance-transaction breakdown —

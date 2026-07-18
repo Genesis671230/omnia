@@ -35,8 +35,9 @@ const ORDERS_QUERY = /* GraphQL */ `
         displayFinancialStatus
         displayFulfillmentStatus
         paymentGatewayNames
-        customer { displayName phone }
+        customer { displayName phone defaultAddress { phone } }
         shippingAddress { city countryCodeV2 phone }
+        billingAddress { phone }
         currentTotalPriceSet { shopMoney { amount currencyCode } }
         currentSubtotalPriceSet { shopMoney { amount } }
         totalShippingPriceSet { shopMoney { amount } }
@@ -67,8 +68,9 @@ export type ShopifyRawOrder = {
   displayFinancialStatus: string | null;
   displayFulfillmentStatus: string | null;
   paymentGatewayNames: string[];
-  customer: { displayName: string; phone: string | null } | null;
+  customer: { displayName: string; phone: string | null; defaultAddress: { phone: string | null } | null } | null;
   shippingAddress: { city: string | null; countryCodeV2: string | null; phone: string | null } | null;
+  billingAddress: { phone: string | null } | null;
   currentTotalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   currentSubtotalPriceSet: { shopMoney: { amount: string } } | null;
   totalShippingPriceSet: { shopMoney: { amount: string } } | null;

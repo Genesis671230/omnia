@@ -91,9 +91,15 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
     customer_name: raw.customer?.displayName || "",
     customer_email: raw.email || "",
     // shippingAddress.phone (entered at checkout) is filled far more often
-    // than customer.phone (Shopify's marketing-profile phone, opt-in only) —
-    // prefer it, falling back to the profile phone if checkout had none.
-    customer_phone: raw.shippingAddress?.phone || raw.customer?.phone || "",
+    // than customer.phone (Shopify's marketing-profile phone, opt-in only).
+    // Prefer it, then billing, then the profile phone, then the customer's
+    // default saved address — orders frequently carry a number ONLY there.
+    customer_phone:
+      raw.shippingAddress?.phone ||
+      raw.billingAddress?.phone ||
+      raw.customer?.phone ||
+      raw.customer?.defaultAddress?.phone ||
+      "",
     source: "shopify",
     payout_status: "awaiting",
     updated_at: new Date().toISOString(),

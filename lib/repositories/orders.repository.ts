@@ -117,7 +117,24 @@ export const OrdersRepository = {
       rows.push(...(data ?? []));
       if (!data || data.length < PAGE) break;
     }
+    console.log("Total orders fetched:", rows.length);
     return rows as OrderRowRaw[];
+  },
+
+  // Minimal rows for matching payout refs → orders (Stripe API settlement
+  // creation). Chunked: a payout batch can name hundreds of numbers and
+  // .in() rides in the request URL.
+  async getByOrderNumbers(numbers: string[]) {
+    const out: { uid: string; order_number: string; store_id: string; customer_name: string; customer_email: string; order_date: string | null; gross_aed: number }[] = [];
+    for (let i = 0; i < numbers.length; i += 200) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("uid, order_number, store_id, customer_name, customer_email, order_date, gross_aed")
+        .in("order_number", numbers.slice(i, i + 200));
+      if (error) throw new Error(`orders by-number select failed: ${error.message}`);
+      out.push(...(data ?? []));
+    }
+    return out;
   },
 
   async getByUid(uid: string) {

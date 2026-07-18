@@ -1,62 +1,66 @@
 import { NextResponse } from "next/server";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { buildInvoicePdf, type InvoiceFields } from "@/lib/invoice";
-import { defaultCourier } from "@/lib/courier";
+import { buildIntlInvoicePdf, type IntlInvoiceFields } from "@/lib/invoice-intl";
+import { ontrackPrefill, intlPrefill, selectInvoiceTemplate, type InvoiceTemplate } from "@/lib/invoice-fields";
 
-function prefill(order: NonNullable<Awaited<ReturnType<typeof OrdersRepository.getByUid>>>): InvoiceFields {
-  const total = Number(order.gross_aed || 0);
-  return {
-    orderNumber: order.order_number,
-    invoiceNo: order.order_number,
-    customerId: "",
-    date: order.order_date ? new Date(order.order_date).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB"),
-    customerName: order.customer_name || "",
-    address1: "",
-    address2: [order.city, order.country].filter(Boolean).join(", "),
-    mobile: order.customer_phone || "",
-    additionalNotes: "",
-    remarks: "",
-    orderValue: total,
-    shipping: 0,
-    total,
-    paid: order.gateway === "COD" ? "COD" : "Yes",
-    courier: order.courier || defaultCourier(order.country || ""),
-    currency: order.currency || "AED",
-  };
+type OrderRow = NonNullable<Awaited<ReturnType<typeof OrdersRepository.getByUid>>>;
+
+function resolveTemplate(order: OrderRow, requested?: unknown): InvoiceTemplate {
+  return requested === "ontrack" || requested === "intl"
+    ? requested
+    : selectInvoiceTemplate(order.country || "");
 }
 
-// GET /api/orders/:uid/invoice — quick-download PDF, auto-filled from the
-// order with no editing step.
-export async function GET(_req: Request, { params }: { params: Promise<{ uid: string }> }) {
-  const { uid } = await params;
-  const order = await OrdersRepository.getByUid(uid);
-  if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+async function renderPdf(order: OrderRow, template: InvoiceTemplate, edits: Record<string, unknown>): Promise<Uint8Array> {
+  if (template === "intl") {
+    // Line items come from the order (read server-side) so the client can't
+    // forge item totals; the caller may still override presentational fields
+    // (addresses, terms, descriptions, shipping) via `edits`.
+    const base = intlPrefill(order, order.line_items || []);
+    const fields: IntlInvoiceFields = { ...base, ...(edits as Partial<IntlInvoiceFields>) };
+    return buildIntlInvoicePdf(fields);
+  }
+  const base = ontrackPrefill(order);
+  const fields: InvoiceFields = { ...base, ...(edits as Partial<InvoiceFields>) };
+  return buildInvoicePdf(fields);
+}
 
-  const pdf = await buildInvoicePdf(prefill(order));
+function pdfResponse(pdf: Uint8Array, orderNumber: string) {
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="omnia-invoice-${order.order_number}.pdf"`,
+      "Content-Disposition": `attachment; filename="omnia-invoice-${orderNumber}.pdf"`,
     },
   });
 }
 
-// POST /api/orders/:uid/invoice — same PDF, built from founder-edited fields
-// (address lines and a customer ID aren't captured in synced order data, so
-// the UI collects them here before generating rather than leaving them blank).
+// GET /api/orders/:uid/invoice — quick-download PDF, auto-filled from the order
+// with no editing step. `?template=ontrack|intl` overrides the destination
+// default.
+export async function GET(req: Request, { params }: { params: Promise<{ uid: string }> }) {
+  const { uid } = await params;
+  const order = await OrdersRepository.getByUid(uid);
+  if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+  const template = resolveTemplate(order, new URL(req.url).searchParams.get("template"));
+  const pdf = await renderPdf(order, template, {});
+  return pdfResponse(pdf, order.order_number);
+}
+
+// POST /api/orders/:uid/invoice — same PDF, built from founder-edited fields.
+// Body: { template?, ...templateFields }. Address lines, customer id, HS/origin
+// notes and the like aren't in synced order data, so the modal collects them
+// here before generating.
 export async function POST(request: Request, { params }: { params: Promise<{ uid: string }> }) {
   const { uid } = await params;
   const order = await OrdersRepository.getByUid(uid);
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-  const edits = await request.json().catch(() => ({}));
-  const fields: InvoiceFields = { ...prefill(order), ...edits };
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const { template: requested, ...edits } = body;
+  const template = resolveTemplate(order, requested);
 
-  const pdf = await buildInvoicePdf(fields);
-  return new NextResponse(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="omnia-invoice-${order.order_number}.pdf"`,
-    },
-  });
+  const pdf = await renderPdf(order, template, edits);
+  return pdfResponse(pdf, order.order_number);
 }

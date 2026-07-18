@@ -81,6 +81,23 @@ export const SettlementsRepository = {
       .sort((a, b) => (a.date < b.date ? 1 : -1));
   },
 
+  // Which of these orders already have a settlement record, and under what
+  // id — both the engine and the Stripe-API path check this before writing,
+  // so one order can never accumulate two publishable records (= two Zoho
+  // Customer Payments). Chunked for .in() URL length.
+  async listExistingByOrderUids(orderUids: string[]): Promise<{ id: string; order_uid: string }[]> {
+    const out: { id: string; order_uid: string }[] = [];
+    for (let i = 0; i < orderUids.length; i += 200) {
+      const { data, error } = await supabase
+        .from("settlement_records")
+        .select("id, order_uid")
+        .in("order_uid", orderUids.slice(i, i + 200));
+      if (error) throw new Error(`settlement_records existing select failed: ${error.message}`);
+      out.push(...(data ?? []));
+    }
+    return out;
+  },
+
   async markStripeEvidence(settlementIds: string[]): Promise<void> {
     if (settlementIds.length === 0) return;
     const { error } = await supabase
