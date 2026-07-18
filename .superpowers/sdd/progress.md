@@ -17,6 +17,17 @@ Brief-level note for Task 2/4 implementers: the brief's Interfaces line for
 the full `SettlementDocumentWithLinks` with field `confirm_token` (snake_case)
 — read the file, not the brief's summary line.
 
+Task 3: complete (commits d930739..212cd1f, review approved after one fix).
+Two haiku implementer-subagent dispatches hit the account's session rate
+limit before doing any work (one made zero edits, one didn't even read the
+brief) — controller implemented Task 3 directly instead of retrying.
+Real bug found+fixed by review: POST /api/settlements/documents parsed
+request.json() with no .catch(), so a malformed body 500'd instead of
+returning this route's own 400 — fixed to match the .catch(() => ({}))
+pattern already used by orders/ship and orders/status; also patched the
+plan's own Task 4/5 code samples for consistency since they had the same
+gap.
+
 Task 2: complete (commits 5a0592b..f73f203, review approved, zero issues).
 Implementer subagent hit a session rate limit right after finishing
 (committed + wrote its report, cut off before replying) — controller
