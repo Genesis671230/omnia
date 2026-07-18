@@ -1,5 +1,86 @@
 import { supabase } from "@/lib/supabase";
 import type { OrderRow } from "@/lib/normalize/order";
+import { keywordsForLocation } from "@/lib/orders-locations";
+
+const ORDER_COLUMNS =
+  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
+
+export type OrderRowRaw = {
+  uid: string; store_id: string; order_number: string; order_date: string | null;
+  customer_name: string; customer_email: string; customer_phone: string; city: string; country: string;
+  currency: string; gross_original: number; gross_aed: number; gateway: string;
+  gateway_raw: string; financial_status: string; fulfillment_status: string;
+  telr_cartid: string; telr_tranref: string; payout_id: string | null;
+  payout_status: string;
+  line_items: { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null }[];
+  courier: string; tracking_number: string; tracking_url: string;
+  fulfillment_stage: string; fulfillment_stage_updated_at: string | null;
+  awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
+};
+
+export type OrdersQuery = {
+  days: number; page: number; limit: number;
+  store: string | null; location: string | null; q: string;
+};
+
+// Pure — turns URL search params into clamped, normalized query args. Kept
+// separate from the DB call so it's unit-testable without Supabase.
+export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
+  // Note: parseInt(...) || <default> would be wrong here — 0 is a valid,
+  // meaningful parsed value (days=0 means unbounded; limit clamps to 1) and
+  // `0 || x` treats that legitimate 0 as falsy, silently replacing it with
+  // the default. Guard on NaN specifically instead.
+  const daysParsed = parseInt(params.get("days") ?? "30", 10);
+  const days = Math.max(Number.isNaN(daysParsed) ? 30 : daysParsed, 0);
+  const pageParsed = parseInt(params.get("page") ?? "1", 10);
+  const page = Math.max(Number.isNaN(pageParsed) ? 1 : pageParsed, 1);
+  const limitParsed = parseInt(params.get("limit") ?? "50", 10);
+  const limit = Math.min(Math.max(Number.isNaN(limitParsed) ? 50 : limitParsed, 1), 200);
+  const storeRaw = (params.get("store") || "All").trim();
+  const store = storeRaw.toLowerCase() === "all" ? null : storeRaw;
+  const locationRaw = (params.get("location") || "All locations").trim();
+  const location = locationRaw.toLowerCase() === "all locations" ? null : locationRaw;
+  const q = (params.get("q") || "").trim();
+  return { days, page, limit, store, location, q };
+}
+
+// Supabase's fluent query builder returns an increasingly specific generic
+// type after each chained call — typing that precisely here isn't worth it
+// for internal glue code that just narrows a select; `any` in, `any` out,
+// the caller re-asserts the final row shape it actually wants.
+function applyOrdersFilters(
+  query: any,
+  opts: { from?: string; to?: string; store?: string | null; location?: string | null; q?: string },
+): any {
+  let qy = query;
+  if (opts.from) qy = qy.gte("order_date", opts.from);
+  if (opts.to) qy = qy.lte("order_date", opts.to);
+  if (opts.store) qy = qy.eq("store_id", opts.store);
+  if (opts.location) {
+    const keywords = keywordsForLocation(opts.location);
+    if (keywords && keywords.length > 0) {
+      qy = qy.or(keywords.map((k) => `city.ilike.%${k}%`).join(","));
+    }
+  }
+  if (opts.q) {
+    const term = opts.q.replace(/[%,]/g, "");
+    qy = qy.or(
+      [
+        `customer_name.ilike.%${term}%`,
+        `order_number.ilike.%${term}%`,
+        `city.ilike.%${term}%`,
+        `country.ilike.%${term}%`,
+        `customer_phone.ilike.%${term}%`,
+      ].join(","),
+    );
+  }
+  // Repeated .or()/.eq()/.gte() calls each add an independent, ANDed filter
+  // clause in PostgREST — so the location OR-group and the search OR-group
+  // combine as (location keyword match) AND (search column match), not one
+  // flat OR across everything. That's the whole point of calling them
+  // separately rather than merging into a single .or() string.
+  return qy;
+}
 
 export const OrdersRepository = {
   // Upsert synced orders WITHOUT touching settlement fields — payout_id /
@@ -36,18 +117,7 @@ export const OrdersRepository = {
       rows.push(...(data ?? []));
       if (!data || data.length < PAGE) break;
     }
-    return rows as {
-      uid: string; store_id: string; order_number: string; order_date: string | null;
-      customer_name: string; customer_email: string; customer_phone: string; city: string; country: string;
-      currency: string; gross_original: number; gross_aed: number; gateway: string;
-      gateway_raw: string; financial_status: string; fulfillment_status: string;
-      telr_cartid: string; telr_tranref: string; payout_id: string | null;
-      payout_status: string;
-      line_items: { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null }[];
-      courier: string; tracking_number: string; tracking_url: string;
-      fulfillment_stage: string; fulfillment_stage_updated_at: string | null;
-      awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
-    }[];
+    return rows as OrderRowRaw[];
   },
 
   async getByUid(uid: string) {
@@ -99,5 +169,86 @@ export const OrdersRepository = {
   async recordShipmentError(uid: string, message: string) {
     const { error } = await supabase.from("orders").update({ ship_error: message }).eq("uid", uid);
     if (error) throw new Error(`ship_error write failed: ${error.message}`);
+  },
+
+  // UI-facing paginated + filtered query — the ledger's data source going
+  // forward. listAll() stays untouched for the reconciler, which needs the
+  // full book regardless of any UI filter.
+  async listPage({ from, to, store, location, q, page, limit }: {
+    from?: string; to?: string; store?: string | null; location?: string | null;
+    q?: string; page: number; limit: number;
+  }) {
+    let query = supabase.from("orders").select(ORDER_COLUMNS, { count: "exact" });
+    query = applyOrdersFilters(query, { from, to, store, location, q });
+    const fromIdx = (page - 1) * limit;
+    const { data, error, count } = await query
+      .order("order_date", { ascending: false })
+      .range(fromIdx, fromIdx + limit - 1);
+    if (error) throw new Error(`orders page select failed: ${error.message}`);
+    return { rows: (data ?? []) as OrderRowRaw[], total: count ?? 0 };
+  },
+
+  // Full rows within a date window (+ optional store), for dashboard
+  // aggregation that needs every row in range, not one page of it. Still
+  // pages past Supabase's 1000-row cap internally like listAll(), just only
+  // within the window instead of across all history.
+  async listInWindow({ from, store }: { from: string; store?: string | null }) {
+    const PAGE = 1000;
+    const rows: OrderRowRaw[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      let query = supabase.from("orders").select(ORDER_COLUMNS);
+      query = applyOrdersFilters(query, { from, store });
+      const { data, error } = await query
+        .order("order_date", { ascending: false })
+        .range(offset, offset + PAGE - 1);
+      if (error) throw new Error(`orders window select failed: ${error.message}`);
+      rows.push(...((data ?? []) as OrderRowRaw[]));
+      if (!data || data.length < PAGE) break;
+    }
+    return rows;
+  },
+
+  // All-time counts — deliberately NOT date-windowed (matches the dashboard
+  // route's existing behavior for these three numbers exactly). Count-only
+  // queries (head: true) pull zero row data.
+  async getOrderCounts({ store }: { store?: string | null } = {}) {
+    const base = () => {
+      let q = supabase.from("orders").select("uid", { count: "exact", head: true });
+      if (store) q = q.eq("store_id", store);
+      return q;
+    };
+    const cancelled = ["voided", "refunded", "cancelled"];
+    const [settledRes, totalRes, codRes] = await Promise.all([
+      base().eq("payout_status", "settled"),
+      base(),
+      (() => {
+        let q = supabase.from("orders").select("gross_aed").eq("gateway", "COD").neq("payout_status", "settled");
+        if (store) q = q.eq("store_id", store);
+        return q.not("financial_status", "in", `(${cancelled.join(",")})`);
+      })(),
+    ]);
+    if (settledRes.error) throw new Error(`settled count failed: ${settledRes.error.message}`);
+    if (totalRes.error) throw new Error(`total count failed: ${totalRes.error.message}`);
+    if (codRes.error) throw new Error(`cod pending select failed: ${codRes.error.message}`);
+    const codRows = codRes.data ?? [];
+    return {
+      settledOrders: settledRes.count ?? 0,
+      totalOrders: totalRes.count ?? 0,
+      codPendingCount: codRows.length,
+      codPendingAed: +codRows.reduce((s, r) => s + Number(r.gross_aed || 0), 0).toFixed(2),
+    };
+  },
+
+  // Single most recent order (optionally store-filtered), full row data —
+  // for the dashboard spotlight. No date window: a quiet week shouldn't make
+  // the spotlight go blank.
+  async getMostRecent({ store }: { store?: string | null } = {}) {
+    let query = supabase.from("orders").select(ORDER_COLUMNS);
+    if (store) query = query.eq("store_id", store);
+    const { data, error } = await query
+      .order("order_date", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`most-recent order select failed: ${error.message}`);
+    return (data && data[0]) as OrderRowRaw | undefined ?? null;
   },
 };

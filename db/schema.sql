@@ -252,3 +252,13 @@ alter table ad_insights add column if not exists landing_page_views integer not 
 alter table ad_insights add column if not exists view_content       integer not null default 0;
 alter table ad_insights add column if not exists add_to_cart        integer not null default 0;
 alter table ad_insights add column if not exists initiate_checkout  integer not null default 0;
+
+-- orders: at tens of thousands of rows and growing, the ledger and dashboard
+-- now query by date range, store, and free-text search server-side instead
+-- of fetching everything and filtering in JS — these indexes make that fast.
+create index if not exists orders_date_idx on orders (order_date desc);
+create index if not exists orders_store_date_idx on orders (store_id, order_date desc);
+create extension if not exists pg_trgm;
+create index if not exists orders_customer_name_trgm_idx on orders using gin (customer_name gin_trgm_ops);
+create index if not exists orders_order_number_trgm_idx on orders using gin (order_number gin_trgm_ops);
+create index if not exists orders_city_trgm_idx on orders using gin (city gin_trgm_ops);
