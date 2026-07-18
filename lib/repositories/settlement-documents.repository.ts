@@ -56,10 +56,11 @@ export const SettlementDocumentsRepository = {
       .maybeSingle();
     if (error || !data) return null;
 
-    const { data: links } = await supabase
+    const { data: links, error: linksError } = await supabase
       .from("settlement_document_links")
       .select("settlement_record_id")
       .eq("settlement_document_id", data.id);
+    if (linksError) throw new Error(`settlement_document_links select failed: ${linksError.message}`);
 
     return {
       ...(data as SettlementDocument),
