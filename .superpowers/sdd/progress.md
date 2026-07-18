@@ -17,6 +17,19 @@ Brief-level note for Task 2/4 implementers: the brief's Interfaces line for
 the full `SettlementDocumentWithLinks` with field `confirm_token` (snake_case)
 — read the file, not the brief's summary line.
 
+Task 4: complete (commits 212cd1f..ea47196, review approved after one fix).
+Real security bug found+fixed: the public unauthenticated /confirm/:token/
+document route served the uploaded file's uploader-controlled `mime` field
+(client's file.type at upload) with Content-Disposition inline — a "payout
+evidence" file uploaded with mime text/html or image/svg+xml would execute
+in-browser for anyone holding the link, no auth. Fixed with a fixed
+inline-safe MIME allowlist (pdf/png/jpeg/gif/webp), else forces attachment
+download. Minor (not fixed, logged for final review): confirm() is
+read-then-write, not atomic — a true concurrent double-POST race could
+attribute confirmed_by inconsistently between settlement_documents and
+settlement_records (cosmetic only, evidence_confirmed ends up true either
+way).
+
 Task 3: complete (commits d930739..212cd1f, review approved after one fix).
 Two haiku implementer-subagent dispatches hit the account's session rate
 limit before doing any work (one made zero edits, one didn't even read the
