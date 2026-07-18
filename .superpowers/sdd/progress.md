@@ -1,16 +1,27 @@
-# Progress ledger — Reconciliation Gateway Hardening
+# Progress ledger — Settlement Confirmation + Zoho Books Publish
 
-Plan: docs/superpowers/plans/2026-07-16-recon-gateway-hardening.md
+Plan: docs/superpowers/plans/2026-07-18-settlement-confirmation-zoho-publish.md
 Branch: recon-gateway-hardening
+Baseline commit: 47d4187 (plan committed; prior orders-pagination-perf plan
+paused after its Task 2 — Tasks 3-8 of that plan remain to resume later,
+history in `git log -p -- .superpowers/sdd/progress.md`)
 
-Task 1: complete (commits e77ec15..fdc7695, review clean)
-Task 2: complete (commits fdc7695..ee76fee, review clean; minor note: dropped comment inherited from plan, cosmetic only). Env note: tests importing lib/reconciliation/engine.ts require `set -a && source .env && set +a` first (pre-existing, module-scope Supabase client init). Plan bug found+fixed: Task 7's PAYOUT_VARIANCE fixture numbers (credit 950 vs payout net 1000, diff 50) also fall outside the candidate-match filter (max(1, 2%) = 19) same as Task 2's original 100/90 fixture — must correct before dispatching Task 7 (e.g. net=940, diff=10, variance=10).
-Task 3: complete (commits ee76fee..b88305c, review clean). Minor findings logged for final review: (1) filename invoice-number fallback regex grabs first 3+ digit run, could misfire on date-prefixed filenames (plan-mandated, inherited from brief) — acceptable per spec's "may need one iteration" caveat; (2) parseCodXlsx's try/catch around parseCodRecords is effectively dead-code-guarded and could mask an unrelated bug as "no header row found" — cosmetic, not urgent.
-Task 4: complete (commits b88305c..9ef05f6, review clean after fix). Real bug found+fixed by review loop: multi-ref Checkout Payment IDs dropped all but refs[0], folding other orders' money into the first — now even-splits matching parseStripeCsv's contract. Minor for final review: test 3 asserts netShare split but not grossShare/feeShare split (both happen to be trivial in that fixture).
-Task 6: complete (commits d27f413..cc9b0dd, review clean). Two real bugs found+fixed post-commit: (1) Checkout-shaped .xlsx reached parseCheckoutCsv via buffer.toString("utf8") → zip binary as mojibake → confusing "missing column(s)" error; now throws an explicit "must be a CSV" message. (2) parseCodCsv assumed row 0 = header, but real courier CSVs carry an INVOICE banner above the table (the shape parseCodXlsx already scanned for); now finds the header row the same way.
-Task 7: complete (commits cc9b0dd..efad0b5, review clean, 26/26). Plan bug confirmed+corrected as predicted in Task 2's note: PAYOUT_VARIANCE fixture's 950-vs-1000 (diff 50) exceeds the candidate filter's max(1, 950*2%)=19, so it would have asserted PAYOUT_VARIANCE but gotten AWAITING_PAYOUT. Corrected to net=940 vs credit=950 → variance=10; reviewer independently re-derived both the bug and the fix against engine source. Minors for final review: (1) test 3 uses `gross_amount: codPayout.net` instead of the file's own `codPayout.gross ?? codPayout.net` pattern (inconsequential — gross_amount is unread by computeReconLines); (2) new tests omit the `lines.length === 1` assert the precedent engine.test.ts uses; (3) plan's Task 7 Step 2 says "expect tests 23" — real total is 26, arithmetic slip in the plan doc.
-PRODUCT OBSERVATION (not a plan task, for founder): the >2% case the plan author instinctively wrote (bank 950 vs payout 1000) does NOT surface as a variance — it falls outside the candidate filter and shows as AWAITING_PAYOUT, i.e. "upload the payout file" for a file already uploaded. A big mismatch is exactly when a founder most wants to be told. Worth raising.
+Task 1: complete (commits 47d4187..5a0592b, review approved after one fix).
+Real bug found+fixed: `getByToken` discarded the settlement_document_links
+select's error, so a failed lookup silently returned settlementRecordIds:
+[] — `confirm()` would then mark the document confirmed while leaving every
+linked settlement_records row unconfirmed forever, no error anywhere.
+Brief-level note for Task 2/4 implementers: the brief's Interfaces line for
+`SettlementDocumentsRepository.create` says it returns
+`{ id, confirmToken }` but the actual code (and what got built) returns
+the full `SettlementDocumentWithLinks` with field `confirm_token` (snake_case)
+— read the file, not the brief's summary line.
 
-Task 5: complete (commits 9ef05f6..d27f413, review clean). Reviewer independently re-derived + stress-tested (56k randomized trials) that Tabby/Tamara aggregate math is behavior-identical after the hoist. Minor for final review: `quality: "multi"` now carries two distinct meanings across parsers — Checkout/Stripe = one row's amount split across several refs; Tabby/Tamara = same ref repeated across rows, shares summed. Worth a doc comment on the type, not a code change.
-
-Task 8: in progress, uncommitted. Step 3-4 done (info tone + situational AWAITING_PAYOUT copy naming provider/reference/statement type). Extended beyond the plan's original scope at founder's request ("good UI on each task"): added a PAYOUT_VARIANCE note (previously had none at all despite being an "Exceptions" state) that states the surplus/shortfall in AED and infers a likely cause from `payout.fxSource`/`refundedOrders`; gave SETTLED a confirmatory note.ok explaining why it settled; tightened ORDERS_UNRESOLVED to name the payout id and handle the zero-unresolvedRefs edge case (payout matched but carried no chargeable refs — old copy would have rendered "order #" with nothing after the #). Typecheck clean; page returns 200. Not yet visually verified in-browser — Chrome extension wasn't connected this session.
+Task 2: complete (commits 5a0592b..f73f203). Implementer subagent hit a
+session rate limit right after finishing (committed + wrote its report,
+cut off before replying) — controller verified the commit is scoped
+correctly (only engine.ts + the new test file), tests pass, typecheck
+clean. Review pending. Unrelated note: `lib/invoice.ts` appeared modified
+in the working tree during this task (a `totalLabel` field + exported
+`winAnsiSafe`) — not touched by this plan's work, left uncommitted and
+untouched; flagged to the user as likely concurrent/external work.
