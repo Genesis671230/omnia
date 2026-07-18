@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runReconciliation, type ReconLine } from "@/lib/reconciliation/engine";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
+import { OrdersRepository } from "@/lib/repositories/orders.repository";
 
 // A credit's statement date (YYYY-MM-DD…) falls inside an optional [from, to]
 // window — either bound omitted means unbounded on that side.
@@ -25,9 +26,10 @@ export async function GET(request: Request) {
   const lines = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
 
   // document checklist: which gateways have bank credits but no payout file
-  const [credits, payouts] = await Promise.all([
+  const [credits, payouts, orderCounts] = await Promise.all([
     BankRepository.listCredits(),
     PayoutsRepository.listWithRefs(),
+    OrdersRepository.getOrderCounts(),
   ]);
   const rangeCredits = (from || to) ? credits.filter((c) => inRange(c.statement_date, from, to)) : credits;
 
@@ -47,6 +49,8 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     lines,
+    settledOrders: orderCounts.settledOrders,
+    totalOrders: orderCounts.totalOrders,
     documents: {
       bankStatement: credits.length > 0,
       missingPayouts: missingDocs,

@@ -35,7 +35,6 @@ import { MarketingPanel } from "@/components/finance/marketing-panel";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { CustomersPanel } from "@/components/finance/customers-panel";
-import type { OrderRow } from "@/lib/types/orders";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
@@ -87,6 +86,8 @@ type StripeProof =
 
 type ReconPayload = {
   lines: ReconLine[];
+  settledOrders: number;
+  totalOrders: number;
   documents: {
     bankStatement: boolean;
     missingPayouts: { provider: string; awaitingAmount: number }[];
@@ -443,7 +444,6 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
   const pathname = usePathname();
   const [isFounder, setIsFounder] = useState(true);
   const [recon, setRecon] = useState<ReconPayload | null>(null);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [tab, setTab] = useState("all");
@@ -461,13 +461,9 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
       const qs = params.toString();
-      const [r, o] = await Promise.all([
-        fetch(`/api/reconcile${qs ? `?${qs}` : ""}`).then((x) => x.json()),
-        fetch("/api/orders").then((x) => x.json()),
-      ]);
+      const r = await fetch(`/api/reconcile${qs ? `?${qs}` : ""}`).then((x) => x.json());
       if (r.error) throw new Error(r.error);
       setRecon(r);
-      setOrders(o.orders ?? []);
     } catch (e) {
       toast.error(`Load failed: ${(e as Error).message}`);
     } finally {
@@ -625,7 +621,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         <div className="kpis">
           <Kpi label="Bank-confirmed settled" value={aed(sum(settled))} note={`${settled.length} of ${lines.length} credit lines`} tone="ok" />
           <Kpi label="Awaiting payout file" value={aed(sum(buckets.awaiting))} note={`${buckets.awaiting.length} lines · money in transit`} tone="info" />
-          <Kpi label="Orders settled" value={`${orders.filter((o) => o.finance_status === "SETTLED").length} / ${orders.length}`} note="stamped by bank-confirmed payouts" tone="ok" />
+          <Kpi label="Orders settled" value={`${recon?.settledOrders ?? 0} / ${recon?.totalOrders ?? 0}`} note="stamped by bank-confirmed payouts" tone="ok" />
           <Kpi label="Exceptions" value={String(buckets.variance.length + buckets.unresolved.length)} note="variance or unresolved orders" tone={buckets.variance.length + buckets.unresolved.length ? "bad" : "muted"} />
         </div>
       )}
@@ -643,7 +639,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       ) : showCustomers ? (
         <CustomersPanel />
       ) : showOrders ? (
-        <OrdersLedger orders={orders} loading={loading} />
+        <OrdersLedger />
       ) : (
         <>
           <div className="tabs">

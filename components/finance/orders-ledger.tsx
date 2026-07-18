@@ -11,7 +11,7 @@
    which this always renders inside — so the --gold/--line/etc. tokens resolve
    in the arbitrary-value classes below. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Check, ChevronDown, Loader2, MapPin, Package, PackageCheck,
@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import type { OrderRow } from "@/lib/types/orders";
 import { ORDER_STATUS_META } from "@/lib/types/orders";
+import { LOCATION_GROUPS, locationGroupFor } from "@/lib/orders-locations";
 import { InvoiceModal } from "@/components/finance/invoice-modal";
 import { ShipModal } from "@/components/finance/ship-modal";
 
@@ -35,28 +36,6 @@ const formatOrderDate = (iso: string | null) =>
 
 const aed2 = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", minimumFractionDigits: 2 }).format(v);
-
-// Known cities per emirate/region, for the location filter dropdown. Matched
-// case-insensitively against the order's `city` field, which is free text
-// synced from Shopify/Woo — not every order will match a known group, so an
-// unmatched order still shows up under "All locations".
-const LOCATION_GROUPS: Record<string, string[]> = {
-  "Dubai": ["dubai"],
-  "Abu Dhabi": ["abu dhabi", "abudhabi"],
-  "Sharjah": ["sharjah"],
-  "Riyadh": ["riyadh"],
-  "Jeddah": ["jeddah", "jedda"],
-  "Other UAE": ["ajman", "fujairah", "ras al khaimah", "rak", "umm al quwain"],
-  "Other KSA": ["dammam", "khobar", "mecca", "makkah", "medina"],
-};
-
-function locationGroupFor(city: string): string | null {
-  const c = (city || "").toLowerCase();
-  for (const [group, keywords] of Object.entries(LOCATION_GROUPS)) {
-    if (keywords.some((k) => c.includes(k))) return group;
-  }
-  return null;
-}
 
 const STAGES = [
   { key: "processing", label: "Processing", icon: Package },
@@ -242,10 +221,90 @@ function ExpandedOrder({ order, onStageChanged, onInvoice, onShip }: {
   );
 }
 
-export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading: boolean }) {
+const OrderCard = React.memo(function OrderCard({
+  order, displayOrder, isOpen, isSelected, onToggleSelect, onToggleExpand, onStageChanged, onInvoice, onShip,
+}: {
+  order: OrderRow; displayOrder: OrderRow; isOpen: boolean; isSelected: boolean;
+  onToggleSelect: (uid: string) => void; onToggleExpand: (uid: string) => void;
+  onStageChanged: (stage: string) => void; onInvoice: () => void; onShip: () => void;
+}) {
+  const stage = displayOrder.fulfillment_stage ?? "processing";
+  const m = ORDER_STATUS_META[order.finance_status];
+  const group = locationGroupFor(order.city);
+  return (
+    <div
+      className={`overflow-hidden rounded-[14px] border bg-[var(--card)] transition-[border-color,box-shadow] ${
+        isOpen ? "border-[var(--gold)] shadow-[0_4px_18px_rgba(176,131,67,.12)]" : "border-[var(--line)]"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 pl-3.5">
+        <input
+          type="checkbox"
+          className="size-4 shrink-0 cursor-pointer accent-[var(--gold)]"
+          checked={isSelected}
+          onChange={() => onToggleSelect(order.uid)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select order #${order.order_number}`}
+        />
+        <button
+          className="grid w-full grid-cols-[130px_1fr_150px_90px_100px_110px_90px_20px] items-center gap-3 px-4 py-[13px] text-left text-[13px]"
+          onClick={() => onToggleExpand(order.uid)}
+        >
+          <div className="flex flex-col gap-0.5">
+            <span className="mono">#{order.order_number}</span>
+            <span className="store-badge w-fit">{order.store_id}</span>
+            <span className="text-[10.5px] text-[var(--muted)]">{formatOrderDate(order.order_date)}</span>
+          </div>
+          <div className="overflow-hidden text-ellipsis whitespace-nowrap" dir="auto">{order.customer_name || "—"}</div>
+          <div className="flex items-center gap-[5px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--muted)]">
+            <MapPin size={12} />
+            {group ?? [order.city, order.country].filter(Boolean).join(", ") ?? "—"}
+          </div>
+          <div className="text-[12.5px] text-[var(--muted)]">{order.gateway}</div>
+          <span className={`rounded-full px-2.5 py-[3px] text-center text-[10.5px] font-semibold uppercase tracking-[.03em] ${STAGE_PILL[stage] ?? STAGE_PILL.processing}`}>
+            {STAGES.find((s) => s.key === stage)?.label ?? stage}
+          </span>
+          <span className={`pill ${m.tone}`}>{m.label}</span>
+          <span className="mono text-right font-semibold">{aed2(Number(order.gross_aed))}</span>
+          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-[var(--muted)]">
+            <ChevronDown size={16} />
+          </motion.span>
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <ExpandedOrder
+            order={displayOrder}
+            onStageChanged={onStageChanged}
+            onInvoice={onInvoice}
+            onShip={onShip}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}, (prev, next) =>
+  prev.order === next.order &&
+  prev.displayOrder.fulfillment_stage === next.displayOrder.fulfillment_stage &&
+  prev.displayOrder.awb_number === next.displayOrder.awb_number &&
+  prev.displayOrder.label_url === next.displayOrder.label_url &&
+  prev.displayOrder.courier === next.displayOrder.courier &&
+  prev.isOpen === next.isOpen &&
+  prev.isSelected === next.isSelected,
+);
+
+const PAGE_SIZE = 50;
+
+export function OrdersLedger() {
   const [store, setStore] = useState("All");
   const [location, setLocation] = useState("All locations");
   const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
+  const [days, setDays] = useState(30);
+  const [page, setPage] = useState(1);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<OrderRow | null>(null);
   const [shipFor, setShipFor] = useState<OrderRow | null>(null);
@@ -255,18 +314,48 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
   // just chains it: closing (cancel or generate) advances to the next one.
   const [invoiceQueue, setInvoiceQueue] = useState<OrderRow[]>([]);
   // Patches from status changes / a completed shipment, applied on top of
-  // the fetched order so the row updates in place without a full refetch.
+  // the fetched page so a row updates in place without a full refetch.
   const [overrides, setOverrides] = useState<Record<string, Partial<OrderRow>>>({});
 
   const stores = ["All", "WA", "UAE", "KSA", "WOO"];
   const locations = ["All locations", ...Object.keys(LOCATION_GROUPS)];
+  const dateWindows = [
+    { label: "30d", days: 30 }, { label: "90d", days: 90 },
+    { label: "1yr", days: 365 }, { label: "All time", days: 0 },
+  ];
 
-  const rows = useMemo(() => orders.filter((o) => {
-    if (store !== "All" && o.store_id !== store) return false;
-    if (location !== "All locations" && locationGroupFor(o.city) !== location) return false;
-    const haystack = `${o.order_number} ${o.customer_name} ${o.gateway} ${o.city} ${o.country} ${o.customer_phone}`.toLowerCase();
-    return haystack.includes(q.toLowerCase());
-  }), [orders, store, location, q]);
+  // Debounce free-text search only — store/location/days/page changes fetch
+  // immediately, a keystroke doesn't.
+  useEffect(() => {
+    const id = setTimeout(() => setQDebounced(q), 300);
+    return () => clearTimeout(id);
+  }, [q]);
+
+  // Any filter change resets to page 1 — only page-button clicks should
+  // change `page` on their own.
+  useEffect(() => { setPage(1); }, [store, location, days, qDebounced]);
+
+  useEffect(() => {
+    let cancelledFetch = false;
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), days: String(days) });
+    if (store !== "All") params.set("store", store);
+    if (location !== "All locations") params.set("location", location);
+    if (qDebounced) params.set("q", qDebounced);
+    fetch(`/api/orders?${params.toString()}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelledFetch) return;
+        setOrders(d.orders ?? []);
+        setTotal(d.total ?? 0);
+      })
+      .catch(() => { if (!cancelledFetch) { setOrders([]); setTotal(0); } })
+      .finally(() => { if (!cancelledFetch) setLoading(false); });
+    return () => { cancelledFetch = true; };
+  }, [page, store, location, days, qDebounced]);
+
+  const rows = orders;
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   const patch = useCallback((uid: string, fields: Partial<OrderRow>) => {
     setOverrides((prev) => ({ ...prev, [uid]: { ...prev[uid], ...fields } }));
@@ -300,11 +389,14 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
     }
   };
 
-  if (loading) return <div className="empty"><Loader2 size={18} className="animate-spin" /> Loading orders…</div>;
-  if (orders.length === 0) {
+  if (loading && orders.length === 0) return <div className="empty"><Loader2 size={18} className="animate-spin" /> Loading orders…</div>;
+  if (!loading && total === 0) {
+    const filtered = store !== "All" || location !== "All locations" || qDebounced !== "" || days !== 30;
     return (
       <div className="empty">
-        No orders in Supabase yet. Hit <b>Sync stores</b> to pull WA / UAE / KSA Shopify and WooCommerce orders.
+        {filtered
+          ? "No orders match these filters."
+          : <>No orders in Supabase yet. Hit <b>Sync stores</b> to pull WA / UAE / KSA Shopify and WooCommerce orders.</>}
       </div>
     );
   }
@@ -321,7 +413,12 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
             <button key={`${s} ${index}`} className={store === s ? "tab on" : "tab"} onClick={() => setStore(s)}>{s}</button>
           ))}
         </div>
-        <select className="ml-auto rounded-lg border border-[var(--line)] bg-[var(--card)] px-3 py-2 text-[12.5px] text-[var(--ink)]" value={location} onChange={(e) => setLocation(e.target.value)}>
+        <div className="tabs ml-auto" style={{ margin: 0 }}>
+          {dateWindows.map((w) => (
+            <button key={w.label} className={days === w.days ? "tab on" : "tab"} onClick={() => setDays(w.days)}>{w.label}</button>
+          ))}
+        </div>
+        <select className="rounded-lg border border-[var(--line)] bg-[var(--card)] px-3 py-2 text-[12.5px] text-[var(--ink)]" value={location} onChange={(e) => setLocation(e.target.value)}>
           {locations.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
       </div>
@@ -339,67 +436,37 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
       <div className="mt-1 flex flex-col gap-2.5">
         {rows.map((o) => {
           const displayOrder = { ...o, ...overrides[o.uid] };
-          const stage = displayOrder.fulfillment_stage ?? "processing";
-          const m = ORDER_STATUS_META[o.finance_status];
           const isOpen = expanded === o.uid;
-          const group = locationGroupFor(o.city);
           return (
-            <div
+            <OrderCard
               key={o.uid}
-              className={`overflow-hidden rounded-[14px] border bg-[var(--card)] transition-[border-color,box-shadow] ${
-                isOpen ? "border-[var(--gold)] shadow-[0_4px_18px_rgba(176,131,67,.12)]" : "border-[var(--line)]"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 pl-3.5">
-                <input
-                  type="checkbox"
-                  className="size-4 shrink-0 cursor-pointer accent-[var(--gold)]"
-                  checked={selected.has(o.uid)}
-                  onChange={() => toggleSelect(o.uid)}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Select order #${o.order_number}`}
-                />
-                <button
-                  className="grid w-full grid-cols-[130px_1fr_150px_90px_100px_110px_90px_20px] items-center gap-3 px-4 py-[13px] text-left text-[13px]"
-                  onClick={() => setExpanded(isOpen ? null : o.uid)}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span className="mono">#{o.order_number}</span>
-                    <span className="store-badge w-fit">{o.store_id}</span>
-                    <span className="text-[10.5px] text-[var(--muted)]">{formatOrderDate(o.order_date)}</span>
-                  </div>
-                  <div className="overflow-hidden text-ellipsis whitespace-nowrap" dir="auto">{o.customer_name || "—"}</div>
-                  <div className="flex items-center gap-[5px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--muted)]">
-                    <MapPin size={12} />
-                    {group ?? [o.city, o.country].filter(Boolean).join(", ") ?? "—"}
-                  </div>
-                  <div className="text-[12.5px] text-[var(--muted)]">{o.gateway}</div>
-                  <span className={`rounded-full px-2.5 py-[3px] text-center text-[10.5px] font-semibold uppercase tracking-[.03em] ${STAGE_PILL[stage] ?? STAGE_PILL.processing}`}>
-                    {STAGES.find((s) => s.key === stage)?.label ?? stage}
-                  </span>
-                  <span className={`pill ${m.tone}`}>{m.label}</span>
-                  <span className="mono text-right font-semibold">{aed2(Number(o.gross_aed))}</span>
-                  <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-[var(--muted)]">
-                    <ChevronDown size={16} />
-                  </motion.span>
-                </button>
-              </div>
-              <AnimatePresence initial={false}>
-                {isOpen && (
-                  <ExpandedOrder
-                    order={displayOrder}
-                    onStageChanged={(newStage) => patch(o.uid, { fulfillment_stage: newStage })}
-                    onInvoice={() => setInvoiceFor(o)}
-                    onShip={() => setShipFor(displayOrder)}
-                  />
-                )}
-              </AnimatePresence>
-            </div>
+              order={o}
+              displayOrder={displayOrder}
+              isOpen={isOpen}
+              isSelected={selected.has(o.uid)}
+              onToggleSelect={toggleSelect}
+              onToggleExpand={(uid) => setExpanded(isOpen ? null : uid)}
+              onStageChanged={(newStage) => patch(o.uid, { fulfillment_stage: newStage })}
+              onInvoice={() => setInvoiceFor(displayOrder)}
+              onShip={() => setShipFor(displayOrder)}
+            />
           );
         })}
       </div>
 
-      <p className="table-note">{rows.length} of {orders.length} orders · settlement comes only from a bank-confirmed payout, never from the store's own "paid" flag.</p>
+      <p className="table-note">Page {page} of {totalPages} · {total} orders total · settlement comes only from a bank-confirmed payout, never from the store's own "paid" flag.</p>
+
+      {totalPages > 1 && (
+        <div className="mt-2 flex items-center justify-center gap-3">
+          <button className="btn ghost small" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(p - 1, 1))}>
+            Prev
+          </button>
+          <span className="text-[12.5px] text-[var(--muted)]">Page {page} of {totalPages}</span>
+          <button className="btn ghost small" disabled={page >= totalPages || loading} onClick={() => setPage((p) => Math.min(p + 1, totalPages))}>
+            Next
+          </button>
+        </div>
+      )}
 
       {invoiceFor && (
         <InvoiceModal order={invoiceFor} onClose={advanceInvoiceQueue} queueRemaining={invoiceQueue.length} />
