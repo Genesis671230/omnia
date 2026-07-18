@@ -16,8 +16,11 @@ export async function GET(request: Request) {
   const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const fromIso = from.toISOString();
 
-  const [orders, bankLinesRes, reconRes, payoutsRes, payoutsWithRefs] = await Promise.all([
-    OrdersRepository.listAll(),
+  const storeParam = storeFilter === "ALL" ? null : storeFilter;
+  const [inWindow, orderCounts, spotlightOrder, bankLinesRes, reconRes, payoutsRes, payoutsWithRefs] = await Promise.all([
+    OrdersRepository.listInWindow({ from: fromIso, store: storeParam }),
+    OrdersRepository.getOrderCounts({ store: storeParam }),
+    OrdersRepository.getMostRecent({ store: storeParam }),
     supabase
       .from("bank_lines")
       .select("id, statement_date, description, reference, amount, direction, gateway_guess, confidence, kind")
@@ -36,14 +39,9 @@ export async function GET(request: Request) {
 
   // ── orders side (window + optional store filter) ─────────────────────────
   const cancelled = new Set(["voided", "refunded", "cancelled"]);
-  const inWindow = orders.filter(
-    (o) =>
-      o.order_date && o.order_date >= fromIso &&
-      !cancelled.has(o.financial_status) &&
-      (storeFilter === "ALL" || o.store_id === storeFilter),
-  );
+  const inWindowFiltered = inWindow.filter((o) => !cancelled.has(o.financial_status));
 
-  const revenue = inWindow.reduce((s, o) => s + Number(o.gross_aed || 0), 0);
+  const revenue = inWindowFiltered.reduce((s, o) => s + Number(o.gross_aed || 0), 0);
 
   // daily trend, stacked by store
   const trendMap = new Map<string, Record<string, number>>();
@@ -51,7 +49,7 @@ export async function GET(request: Request) {
     const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     trendMap.set(d, {});
   }
-  for (const o of inWindow) {
+  for (const o of inWindowFiltered) {
     const d = (o.order_date as string).slice(0, 10);
     const bucket = trendMap.get(d);
     if (!bucket) continue;
@@ -66,7 +64,7 @@ export async function GET(request: Request) {
   // per-store + per-gateway splits
   const storeAgg = new Map<string, { revenue: number; orders: number }>();
   const gatewayAgg = new Map<string, { revenue: number; orders: number }>();
-  for (const o of inWindow) {
+  for (const o of inWindowFiltered) {
     const s = storeAgg.get(o.store_id) || { revenue: 0, orders: 0 };
     s.revenue += Number(o.gross_aed || 0); s.orders += 1;
     storeAgg.set(o.store_id, s);
@@ -77,7 +75,7 @@ export async function GET(request: Request) {
 
   // top products from line items
   const productAgg = new Map<string, { title: string; sku: string; qty: number; revenue: number; orders: number; stores: Set<string>; image_url: string }>();
-  for (const o of inWindow) {
+  for (const o of inWindowFiltered) {
     for (const li of o.line_items ?? []) {
       const key = li.sku || li.title;
       const p = productAgg.get(key) || { title: li.title, sku: li.sku, qty: 0, revenue: 0, orders: 0, stores: new Set<string>(), image_url: "" };
@@ -113,10 +111,6 @@ export async function GET(request: Request) {
     payoutsByProvider.set(provider, p);
   }
 
-  const codPending = orders.filter(
-    (o) => o.gateway === "COD" && o.payout_status !== "settled" && !cancelled.has(o.financial_status),
-  );
-
   // ── spotlight: the single most recent order, full chain detail ───────────
   const refsSeen = new Set<string>();
   for (const p of payoutsWithRefs) {
@@ -125,11 +119,6 @@ export async function GET(request: Request) {
       refsSeen.add(ref.replace(/^(WA|UAE|KSA|WOO)/i, ""));
     }
   }
-  const spotlightPool = orders
-    .filter((o) => storeFilter === "ALL" || o.store_id === storeFilter)
-    .filter((o) => o.order_date)
-    .sort((a, b) => (b.order_date! > a.order_date! ? 1 : -1));
-  const spotlightOrder = spotlightPool[0];
   const spotlight = spotlightOrder
     ? (() => {
         const settled = spotlightOrder.payout_status === "settled";
@@ -184,17 +173,17 @@ export async function GET(request: Request) {
     window: { days, from: fromIso.slice(0, 10), store: storeFilter },
     kpis: {
       revenue: +revenue.toFixed(2),
-      orders: inWindow.length,
-      aov: inWindow.length ? +(revenue / inWindow.length).toFixed(2) : 0,
+      orders: inWindowFiltered.length,
+      aov: inWindowFiltered.length ? +(revenue / inWindowFiltered.length).toFixed(2) : 0,
       bankCredits: +credits.reduce((s, c) => s + Number(c.amount), 0).toFixed(2),
       bankDebits: +debits.reduce((s, c) => s + Number(c.amount), 0).toFixed(2),
       settled: +settledCredits.reduce((s, c) => s + Number(c.amount), 0).toFixed(2),
       awaitingPayout: +awaitingCredits.reduce((s, c) => s + Number(c.amount), 0).toFixed(2),
       exceptions: exceptionCredits.length,
-      codPendingAed: +codPending.reduce((s, o) => s + Number(o.gross_aed || 0), 0).toFixed(2),
-      codPendingCount: codPending.length,
-      settledOrders: orders.filter((o) => o.payout_status === "settled").length,
-      totalOrders: orders.length,
+      codPendingAed: orderCounts.codPendingAed,
+      codPendingCount: orderCounts.codPendingCount,
+      settledOrders: orderCounts.settledOrders,
+      totalOrders: orderCounts.totalOrders,
     },
     trend,
     stores: [...storeAgg.entries()]
@@ -225,7 +214,7 @@ export async function GET(request: Request) {
     },
     topProducts,
     spotlight,
-    recentOrders: inWindow.slice(0, 8).map((o) => ({
+    recentOrders: inWindowFiltered.slice(0, 8).map((o) => ({
       uid: o.uid, store_id: o.store_id, order_number: o.order_number,
       order_date: o.order_date, customer_name: o.customer_name,
       gross_aed: Number(o.gross_aed || 0), gateway: o.gateway,
