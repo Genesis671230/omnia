@@ -4,7 +4,7 @@ import { SettlementDocumentsRepository } from "@/lib/repositories/settlement-doc
 // POST /api/settlements/documents — link an already-uploaded payout file to
 // the settlement records it evidences, and mint the public confirm link.
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const uploadedFileId = String(body.uploadedFileId || "");
   const settlementRecordIds = Array.isArray(body.settlementRecordIds) ? body.settlementRecordIds.map(String) : [];
 

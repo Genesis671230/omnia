@@ -483,7 +483,7 @@ import { SettlementDocumentsRepository } from "@/lib/repositories/settlement-doc
 // POST /api/settlements/documents — link an already-uploaded payout file to
 // the settlement records it evidences, and mint the public confirm link.
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const uploadedFileId = String(body.uploadedFileId || "");
   const settlementRecordIds = Array.isArray(body.settlementRecordIds) ? body.settlementRecordIds.map(String) : [];
 
@@ -593,7 +593,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
 // confirmation rather than erroring.
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const confirmedBy = String(body.confirmedBy || "").trim();
   if (!confirmedBy) return NextResponse.json({ error: "confirmedBy (name or email) is required" }, { status: 400 });
 
@@ -875,7 +875,7 @@ export async function POST(request: Request) {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const settlementIds = Array.isArray(body.settlementIds) ? body.settlementIds.map(String) : [];
   if (settlementIds.length === 0) {
     return NextResponse.json({ error: "settlementIds is required" }, { status: 400 });
