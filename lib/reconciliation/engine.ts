@@ -313,6 +313,13 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
           bank_line_id: l.id,
           payout_id: l.payout?.id ?? null,
           bank_reference: l.reference,
+          evidence_type: null,
+          evidence_confirmed: false,
+          evidence_confirmed_by: null,
+          evidence_confirmed_at: null,
+          evidence_document_id: null,
+          zoho_payment_id: null,
+          zoho_published_at: null,
         })),
     );
   if (settlementRows.length > 0) await SettlementsRepository.upsertMany(settlementRows);

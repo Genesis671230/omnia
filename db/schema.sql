@@ -262,3 +262,34 @@ create extension if not exists pg_trgm;
 create index if not exists orders_customer_name_trgm_idx on orders using gin (customer_name gin_trgm_ops);
 create index if not exists orders_order_number_trgm_idx on orders using gin (order_number gin_trgm_ops);
 create index if not exists orders_city_trgm_idx on orders using gin (city gin_trgm_ops);
+
+-- settlement evidence: automatic (Stripe API match) or human-confirmed
+-- (uploaded document + public confirm link). Gates Zoho Books publish.
+alter table settlement_records add column if not exists evidence_type text;
+alter table settlement_records add column if not exists evidence_confirmed boolean not null default false;
+alter table settlement_records add column if not exists evidence_confirmed_by text;
+alter table settlement_records add column if not exists evidence_confirmed_at timestamptz;
+alter table settlement_records add column if not exists evidence_document_id uuid;
+alter table settlement_records add column if not exists zoho_payment_id text;
+alter table settlement_records add column if not exists zoho_published_at timestamptz;
+create index if not exists settlement_records_evidence_idx on settlement_records (evidence_confirmed, zoho_payment_id);
+
+-- one uploaded statement can evidence many orders (e.g. one Tabby payout
+-- file covering 40 settled orders) — parent row + join table, not a single
+-- FK on settlement_records.
+create table if not exists settlement_documents (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'omnia',
+  uploaded_file_id uuid not null references uploaded_files(id),
+  confirm_token text not null unique,
+  confirmed_by text,
+  confirmed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists settlement_documents_token_idx on settlement_documents (confirm_token);
+
+create table if not exists settlement_document_links (
+  settlement_document_id uuid not null references settlement_documents(id),
+  settlement_record_id text not null references settlement_records(id),
+  primary key (settlement_document_id, settlement_record_id)
+);

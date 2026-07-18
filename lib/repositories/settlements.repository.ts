@@ -23,6 +23,13 @@ export type SettlementRecord = {
   payout_id: string | null;
   bank_reference: string;
   recorded_at: string;
+  evidence_type: "stripe_api" | "document" | null;
+  evidence_confirmed: boolean;
+  evidence_confirmed_by: string | null;
+  evidence_confirmed_at: string | null;
+  evidence_document_id: string | null;
+  zoho_payment_id: string | null;
+  zoho_published_at: string | null;
 };
 
 export const SettlementsRepository = {
@@ -72,5 +79,50 @@ export const SettlementsRepository = {
     return [...byDate.entries()]
       .map(([date, v]) => ({ date, count: v.count, total: +v.total.toFixed(2) }))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
+  },
+
+  async markStripeEvidence(settlementIds: string[]): Promise<void> {
+    if (settlementIds.length === 0) return;
+    const { error } = await supabase
+      .from("settlement_records")
+      .update({
+        evidence_type: "stripe_api",
+        evidence_confirmed: true,
+        evidence_confirmed_by: "stripe-api",
+        evidence_confirmed_at: new Date().toISOString(),
+      })
+      .in("id", settlementIds);
+    if (error) throw new Error(`settlement_records evidence update failed: ${error.message}`);
+  },
+
+  async listUnconfirmed(): Promise<SettlementRecord[]> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("*")
+      .eq("evidence_confirmed", false)
+      .order("settlement_date", { ascending: false })
+      .limit(500);
+    if (error) throw new Error(`settlement_records select failed: ${error.message}`);
+    return (data ?? []) as SettlementRecord[];
+  },
+
+  async listReadyToPublish(): Promise<SettlementRecord[]> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("*")
+      .eq("evidence_confirmed", true)
+      .is("zoho_payment_id", null)
+      .order("settlement_date", { ascending: false })
+      .limit(500);
+    if (error) throw new Error(`settlement_records select failed: ${error.message}`);
+    return (data ?? []) as SettlementRecord[];
+  },
+
+  async markPublished(id: string, zohoPaymentId: string): Promise<void> {
+    const { error } = await supabase
+      .from("settlement_records")
+      .update({ zoho_payment_id: zohoPaymentId, zoho_published_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw new Error(`settlement_records publish update failed: ${error.message}`);
   },
 };
