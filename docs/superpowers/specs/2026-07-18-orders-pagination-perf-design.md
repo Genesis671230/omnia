@@ -109,16 +109,41 @@ lets the UI page back through older history without changing the default.
 
 ### 4. `/api/dashboard` route
 
-Add a second, distinct repository method, `OrdersRepository.listInWindow({ from, store })`
-— not `listPage`, since dashboard aggregation needs every row *in the date
-window*, not one page of it (no `limit`/`page`/`count`, just `.gte('order_date',
-fromIso)` and `.eq('store_id', ...)` when filtered, still paging past
-Supabase's 1000-row cap internally like `listAll()` does, but only within the
-window instead of across all history). `/api/dashboard/route.ts` swaps its
-`OrdersRepository.listAll()` call for this. This is the change that matters:
-fetch shrinks from "entire order history" to "the selected day range," which
-is what the route already logically scopes to but currently fetches
-everything for first.
+The route's single `OrdersRepository.listAll()` call currently feeds **three
+different, differently-scoped** consumers, confirmed by reading the full
+route — a blind swap to a windowed fetch would silently break two of them:
+
+- `inWindow` (revenue, trend, per-store/gateway splits, top products,
+  `recentOrders`) — **is** meant to be scoped to the `days` window. Today it
+  fetches all-time and filters in JS after the fact.
+- `codPending` (line 116-118) and `kpis.settledOrders`/`totalOrders`
+  (line 196-197) — deliberately **all-time**, filtered from the full `orders`
+  array with no day-window applied. These must stay all-time.
+- `spotlightPool` (line 128-131) — the single most recent order, store-filtered
+  only, no day-window. Must also stay unwindowed (a quiet week shouldn't make
+  the spotlight go blank).
+
+So this becomes three targeted repository methods instead of one swap:
+
+1. `OrdersRepository.listInWindow({ from, store })` — full row data (needed
+   for line_items → trend/top products), scoped to `.gte('order_date', fromIso)`
+   and `.eq('store_id', ...)` when filtered, replacing `inWindow`. Still pages
+   past Supabase's 1000-row cap internally like `listAll()`, just only within
+   the window.
+2. `OrdersRepository.getOrderCounts({ store })` — `{ settledOrders, totalOrders,
+   codPendingCount, codPendingAed }` via `count: 'exact', head: true` and a
+   `.select('gross_aed').eq(...)` sum for the COD amount — no row data pulled,
+   replacing three all-time JS `.filter().length`/`.reduce()` passes over the
+   full book with cheap counts.
+3. `OrdersRepository.getMostRecent({ store })` — `.order('order_date', {
+   ascending: false }).limit(1)`, replacing the full-book sort-and-take-first
+   that builds `spotlightPool` today.
+
+`/api/dashboard/route.ts` calls all three instead of `listAll()`. Net effect
+is the same as originally intended — fetched data shrinks from "entire order
+history" to "exactly what each part of the response needs" — just via three
+right-sized queries instead of one windowed one, since the response mixes
+windowed and all-time numbers.
 
 ### 5. `FinanceWorkspace` decoupling
 

@@ -4,7 +4,12 @@
    invoice generation gets an explicit button, never a click meant for
    reading). Each row opens to product images, address, and the pack-and-ship
    status buttons. Animated with framer-motion so status changes and row
-   expansion read as live, not as a page reflow. */
+   expansion read as live, not as a page reflow.
+
+   Ledger-specific styling is tailwind; shared design-system classes (btn,
+   pill, tab, store-badge, mono, empty) still come from the workspace CSS,
+   which this always renders inside — so the --gold/--line/etc. tokens resolve
+   in the arbitrary-value classes below. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,8 +20,8 @@ import {
 import { toast } from "sonner";
 import type { OrderRow } from "@/lib/types/orders";
 import { ORDER_STATUS_META } from "@/lib/types/orders";
-import { InvoiceModal, INVOICE_MODAL_CSS } from "@/components/finance/invoice-modal";
-import { ShipModal, SHIP_MODAL_CSS } from "@/components/finance/ship-modal";
+import { InvoiceModal } from "@/components/finance/invoice-modal";
+import { ShipModal } from "@/components/finance/ship-modal";
 
 // A "Ship" button only makes sense for international orders (SMSA covers
 // KSA-domestic + beyond; Ontrack already handles UAE-local through the
@@ -60,6 +65,13 @@ const STAGES = [
   { key: "delivered", label: "Delivered", icon: PackageCheck },
 ] as const;
 
+const STAGE_PILL: Record<string, string> = {
+  processing: "bg-[#F3EFE7] text-[var(--gold-deep)]",
+  packed: "bg-[var(--info-wash)] text-[var(--info)]",
+  shipped: "bg-[var(--warn-wash)] text-[var(--warn)]",
+  delivered: "bg-[var(--ok-wash)] text-[var(--ok)]",
+};
+
 type LineItem = { title: string; sku: string; qty: number; total_aed: number; image_url?: string; stock?: number | null };
 type OrderDetail = OrderRow & { line_items: LineItem[] };
 
@@ -87,23 +99,29 @@ function StageTracker({ order, onChanged }: { order: OrderRow; onChanged: (stage
   };
 
   return (
-    <div className="stage-tracker">
+    <div className="flex items-center">
       {STAGES.map((s, i) => {
         const Icon = s.icon;
         const done = currentIdx >= 0 && i <= currentIdx;
         const active = s.key === order.fulfillment_stage;
         return (
-          <div key={s.key} className="stage-item">
+          <div key={s.key} className="flex items-center">
             {i > 0 && (
               <motion.div
-                className="stage-line"
+                className="mx-0.5 h-0.5 w-7"
                 initial={false}
                 animate={{ backgroundColor: i <= currentIdx ? "var(--gold)" : "var(--line)" }}
                 transition={{ duration: 0.3 }}
               />
             )}
             <motion.button
-              className={`stage-btn ${done ? "done" : ""} ${active ? "active" : ""}`}
+              className={`relative flex size-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] disabled:cursor-wait ${
+                active
+                  ? "border-[var(--gold)] text-[var(--gold-deep)] shadow-[0_0_0_3px_var(--gold-wash)]"
+                  : done
+                    ? "border-[var(--gold)] bg-[var(--gold-wash)] text-[var(--gold-deep)]"
+                    : "border-[var(--line-strong)] bg-[var(--card)] text-[var(--muted)]"
+              }`}
               onClick={() => advance(s.key)}
               whileTap={{ scale: 0.92 }}
               whileHover={{ scale: 1.05 }}
@@ -111,7 +129,7 @@ function StageTracker({ order, onChanged }: { order: OrderRow; onChanged: (stage
               title={s.label}
             >
               {updating === s.key ? (
-                <Loader2 size={14} className="spin" />
+                <Loader2 size={14} className="animate-spin" />
               ) : done ? (
                 <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
                   <Check size={14} />
@@ -120,7 +138,6 @@ function StageTracker({ order, onChanged }: { order: OrderRow; onChanged: (stage
                 <Icon size={14} />
               )}
             </motion.button>
-            <span className={`stage-label ${active ? "active" : ""}`}>{s.label}</span>
           </div>
         );
       })}
@@ -149,49 +166,52 @@ function ExpandedOrder({ order, onStageChanged, onInvoice, onShip }: {
 
   return (
     <motion.div
-      className="row-expand"
+      className="overflow-hidden"
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: "auto", opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      style={{ overflow: "hidden" }}
     >
-      <div className="row-expand-inner">
-        <div className="expand-grid">
-          <div className="expand-col">
-            <h4>Ship to</h4>
-            <div className="ship-info">
-              <div><Phone size={12} /> {order.customer_phone || "—"}</div>
-              <div><MapPin size={12} /> {[order.city, order.country].filter(Boolean).join(", ") || "—"}</div>
-              {order.courier && <div className="courier-chip">{order.courier}{order.tracking_number ? ` · ${order.tracking_number}` : ""}</div>}
+      <div className="border-t border-[var(--line)] px-[18px] pb-[18px] pt-1">
+        <div className="grid grid-cols-1 gap-5 pt-4 md:grid-cols-[220px_1fr]">
+          <div>
+            <h4 className="mb-2.5 text-[10.5px] uppercase tracking-[.06em] text-[var(--muted)]">Ship to</h4>
+            <div className="flex flex-col gap-[7px] text-[13px]">
+              <div className="flex items-center gap-[7px]"><Phone size={12} /> {order.customer_phone || "—"}</div>
+              <div className="flex items-center gap-[7px]"><MapPin size={12} /> {[order.city, order.country].filter(Boolean).join(", ") || "—"}</div>
+              {order.courier && (
+                <div className="mt-0.5 inline-flex w-fit items-center rounded-md bg-[var(--gold-wash)] px-2.5 py-[3px] text-[11px] font-semibold text-[var(--gold-deep)]">
+                  {order.courier}{order.tracking_number ? ` · ${order.tracking_number}` : ""}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="expand-col span2">
-            <h4>Items</h4>
+          <div>
+            <h4 className="mb-2.5 text-[10.5px] uppercase tracking-[.06em] text-[var(--muted)]">Items</h4>
             {loadingDetail ? (
-              <div className="quiet-row"><Loader2 size={14} className="spin" /> Loading items…</div>
+              <div className="flex items-center gap-2 py-2 text-[12.5px] text-[var(--muted)]"><Loader2 size={14} className="animate-spin" /> Loading items…</div>
             ) : !detail?.line_items?.length ? (
-              <div className="quiet-row">No line items on this order.</div>
+              <div className="flex items-center gap-2 py-2 text-[12.5px] text-[var(--muted)]">No line items on this order.</div>
             ) : (
-              <div className="item-strip">
+              <div className="flex flex-wrap gap-2.5">
                 {detail.line_items.slice(0, 8).map((li, i) => (
                   <motion.div
                     key={`${li.sku}-${i}`}
-                    className="item-card"
+                    className="flex w-24 flex-col gap-1.5"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.03 }}
                   >
                     {li.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={li.image_url} alt={li.title} className="item-img" loading="lazy" />
+                      <img src={li.image_url} alt={li.title} className="size-24 rounded-[10px] border border-[var(--line)] bg-[var(--cream)] object-cover" loading="lazy" />
                     ) : (
-                      <div className="item-img placeholder"><Package size={18} /></div>
+                      <div className="flex size-24 items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--cream)] text-[var(--muted)]"><Package size={18} /></div>
                     )}
-                    <div className="item-meta">
-                      <span className="item-title" title={li.title}>{li.title}</span>
-                      <span className="item-sub">×{li.qty} · {aed2(li.total_aed)}</span>
+                    <div className="flex flex-col gap-px">
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px]" title={li.title}>{li.title}</span>
+                      <span className="text-[10.5px] text-[var(--muted)]">×{li.qty} · {aed2(li.total_aed)}</span>
                     </div>
                   </motion.div>
                 ))}
@@ -200,9 +220,9 @@ function ExpandedOrder({ order, onStageChanged, onInvoice, onShip }: {
           </div>
         </div>
 
-        <div className="expand-footer">
+        <div className="mt-[18px] flex flex-wrap items-center justify-between gap-4 border-t border-dashed border-[var(--line)] pt-4">
           <StageTracker order={order} onChanged={onStageChanged} />
-          <div className="expand-actions">
+          <div className="flex gap-2">
             {order.awb_number ? (
               <a className="btn small" href={`/api/orders/${order.uid}/label`} target="_blank" rel="noreferrer">
                 <Truck size={13} /> AWB {order.awb_number}
@@ -229,6 +249,11 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
   const [expanded, setExpanded] = useState<string | null>(null);
   const [invoiceFor, setInvoiceFor] = useState<OrderRow | null>(null);
   const [shipFor, setShipFor] = useState<OrderRow | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Orders still waiting behind the one currently open in InvoiceModal —
+  // "generate N invoices" doesn't skip the per-order confirmation step, it
+  // just chains it: closing (cancel or generate) advances to the next one.
+  const [invoiceQueue, setInvoiceQueue] = useState<OrderRow[]>([]);
   // Patches from status changes / a completed shipment, applied on top of
   // the fetched order so the row updates in place without a full refetch.
   const [overrides, setOverrides] = useState<Record<string, Partial<OrderRow>>>({});
@@ -247,7 +272,35 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
     setOverrides((prev) => ({ ...prev, [uid]: { ...prev[uid], ...fields } }));
   }, []);
 
-  if (loading) return <div className="empty"><Loader2 size={18} className="spin" /> Loading orders…</div>;
+  const toggleSelect = useCallback((uid: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid); else next.add(uid);
+      return next;
+    });
+  }, []);
+
+  const startBulkInvoice = () => {
+    const chosen = rows.filter((o) => selected.has(o.uid));
+    if (chosen.length === 0) return;
+    setInvoiceFor(chosen[0]);
+    setInvoiceQueue(chosen.slice(1));
+  };
+
+  // Fires on Cancel and on a successful generate (generate() calls onClose
+  // itself) — either way, move to the next queued order, or finish up.
+  const advanceInvoiceQueue = () => {
+    if (invoiceQueue.length > 0) {
+      const [next, ...rest] = invoiceQueue;
+      setInvoiceFor(next);
+      setInvoiceQueue(rest);
+    } else {
+      setInvoiceFor(null);
+      setSelected(new Set());
+    }
+  };
+
+  if (loading) return <div className="empty"><Loader2 size={18} className="animate-spin" /> Loading orders…</div>;
   if (orders.length === 0) {
     return (
       <div className="empty">
@@ -259,21 +312,31 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
   return (
     <>
       <div className="filters">
-        <div className="search-wrap">
-          <Search size={14} />
-          <input className="search" placeholder="Search number, customer, city, phone…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="relative flex items-center">
+          <Search size={14} className="pointer-events-none absolute left-[11px] text-[var(--muted)]" />
+          <input className="search pl-8" placeholder="Search number, customer, city, phone…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="tabs" style={{ margin: 0 }}>
           {stores.map((s, index) => (
             <button key={`${s} ${index}`} className={store === s ? "tab on" : "tab"} onClick={() => setStore(s)}>{s}</button>
           ))}
         </div>
-        <select className="loc-select" value={location} onChange={(e) => setLocation(e.target.value)}>
+        <select className="ml-auto rounded-lg border border-[var(--line)] bg-[var(--card)] px-3 py-2 text-[12.5px] text-[var(--ink)]" value={location} onChange={(e) => setLocation(e.target.value)}>
           {locations.map((l) => <option key={l} value={l}>{l}</option>)}
         </select>
       </div>
 
-      <div className="order-cards">
+      {selected.size > 0 && (
+        <div className="mt-2.5 flex items-center gap-3 rounded-xl border border-[var(--gold)] bg-[var(--gold-wash)] px-4 py-2.5 text-[13px] font-medium text-[var(--gold-deep)]">
+          <span>{selected.size} selected</span>
+          <button className="btn primary small ml-auto" onClick={startBulkInvoice}>
+            <Printer size={13} /> Generate {selected.size} invoice{selected.size > 1 ? "s" : ""}
+          </button>
+          <button className="btn ghost small" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
+
+      <div className="mt-1 flex flex-col gap-2.5">
         {rows.map((o) => {
           const displayOrder = { ...o, ...overrides[o.uid] };
           const stage = displayOrder.fulfillment_stage ?? "processing";
@@ -281,28 +344,46 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
           const isOpen = expanded === o.uid;
           const group = locationGroupFor(o.city);
           return (
-            <div key={o.uid} className={`order-card ${isOpen ? "open" : ""}`}>
-              <button className="order-card-head" onClick={() => setExpanded(isOpen ? null : o.uid)}>
-                <div className="oc-order">
-                  <span className="mono">#{o.order_number}</span>
-                  <span className="store-badge">{o.store_id}</span>
-                  <span className="oc-date">{formatOrderDate(o.order_date)}</span>
-                </div>
-                <div className="oc-customer" dir="auto">{o.customer_name || "—"}</div>
-                <div className="oc-location">
-                  <MapPin size={12} />
-                  {group ?? [o.city, o.country].filter(Boolean).join(", ") ?? "—"}
-                </div>
-                <div className="oc-gateway">{o.gateway}</div>
-                <span className={`stage-pill ${stage}`}>
-                  {STAGES.find((s) => s.key === stage)?.label ?? stage}
-                </span>
-                <span className={`pill ${m.tone}`}>{m.label}</span>
-                <span className="mono oc-amount">{aed2(Number(o.gross_aed))}</span>
-                <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="chev">
-                  <ChevronDown size={16} />
-                </motion.span>
-              </button>
+            <div
+              key={o.uid}
+              className={`overflow-hidden rounded-[14px] border bg-[var(--card)] transition-[border-color,box-shadow] ${
+                isOpen ? "border-[var(--gold)] shadow-[0_4px_18px_rgba(176,131,67,.12)]" : "border-[var(--line)]"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 pl-3.5">
+                <input
+                  type="checkbox"
+                  className="size-4 shrink-0 cursor-pointer accent-[var(--gold)]"
+                  checked={selected.has(o.uid)}
+                  onChange={() => toggleSelect(o.uid)}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Select order #${o.order_number}`}
+                />
+                <button
+                  className="grid w-full grid-cols-[130px_1fr_150px_90px_100px_110px_90px_20px] items-center gap-3 px-4 py-[13px] text-left text-[13px]"
+                  onClick={() => setExpanded(isOpen ? null : o.uid)}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="mono">#{o.order_number}</span>
+                    <span className="store-badge w-fit">{o.store_id}</span>
+                    <span className="text-[10.5px] text-[var(--muted)]">{formatOrderDate(o.order_date)}</span>
+                  </div>
+                  <div className="overflow-hidden text-ellipsis whitespace-nowrap" dir="auto">{o.customer_name || "—"}</div>
+                  <div className="flex items-center gap-[5px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--muted)]">
+                    <MapPin size={12} />
+                    {group ?? [o.city, o.country].filter(Boolean).join(", ") ?? "—"}
+                  </div>
+                  <div className="text-[12.5px] text-[var(--muted)]">{o.gateway}</div>
+                  <span className={`rounded-full px-2.5 py-[3px] text-center text-[10.5px] font-semibold uppercase tracking-[.03em] ${STAGE_PILL[stage] ?? STAGE_PILL.processing}`}>
+                    {STAGES.find((s) => s.key === stage)?.label ?? stage}
+                  </span>
+                  <span className={`pill ${m.tone}`}>{m.label}</span>
+                  <span className="mono text-right font-semibold">{aed2(Number(o.gross_aed))}</span>
+                  <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-[var(--muted)]">
+                    <ChevronDown size={16} />
+                  </motion.span>
+                </button>
+              </div>
               <AnimatePresence initial={false}>
                 {isOpen && (
                   <ExpandedOrder
@@ -320,7 +401,9 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
 
       <p className="table-note">{rows.length} of {orders.length} orders · settlement comes only from a bank-confirmed payout, never from the store's own "paid" flag.</p>
 
-      {invoiceFor && <InvoiceModal order={invoiceFor} onClose={() => setInvoiceFor(null)} />}
+      {invoiceFor && (
+        <InvoiceModal order={invoiceFor} onClose={advanceInvoiceQueue} queueRemaining={invoiceQueue.length} />
+      )}
       {shipFor && (
         <ShipModal
           order={shipFor}
@@ -328,78 +411,6 @@ export function OrdersLedger({ orders, loading }: { orders: OrderRow[]; loading:
           onShipped={(awb, labelUrl) => patch(shipFor.uid, { awb_number: awb, label_url: labelUrl, courier: "SMSA", fulfillment_stage: "shipped" })}
         />
       )}
-
-      <style jsx global>{ORDERS_LEDGER_CSS}</style>
-      <style jsx global>{INVOICE_MODAL_CSS}</style>
-      <style jsx global>{SHIP_MODAL_CSS}</style>
     </>
   );
 }
-
-const ORDERS_LEDGER_CSS = `
-  .search-wrap { position: relative; display: flex; align-items: center; }
-  .search-wrap svg { position: absolute; left: 11px; color: var(--muted); pointer-events: none; }
-  .search-wrap .search { padding-left: 32px; }
-  .loc-select { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; color: var(--ink); margin-left: auto; }
-
-  .order-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-  .order-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
-  .order-card.open { border-color: var(--gold); box-shadow: 0 4px 18px rgba(176,131,67,.12); }
-  .order-card-head {
-    width: 100%; border: 0; background: transparent; cursor: pointer; padding: 13px 16px;
-    display: grid; grid-template-columns: 130px 1fr 150px 90px 100px 110px 90px 20px;
-    align-items: center; gap: 12px; text-align: left; font-size: 13px;
-  }
-  .oc-order { display: flex; flex-direction: column; gap: 2px; }
-  .oc-order .store-badge { width: fit-content; }
-  .oc-date { font-size: 10.5px; color: var(--muted); }
-  .oc-customer { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .oc-location { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .oc-gateway { color: var(--muted); font-size: 12.5px; }
-  .oc-amount { text-align: right; font-weight: 600; }
-
-  .stage-pill { font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; text-align: center; text-transform: uppercase; letter-spacing: .03em; }
-  .stage-pill.processing { background: #F3EFE7; color: var(--gold-deep); }
-  .stage-pill.packed { background: var(--info-wash, #E8F1F3); color: var(--info, #2E6B7A); }
-  .stage-pill.shipped { background: var(--warn-wash); color: var(--warn); }
-  .stage-pill.delivered { background: var(--ok-wash); color: var(--ok); }
-
-  .row-expand-inner { padding: 4px 18px 18px; border-top: 1px solid var(--line); }
-  .expand-grid { display: grid; grid-template-columns: 220px 1fr; gap: 20px; padding-top: 16px; }
-  .expand-col h4 { margin: 0 0 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .ship-info { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
-  .ship-info > div { display: flex; align-items: center; gap: 7px; }
-  .courier-chip { display: inline-flex; width: fit-content; background: var(--gold-wash); color: var(--gold-deep); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; margin-top: 2px; }
-
-  .item-strip { display: flex; gap: 10px; flex-wrap: wrap; }
-  .item-card { display: flex; flex-direction: column; gap: 6px; width: 96px; }
-  .item-img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--cream); }
-  .item-img.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); }
-  .item-meta { display: flex; flex-direction: column; gap: 1px; }
-  .item-title { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item-sub { font-size: 10.5px; color: var(--muted); }
-  .quiet-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; padding: 8px 0; }
-
-  .expand-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); gap: 16px; flex-wrap: wrap; }
-  .expand-actions { display: flex; gap: 8px; }
-
-  .stage-tracker { display: flex; align-items: center; }
-  .stage-item { display: flex; align-items: center; }
-  .stage-item:first-child .stage-line { display: none; }
-  .stage-line { width: 28px; height: 2px; margin: 0 2px; }
-  .stage-btn {
-    width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--line-strong);
-    background: var(--card); color: var(--muted); display: flex; align-items: center; justify-content: center;
-    cursor: pointer; flex-shrink: 0; position: relative;
-  }
-  .stage-btn.done { background: var(--gold-wash); border-color: var(--gold); color: var(--gold-deep); }
-  .stage-btn.active { border-color: var(--gold); color: var(--gold-deep); box-shadow: 0 0 0 3px var(--gold-wash); }
-  .stage-btn:disabled { cursor: wait; }
-  .stage-item { flex-direction: column; }
-  .stage-label { display: none; }
-  @media (min-width: 900px) {
-    .stage-item { flex-direction: row; }
-  }
-
-  .btn.small { padding: 6px 12px; font-size: 12px; }
-`;

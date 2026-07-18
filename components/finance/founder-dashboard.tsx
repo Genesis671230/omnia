@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { InvoiceModal } from "@/components/finance/invoice-modal";
 
 /* Fixed, entity-keyed categorical colors (validated: dataviz palette on white).
    Sub-3:1 slots (aqua/yellow/magenta) always ship with visible text labels. */
@@ -226,6 +227,7 @@ function PulseTicker() {
 
 function OrderSpotlight({ o }: { o: SpotlightOrder }) {
   const [copied, setCopied] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const financeMeta = SPOTLIGHT_FINANCE[o.finance_status];
   const invMeta = { in_stock: { label: "In stock", icon: PackageCheck, tone: "ok" }, out_of_stock: { label: "Out of stock", icon: PackageX, tone: "bad" }, unknown: { label: "Stock unknown", icon: HelpCircle, tone: "muted" } }[o.inventory];
 
@@ -267,11 +269,11 @@ function OrderSpotlight({ o }: { o: SpotlightOrder }) {
           <span className="spot-sub">{o.tracking_number ? `# ${o.tracking_number}` : `ETA ${o.eta_date}`}</span>
         </div>
         <div className="spot-cell">
+          <button className="pill ok spot-link" onClick={() => setInvoiceOpen(true)}>
+            <Download size={12} />Generate invoice
+          </button>
           <span className="spot-label">Invoice</span>
-          <a className="pill ok spot-link" href={`/api/orders/${o.uid}/invoice`} target="_blank" rel="noreferrer">
-            <Download size={12} />Download PDF
-          </a>
-          <span className="spot-sub">{o.tracking_url ? <a href={o.tracking_url} target="_blank" rel="noreferrer">Track shipment</a> : "generated on demand"}</span>
+          <span className="spot-sub">{o.tracking_url ? <a href={o.tracking_url} target="_blank" rel="noreferrer">Track shipment</a> : "confirm courier & address first"}</span>
         </div>
       </div>
 
@@ -291,6 +293,24 @@ function OrderSpotlight({ o }: { o: SpotlightOrder }) {
           </button>
         </div>
       </div>
+
+      {invoiceOpen && (
+        <InvoiceModal
+          order={{
+            uid: o.uid,
+            order_number: o.order_number,
+            order_date: o.order_date,
+            customer_name: o.customer.name,
+            customer_phone: o.customer.phone,
+            city: o.customer.city,
+            country: o.customer.country,
+            gateway: o.gateway,
+            gross_aed: o.gross_aed,
+            currency: "AED",
+          }}
+          onClose={() => setInvoiceOpen(false)}
+        />
+      )}
     </section>
   );
 }
@@ -560,7 +580,7 @@ const DASH_CSS = `
   .spot-cell { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
   .spot-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
   .spot-sub { font-size: 11.5px; color: var(--muted); }
-  .spot-link { text-decoration: none; width: fit-content; }
+  .spot-link { text-decoration: none; width: fit-content; border: 0; cursor: pointer; font: inherit; }
   .spot-lower { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; }
   .spot-customer { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
   .spot-customer b { font-family: Georgia, serif; font-size: 15px; font-weight: 500; }

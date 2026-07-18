@@ -21,7 +21,7 @@ import {
   Landmark, FileSpreadsheet, Package, ArrowRight, Check, AlertTriangle,
   Clock, HelpCircle, Upload, ShieldCheck, ChevronDown, Lock, BadgeCheck,
   RefreshCcw, Loader2, LayoutDashboard, ChartNoAxesCombined, PackageSearch,
-  WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings, Megaphone, Boxes,
+  WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings, Megaphone, Boxes, Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,11 +34,12 @@ import { ReportsPanel } from "@/components/finance/reports-panel";
 import { MarketingPanel } from "@/components/finance/marketing-panel";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
+import { CustomersPanel } from "@/components/finance/customers-panel";
 import type { OrderRow } from "@/lib/types/orders";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
-  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "inventory" | "settings";
+  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "inventory" | "customers" | "settings";
 
 const NAV: { href: string; view: FinanceView; label: string; icon: React.ElementType }[] = [
   { href: "/", view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -51,6 +52,7 @@ const NAV: { href: string; view: FinanceView; label: string; icon: React.Element
   // { href: "/reports", view: "reports", label: "Reports", icon: FileChartColumn },
   { href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
   { href: "/inventory", view: "inventory", label: "Inventory", icon: Boxes },
+  { href: "/customers", view: "customers", label: "Customers", icon: Users },
   { href: "/settings", view: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -74,6 +76,14 @@ type ReconLine = {
   state: "AWAITING_PAYOUT" | "PAYOUT_VARIANCE" | "ORDERS_UNRESOLVED" | "SETTLED";
   confirmedBy: string | null;
 };
+
+// Live per-order evidence behind a Stripe bank credit, from the Stripe API
+// (GET /api/payouts/:id/stripe-proof) — the gateway's own ledger, not the
+// uploaded CSV.
+type StripeTxn = { ref: string; isRefund: boolean; quality: string; netShare: number; grossShare: number; feeShare: number };
+type StripeProof =
+  | { available: true; payoutId: string; net: number; refs: string[]; transactions: StripeTxn[] }
+  | { available: false; reason: string };
 
 type ReconPayload = {
   lines: ReconLine[];
@@ -180,6 +190,22 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
   const payoutOk = !!r.payout && Math.abs(r.variance) <= 1;
   const ordersOk = payoutOk && r.unresolvedRefs.length === 0 && r.resolvedOrders.length > 0;
 
+  // Payouts reach the bank within ~1 week, so a credit still missing its
+  // payout file after 7 days is overdue — the file should already exist.
+  const ageDays = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86_400_000) : null;
+  const overdue = !r.payout && ageDays !== null && ageDays > 7;
+
+  // Live Stripe proof — fetched lazily the first time a Stripe row is opened.
+  const isStripe = r.provider === "Stripe" && !!r.payout && r.payout.id.startsWith("STRIPE-");
+  const [proof, setProof] = useState<StripeProof | null>(null);
+  useEffect(() => {
+    if (!open || !isStripe || proof || !r.payout) return;
+    fetch(`/api/payouts/${encodeURIComponent(r.payout.id)}/stripe-proof`)
+      .then((x) => x.json())
+      .then((d: StripeProof) => setProof(d))
+      .catch(() => setProof({ available: false, reason: "Could not reach Stripe" }));
+  }, [open, isStripe, proof, r.payout]);
+
   return (
     <div className={`row ${meta.tone}`}>
       <button className="row-head" onClick={() => setOpen(!open)}>
@@ -208,6 +234,11 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
             )}
           </span>
           <span className={`pill ${meta.tone}`}><meta.icon size={12} />{r.confirmedBy ? "Confirmed" : meta.label}</span>
+          {overdue && (
+            <span className="pill bad" title={`Bank credited ${ageDays} days ago — the payout file should already be here`}>
+              <AlertTriangle size={12} />{ageDays}d overdue
+            </span>
+          )}
           {r.refundedOrders.length > 0 && (
             <span className="pill muted" title={`Refunded: #${r.refundedOrders.join(", #")}`}>
               <RotateCcw size={12} />{r.refundedOrders.length} refund{r.refundedOrders.length > 1 ? "s" : ""}
@@ -325,6 +356,45 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
             </div>
           )}
 
+          {overdue && (
+            <div className="note bad">
+              This bank credit is <b>{ageDays} days old</b>. {r.provider} payouts normally reach the bank within a week, so the payout file is overdue —
+              upload it below, or check the {r.provider} dashboard for a settlement that hasn&apos;t been exported yet.
+            </div>
+          )}
+
+          {isStripe && (
+            <div className="stripe-proof">
+              <div className="proof-head">
+                <ShieldCheck size={13} /> Stripe proof
+                {proof?.available && <span className="proof-sub">live from Stripe · payout {proof.payoutId}</span>}
+              </div>
+              {!proof ? (
+                <div className="proof-loading"><Loader2 size={13} className="spin" /> Pulling balance transactions…</div>
+              ) : !proof.available ? (
+                <div className="note muted">Couldn&apos;t load live Stripe proof: {proof.reason}</div>
+              ) : proof.transactions.length === 0 ? (
+                <div className="note muted">Stripe returned no per-order transactions for this payout.</div>
+              ) : (
+                <table className="proof-table">
+                  <thead><tr><th>Order</th><th>Gross</th><th>Fee</th><th className="r">Net</th><th /></tr></thead>
+                  <tbody>
+                    {proof.transactions.map((t, i) => (
+                      <tr key={t.ref + i} className={t.isRefund ? "refund" : ""}>
+                        <td className="mono">#{t.ref}</td>
+                        <td className="mono">{aed2(t.grossShare)}</td>
+                        <td className="mono">{aed2(t.feeShare)}</td>
+                        <td className="mono r">{aed2(t.netShare)}</td>
+                        <td>{t.isRefund ? <span className="pill muted"><RotateCcw size={11} />refund</span> : null}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr><td>Net settled</td><td /><td /><td className="mono r"><b>{aed2(proof.net)}</b></td><td /></tr></tfoot>
+                </table>
+              )}
+            </div>
+          )}
+
           <div className="row-actions">
             {r.state === "SETTLED" && !r.confirmedBy && (
               isFounder ? (
@@ -365,6 +435,7 @@ const VIEW_META: Record<FinanceView, { title: string; sub: string }> = {
   reports: { title: "Finance reports", sub: "Founder-ready settlement packs." },
   marketing: { title: "Marketing performance", sub: "Ad spend and conversions from Meta, Google, TikTok, and Snapchat, next to actual store revenue for each store." },
   inventory: { title: "Inventory sync", sub: "Zoho's authoritative stock next to live Shopify and WooCommerce quantities, plus recent orders missing from Zoho." },
+  customers: { title: "Customers", sub: "Every customer ranked by lifetime spend across all stores, with full cross-store order history, expected LTV, and blended acquisition cost." },
   settings: { title: "Workspace settings", sub: "Stores, gateways, and reporting preferences." },
 };
 
@@ -459,6 +530,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
   const showReports = view === "reports";
   const showMarketing = view === "marketing";
   const showInventory = view === "inventory";
+  const showCustomers = view === "customers";
   // The bank-settlement KPI bar and document checklist below belong to the
   // reconciliation chain (bank → payout → orders) — showing them on pages
   // with their own contextual metrics (marketing spend, inventory mismatch
@@ -568,6 +640,8 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         <MarketingPanel />
       ) : showInventory ? (
         <InventoryPanel />
+      ) : showCustomers ? (
+        <CustomersPanel />
       ) : showOrders ? (
         <OrdersLedger orders={orders} loading={loading} />
       ) : (
@@ -720,12 +794,26 @@ const CSS = `
   .note.info { background: var(--info-wash); color: var(--gold-deep); }
   .note.ok { background: var(--ok-wash); color: var(--ok); }
 
+  .stripe-proof { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; background: var(--cream); }
+  .proof-head { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gold-deep); font-weight: 600; margin-bottom: 10px; }
+  .proof-head svg { color: var(--gold); }
+  .proof-sub { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .proof-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+  .proof-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .proof-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+  .proof-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .proof-table tr:last-child td { border-bottom: 0; }
+  .proof-table .r { text-align: right; }
+  .proof-table tr.refund td { color: var(--muted); }
+  .proof-table tfoot td { border-top: 1px solid var(--line-strong); border-bottom: 0; padding-top: 8px; color: var(--gold-deep); }
+
   .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .btn { display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); }
   .btn:disabled { opacity: .6; cursor: wait; }
   .btn.primary { background: var(--gold); border-color: var(--gold); color: #fff; }
   .btn.ghost { background: transparent; }
   .btn.locked { background: #F3EFE7; color: var(--muted); border-style: dashed; cursor: not-allowed; }
+  .btn.small { padding: 6px 12px; font-size: 12px; }
   .confirmed-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ok); font-weight: 500; }
   .hidden-input { display: none; }
   .spin { animation: spin 1s linear infinite; }
