@@ -549,7 +549,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
 
       {/* {view !=="orders"&&(
          */}
-        {/* <header className="top">
+        <header className="top">
         <div>
           <p className="eyebrow">Omnia financial operations</p>
           <h1>{meta.title}</h1>
@@ -572,7 +572,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           }
           </div>
         </div>
-      </header> */}
+      </header>
           {/* )} */}
 
       {showReconContext &&(
