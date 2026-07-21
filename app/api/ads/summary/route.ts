@@ -6,17 +6,18 @@ const STORES = ["WOO", "KSA", "UAE"];
 const cancelled = new Set(["voided", "refunded", "cancelled"]);
 
 // GET /api/ads/summary?days=30&store=ALL — per-store ad spend/conversions
-// (Meta/Google/TikTok/Snap) next to actual store revenue for the same
-// window, plus a per-campaign breakdown for the marketing table.
+// (Meta/Google/TikTok/Snap) next to actual store revenue for the same window,
+// a per-PLATFORM spend-efficiency breakdown, and a per-campaign table.
 //
-// REVERSAL (2026-07-17, founder-approved): the 2026-07-15 spec forbade
-// computing a "true ROAS" at all. The founder asked for one. We now return
-// BOTH — pixel_roas (Meta's self-reported attribution) and settled_roas
-// (real store revenue / spend) — each labeled by source, never averaged into
-// one figure. The original caution was well-founded: this connector was
-// overcounting conversions 8x and would have reported 28.55x against a real
-// 4.76x. Showing both keeps that gap visible instead of hiding it in a mean.
-// See docs/superpowers/specs/2026-07-17-meta-ads-correctness-design.md.
+// ROAS honesty (2026-07-17 spec): pixel_roas = platform self-reported;
+// settled_roas = real store revenue / spend. Never averaged into one.
+//
+// Per-platform note: pixel_roas IS computable per platform (conversion_value
+// lives on ad_insights, which carries `platform`). settled_roas is NOT —
+// store revenue can't be attributed to a platform (no click-to-order link in
+// this data, same limitation as blended CAC). So the platform breakdown
+// deliberately OMITS settled ROAS rather than fabricate a per-platform split;
+// settled ROAS stays store-level only.
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const days = Math.min(Math.max(parseInt(url.searchParams.get("days") || "30", 10) || 30, 1), 365);
@@ -63,14 +64,54 @@ export async function GET(request: Request) {
         purchase: +purchases.toFixed(2),
       },
       cost_per_purchase_aed: purchases > 0 ? +(spend / purchases).toFixed(2) : null,
-      // Two ROAS figures, never averaged into one. pixel_roas is Meta's own
-      // attribution; settled_roas is money that actually reached the store.
-      // They measure different things and the gap between them is the point.
       pixel_roas: spend > 0 ? +(pixelValue / spend).toFixed(2) : null,
       settled_roas: spend > 0 ? +(revenue / spend).toFixed(2) : null,
     };
   });
 
+  // ── per-PLATFORM spend-efficiency aggregate ──────────────────────────────
+  // Real fields only. NO settled_roas here (see header note). pixel_roas and
+  // the cost-per-* efficiency numbers are all sourced from ad_insights, which
+  // carries the platform tag, so these are honest.
+  const byPlatform = new Map<string, {
+    platform: string; spend: number; impressions: number; clicks: number;
+    conversions: number; conversion_value: number; campaigns: Set<string>;
+  }>();
+  for (const r of scopedInsights) {
+    const p = byPlatform.get(r.platform) ?? {
+      platform: r.platform, spend: 0, impressions: 0, clicks: 0,
+      conversions: 0, conversion_value: 0, campaigns: new Set<string>(),
+    };
+    p.spend += r.spend;
+    p.impressions += r.impressions;
+    p.clicks += r.clicks;
+    p.conversions += r.conversions;
+    p.conversion_value += r.conversion_value;
+    p.campaigns.add(r.campaign_id);
+    byPlatform.set(r.platform, p);
+  }
+
+  const totalSpend = [...byPlatform.values()].reduce((s, p) => s + p.spend, 0);
+  const platforms = [...byPlatform.values()]
+    .map((p) => ({
+      platform: p.platform,
+      spend_aed: +p.spend.toFixed(2),
+      spend_share: totalSpend > 0 ? +(p.spend / totalSpend).toFixed(4) : 0,
+      impressions: p.impressions,
+      clicks: p.clicks,
+      conversions: +p.conversions.toFixed(2),
+      conversion_value_aed: +p.conversion_value.toFixed(2),
+      campaign_count: p.campaigns.size,
+      ctr: p.impressions > 0 ? +(p.clicks / p.impressions).toFixed(4) : null,
+      cost_per_click_aed: p.clicks > 0 ? +(p.spend / p.clicks).toFixed(2) : null,
+      cost_per_conversion_aed: p.conversions > 0 ? +(p.spend / p.conversions).toFixed(2) : null,
+      // pixel ROAS only — platform self-reported value / spend. Labeled as
+      // pixel everywhere in the UI so it's never mistaken for settled money.
+      pixel_roas: p.spend > 0 ? +(p.conversion_value / p.spend).toFixed(2) : null,
+    }))
+    .sort((a, b) => b.spend_aed - a.spend_aed);
+
+  // ── per-campaign table (unchanged) ───────────────────────────────────────
   const byCampaign = new Map<string, {
     campaign_id: string; platform: string; store_id: string; campaign_name: string;
     campaign_status: string; spend: number; impressions: number; clicks: number;
@@ -91,8 +132,21 @@ export async function GET(request: Request) {
   }
 
   const campaigns = [...byCampaign.values()]
-    .map((c) => ({ ...c, spend: +c.spend.toFixed(2), conversions: +c.conversions.toFixed(2), conversion_value: +c.conversion_value.toFixed(2) }))
+    .map((c) => ({
+      ...c,
+      spend: +c.spend.toFixed(2),
+      conversions: +c.conversions.toFixed(2),
+      conversion_value: +c.conversion_value.toFixed(2),
+      // per-campaign pixel ROAS + cost-per-conversion, for the sortable table
+      pixel_roas: c.spend > 0 ? +(c.conversion_value / c.spend).toFixed(2) : null,
+      cost_per_conversion: c.conversions > 0 ? +(c.spend / c.conversions).toFixed(2) : null,
+    }))
     .sort((a, b) => b.spend - a.spend);
 
-  return NextResponse.json({ window: { days, from, to, store: storeFilter }, stores, campaigns });
+  return NextResponse.json({
+    window: { days, from, to, store: storeFilter },
+    platforms,
+    stores,
+    campaigns,
+  });
 }

@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "docs-tam",
+      "source": "@docs-tam/v1.0.0#17ybpf1vml68lt7f",
+      "integrity": "sha512-II8YMJnjWdfoB8H7NGx60MgG8RNAEjvC2t9lkLd53vsezSBp4MQpcBBDozSkY8PTANLvIy+vZSntxj2ZBWt/6g==",
+      "installerVersion": "6.1.3"
+    }
+  ]
+}

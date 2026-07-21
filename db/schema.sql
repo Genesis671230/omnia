@@ -307,3 +307,28 @@ create table if not exists zoho_publish_runs (
   error         text
 );
 create index if not exists zoho_publish_runs_started_idx on zoho_publish_runs (started_at desc);
+
+-- customer_id: deterministic identity key ('email:<normalized>' or
+-- 'phone:<last9digits>') stamped on every order at sync time
+-- (lib/customer-identity.ts) — lets customer lookups use a direct index
+-- instead of re-matching email/phone across the whole order book.
+alter table orders add column if not exists customer_id text;
+create index if not exists orders_customer_id_idx on orders (customer_id);
+
+-- customers: a `customers` table already existed (id/tenant_id/email/
+-- phone/name/country/city/shopify_ids/woo_ids/first_order_date/
+-- total_orders/total_returns/flag_score — empty, unused by any code,
+-- apparently scaffolded for a different, never-built fraud/returns-risk
+-- feature). Per founder decision, that table is kept as-is and this only
+-- ADDS the columns needed for spend/LTV tracking derived from orders
+-- (lib/repositories/customers.repository.ts, CustomersRepository.rebuildAll).
+-- id/tenant_id/email/phone/name/first_order_date/total_orders are reused
+-- from the existing table, not redefined here.
+alter table customers add column if not exists matched_by             text not null default '';
+alter table customers add column if not exists stores                 text[] not null default '{}';
+alter table customers add column if not exists total_spend_aed        numeric not null default 0;
+alter table customers add column if not exists aov_aed                numeric not null default 0;
+alter table customers add column if not exists last_order_date        timestamptz;
+alter table customers add column if not exists expected_ltv_next_year numeric not null default 0;
+alter table customers add column if not exists updated_at             timestamptz not null default now();
+create index if not exists customers_total_spend_idx on customers (total_spend_aed desc);

@@ -7,7 +7,7 @@
 import { syncAdInsights } from "@/lib/ad-sync";
 import { AdSyncRunsRepository } from "@/lib/repositories/ad-sync-runs.repository";
 
-const DEFAULT_INTERVAL_MINUTES = 15;
+const DEFAULT_INTERVAL_MINUTES = 120;
 const INITIAL_DELAY_MS = 15_000; // let the server finish booting before the first cycle
 
 // Next.js hot-reloads server modules in dev; stash the timer on globalThis so
@@ -28,7 +28,7 @@ async function runSyncCycle(trigger: "scheduler" | "manual") {
 export function startAdSyncScheduler() {
   if (g.__adSyncTimer) return; // already running
 
-  const minutes = Math.max(parseInt(process.env.AD_SYNC_INTERVAL_MINUTES || "", 10) || DEFAULT_INTERVAL_MINUTES, 5);
+  const minutes = Math.max(parseInt(process.env.AD_SYNC_INTERVAL_MINUTES || "", 120) || DEFAULT_INTERVAL_MINUTES, 120);
   const intervalMs = minutes * 60 * 1000;
 
   const tick = () => { void runSyncCycle("scheduler"); };

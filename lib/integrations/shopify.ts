@@ -22,6 +22,34 @@ export function getShopifyStores(): ShopifyStoreConfig[] {
 
 const API_VERSION = process.env.SHOPIFY_API_VERSION || "2024-04";
 
+// Shopify's Admin API is cost-throttled (HTTP 429, or a 200 with a
+// GraphQL-level `THROTTLED` error). A 2-year backfill across 3 stores is
+// enough volume to trip it — without this, one throttle response aborts
+// the whole store's sync, losing every page already fetched in that run.
+const MAX_RETRY_ATTEMPTS = 5;
+
+async function shopifyFetchWithRetry(endpoint: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(endpoint, init);
+    if (res.status !== 429 || attempt >= MAX_RETRY_ATTEMPTS) return res;
+    const retryAfter = Number(res.headers.get("Retry-After")) || Math.min(2 ** attempt, 30);
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+  }
+}
+
+// GraphQL-level throttling returns HTTP 200 with errors[].extensions.code
+// === "THROTTLED" — distinct from the HTTP 429 case above, handled at each
+// call site since it requires re-issuing the same POST body.
+function isThrottledGraphQLError(json: any): boolean {
+  return Array.isArray(json?.errors) && json.errors.some((e: any) => e?.extensions?.code === "THROTTLED");
+}
+
+function throttleDelayMs(json: any, attempt: number): number {
+  const restoreRate = json?.errors?.[0]?.extensions?.cost?.throttleStatus?.restoreRate;
+  if (typeof restoreRate === "number" && restoreRate > 0) return Math.ceil(1000 / restoreRate) + 250;
+  return Math.min(2 ** attempt, 30) * 1000;
+}
+
 // Everything the finance OS needs from an order, in one page-sized query.
 const ORDERS_QUERY = /* GraphQL */ `
   query FinanceOrders($first: Int!, $after: String, $query: String) {
@@ -118,23 +146,31 @@ export async function fetchShopifyInventory(store: ShopifyStoreConfig): Promise<
   let after: string | null = null;
 
   do {
-    const res: Response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": store.token,
-      },
-      body: JSON.stringify({ query: INVENTORY_QUERY, variables: { first: 250, after } }),
-      cache: "no-store",
-    });
+    let json: any;
+    for (let attempt = 1; ; attempt++) {
+      const res = await shopifyFetchWithRetry(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": store.token,
+        },
+        body: JSON.stringify({ query: INVENTORY_QUERY, variables: { first: 250, after } }),
+        cache: "no-store",
+      });
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${body.slice(0, 300)}`);
-    }
-    const json = await res.json();
-    if (json.errors) {
-      throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${body.slice(0, 300)}`);
+      }
+      json = await res.json();
+      if (isThrottledGraphQLError(json) && attempt < MAX_RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, throttleDelayMs(json, attempt)));
+        continue;
+      }
+      if (json.errors) {
+        throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+      }
+      break;
     }
 
     const page = json.data.productVariants;
@@ -148,36 +184,46 @@ export async function fetchShopifyInventory(store: ShopifyStoreConfig): Promise<
 export async function fetchShopifyOrders(
   store: ShopifyStoreConfig,
   sinceIso: string,
+  onPage?: (orders: ShopifyRawOrder[]) => Promise<void>,
 ): Promise<ShopifyRawOrder[]> {
   const endpoint = `${store.url}/admin/api/${API_VERSION}/graphql.json`;
   const orders: ShopifyRawOrder[] = [];
   let after: string | null = null;
 
   do {
-    const res: Response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": store.token,
-      },
-      body: JSON.stringify({
-        query: ORDERS_QUERY,
-        variables: { first: 100, after, query: `created_at:>='${sinceIso}'` },
-      }),
-      cache: "no-store",
-    });
+    let json: any;
+    for (let attempt = 1; ; attempt++) {
+      const res = await shopifyFetchWithRetry(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Access-Token": store.token,
+        },
+        body: JSON.stringify({
+          query: ORDERS_QUERY,
+          variables: { first: 100, after, query: `created_at:>='${sinceIso}'` },
+        }),
+        cache: "no-store",
+      });
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${body.slice(0, 300)}`);
-    }
-    const json = await res.json();
-    if (json.errors) {
-      throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${body.slice(0, 300)}`);
+      }
+      json = await res.json();
+      if (isThrottledGraphQLError(json) && attempt < MAX_RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, throttleDelayMs(json, attempt)));
+        continue;
+      }
+      if (json.errors) {
+        throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+      }
+      break;
     }
 
     const page = json.data.orders;
     orders.push(...page.nodes);
+    if (onPage && page.nodes.length > 0) await onPage(page.nodes);
     after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
   } while (after);
 

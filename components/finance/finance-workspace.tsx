@@ -546,7 +546,10 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         ))}
       </nav>
 
-      <header className="top">
+
+      {/* {view !=="orders"&&(
+         */}
+        {/* <header className="top">
         <div>
           <p className="eyebrow">Omnia financial operations</p>
           <h1>{meta.title}</h1>
@@ -564,13 +567,15 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
             <button className="btn" disabled={syncing} onClick={sync}>
               {syncing ? <Loader2 size={14} className="spin" /> : <RefreshCcw size={14} />} Sync stores
             </button>
-            <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt"
-              label="Upload bank statement" onDone={refresh} />
+            {view ==="reconciliation"&&   <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt"
+            label="Upload bank statement" onDone={refresh} />
+          }
           </div>
         </div>
-      </header>
+      </header> */}
+          {/* )} */}
 
-      {showReconContext && (
+      {showReconContext &&(
         <div className="range-bar">
           <label>From <input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} /></label>
           <label>To <input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} /></label>
@@ -590,10 +595,10 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       )}
 
       {/* Document checklist — what's missing before things can settle */}
-      {showReconContext && recon && (
+      {showReconContext && recon &&   (
         !recon.documents.bankStatement ||
         recon.documents.missingPayouts.length > 0 ||
-        recon.documents.range?.noStatementForRange
+        recon.documents.range?.noStatementForRange 
       ) && (
         <div className="docs">
           <span className="docs-title"><FileSpreadsheet size={13} /> Documents required</span>
@@ -617,7 +622,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         </div>
       )}
 
-      {showReconContext && (
+      {showReconContext && view !=="orders"&& (
         <div className="kpis">
           <Kpi label="Bank-confirmed settled" value={aed(sum(settled))} note={`${settled.length} of ${lines.length} credit lines`} tone="ok" />
           <Kpi label="Awaiting payout file" value={aed(sum(buckets.awaiting))} note={`${buckets.awaiting.length} lines · money in transit`} tone="info" />
@@ -708,7 +713,7 @@ const CSS = `
     --bad: #A6472F; --bad-wash: #F9ECE7;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     color: var(--ink); background: var(--cream);
-    padding: 32px; padding-bottom: 110px; max-width: 1120px; margin: 0 auto; min-height: 100vh;
+    padding: 32px; padding-bottom: 110px; max-width: 1320px; margin: 0 auto; min-height: 100vh;
   }
   .wrap * { box-sizing: border-box; }
   .topnav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }

@@ -8,7 +8,7 @@ import { syncGatewayPayouts } from "@/lib/payout-sync";
 import { runReconciliation, summarizeReconLines } from "@/lib/reconciliation/engine";
 import { SyncRunsRepository } from "@/lib/repositories/sync-runs.repository";
 
-const DEFAULT_INTERVAL_MINUTES = 30;
+const DEFAULT_INTERVAL_MINUTES = 130;
 const INITIAL_DELAY_MS = 10_000; // let the server finish booting before the first cycle
 
 // Next.js hot-reloads server modules in dev; stash the timer on globalThis so
@@ -31,7 +31,7 @@ async function runSyncCycle(trigger: "scheduler" | "manual") {
 export function startPayoutSyncScheduler() {
   if (g.__payoutSyncTimer) return; // already running
 
-  const minutes = Math.max(parseInt(process.env.PAYOUT_SYNC_INTERVAL_MINUTES || "", 10) || DEFAULT_INTERVAL_MINUTES, 5);
+  const minutes = Math.max(parseInt(process.env.PAYOUT_SYNC_INTERVAL_MINUTES || "", 130) || DEFAULT_INTERVAL_MINUTES, 130);
   const intervalMs = minutes * 60 * 1000;
 
   const tick = () => { void runSyncCycle("scheduler"); };

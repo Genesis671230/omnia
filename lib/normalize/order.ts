@@ -4,6 +4,7 @@
 
 import { toAed } from "@/lib/fx";
 import { classifyOrderGateway } from "@/lib/gateways";
+import { customerIdentityKey } from "@/lib/customer-identity";
 import type { ShopifyRawOrder, ShopifyStoreCode } from "@/lib/integrations/shopify";
 import { telrRefsFromMeta, type WooRawOrder } from "@/lib/integrations/woo";
 
@@ -35,6 +36,7 @@ export type OrderRow = {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  customer_id: string | null;
   source: string;
   payout_status: string;
   updated_at: string;
@@ -64,6 +66,12 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
   const gross = money(raw.currentTotalPriceSet);
   const gatewayRaw = raw.paymentGatewayNames.join(",");
   const tracking = raw.fulfillments?.flatMap((f) => f.trackingInfo ?? []).find((t) => t.company || t.number);
+  const phone =
+    raw.shippingAddress?.phone ||
+    raw.billingAddress?.phone ||
+    raw.customer?.phone ||
+    raw.customer?.defaultAddress?.phone ||
+    "";
 
   return {
     id: uid,
@@ -94,12 +102,8 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
     // than customer.phone (Shopify's marketing-profile phone, opt-in only).
     // Prefer it, then billing, then the profile phone, then the customer's
     // default saved address — orders frequently carry a number ONLY there.
-    customer_phone:
-      raw.shippingAddress?.phone ||
-      raw.billingAddress?.phone ||
-      raw.customer?.phone ||
-      raw.customer?.defaultAddress?.phone ||
-      "",
+    customer_phone: phone,
+    customer_id: customerIdentityKey(raw.email, phone)?.id ?? null,
     source: "shopify",
     payout_status: "awaiting",
     updated_at: new Date().toISOString(),
@@ -151,6 +155,7 @@ export function normalizeWooOrder(raw: WooRawOrder): OrderRow {
     customer_name: `${raw.billing?.first_name || ""} ${raw.billing?.last_name || ""}`.trim(),
     customer_email: raw.billing?.email || "",
     customer_phone: raw.billing?.phone || "",
+    customer_id: customerIdentityKey(raw.billing?.email, raw.billing?.phone)?.id ?? null,
     source: "woocommerce",
     payout_status: "awaiting",
     updated_at: new Date().toISOString(),

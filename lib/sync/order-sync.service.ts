@@ -5,6 +5,7 @@ import { fetchShopifyOrders, getShopifyStores } from "@/lib/integrations/shopify
 import { fetchWooOrders, wooConfigured } from "@/lib/integrations/woo";
 import { normalizeShopifyOrder, normalizeWooOrder } from "@/lib/normalize/order";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
+import { CustomersRepository } from "@/lib/repositories/customers.repository";
 
 const DEFAULT_WINDOW_DAYS = 60;
 
@@ -52,5 +53,16 @@ export async function syncAllStores(windowDays = DEFAULT_WINDOW_DAYS): Promise<S
     );
   }
 
-  return Promise.all(jobs);
+  const results = await Promise.all(jobs);
+
+  // Derived view, not the source of truth — a rebuild failure must never
+  // fail the order sync itself, since orders (already upserted above) are
+  // what actually matters here.
+  try {
+    await CustomersRepository.rebuildAll();
+  } catch (e) {
+    console.error("[order-sync] customers rebuild failed:", (e as Error).message);
+  }
+
+  return results;
 }

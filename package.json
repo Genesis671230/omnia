@@ -7,9 +7,12 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "test": "tsx --test 'tests/**/*.test.ts'"
+    "test": "tsx --test 'tests/**/*.test.ts'",
+    "backfill:orders": "tsx scripts/backfill-orders.ts",
+    "test:woo-rate-limit": "tsx scripts/test-woo-rate-limit.ts"
   },
   "dependencies": {
+    "@api/docs-tam": "file:.api/apis/docs-tam",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -42,6 +45,7 @@
     "@supabase/supabase-js": "^2.110.5",
     "@vercel/analytics": "1.3.1",
     "autoprefixer": "^10.4.20",
+    "bottleneck": "^2.19.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -72,6 +76,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
     "@types/node": "^22",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "baseline-browser-mapping": "^2.10.43",

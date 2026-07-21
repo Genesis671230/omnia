@@ -1,13 +1,15 @@
 import { supabase } from "@/lib/supabase";
 import type { OrderRow } from "@/lib/normalize/order";
 import { keywordsForLocation } from "@/lib/orders-locations";
+import { dropClobberRiskFields } from "@/lib/orders-clobber-guard";
 
 const ORDER_COLUMNS =
-  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
+  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
 
 export type OrderRowRaw = {
   uid: string; store_id: string; order_number: string; order_date: string | null;
-  customer_name: string; customer_email: string; customer_phone: string; city: string; country: string;
+  customer_name: string; customer_email: string; customer_phone: string; customer_id: string | null;
+  city: string; country: string;
   currency: string; gross_original: number; gross_aed: number; gateway: string;
   gateway_raw: string; financial_status: string; fulfillment_status: string;
   telr_cartid: string; telr_tranref: string; payout_id: string | null;
@@ -85,10 +87,53 @@ function applyOrdersFilters(
 export const OrdersRepository = {
   // Upsert synced orders WITHOUT touching settlement fields — payout_id /
   // payout_status belong to the reconciler, and a re-sync must never
-  // un-settle an order.
+  // un-settle an order. Also protects courier/tracking_number/tracking_url
+  // for orders already shipped through this app's own SMSA pipeline (see
+  // dropClobberRiskFields above) — those fields belong to whoever shipped
+  // the order, not to whatever the store's raw payload says today.
   async upsertMany(rows: OrderRow[]): Promise<number> {
     if (rows.length === 0) return 0;
-    const syncRows = rows.map(({ payout_status: _p, ...rest }) => rest);
+
+    const uids = rows.map((r) => r.uid);
+    const shippedUids = new Set<string>();
+    for (let i = 0; i < uids.length; i += 200) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("uid")
+        .in("uid", uids.slice(i, i + 200))
+        .not("awb_number", "is", null)
+        .neq("awb_number", "");
+      if (error) throw new Error(`orders shipped-lookup failed: ${error.message}`);
+      for (const r of data ?? []) shippedUids.add(r.uid as string);
+    }
+
+    const syncRows = rows.map((row) => dropClobberRiskFields(row, shippedUids));
+
+    // orders.customer_id carries a FK to customers(id) — a customer row must
+    // exist before any order referencing it can be written. These are cheap
+    // placeholder values (only touches id/tenant_id/name/email/phone/
+    // matched_by, never total_spend_aed etc.), immediately superseded by
+    // CustomersRepository.rebuildAll() which runs after every sync/backfill
+    // — this step only exists to satisfy the constraint at write time.
+    const customerStubs = new Map<string, { id: string; tenant_id: string; name: string; email: string; phone: string; matched_by: string }>();
+    for (const row of rows) {
+      if (!row.customer_id) continue;
+      customerStubs.set(row.customer_id, {
+        id: row.customer_id,
+        tenant_id: row.tenant_id,
+        name: row.customer_name || row.customer_email || row.customer_phone || "Unknown",
+        email: row.customer_email,
+        phone: row.customer_phone,
+        matched_by: row.customer_id.startsWith("email:") ? "email" : "phone",
+      });
+    }
+    if (customerStubs.size > 0) {
+      const { error: stubErr } = await supabase
+        .from("customers")
+        .upsert([...customerStubs.values()], { onConflict: "id" });
+      if (stubErr) throw new Error(`customers stub upsert failed: ${stubErr.message}`);
+    }
+
     const { error } = await supabase.from("orders").upsert(syncRows, { onConflict: "uid" });
     if (error) throw new Error(`orders upsert failed: ${error.message}`);
 
@@ -108,16 +153,14 @@ export const OrdersRepository = {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("orders")
-        .select(
-          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error",
-        )
+        .select(ORDER_COLUMNS)
         .order("order_date", { ascending: false })
         .range(from, from + PAGE - 1);
       if (error) throw new Error(`orders select failed: ${error.message}`);
       rows.push(...(data ?? []));
       if (!data || data.length < PAGE) break;
     }
-    console.log("Total orders fetched:", rows.length);
+
     return rows as OrderRowRaw[];
   },
 
@@ -141,7 +184,7 @@ export const OrdersRepository = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error",
+        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error",
       )
       .eq("uid", uid)
       .single();
