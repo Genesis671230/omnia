@@ -27,7 +27,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FounderDashboard } from "@/components/finance/founder-dashboard";
+import { FounderDashboard } from "@/components/finance/dashboard-v2/founder-dashboard";
 import { StoreChat } from "@/components/finance/store-chat";
 import { DocumentsPanel } from "@/components/finance/documents-panel";
 import { ReportsPanel } from "@/components/finance/reports-panel";
@@ -158,7 +158,9 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, ghost }: {
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success(
         json.batchId
-          ? `${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new)`
+          ? `${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new` +
+            (json.updated ? `, ${json.updated} corrected` : "") +
+            ")"
           : `Payout saved: ${json.payouts?.map((p: { id: string }) => p.id).join(", ")}`,
       );
       onDone();

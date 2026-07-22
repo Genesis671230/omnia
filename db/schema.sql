@@ -332,3 +332,38 @@ alter table customers add column if not exists last_order_date        timestampt
 alter table customers add column if not exists expected_ltv_next_year numeric not null default 0;
 alter table customers add column if not exists updated_at             timestamptz not null default now();
 create index if not exists customers_total_spend_idx on customers (total_spend_aed desc);
+
+-- tasks: lightweight actionable work items created from dashboard insights
+-- ("Assign task" on an insight card) or manually. Deliberately minimal — the
+-- employee-performance module (phase 4) builds on this same table rather than
+-- introducing a second task store.
+create table if not exists tasks (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   text not null default 'omnia',
+  title       text not null,
+  detail      text not null default '',
+  source      text not null default 'manual',   -- 'insight' | 'manual'
+  source_ref  text not null default '',         -- insight fact id when source='insight'
+  assignee    text not null default '',
+  status      text not null default 'open',     -- 'open' | 'in_progress' | 'done'
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists tasks_status_idx on tasks (status, created_at desc);
+
+-- insight_runs: cached output of the dashboard insight engine. facts are the
+-- deterministic rule detections (every number the UI shows comes from here);
+-- cards are the AI-phrased headline/why/recommendation layer keyed by fact id.
+-- The dashboard serves the latest fresh run instead of re-running rules + AI
+-- on every page load.
+create table if not exists insight_runs (
+  id           uuid primary key default gen_random_uuid(),
+  tenant_id    text not null default 'omnia',
+  generated_at timestamptz not null default now(),
+  window_days  int not null default 30,
+  store        text not null default 'All',
+  facts        jsonb not null default '[]',
+  cards        jsonb not null default '[]',
+  model        text not null default ''
+);
+create index if not exists insight_runs_generated_idx on insight_runs (generated_at desc);

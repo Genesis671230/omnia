@@ -16,9 +16,13 @@ export async function GET(request: Request) {
   const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const fromIso = from.toISOString();
 
+  // Fetch double the window in one query; rows before fromIso form the
+  // previous period so the hero cards can show honest deltas.
+  const prevFromIso = new Date(Date.now() - 2 * days * 24 * 60 * 60 * 1000).toISOString();
+
   const storeParam = storeFilter === "ALL" ? null : storeFilter;
-  const [inWindow, orderCounts, spotlightOrder, bankLinesRes, reconRes, payoutsRes, payoutsWithRefs] = await Promise.all([
-    OrdersRepository.listInWindow({ from: fromIso, store: storeParam }),
+  const [twoWindows, orderCounts, spotlightOrder, bankLinesRes, reconRes, payoutsRes, payoutsWithRefs] = await Promise.all([
+    OrdersRepository.listInWindow({ from: prevFromIso, store: storeParam }),
     OrdersRepository.getOrderCounts({ store: storeParam }),
     OrdersRepository.getMostRecent({ store: storeParam }),
     supabase
@@ -39,9 +43,12 @@ export async function GET(request: Request) {
 
   // ── orders side (window + optional store filter) ─────────────────────────
   const cancelled = new Set(["voided", "refunded", "cancelled"]);
-  const inWindowFiltered = inWindow.filter((o) => !cancelled.has(o.financial_status));
+  const validRows = twoWindows.filter((o) => !cancelled.has(o.financial_status));
+  const inWindowFiltered = validRows.filter((o) => (o.order_date ?? "") >= fromIso);
+  const prevWindow = validRows.filter((o) => (o.order_date ?? "") < fromIso);
 
   const revenue = inWindowFiltered.reduce((s, o) => s + Number(o.gross_aed || 0), 0);
+  const prevRevenue = prevWindow.reduce((s, o) => s + Number(o.gross_aed || 0), 0);
 
   // daily trend, stacked by store
   const trendMap = new Map<string, Record<string, number>>();
@@ -184,6 +191,11 @@ export async function GET(request: Request) {
       codPendingCount: orderCounts.codPendingCount,
       settledOrders: orderCounts.settledOrders,
       totalOrders: orderCounts.totalOrders,
+    },
+    previous: {
+      revenue: +prevRevenue.toFixed(2),
+      orders: prevWindow.length,
+      aov: prevWindow.length ? +(prevRevenue / prevWindow.length).toFixed(2) : 0,
     },
     trend,
     stores: [...storeAgg.entries()]
