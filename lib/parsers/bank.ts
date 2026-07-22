@@ -52,13 +52,18 @@ function extractReference(text: string): string {
 }
 
 const DATE_TOKEN_RE = /\b(\d{2})[/-](\d{2})[/-](\d{4})\b|\b(\d{4})-(\d{2})-(\d{2})\b/g;
-// amount then balance: amount may be signed and short ("-50", "-2.5"),
-// balance always carries exactly two decimals. Guard both sides so digits
-// inside references / phone numbers can't bleed into a match.
+// amount then balance: both carry exactly two decimals on these statements.
+// The lookbehind must reject word chars (\w), not just digits/punctuation:
+// a wire reference ending in a digit ("...FT26202HNZB1 2,345.67 890,123.45")
+// otherwise lets the trailing "1" pair up with the real amount and become a
+// phantom AED 1.00 transaction — with the narration truncated mid-reference.
+// That single bad amount also flips direction: positive ref-digits read as
+// CREDITS, so "Tax Amount Payable" / "Outward SWIFT" debits surfaced as
+// credits. Word-char guard + mandatory decimals kill both failure modes.
 const AMOUNT_PAIR_RE =
-  /(?<![\d,.])(-?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)[ \t]+(-?\d{1,3}(?:,\d{3})*\.\d{2})(?![\d.])/g;
+  /(?<![\w,.])(-?\d{1,3}(?:,\d{3})*\.\d{2})[ \t]+(-?\d{1,3}(?:,\d{3})*\.\d{2})(?![\d.])/g;
 // line-oriented tail: "<amount> <balance>" at end of a wrapped block
-const AMT_BAL_EOL_RE = /(-?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s+(-?\d{1,3}(?:,\d{3})*(?:\.\d{2}))\s*$/;
+const AMT_BAL_EOL_RE = /(?<![\w,.])(-?\d{1,3}(?:,\d{3})*\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2})\s*$/;
 
 const CREDIT_KEYWORDS = ["INWARD", "CR ACCOUNT", "CTD CR", "DEPOSIT", "REVERSAL", "REFUND CREDIT"];
 const DEBIT_KEYWORDS = ["OUTWARD", "DEBIT", "FEES", "TAX AMOUNT", "CHARGES", "WITHDRAWAL"];

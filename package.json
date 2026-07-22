@@ -9,6 +9,7 @@
     "start": "next start",
     "test": "tsx --test 'tests/**/*.test.ts'",
     "backfill:orders": "tsx scripts/backfill-orders.ts",
+    "reprocess:bank-archives": "tsx scripts/reprocess-bank-archives.ts",
     "test:woo-rate-limit": "tsx scripts/test-woo-rate-limit.ts"
   },
   "dependencies": {

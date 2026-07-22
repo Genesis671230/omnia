@@ -61,7 +61,9 @@ export async function POST(request: Request) {
     creditTotal: +credits.reduce((s, c) => s + c.amount, 0).toFixed(2),
     debitTotal: +debits.reduce((s, c) => s + c.amount, 0).toFixed(2),
     inserted: result.inserted,
-    skippedDuplicates: result.skipped,
+    updated: result.updated,
+    collapsedDuplicates: result.collapsed,
+    preexistingDuplicateReferences: result.duplicates.length,
     unclassifiedCredits: credits.filter((c) => c.confidence === "unknown").length,
   });
 }

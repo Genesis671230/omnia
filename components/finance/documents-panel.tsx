@@ -69,7 +69,11 @@ export function DocumentsPanel({ version, onDone }: { version: number; onDone: (
       const res = await fetch("/api/upload/bank", { method: "POST", body: form });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      toast.success(`${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new)`);
+      toast.success(
+        `${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new` +
+          (json.updated ? `, ${json.updated} corrected` : "") +
+          ")",
+      );
       onDone(); load();
     } catch (e) {
       toast.error((e as Error).message);
