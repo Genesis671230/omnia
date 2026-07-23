@@ -415,3 +415,38 @@ create table if not exists zoho_account_config (
   updated_at          timestamptz not null default now(),
   updated_by          text not null default ''
 );
+
+-- Bulk bank-statement-to-Zoho feature (2026-07-23). Independent of the
+-- gateway-payout clearing-account flow above — see
+-- docs/superpowers/specs/2026-07-23-bulk-bank-transactions-to-zoho-design.md.
+
+-- Bookkeeper's override description, used only when posting to Zoho. The
+-- original parsed narration in `description` is never overwritten — other
+-- reconciliation UI and the dedupe/matching logic depend on it unchanged.
+alter table bank_lines add column if not exists zoho_description text;
+
+-- What this feature has posted. Deliberately separate from zoho_postings
+-- (shaped for payout net/gross/fee triples) — a plain bank transaction is a
+-- single amount against a single category account, a different shape.
+create table if not exists zoho_bank_txn_postings (
+  id                   uuid primary key default gen_random_uuid(),
+  tenant_id            text not null default 'omnia',
+  bank_line_id         text not null,
+  direction            text not null,
+  transaction_type     text not null default '',
+  category_account_id  text not null default '',
+  reference_number     text not null default '',
+  amount               numeric not null default 0,
+  zoho_transaction_id  text,
+  status               text not null default 'posted',
+  error                text not null default '',
+  posted_by            text not null default '',
+  posted_at            timestamptz not null default now()
+);
+create unique index if not exists zoho_bank_txn_postings_line_idx on zoho_bank_txn_postings (bank_line_id);
+
+-- Extends the existing single-row account-mapping config with the fields
+-- this feature needs: one income account for all credits, one expense
+-- account per debit kind (salary/supplier/fee/tax/transfer/other).
+alter table zoho_account_config add column if not exists default_income_account_id text not null default '';
+alter table zoho_account_config add column if not exists expense_account_by_kind jsonb not null default '{}';
