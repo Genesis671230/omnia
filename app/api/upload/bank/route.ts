@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseBankStatement } from "@/lib/parsers/bank";
+import { xlsxToCsvText } from "@/lib/parsers/xlsx-to-csv";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { FilesRepository } from "@/lib/repositories/files.repository";
 
@@ -18,21 +19,25 @@ export async function POST(request: Request) {
   const buf = Buffer.from(await file.arrayBuffer());
 
   let text: string;
+  let parserFilename = file.name;
   if (file.name.toLowerCase().endsWith(".pdf")) {
     const { extractText, getDocumentProxy } = await import("unpdf");
     const pdf = await getDocumentProxy(new Uint8Array(buf));
     const extracted = await extractText(pdf, { mergePages: true });
     text = extracted.text;
+  } else if (/\.xlsx?$/i.test(file.name)) {
+    text = xlsxToCsvText(buf);
+    parserFilename = "statement.csv"; // force the existing CSV header-matching path
   } else {
     text = buf.toString("utf8");
   }
 
-  const { credits, debits, format } = parseBankStatement(text, file.name);
+  const { credits, debits, format } = parseBankStatement(text, parserFilename);
   if (credits.length === 0 && debits.length === 0) {
     return NextResponse.json(
       {
         error:
-          "No transactions recognized. Upload a bank statement as PDF, or a CSV export with date, description, and debit/credit (or amount) columns.",
+          "No transactions recognized. Upload a bank statement as PDF, XLS/XLSX, or a CSV export with date, description, and debit/credit (or amount) columns.",
       },
       { status: 422 },
     );

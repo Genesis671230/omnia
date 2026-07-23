@@ -266,7 +266,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                 })()}`}>
                   <FileChartColumn size={14} /> Export
                 </a>
-                <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt"
+                <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt,.xls,.xlsx"
                   label="Upload bank statement" onDone={refresh} />
               </>
             )}
