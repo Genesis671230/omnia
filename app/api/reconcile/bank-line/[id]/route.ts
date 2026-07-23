@@ -9,7 +9,11 @@ import { BankRepository } from "@/lib/repositories/bank.repository";
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const zohoDescription = String(body.zohoDescription ?? "");
+
+  if (typeof body.zohoDescription !== "string") {
+    return NextResponse.json({ error: "zohoDescription must be a string" }, { status: 400 });
+  }
+  const zohoDescription = body.zohoDescription;
 
   try {
     await BankRepository.updateZohoDescription(id, zohoDescription);
