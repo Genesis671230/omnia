@@ -20,16 +20,23 @@ export async function POST(request: Request) {
 
   let text: string;
   let parserFilename = file.name;
-  if (file.name.toLowerCase().endsWith(".pdf")) {
-    const { extractText, getDocumentProxy } = await import("unpdf");
-    const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const extracted = await extractText(pdf, { mergePages: true });
-    text = extracted.text;
-  } else if (/\.xlsx?$/i.test(file.name)) {
-    text = xlsxToCsvText(buf);
-    parserFilename = "statement.csv"; // force the existing CSV header-matching path
-  } else {
-    text = buf.toString("utf8");
+  try {
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      const { extractText, getDocumentProxy } = await import("unpdf");
+      const pdf = await getDocumentProxy(new Uint8Array(buf));
+      const extracted = await extractText(pdf, { mergePages: true });
+      text = extracted.text;
+    } else if (/\.xlsx?$/i.test(file.name)) {
+      text = xlsxToCsvText(buf);
+      parserFilename = "statement.csv"; // force the existing CSV header-matching path
+    } else {
+      text = buf.toString("utf8");
+    }
+  } catch (e) {
+    return NextResponse.json(
+      { error: `Couldn't read this file: ${(e as Error).message}` },
+      { status: 400 },
+    );
   }
 
   const { credits, debits, format } = parseBankStatement(text, parserFilename);
