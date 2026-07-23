@@ -24,6 +24,8 @@ export type BankLineRow = {
   dedupe_key: string;
 };
 
+export type BankLineWithZoho = BankLineRow & { zoho_description: string | null };
+
 // Rows that would collide on re-parse (see dedupeKey doc), collapsed
 // last-wins — guards against one parse emitting the same transaction twice
 // (e.g. a segment straddling a merged-PDF page break), which would
@@ -228,5 +230,36 @@ export const BankRepository = {
       .order("statement_date", { ascending: false });
     if (error) throw new Error(`bank_lines select failed: ${error.message}`);
     return data ?? [];
+  },
+
+  async listAll(opts: { from?: string; to?: string } = {}): Promise<BankLineWithZoho[]> {
+    let q = supabase
+      .from("bank_lines")
+      .select(
+        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key",
+      )
+      .order("statement_date", { ascending: false });
+    if (opts.from) q = q.gte("statement_date", opts.from);
+    if (opts.to) q = q.lte("statement_date", opts.to);
+    const { data, error } = await q;
+    if (error) throw new Error(`bank_lines select failed: ${error.message}`);
+    return (data ?? []) as BankLineWithZoho[];
+  },
+
+  async getByIds(ids: string[]): Promise<BankLineWithZoho[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from("bank_lines")
+      .select(
+        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key",
+      )
+      .in("id", ids);
+    if (error) throw new Error(`bank_lines select failed: ${error.message}`);
+    return (data ?? []) as BankLineWithZoho[];
+  },
+
+  async updateZohoDescription(id: string, zohoDescription: string): Promise<void> {
+    const { error } = await supabase.from("bank_lines").update({ zoho_description: zohoDescription }).eq("id", id);
+    if (error) throw new Error(`bank_lines zoho_description update failed: ${error.message}`);
   },
 };

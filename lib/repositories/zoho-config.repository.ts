@@ -26,7 +26,7 @@ export const ZohoConfigRepository = {
   async getAccountMap(): Promise<ZohoAccountMap | null> {
     const { data, error } = await supabase
       .from("zoho_account_config")
-      .select("bank_account_id, fee_account_id, clearing_by_gateway")
+      .select("bank_account_id, fee_account_id, clearing_by_gateway, default_income_account_id, expense_account_by_kind")
       .eq("id", TENANT)
       .maybeSingle();
     if (error || !data) return null;
@@ -34,6 +34,8 @@ export const ZohoConfigRepository = {
       bankAccountId: data.bank_account_id ?? "",
       feeAccountId: data.fee_account_id ?? "",
       clearingByGateway: (data.clearing_by_gateway ?? {}) as Record<string, string>,
+      defaultIncomeAccountId: data.default_income_account_id ?? "",
+      expenseAccountByKind: (data.expense_account_by_kind ?? {}) as Record<string, string>,
     };
   },
 
@@ -45,6 +47,8 @@ export const ZohoConfigRepository = {
         bank_account_id: map.bankAccountId,
         fee_account_id: map.feeAccountId,
         clearing_by_gateway: map.clearingByGateway,
+        default_income_account_id: map.defaultIncomeAccountId ?? "",
+        expense_account_by_kind: map.expenseAccountByKind ?? {},
         updated_at: new Date().toISOString(),
         updated_by: updatedBy,
       },
