@@ -18,10 +18,16 @@ type Account = { account_id: string; account_name: string; account_type: string;
 
 type Config = {
   gateways: string[];
+  bankLineKinds: string[];
   bankAccounts: Account[];
   allAccounts: Account[];
-  effective: { bankAccountId: string; feeAccountId: string; clearingByGateway: Record<string, string> };
+  effective: {
+    bankAccountId: string; feeAccountId: string; clearingByGateway: Record<string, string>;
+    defaultIncomeAccountId: string; expenseAccountByKind: Record<string, string>;
+  };
   readiness: { gateway: string; missing: string[] }[];
+  incomeReadiness: string[];
+  kindReadiness: { kind: string; missing: string[] }[];
   fetchError: string | null;
   error?: string;
 };
@@ -57,6 +63,8 @@ export function ZohoSettingsPanel() {
   const [bankAccountId, setBankAccountId] = useState("");
   const [feeAccountId, setFeeAccountId] = useState("");
   const [clearing, setClearing] = useState<Record<string, string>>({});
+  const [incomeAccountId, setIncomeAccountId] = useState("");
+  const [expenseByKind, setExpenseByKind] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +75,8 @@ export function ZohoSettingsPanel() {
         setBankAccountId(r.effective.bankAccountId || "");
         setFeeAccountId(r.effective.feeAccountId || "");
         setClearing(r.effective.clearingByGateway || {});
+        setIncomeAccountId(r.effective.defaultIncomeAccountId || "");
+        setExpenseByKind(r.effective.expenseAccountByKind || {});
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -83,7 +93,11 @@ export function ZohoSettingsPanel() {
       const res = await fetch("/api/integrations/zoho/account-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankAccountId, feeAccountId, clearingByGateway: clearing, actor: "founder" }),
+        body: JSON.stringify({
+          bankAccountId, feeAccountId, clearingByGateway: clearing,
+          defaultIncomeAccountId: incomeAccountId, expenseAccountByKind: expenseByKind,
+          actor: "founder",
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -209,7 +223,61 @@ export function ZohoSettingsPanel() {
           })}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+      </div>
+
+      <div className="rounded-2xl border border-[#EAE3D6] bg-white p-5 shadow-sm">
+        <h3 className="mb-1 text-[15px] font-semibold text-[#1F1B16]">Bank transaction categories</h3>
+        <p className="mb-4 text-[13px] leading-relaxed text-[#8A8175]">
+          Used by the Bank Transactions tab — one income account for every credit with no gateway match, and one
+          expense account per debit kind. Map these once and every future statement upload posts with zero manual
+          entry.
+        </p>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block text-[12px] font-medium text-[#1F1B16]">
+            Default income account
+            <span className="ml-1.5 font-normal text-[#8A8175]">where every credit posts from</span>
+          </label>
+          <AccountSelect value={incomeAccountId} onChange={setIncomeAccountId} accounts={all} placeholder="Select an income account…" />
+          {cfg?.incomeReadiness && cfg.incomeReadiness.length > 0 && (
+            <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#FBF2E6] px-2.5 py-1 text-[11.5px] font-medium text-[#B0742E]">
+              <AlertTriangle size={12} /> {cfg.incomeReadiness.join(", ")}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-2.5">
+          {(cfg?.bankLineKinds ?? []).map((k) => {
+            const missing = cfg?.kindReadiness.find((r) => r.kind === k)?.missing ?? [];
+            const ok = missing.length === 0;
+            return (
+              <div key={k} className="flex flex-wrap items-center gap-3 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
+                <span className="inline-flex min-w-[110px] items-center text-[13px] font-medium capitalize text-[#1F1B16]">
+                  {k}
+                </span>
+                <div className="min-w-[240px] flex-1">
+                  <AccountSelect
+                    value={expenseByKind[k] ?? ""}
+                    onChange={(v) => setExpenseByKind({ ...expenseByKind, [k]: v })}
+                    accounts={all}
+                    placeholder={`Select ${k} expense account…`}
+                  />
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-medium ${
+                    ok ? "bg-[#F0F5EF] text-[#4B7A54]" : "bg-[#FBF2E6] text-[#B0742E]"
+                  }`}
+                >
+                  {ok ? <><Check size={12} /> Ready</> : <><AlertTriangle size={12} /> {missing.join(", ")}</>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#EAE3D6] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={save}
             disabled={saving}
