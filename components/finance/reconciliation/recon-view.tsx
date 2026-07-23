@@ -7,6 +7,7 @@ import { ReconFilters } from "./recon-filters";
 import { ReconGroupHeader } from "./recon-group";
 import { ReconRow } from "./recon-row";
 import { InsightsTab } from "./insights-tab";
+import { BankTransactionsTab } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
 
 /* The reconciliation surface: filters → tabs → grouped rows, or Insights.
@@ -16,7 +17,7 @@ import type { ReconLine, ReconPayload } from "./types";
  * data and filters only its output, because a payout can straddle a boundary.
  */
 
-type Tab = "all" | "settled" | "awaiting" | "exceptions" | "flagged" | "insights";
+type Tab = "all" | "settled" | "awaiting" | "exceptions" | "flagged" | "transactions" | "insights";
 
 export function ReconView({
   recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor,
@@ -53,6 +54,10 @@ export function ReconView({
       (l) => l.state === "PAYOUT_VARIANCE" || l.state === "ORDERS_UNRESOLVED" || l.reviewFlag,
     ),
     flagged: searched.filter((l) => l.reviewFlag),
+    // Not used to render rows (BankTransactionsTab fetches its own data), but
+    // buckets[tab] is indexed unconditionally below — every Tab needs a key
+    // here or that lookup returns undefined and groupLines() throws on it.
+    transactions: searched,
     insights: searched,
   }), [searched]);
 
@@ -72,6 +77,7 @@ export function ReconView({
     ["awaiting", "Awaiting", buckets.awaiting.length],
     ["exceptions", "Exceptions", buckets.exceptions.length],
     ["flagged", "Flagged", buckets.flagged.length],
+    ["transactions", "Bank Transactions", -1],
     ["insights", "Insights", -1],
   ];
 
@@ -97,6 +103,7 @@ export function ReconView({
           >
             {k === "insights" && <BarChart3 size={13} />}
             {k === "flagged" && <Flag size={13} />}
+            {k === "transactions" && <Landmark size={13} />}
             {label}
             {n >= 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${tab === k ? "bg-white/20" : "bg-black/[.06]"}`}>
@@ -113,6 +120,8 @@ export function ReconView({
         </div>
       ) : tab === "insights" ? (
         <InsightsTab lines={visible} />
+      ) : tab === "transactions" ? (
+        <BankTransactionsTab fromDate={fromDate} toDate={toDate} onRange={onRange} />
       ) : lines.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#8A8175]">
           No bank credits imported yet. Upload the daily bank statement — parsing turns it into credit lines, and each
