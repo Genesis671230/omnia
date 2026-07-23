@@ -14,8 +14,14 @@ export async function POST(
     if (!bankLineId) {
       return NextResponse.json({ error: "bankLineId required" }, { status: 400 });
     }
-    await confirmLine(bankLineId, actor || "founder");
-    return NextResponse.json({ ok: true, action, bankLineId, updatedAt: new Date().toISOString() });
+    // How many orders this confirmation just made publishable to Zoho — the
+    // UI reports it back so a bookkeeper sees the consequence of the click
+    // rather than having to go hunting in the Settlements panel.
+    const settlementsConfirmed = await confirmLine(bankLineId, actor || "founder");
+    return NextResponse.json({
+      ok: true, action, bankLineId, settlementsConfirmed,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });

@@ -72,6 +72,14 @@ type ReconLine = {
   unresolvedRefs: string[];
   refundedOrders: string[];
   qualityIssues: { ref: string; quality: string }[];
+  // Per-order proof, already rescaled by the engine to the bank's real wire
+  // rate so these rows always sum to `payout.net`.
+  transactions: {
+    ref: string; netShare: number; grossShare: number; feeShare: number;
+    isRefund: boolean; quality: string | null;
+  }[];
+  rateDriftAed: number | null;
+  fxFeeAed: number | null;
   state: "AWAITING_PAYOUT" | "PAYOUT_VARIANCE" | "ORDERS_UNRESOLVED" | "SETTLED";
   confirmedBy: string | null;
 };
@@ -180,6 +188,89 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, ghost }: {
       <input ref={input} type="file" className="hidden-input" accept={accept}
         onChange={(e) => upload(e.target.files?.[0])} />
     </>
+  );
+}
+
+/* ── Per-order proof for a non-Stripe gateway ───────────────────────────────
+ * The reader here is a bookkeeper, not an engineer, so this leads with one
+ * plain sentence answering "can I trust this number" and keeps the numbers
+ * table as supporting detail behind a toggle. Two different reasons a figure
+ * can move are named separately rather than merged, because conflating them
+ * is what makes a statement look wrong when it isn't:
+ *   - rate drift: our own estimate vs the rate the bank actually used. Not a
+ *     charge — nobody took this money, it's a conversion artifact.
+ *   - FX fee: what the gateway genuinely deducted to convert the currency.
+ */
+function GatewayProof({ r }: { r: ReconLine }) {
+  const [showTable, setShowTable] = useState(false);
+  const payout = r.payout!;
+  const sum = +r.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  const foots = Math.abs(sum - payout.net) < 0.01;
+  const refunds = r.transactions.filter((t) => t.isRefund).length;
+
+  return (
+    <div className="stripe-proof">
+      <div className="proof-head">
+        <ShieldCheck size={13} /> {r.provider} proof
+        <span className="proof-sub">from {payout.source ?? payout.id}</span>
+      </div>
+
+      <p className="proof-verdict">
+        {foots ? (
+          <>
+            All <b>{r.transactions.length}</b> order{r.transactions.length > 1 ? "s" : ""} in this
+            payout add up to the <b>{aed2(payout.net)}</b> the bank credited.
+          </>
+        ) : (
+          <>
+            These orders add up to <b>{aed2(sum)}</b>, but the bank credited{" "}
+            <b>{aed2(payout.net)}</b> — a <b>{aed2(Math.abs(sum - payout.net))}</b> gap worth
+            checking before this is treated as proven.
+          </>
+        )}
+        {refunds > 0 && <> {refunds} refund{refunds > 1 ? "s are" : " is"} included and subtracted.</>}
+      </p>
+
+      {payout.currency && (
+        <p className="proof-verdict">
+          Paid in <b>{payout.currency}</b>, converted at{" "}
+          <b>{payout.fxRate ?? "—"} AED</b>
+          {payout.fxSource === "bank" ? " (the rate the bank actually used)" : " (our estimate — the bank did not quote one)"}.
+          {r.fxFeeAed != null && r.fxFeeAed > 0 && (
+            <> {r.provider} kept <b>{aed2(r.fxFeeAed)}</b> in fees on the way.</>
+          )}
+          {r.rateDriftAed != null && Math.abs(r.rateDriftAed) >= 0.01 && (
+            <>
+              {" "}Our earlier estimate was off by <b>{aed2(Math.abs(r.rateDriftAed))}</b>; the
+              figures below use the bank&apos;s real rate, so nobody charged you that difference.
+            </>
+          )}
+        </p>
+      )}
+
+      <button className="proof-toggle" onClick={() => setShowTable(!showTable)}>
+        {showTable ? "Hide" : "Show"} the {r.transactions.length} order
+        {r.transactions.length > 1 ? "s" : ""}
+      </button>
+
+      {showTable && (
+        <table className="proof-table">
+          <thead><tr><th>Order</th><th>Gross</th><th>Fee</th><th className="r">Net</th><th /></tr></thead>
+          <tbody>
+            {r.transactions.map((t, i) => (
+              <tr key={t.ref + i} className={t.isRefund ? "refund" : ""}>
+                <td className="mono">#{t.ref}</td>
+                <td className="mono">{aed2(t.grossShare)}</td>
+                <td className="mono">{aed2(t.feeShare)}</td>
+                <td className="mono r">{aed2(t.netShare)}</td>
+                <td>{t.isRefund ? <span className="pill muted"><RotateCcw size={11} />refund</span> : null}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td>Net settled</td><td /><td /><td className="mono r"><b>{aed2(payout.net)}</b></td><td /></tr></tfoot>
+        </table>
+      )}
+    </div>
   );
 }
 
@@ -396,6 +487,13 @@ function ReconRow({ r, isFounder, onConfirm, refresh }: {
                 </table>
               )}
             </div>
+          )}
+
+          {/* Every non-Stripe gateway: the same per-order proof, built from the
+              uploaded payout file rather than a live API. Stripe keeps its own
+              live-fetch block above — this is the offline equivalent. */}
+          {!isStripe && r.transactions.length > 0 && r.payout && (
+            <GatewayProof r={r} />
           )}
 
           <div className="row-actions">
@@ -801,6 +899,9 @@ const CSS = `
   .proof-head { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--gold-deep); font-weight: 600; margin-bottom: 10px; }
   .proof-head svg { color: var(--gold); }
   .proof-sub { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .proof-verdict { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 0 0 8px; }
+  .proof-verdict b { font-variant-numeric: tabular-nums; }
+  .proof-toggle { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--gold-deep); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
   .proof-loading { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
   .proof-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .proof-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--line); }

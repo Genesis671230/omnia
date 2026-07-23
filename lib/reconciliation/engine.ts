@@ -467,4 +467,13 @@ export async function confirmLine(bankLineId: string, actor: string) {
     .update({ confirmed_by: actor, confirmed_at: new Date().toISOString() })
     .eq("bank_line_id", bankLineId);
   if (error) throw new Error(`confirm failed: ${error.message}`);
+
+  // persistResults() writes a settlement record per resolved order the moment
+  // a credit reaches SETTLED, but leaves it evidence_confirmed=false — the
+  // reconciliation math alone is not a human saying "yes, this is right".
+  // Confirming the credit supplies that, which is what makes non-Stripe
+  // gateways (Tabby, Tamara, COD, Checkout) publishable to Zoho at all;
+  // before this they stayed unconfirmed forever and the publish batch, which
+  // filters on evidence_confirmed, never saw them.
+  return SettlementsRepository.confirmEvidenceForBankLine(bankLineId, actor);
 }

@@ -23,7 +23,11 @@ export type SettlementRecord = {
   payout_id: string | null;
   bank_reference: string;
   recorded_at: string;
-  evidence_type: "stripe_api" | "document" | null;
+  // stripe_api: Stripe itself reported the payout as PAID (born confirmed).
+  // document: a countersigned settlement document was uploaded and confirmed.
+  // bank_confirmed: a human confirmed the reconciled bank credit in the
+  //   reconciliation workspace — the path every non-Stripe gateway takes.
+  evidence_type: "stripe_api" | "document" | "bank_confirmed" | null;
   evidence_confirmed: boolean;
   evidence_confirmed_by: string | null;
   evidence_confirmed_at: string | null;
@@ -164,6 +168,31 @@ export const SettlementsRepository = {
       .eq("id", id)
       .eq("zoho_payment_id", `CLAIMED:${attemptId}`);
     if (error) throw new Error(`settlement_records release failed: ${error.message}`);
+  },
+
+  // A human confirmed the reconciled bank credit, so every settlement record
+  // that credit produced becomes evidence-confirmed and therefore publishable
+  // to Zoho. This is the non-Stripe counterpart to a PAID Stripe payout:
+  // Stripe's own API is the evidence there, a person is the evidence here.
+  //
+  // Deliberately narrow: only rows still awaiting evidence are touched, so
+  // re-confirming can never overwrite stronger stripe_api/document evidence,
+  // reopen an already-published row, or reassign who confirmed it.
+  async confirmEvidenceForBankLine(bankLineId: string, actor: string): Promise<number> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .update({
+        evidence_type: "bank_confirmed",
+        evidence_confirmed: true,
+        evidence_confirmed_by: actor,
+        evidence_confirmed_at: new Date().toISOString(),
+      })
+      .eq("bank_line_id", bankLineId)
+      .eq("evidence_confirmed", false)
+      .is("zoho_payment_id", null)
+      .select("id");
+    if (error) throw new Error(`settlement_records confirm failed: ${error.message}`);
+    return (data ?? []).length;
   },
 
   async markPublished(id: string, zohoPaymentId: string): Promise<void> {
