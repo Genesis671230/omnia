@@ -158,6 +158,56 @@ export function zohoBankingConfigured(): boolean {
   );
 }
 
+/**
+ * Merges the saved (database) mapping over the env one, field by field.
+ *
+ * Pure, so the precedence rule is testable without a database: the Settings UI
+ * writes the DB row, env stays as the fallback, and a field left blank in the
+ * UI falls back rather than blanking a working mapping. Clearing accounts
+ * merge per gateway for the same reason — mapping Tabby in the UI must not
+ * unmap Tamara from env.
+ */
+export function mergeAccountMaps(
+  env: Partial<ZohoAccountMap> | null,
+  db: Partial<ZohoAccountMap> | null,
+): ZohoAccountMap {
+  return {
+    bankAccountId: db?.bankAccountId || env?.bankAccountId || "",
+    feeAccountId: db?.feeAccountId || env?.feeAccountId || "",
+    clearingByGateway: { ...(env?.clearingByGateway ?? {}), ...(db?.clearingByGateway ?? {}) },
+  };
+}
+
+/** env, but never throwing — for the merge path, where a missing env value is
+ *  normal because the database is expected to supply it. */
+export function accountMapFromEnvPartial(): Partial<ZohoAccountMap> {
+  let clearingByGateway: Record<string, string> = {};
+  const raw = process.env.ZOHO_CLEARING_ACCOUNTS;
+  if (raw) {
+    try {
+      clearingByGateway = JSON.parse(raw);
+    } catch {
+      // A malformed env value must not take down a working DB mapping; the
+      // Settings UI reports the parse failure separately.
+      clearingByGateway = {};
+    }
+  }
+  return {
+    bankAccountId: process.env.ZOHO_BANK_ACCOUNT_ID ?? "",
+    feeAccountId: process.env.ZOHO_FEE_ACCOUNT_ID ?? "",
+    clearingByGateway,
+  };
+}
+
+/** What is still missing before a given gateway can be posted. Empty = ready. */
+export function missingMappingFor(gateway: string, map: ZohoAccountMap): string[] {
+  const missing: string[] = [];
+  if (!map.bankAccountId) missing.push("bank account");
+  if (!map.feeAccountId) missing.push("fee account");
+  if (!map.clearingByGateway[gateway]) missing.push(`${gateway} clearing account`);
+  return missing;
+}
+
 async function booksFetch(
   path: string,
   accessToken: string,
@@ -193,6 +243,31 @@ async function booksFetch(
 export async function fetchZohoBankAccounts(accessToken: string): Promise<ZohoBankAccount[]> {
   const json = await booksFetch("/bankaccounts", accessToken);
   return (json.bankaccounts ?? []) as ZohoBankAccount[];
+}
+
+/**
+ * The full chart of accounts.
+ *
+ * /bankaccounts returns only bank and credit-card accounts, which is enough
+ * for the bank leg and for clearing accounts created as bank-type — but a FEE
+ * account is an expense account and never appears there. Mapping the fee side
+ * from /bankaccounts alone is therefore impossible, which is why the setup
+ * endpoint reads both.
+ */
+export async function fetchZohoChartOfAccounts(accessToken: string): Promise<ZohoBankAccount[]> {
+  const json = await booksFetch("/chartofaccounts", accessToken, {
+    query: { filter_by: "AccountType.All" },
+  });
+  const rows = (json.chartofaccounts ?? []) as {
+    account_id: string; account_name: string; account_type: string; is_active?: boolean;
+  }[];
+  return rows.map((a) => ({
+    account_id: a.account_id,
+    account_name: a.account_name,
+    account_type: a.account_type,
+    currency_code: "",
+    is_active: a.is_active !== false,
+  }));
 }
 
 /**

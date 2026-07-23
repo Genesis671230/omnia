@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import {
-  accountMapFromEnv,
+  accountMapFromEnvPartial,
   buildPayoutPostings,
+  mergeAccountMaps,
+  missingMappingFor,
   postPayoutToZoho,
-  zohoBankingConfigured,
   type PayoutPostingInput,
 } from "@/lib/integrations/zoho-banking";
 import { runReconciliation } from "@/lib/reconciliation/engine";
+import { ZohoConfigRepository } from "@/lib/repositories/zoho-config.repository";
 
 export const maxDuration = 120;
 
@@ -26,23 +28,28 @@ export async function POST(request: Request) {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
-  if (!zohoBankingConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          "Zoho banking accounts are not configured. Set ZOHO_BANK_ACCOUNT_ID, " +
-          "ZOHO_FEE_ACCOUNT_ID and ZOHO_CLEARING_ACCOUNTS — GET " +
-          "/api/integrations/zoho/bank-accounts lists the available IDs.",
-      },
-      { status: 503 },
-    );
-  }
 
   const body = await request.json().catch(() => ({}));
   const bankLineId = String(body.bankLineId ?? "");
   const dryRun = Boolean(body.dryRun);
+  const actor = String(body.actor ?? "founder");
   if (!bankLineId) {
     return NextResponse.json({ error: "bankLineId required" }, { status: 400 });
+  }
+
+  // Local record first: cheaper than a Zoho round trip, and it lets the UI
+  // render "Posted ✓" without asking Zoho about every row on every load.
+  // postPayoutToZoho() also dedupes remotely by reference_number, so this is
+  // the fast path over that backstop, not a replacement for it.
+  const existingPosting = await ZohoConfigRepository.getPosting(bankLineId);
+  if (existingPosting && !dryRun && existingPosting.status === "posted") {
+    return NextResponse.json(
+      {
+        error: "This credit is already recorded in Zoho Books",
+        posting: existingPosting,
+      },
+      { status: 409 },
+    );
   }
 
   const line = (await runReconciliation()).find((l) => l.id === bankLineId);
@@ -87,7 +94,20 @@ export async function POST(request: Request) {
     payoutId: line.payout.id,
   };
 
-  const accounts = accountMapFromEnv();
+  // Saved mapping (Settings) over env, field by field — see mergeAccountMaps.
+  const accounts = mergeAccountMaps(accountMapFromEnvPartial(), await ZohoConfigRepository.getAccountMap());
+  const missing = missingMappingFor(line.provider, accounts);
+  if (missing.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `Zoho account mapping incomplete: missing ${missing.join(", ")}. ` +
+          `Map it under Settings → Zoho Books, or set the ZOHO_* environment variables.`,
+        missing,
+      },
+      { status: 503 },
+    );
+  }
 
   try {
     if (dryRun) {
@@ -95,10 +115,33 @@ export async function POST(request: Request) {
         dryRun: true,
         input,
         postings: buildPayoutPostings(input, accounts),
+        alreadyPosted: existingPosting ?? null,
       });
     }
+
     const results = await postPayoutToZoho(input, accounts, await getAccessToken());
-    return NextResponse.json({ dryRun: false, input, results });
+
+    // A posting set is only complete when every leg landed. Recording a
+    // partial as "posted" would hide money stranded in the clearing account —
+    // the exact failure the clearing-account design exists to make visible.
+    const expectedLegs = buildPayoutPostings(input, accounts).length;
+    const status = results.length === expectedLegs ? "posted" : "partial";
+
+    await ZohoConfigRepository.recordPosting({
+      bank_line_id: bankLineId,
+      gateway: line.provider,
+      payout_id: line.payout.id,
+      reference_number: input.bankReference,
+      net_aed: input.netAed,
+      gross_aed: input.grossAed,
+      fee_aed: +(input.grossAed - input.netAed).toFixed(2),
+      status,
+      zoho_result: results,
+      error: "",
+      posted_by: actor,
+    });
+
+    return NextResponse.json({ dryRun: false, input, results, status });
   } catch (e) {
     // buildPayoutPostings' refusals are the caller's problem to fix (bad
     // mapping, impossible figures); a Zoho HTTP failure is not. Both are

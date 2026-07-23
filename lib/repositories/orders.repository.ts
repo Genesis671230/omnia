@@ -180,6 +180,27 @@ export const OrdersRepository = {
     return out;
   },
 
+  // Full detail INCLUDING line_items for a set of order numbers, chunked the
+  // same way as getByOrderNumbers. Backs the reconciliation proof table's
+  // product expansion: the proof table knows order numbers, not uids, so a
+  // per-row getByUid would need a lookup per click AND a round trip per order
+  // — five for one Stripe payout. This fetches the whole credit at once.
+  async getDetailsByOrderNumbers(numbers: string[]) {
+    if (numbers.length === 0) return [];
+    const out: Record<string, unknown>[] = [];
+    for (let i = 0; i < numbers.length; i += 200) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, city, country, currency, gross_original, gross_aed, gateway, financial_status, fulfillment_status, fulfillment_stage, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, awb_number, shipped_at",
+        )
+        .in("order_number", numbers.slice(i, i + 200));
+      if (error) throw new Error(`orders detail by-number select failed: ${error.message}`);
+      out.push(...(data ?? []));
+    }
+    return out;
+  },
+
   async getByUid(uid: string) {
     const { data, error } = await supabase
       .from("orders")

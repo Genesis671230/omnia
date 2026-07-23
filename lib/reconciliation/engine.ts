@@ -69,6 +69,11 @@ export type ReconLine = {
   state: ReconState;
   confirmedBy: string | null;
   confirmedAt: string | null;
+  // Founder-raised "needs a look", independent of state: a credit whose math
+  // foots can still be wrong (an amount that looks off, a gateway to chase).
+  // Never set by matching — only by a person, via POST /api/reconcile/flag.
+  reviewFlag: boolean;
+  reviewNote: string;
 };
 
 export type ReconTransactionShare = {
@@ -178,13 +183,16 @@ export type ComputeReconInputs = {
   payouts: PayoutWithRefs[];
   orders: ComputeReconOrderInput[];
   confirmations: Map<string, { by: string; at: string }>;
+  /** Persisted review flags, keyed by bank line id. Optional so existing
+   *  fixture tests construct inputs unchanged. */
+  reviews?: Map<string, { flag: boolean; note: string }>;
 };
 
 // Pure: bank → payout → orders matching, no I/O. Split out of
 // runReconciliation() so it can be fixture-tested without a live database —
 // see tests/reconciliation/engine.test.ts.
 export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
-  const { credits, payouts, orders, confirmations } = inputs;
+  const { credits, payouts, orders, confirmations, reviews } = inputs;
   const orderNumbers = new Set(orders.map((o) => o.order_number));
   const claimedPayouts = new Set<string>();
   const lines: ReconLine[] = [];
@@ -204,6 +212,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     );
 
     const confirmation = confirmations.get(credit.id);
+    const review = reviews?.get(credit.id);
     const base = {
       id: credit.id,
       date: credit.statement_date,
@@ -214,6 +223,8 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       bankAmount: Number(credit.amount),
       confirmedBy: confirmation?.by ?? null,
       confirmedAt: confirmation?.at ?? null,
+      reviewFlag: review?.flag ?? false,
+      reviewNote: review?.note ?? "",
     };
 
     if (!payout) {
@@ -327,14 +338,21 @@ export async function runReconciliation(): Promise<ReconLine[]> {
 
   const { data: existing } = await supabase
     .from("recon_lines")
-    .select("bank_line_id, confirmed_by, confirmed_at");
+    .select("bank_line_id, confirmed_by, confirmed_at, review_flag, review_note");
   const confirmations = new Map(
     (existing ?? [])
       .filter((r) => r.confirmed_by)
       .map((r) => [r.bank_line_id, { by: r.confirmed_by, at: r.confirmed_at }]),
   );
+  // Only flagged rows are carried — an unflagged row is the default, and
+  // materialising one entry per credit would just be noise in the map.
+  const reviews = new Map(
+    (existing ?? [])
+      .filter((r) => r.review_flag)
+      .map((r) => [r.bank_line_id, { flag: true, note: r.review_note ?? "" }]),
+  );
 
-  const lines = computeReconLines({ credits, payouts, orders, confirmations });
+  const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews });
   await persistResults(lines, orders);
   return lines;
 }
@@ -476,4 +494,18 @@ export async function confirmLine(bankLineId: string, actor: string) {
   // before this they stayed unconfirmed forever and the publish batch, which
   // filters on evidence_confirmed, never saw them.
   return SettlementsRepository.confirmEvidenceForBankLine(bankLineId, actor);
+}
+
+/** Raise or clear a "needs a look" flag on a credit. Deliberately separate from
+ *  confirmLine: confirming asserts a credit is RIGHT, flagging asserts someone
+ *  should check it — a row can legitimately be both, and neither implies the
+ *  other. persistResults() upserts only the columns it names, so a recompute
+ *  leaves these two alone. */
+export async function flagLine(bankLineId: string, flagged: boolean, note: string) {
+  const { error } = await supabase
+    .from("recon_lines")
+    .update({ review_flag: flagged, review_note: flagged ? note : "" })
+    .eq("bank_line_id", bankLineId);
+  if (error) throw new Error(`flag failed: ${error.message}`);
+  return { bankLineId, flagged };
 }

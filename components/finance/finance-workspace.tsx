@@ -35,6 +35,9 @@ import { MarketingPanel } from "@/components/finance/marketing-panel";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { CustomersPanel } from "@/components/finance/customers-panel";
+import { ReconView } from "@/components/finance/reconciliation/recon-view";
+import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-settings-panel";
+import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
@@ -55,91 +58,10 @@ const NAV: { href: string; view: FinanceView; label: string; icon: React.Element
   { href: "/settings", view: "settings", label: "Settings", icon: Settings },
 ];
 
-type ReconLine = {
-  id: string;
-  date: string | null;
-  narration: string;
-  reference: string;
-  provider: string;
-  confidence: string;
-  bankAmount: number;
-  payout: {
-    id: string; net: number; source: string | null;
-    currency: string | null; fxRate: number | null; fxSource: "bank" | "estimate" | null;
-  } | null;
-  variance: number;
-  resolvedOrders: string[];
-  unresolvedRefs: string[];
-  refundedOrders: string[];
-  qualityIssues: { ref: string; quality: string }[];
-  // Per-order proof, already rescaled by the engine to the bank's real wire
-  // rate so these rows always sum to `payout.net`.
-  transactions: {
-    ref: string; netShare: number; grossShare: number; feeShare: number;
-    isRefund: boolean; quality: string | null;
-  }[];
-  rateDriftAed: number | null;
-  fxFeeAed: number | null;
-  state: "AWAITING_PAYOUT" | "PAYOUT_VARIANCE" | "ORDERS_UNRESOLVED" | "SETTLED";
-  confirmedBy: string | null;
-};
-
-// Live per-order evidence behind a Stripe bank credit, from the Stripe API
-// (GET /api/payouts/:id/stripe-proof) — the gateway's own ledger, not the
-// uploaded CSV.
-type StripeTxn = { ref: string; isRefund: boolean; quality: string; netShare: number; grossShare: number; feeShare: number };
-type StripeProof =
-  | { available: true; payoutId: string; net: number; refs: string[]; transactions: StripeTxn[] }
-  | { available: false; reason: string };
-
-type ReconPayload = {
-  lines: ReconLine[];
-  settledOrders: number;
-  totalOrders: number;
-  documents: {
-    bankStatement: boolean;
-    missingPayouts: { provider: string; awaitingAmount: number }[];
-    range: { from: string | null; to: string | null; noStatementForRange: boolean } | null;
-  };
-};
-
-const STATE_META = {
-  SETTLED: { label: "Settled", tone: "ok", icon: Check },
-  PAYOUT_VARIANCE: { label: "Variance", tone: "bad", icon: AlertTriangle },
-  ORDERS_UNRESOLVED: { label: "Orders unresolved", tone: "warn", icon: HelpCircle },
-  AWAITING_PAYOUT: { label: "Awaiting payout", tone: "info", icon: Clock },
-} as const;
-
 const aed = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(v);
 const aed2 = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", minimumFractionDigits: 2 }).format(v);
-
-/* ── Chain link: the signature element ──────────────────────────────────── */
-
-function ChainLink({ icon: Icon, label, sub, status }: {
-  icon: React.ElementType; label: string; sub: string;
-  status: "resolved" | "pending" | "broken";
-}) {
-  const c = {
-    resolved: { ring: "var(--gold)", bg: "var(--gold-wash)", fg: "var(--ink)", subfg: "var(--gold-deep)" },
-    pending: { ring: "var(--line)", bg: "transparent", fg: "var(--muted)", subfg: "var(--muted)" },
-    broken: { ring: "var(--bad)", bg: "var(--bad-wash)", fg: "var(--bad)", subfg: "var(--bad)" },
-  }[status];
-  return (
-    <div className="link" style={{ borderColor: c.ring, background: c.bg }}>
-      <Icon size={15} style={{ color: c.fg, flexShrink: 0 }} />
-      <div className="link-txt">
-        <span style={{ color: c.fg }}>{label}</span>
-        <span style={{ color: c.subfg }}>{sub}</span>
-      </div>
-    </div>
-  );
-}
-
-function Connector({ ok }: { ok: boolean }) {
-  return <ArrowRight size={14} style={{ color: ok ? "var(--gold)" : "var(--line-strong)", flexShrink: 0 }} />;
-}
 
 /* ── Upload button (bank statement or payout file) ──────────────────────── */
 
@@ -188,338 +110,6 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, ghost }: {
       <input ref={input} type="file" className="hidden-input" accept={accept}
         onChange={(e) => upload(e.target.files?.[0])} />
     </>
-  );
-}
-
-/* ── Per-order proof for a non-Stripe gateway ───────────────────────────────
- * The reader here is a bookkeeper, not an engineer, so this leads with one
- * plain sentence answering "can I trust this number" and keeps the numbers
- * table as supporting detail behind a toggle. Two different reasons a figure
- * can move are named separately rather than merged, because conflating them
- * is what makes a statement look wrong when it isn't:
- *   - rate drift: our own estimate vs the rate the bank actually used. Not a
- *     charge — nobody took this money, it's a conversion artifact.
- *   - FX fee: what the gateway genuinely deducted to convert the currency.
- */
-function GatewayProof({ r }: { r: ReconLine }) {
-  const [showTable, setShowTable] = useState(false);
-  const payout = r.payout!;
-  const sum = +r.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
-  const foots = Math.abs(sum - payout.net) < 0.01;
-  const refunds = r.transactions.filter((t) => t.isRefund).length;
-
-  return (
-    <div className="stripe-proof">
-      <div className="proof-head">
-        <ShieldCheck size={13} /> {r.provider} proof
-        <span className="proof-sub">from {payout.source ?? payout.id}</span>
-      </div>
-
-      <p className="proof-verdict">
-        {foots ? (
-          <>
-            All <b>{r.transactions.length}</b> order{r.transactions.length > 1 ? "s" : ""} in this
-            payout add up to the <b>{aed2(payout.net)}</b> the bank credited.
-          </>
-        ) : (
-          <>
-            These orders add up to <b>{aed2(sum)}</b>, but the bank credited{" "}
-            <b>{aed2(payout.net)}</b> — a <b>{aed2(Math.abs(sum - payout.net))}</b> gap worth
-            checking before this is treated as proven.
-          </>
-        )}
-        {refunds > 0 && <> {refunds} refund{refunds > 1 ? "s are" : " is"} included and subtracted.</>}
-      </p>
-
-      {payout.currency && (
-        <p className="proof-verdict">
-          Paid in <b>{payout.currency}</b>, converted at{" "}
-          <b>{payout.fxRate ?? "—"} AED</b>
-          {payout.fxSource === "bank" ? " (the rate the bank actually used)" : " (our estimate — the bank did not quote one)"}.
-          {r.fxFeeAed != null && r.fxFeeAed > 0 && (
-            <> {r.provider} kept <b>{aed2(r.fxFeeAed)}</b> in fees on the way.</>
-          )}
-          {r.rateDriftAed != null && Math.abs(r.rateDriftAed) >= 0.01 && (
-            <>
-              {" "}Our earlier estimate was off by <b>{aed2(Math.abs(r.rateDriftAed))}</b>; the
-              figures below use the bank&apos;s real rate, so nobody charged you that difference.
-            </>
-          )}
-        </p>
-      )}
-
-      <button className="proof-toggle" onClick={() => setShowTable(!showTable)}>
-        {showTable ? "Hide" : "Show"} the {r.transactions.length} order
-        {r.transactions.length > 1 ? "s" : ""}
-      </button>
-
-      {showTable && (
-        <table className="proof-table">
-          <thead><tr><th>Order</th><th>Gross</th><th>Fee</th><th className="r">Net</th><th /></tr></thead>
-          <tbody>
-            {r.transactions.map((t, i) => (
-              <tr key={t.ref + i} className={t.isRefund ? "refund" : ""}>
-                <td className="mono">#{t.ref}</td>
-                <td className="mono">{aed2(t.grossShare)}</td>
-                <td className="mono">{aed2(t.feeShare)}</td>
-                <td className="mono r">{aed2(t.netShare)}</td>
-                <td>{t.isRefund ? <span className="pill muted"><RotateCcw size={11} />refund</span> : null}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot><tr><td>Net settled</td><td /><td /><td className="mono r"><b>{aed2(payout.net)}</b></td><td /></tr></tfoot>
-        </table>
-      )}
-    </div>
-  );
-}
-
-/* ── Reconciliation row ─────────────────────────────────────────────────── */
-
-function ReconRow({ r, isFounder, onConfirm, refresh }: {
-  r: ReconLine; isFounder: boolean; onConfirm: (id: string) => void; refresh: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const meta = STATE_META[r.state];
-  const payoutOk = !!r.payout && Math.abs(r.variance) <= 1;
-  const ordersOk = payoutOk && r.unresolvedRefs.length === 0 && r.resolvedOrders.length > 0;
-
-  // Payouts reach the bank within ~1 week, so a credit still missing its
-  // payout file after 7 days is overdue — the file should already exist.
-  const ageDays = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86_400_000) : null;
-  const overdue = !r.payout && ageDays !== null && ageDays > 7;
-
-  // Live Stripe proof — fetched lazily the first time a Stripe row is opened.
-  const isStripe = r.provider === "Stripe" && !!r.payout && r.payout.id.startsWith("STRIPE-");
-  const [proof, setProof] = useState<StripeProof | null>(null);
-  useEffect(() => {
-    if (!open || !isStripe || proof || !r.payout) return;
-    fetch(`/api/payouts/${encodeURIComponent(r.payout.id)}/stripe-proof`)
-      .then((x) => x.json())
-      .then((d: StripeProof) => setProof(d))
-      .catch(() => setProof({ available: false, reason: "Could not reach Stripe" }));
-  }, [open, isStripe, proof, r.payout]);
-
-  return (
-    <div className={`row ${meta.tone}`}>
-      <button className="row-head" onClick={() => setOpen(!open)}>
-        <div className="chain">
-          <ChainLink icon={Landmark} label={aed2(r.bankAmount)} sub={`Bank · ${r.reference || r.id.slice(0, 8)}`} status="resolved" />
-          <Connector ok={payoutOk} />
-          <ChainLink icon={FileSpreadsheet}
-            label={r.payout ? aed2(r.payout.net) : "No file"}
-            sub={r.payout ? r.payout.id : "not uploaded"}
-            status={r.payout ? (payoutOk ? "resolved" : "broken") : "pending"} />
-          <Connector ok={ordersOk} />
-          <ChainLink icon={Package}
-            label={ordersOk ? `${r.resolvedOrders.length} orders` : r.unresolvedRefs.length ? `${r.unresolvedRefs.length} missing` : "—"}
-            sub={r.unresolvedRefs.length ? `#${r.unresolvedRefs.join(", ")} not found` : ordersOk ? `#${r.resolvedOrders.join(", ")}` : "awaiting payout"}
-            status={ordersOk ? "resolved" : r.unresolvedRefs.length ? "broken" : "pending"} />
-        </div>
-        <div className="row-right">
-          <span className="provider">
-            {r.provider}
-            {r.confidence !== "keyword" && (
-              <em className="conf" title={r.confidence === "inferred"
-                ? "Provider inferred from settlement bank — needs a confirming rule or payout file"
-                : "No rule matched this narration"}>
-                {r.confidence}
-              </em>
-            )}
-          </span>
-          <span className={`pill ${meta.tone}`}><meta.icon size={12} />{r.confirmedBy ? "Confirmed" : meta.label}</span>
-          {overdue && (
-            <span className="pill bad" title={`Bank credited ${ageDays} days ago — the payout file should already be here`}>
-              <AlertTriangle size={12} />{ageDays}d overdue
-            </span>
-          )}
-          {r.refundedOrders.length > 0 && (
-            <span className="pill muted" title={`Refunded: #${r.refundedOrders.join(", #")}`}>
-              <RotateCcw size={12} />{r.refundedOrders.length} refund{r.refundedOrders.length > 1 ? "s" : ""}
-            </span>
-          )}
-          {r.qualityIssues.length > 0 && (
-            <span className="pill warn" title={r.qualityIssues.map((q) => `#${q.ref}: ${q.quality}`).join(" · ")}>
-              <AlertTriangle size={12} />{r.qualityIssues.length} to review
-            </span>
-          )}
-          <ChevronDown size={16} className="chev" style={{ transform: open ? "rotate(180deg)" : "none" }} />
-        </div>
-      </button>
-
-      {open && (
-        <div className="row-body">
-          <p className="narr">{r.narration}</p>
-          <div className="detail-grid">
-            <div><span>Date</span><b>{r.date}</b></div>
-            <div><span>Bank credit</span><b>{aed2(r.bankAmount)}</b></div>
-            <div><span>Payout net</span><b>{r.payout ? aed2(r.payout.net) : "—"}</b></div>
-            <div><span>Variance</span><b style={{ color: Math.abs(r.variance) > 1 ? "var(--bad)" : "inherit" }}>{aed2(r.variance)}</b></div>
-            {r.payout?.currency && (
-              <div>
-                <span>FX rate applied</span>
-                <b>
-                  1 {r.payout.currency} = {r.payout.fxRate ?? "—"} AED
-                  {r.payout.fxSource && (
-                    <em className="conf" title={r.payout.fxSource === "bank"
-                      ? "Read straight from the bank's wire narration for this credit — the rate the bank actually applied"
-                      : "No rate quoted in the bank narration — falling back to our static estimate, which can drift from what the bank actually applied"}>
-                      {" "}{r.payout.fxSource === "bank" ? "bank-quoted" : "estimate"}
-                    </em>
-                  )}
-                </b>
-              </div>
-            )}
-            <div><span>Orders resolved</span><b>{r.resolvedOrders.length ? r.resolvedOrders.map((o) => "#" + o).join(", ") : "—"}</b></div>
-            {r.refundedOrders.length > 0 && (
-              <div><span>Refunded (excluded from settled)</span><b>{r.refundedOrders.map((o) => "#" + o).join(", ")}</b></div>
-            )}
-          </div>
-
-          {r.qualityIssues.length > 0 && (
-            <div className="note muted">
-              {r.qualityIssues.length} description{r.qualityIssues.length > 1 ? "s" : ""} need a look:{" "}
-              {r.qualityIssues.map((q, i) => (
-                <span key={q.ref + i}>#{q.ref} ({q.quality === "refund_unmatched" ? "refund, no matching order" : q.quality}){i < r.qualityIssues.length - 1 ? ", " : ""}</span>
-              ))}
-            </div>
-          )}
-
-          {r.state === "PAYOUT_VARIANCE" && r.payout && (
-            <div className="note bad">
-              {(() => {
-                const surplus = r.variance > 0;
-                let cause: string;
-                if (r.payout.fxSource === "estimate") {
-                  cause = "the FX estimate used to convert this payout likely drifted from the bank's actual wire rate";
-                } else if (r.refundedOrders.length > 0) {
-                  cause = `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} on this payout may not net out the way expected`;
-                } else {
-                  cause = "a bank fee, rounding, or a partial settlement not reflected in the payout file";
-                }
-                return (
-                  <>
-                    Bank credited <b>{aed2(r.bankAmount)}</b> but the {r.provider} payout ({r.payout.id}) says <b>{aed2(r.payout.net)}</b> —
-                    a {surplus ? "surplus" : "shortfall"} of <b>{aed2(Math.abs(r.variance))}</b>. Likely cause: {cause}.
-                    Re-check the payout file's totals, or confirm this is expected before treating the credit as settled.
-                  </>
-                );
-              })()}
-            </div>
-          )}
-          {r.state === "ORDERS_UNRESOLVED" && (
-            <div className="note bad">
-              {r.unresolvedRefs.length > 0 ? (
-                <>
-                  The {r.provider} payout {r.payout ? `(${r.payout.id}) ` : ""}net matches the bank, but order <b>#{r.unresolvedRefs.join(", #")}</b> {r.unresolvedRefs.length > 1 ? "aren't" : "isn't"} in the synced orders.
-                  Run a sync (or widen the window) — this credit can't be called Settled until every order it pays for is accounted for.
-                </>
-              ) : (
-                <>
-                  The {r.provider} payout {r.payout ? `(${r.payout.id}) ` : ""}net matches the bank, but it carries no chargeable order references —
-                  nothing to settle from this credit yet.
-                </>
-              )}
-            </div>
-          )}
-          {r.state === "SETTLED" && r.payout && (
-            <div className="note ok">
-              The {r.provider} payout ({r.payout.id}) net matches the bank credit exactly, and all {r.resolvedOrders.length} order{r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for.
-              {r.confirmedBy ? " Confirmed by the founder." : " Ready for founder confirmation."}
-            </div>
-          )}
-          {r.state === "AWAITING_PAYOUT" && (
-            <div className="note info">
-              {r.confidence === "unknown"
-                ? "No classification rule matches this narration. Add a descriptor rule, then upload the payout file that explains it."
-                : r.confidence === "inferred"
-                  ? `Provider inferred from the settlement bank, not confirmed. Upload the ${r.provider} payout file to prove which gateway and which orders this pays for.`
-                  : (() => {
-                      const statementNoun: Record<string, string> = {
-                        Tabby: "settlement report", Tamara: "merchant statement", COD: "remittance invoice",
-                        Stripe: "payout reconciliation report", Checkout: "settlement export", Telr: "payout file",
-                      };
-                      const noun = statementNoun[r.provider] ?? "payout file";
-                      return (
-                        <>
-                          Bank credit confirmed as {r.provider}
-                          {r.reference ? <> (ref <b>{r.reference}</b>)</> : null}. Upload the {r.provider} {noun} that explains it — the invoice/reference number visible here should match the file.
-                        </>
-                      );
-                    })()}
-            </div>
-          )}
-
-          {overdue && (
-            <div className="note bad">
-              This bank credit is <b>{ageDays} days old</b>. {r.provider} payouts normally reach the bank within a week, so the payout file is overdue —
-              upload it below, or check the {r.provider} dashboard for a settlement that hasn&apos;t been exported yet.
-            </div>
-          )}
-
-          {isStripe && (
-            <div className="stripe-proof">
-              <div className="proof-head">
-                <ShieldCheck size={13} /> Stripe proof
-                {proof?.available && <span className="proof-sub">live from Stripe · payout {proof.payoutId}</span>}
-              </div>
-              {!proof ? (
-                <div className="proof-loading"><Loader2 size={13} className="spin" /> Pulling balance transactions…</div>
-              ) : !proof.available ? (
-                <div className="note muted">Couldn&apos;t load live Stripe proof: {proof.reason}</div>
-              ) : proof.transactions.length === 0 ? (
-                <div className="note muted">Stripe returned no per-order transactions for this payout.</div>
-              ) : (
-                <table className="proof-table">
-                  <thead><tr><th>Order</th><th>Gross</th><th>Fee</th><th className="r">Net</th><th /></tr></thead>
-                  <tbody>
-                    {proof.transactions.map((t, i) => (
-                      <tr key={t.ref + i} className={t.isRefund ? "refund" : ""}>
-                        <td className="mono">#{t.ref}</td>
-                        <td className="mono">{aed2(t.grossShare)}</td>
-                        <td className="mono">{aed2(t.feeShare)}</td>
-                        <td className="mono r">{aed2(t.netShare)}</td>
-                        <td>{t.isRefund ? <span className="pill muted"><RotateCcw size={11} />refund</span> : null}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot><tr><td>Net settled</td><td /><td /><td className="mono r"><b>{aed2(proof.net)}</b></td><td /></tr></tfoot>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Every non-Stripe gateway: the same per-order proof, built from the
-              uploaded payout file rather than a live API. Stripe keeps its own
-              live-fetch block above — this is the offline equivalent. */}
-          {!isStripe && r.transactions.length > 0 && r.payout && (
-            <GatewayProof r={r} />
-          )}
-
-          <div className="row-actions">
-            {r.state === "SETTLED" && !r.confirmedBy && (
-              isFounder ? (
-                <button className="btn primary" onClick={() => onConfirm(r.id)}>
-                  <BadgeCheck size={15} /> Confirm settlement
-                </button>
-              ) : (
-                <button className="btn locked" disabled>
-                  <Lock size={13} /> Founder confirms settlement
-                </button>
-              )
-            )}
-            {r.confirmedBy && <span className="confirmed-tag"><Check size={14} /> Confirmed by founder</span>}
-            {r.state !== "SETTLED" && r.provider !== "Unclassified" && (
-              <UploadButton ghost endpoint="/api/upload/payout"
-                extraFields={{ provider: r.provider }}
-                accept=".csv,.xls,.xlsx"
-                label={`Upload ${r.provider} payout file`}
-                onDone={refresh} />
-            )}
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -614,11 +204,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
     variance: lines.filter((r) => r.state === "PAYOUT_VARIANCE"),
     unresolved: lines.filter((r) => r.state === "ORDERS_UNRESOLVED"),
   };
-  const sum = (arr: ReconLine[]) => arr.reduce((s, r) => s + r.bankAmount, 0);
-  const viewLines = ({
-    all: lines, settled, awaiting: buckets.awaiting,
-    exceptions: [...buckets.variance, ...buckets.unresolved],
-  } as Record<string, ReconLine[]>)[tab];
+  const sum = (arr: { bankAmount: number }[]) => arr.reduce((s, r) => s + r.bankAmount, 0);
 
   const showOrders = view === "orders" || view === "sales";
   const showDashboard = view === "dashboard";
@@ -667,15 +253,29 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
             <button className="btn" disabled={syncing} onClick={sync}>
               {syncing ? <Loader2 size={14} className="spin" /> : <RefreshCcw size={14} />} Sync stores
             </button>
-            {view ==="reconciliation"&&   <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt"
-            label="Upload bank statement" onDone={refresh} />
-          }
+            {view === "reconciliation" && (
+              <>
+                {/* Export follows the same range the view is scoped to — the
+                    filter bar below owns those dates now. */}
+                <a className="btn ghost" href={`/api/reconcile/export${(() => {
+                  const p = new URLSearchParams();
+                  if (fromDate) p.set("from", fromDate);
+                  if (toDate) p.set("to", toDate);
+                  const qs = p.toString();
+                  return qs ? `?${qs}` : "";
+                })()}`}>
+                  <FileChartColumn size={14} /> Export
+                </a>
+                <UploadButton endpoint="/api/upload/bank" accept=".pdf,.csv,.txt"
+                  label="Upload bank statement" onDone={refresh} />
+              </>
+            )}
           </div>
         </div>
       </header>
           {/* )} */}
 
-      {showReconContext &&(
+      {showReconContext && view !== "reconciliation" && (
         <div className="range-bar">
           <label>From <input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} /></label>
           <label>To <input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} /></label>
@@ -745,40 +345,29 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
         <CustomersPanel />
       ) : showOrders ? (
         <OrdersLedger />
+      ) : view === "settings" ? (
+        <ZohoSettingsPanel />
       ) : (
-        <>
-          <div className="tabs">
-            {([["all", "All credits", lines.length], ["settled", "Settled", settled.length],
-            ["awaiting", "Awaiting", buckets.awaiting.length],
-            ["exceptions", "Exceptions", buckets.variance.length + buckets.unresolved.length]] as [string, string, number][]).map(([k, l, n]) => (
-              <button key={k} className={tab === k ? "tab on" : "tab"} onClick={() => setTab(k)}>
-                {l} <span className="count">{n}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="legend">
-            <span><i style={{ background: "var(--gold)" }} /> resolved link</span>
-            <span><i style={{ background: "var(--line-strong)" }} /> pending</span>
-            <span><i style={{ background: "var(--bad)" }} /> broken</span>
-            <span className="legend-chain">Read each row left→right: <Landmark size={12} /> bank <ArrowRight size={11} /> <FileSpreadsheet size={12} /> payout <ArrowRight size={11} /> <Package size={12} /> orders</span>
-          </div>
-
-          {loading ? (
-            <div className="empty"><Loader2 size={18} className="spin" /> Running reconciliation…</div>
-          ) : lines.length === 0 ? (
-            <div className="empty">
-              No bank credits imported yet. Upload the daily bank statement — parsing turns it into credit lines,
-              and each credit then waits for the payout file that explains it.
-            </div>
-          ) : (
-            <div className="rows">
-              {viewLines.map((r) => (
-                <ReconRow key={r.id} r={r} isFounder={isFounder} onConfirm={onConfirm} refresh={refresh} />
-              ))}
-            </div>
+        <ReconView
+          recon={recon}
+          loading={loading}
+          isFounder={isFounder}
+          fromDate={fromDate}
+          toDate={toDate}
+          onRange={(f, t) => { setFromDate(f); setToDate(t); }}
+          onConfirm={onConfirm}
+          refresh={refresh}
+          uploadSlotFor={(provider) => (
+            <UploadButton
+              ghost
+              endpoint="/api/upload/payout"
+              extraFields={{ provider }}
+              accept=".csv,.xls,.xlsx"
+              label={`Upload ${provider} payout file`}
+              onDone={refresh}
+            />
           )}
-        </>
+        />
       )}
 
       <footer className="foot">

@@ -367,3 +367,51 @@ create table if not exists insight_runs (
   model        text not null default ''
 );
 create index if not exists insight_runs_generated_idx on insight_runs (generated_at desc);
+
+-- ── Reconciliation actions layer (2026-07-23) ────────────────────────────────
+
+-- recon_lines review flags: a founder can mark a credit "needs a look" even
+-- when the math foots (an amount that looks wrong, a gateway to chase). Lives
+-- on recon_lines rather than a new table because that row is already the
+-- per-credit audit record (confirmed_by/confirmed_at). persistResults() upserts
+-- only the columns it names, so a recompute never clears a flag.
+alter table recon_lines add column if not exists review_flag boolean not null default false;
+alter table recon_lines add column if not exists review_note text not null default '';
+
+-- zoho_postings: what has actually been written to Zoho Books, one row per
+-- bank credit. Without this, the "Post to Zoho" button double-counts real money
+-- on a double click — the API had no memory of what it had already posted.
+-- The unique index on bank_line_id IS the idempotency guarantee.
+create table if not exists zoho_postings (
+  id               uuid primary key default gen_random_uuid(),
+  tenant_id        text not null default 'omnia',
+  bank_line_id     text not null,
+  gateway          text not null,
+  payout_id        text,
+  reference_number text not null default '',
+  net_aed          numeric not null default 0,
+  gross_aed        numeric not null default 0,
+  fee_aed          numeric not null default 0,
+  -- 'posted' | 'partial' — partial means one leg reached Zoho and the other
+  -- failed, which strands money in the clearing account and needs a human.
+  status           text not null default 'posted',
+  zoho_result      jsonb not null default '[]',
+  error            text not null default '',
+  posted_by        text not null default '',
+  posted_at        timestamptz not null default now()
+);
+create unique index if not exists zoho_postings_bank_line_idx on zoho_postings (bank_line_id);
+
+-- zoho_account_config: the chart-of-accounts mapping payout posting needs
+-- (bank account, fee account, one clearing account per gateway). Previously
+-- env-only (ZOHO_CLEARING_ACCOUNTS json), which made a wrong ID invisible
+-- until the moment a real payout was posted. Single row, id='omnia'.
+create table if not exists zoho_account_config (
+  id                  text primary key default 'omnia',
+  tenant_id           text not null default 'omnia',
+  bank_account_id     text not null default '',
+  fee_account_id      text not null default '',
+  clearing_by_gateway jsonb not null default '{}',
+  updated_at          timestamptz not null default now(),
+  updated_by          text not null default ''
+);

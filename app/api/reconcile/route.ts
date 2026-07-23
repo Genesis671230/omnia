@@ -3,6 +3,7 @@ import { runReconciliation, type ReconLine } from "@/lib/reconciliation/engine";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
+import { ZohoConfigRepository } from "@/lib/repositories/zoho-config.repository";
 
 // A credit's statement date (YYYY-MM-DD…) falls inside an optional [from, to]
 // window — either bound omitted means unbounded on that side.
@@ -26,10 +27,13 @@ export async function GET(request: Request) {
   const lines = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
 
   // document checklist: which gateways have bank credits but no payout file
-  const [credits, payouts, orderCounts] = await Promise.all([
+  const [credits, payouts, orderCounts, postings] = await Promise.all([
     BankRepository.listCredits(),
     PayoutsRepository.listWithRefs(),
     OrdersRepository.getOrderCounts(),
+    // One query for the whole page: the alternative is a per-row lookup (or a
+    // Zoho round trip per row) just to decide whether to draw a button.
+    ZohoConfigRepository.listPostings(),
   ]);
   const rangeCredits = (from || to) ? credits.filter((c) => inRange(c.statement_date, from, to)) : credits;
 
@@ -51,6 +55,12 @@ export async function GET(request: Request) {
     lines,
     settledOrders: orderCounts.settledOrders,
     totalOrders: orderCounts.totalOrders,
+    zohoPostings: Object.fromEntries(
+      postings.map((p) => [
+        p.bank_line_id,
+        { status: p.status, postedAt: p.posted_at, reference: p.reference_number, result: p.zoho_result },
+      ]),
+    ),
     documents: {
       bankStatement: credits.length > 0,
       missingPayouts: missingDocs,
