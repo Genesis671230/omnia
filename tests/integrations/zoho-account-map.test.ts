@@ -29,7 +29,10 @@ describe("mergeAccountMaps", () => {
 
   test("no env and no db is an empty map, not a throw — the UI reports it", () => {
     const m = mergeAccountMaps(null, null);
-    assert.deepEqual(m, { bankAccountId: "", feeAccountId: "", clearingByGateway: {} });
+    assert.deepEqual(m, {
+      bankAccountId: "", feeAccountId: "", clearingByGateway: {},
+      defaultIncomeAccountId: "", expenseAccountByKind: {},
+    });
   });
 
   test("db alone is sufficient — env is not required once a mapping is saved", () => {

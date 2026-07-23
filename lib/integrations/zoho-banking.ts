@@ -39,6 +39,8 @@ export type ZohoAccountMap = {
   bankAccountId: string;
   feeAccountId: string;
   clearingByGateway: Record<string, string>;
+  defaultIncomeAccountId?: string;
+  expenseAccountByKind?: Record<string, string>;
 };
 
 export type PayoutPostingInput = {
@@ -55,7 +57,7 @@ export type PayoutPostingInput = {
 export type ZohoPosting = {
   /** Stable, derived from the bank reference — the idempotency key. */
   referenceNumber: string;
-  transaction_type: "transfer_fund";
+  transaction_type: "transfer_fund" | "deposit" | "expense";
   from_account_id: string;
   to_account_id: string;
   amount: number;
@@ -175,6 +177,8 @@ export function mergeAccountMaps(
     bankAccountId: db?.bankAccountId || env?.bankAccountId || "",
     feeAccountId: db?.feeAccountId || env?.feeAccountId || "",
     clearingByGateway: { ...(env?.clearingByGateway ?? {}), ...(db?.clearingByGateway ?? {}) },
+    defaultIncomeAccountId: db?.defaultIncomeAccountId || env?.defaultIncomeAccountId || "",
+    expenseAccountByKind: { ...(env?.expenseAccountByKind ?? {}), ...(db?.expenseAccountByKind ?? {}) },
   };
 }
 
@@ -192,10 +196,21 @@ export function accountMapFromEnvPartial(): Partial<ZohoAccountMap> {
       clearingByGateway = {};
     }
   }
+  let expenseAccountByKind: Record<string, string> = {};
+  const rawExpense = process.env.ZOHO_EXPENSE_ACCOUNTS_BY_KIND;
+  if (rawExpense) {
+    try {
+      expenseAccountByKind = JSON.parse(rawExpense);
+    } catch {
+      expenseAccountByKind = {};
+    }
+  }
   return {
     bankAccountId: process.env.ZOHO_BANK_ACCOUNT_ID ?? "",
     feeAccountId: process.env.ZOHO_FEE_ACCOUNT_ID ?? "",
     clearingByGateway,
+    defaultIncomeAccountId: process.env.ZOHO_DEFAULT_INCOME_ACCOUNT_ID ?? "",
+    expenseAccountByKind,
   };
 }
 
@@ -353,4 +368,92 @@ export async function postPayoutToZoho(
     });
   }
   return results;
+}
+
+// ── Generic bank-line posting (bulk statement upload feature) ──────────────
+//
+// Independent of the payout-clearing flow above: every parsed bank_lines row
+// (credit or debit) posts as a plain, categorized Zoho Bank Transaction —
+// deposit for credits, expense for debits — against accounts mapped once in
+// Settings, not a per-gateway clearing account.
+
+export const BANK_LINE_KINDS = ["salary", "supplier", "fee", "tax", "transfer", "other"] as const;
+export type BankLineKind = (typeof BANK_LINE_KINDS)[number];
+
+export const BANK_LINE_REFERENCE_PREFIX = "BANKLINE-";
+
+export type BankLinePostingInput = {
+  bankLineId: string;
+  direction: "credit" | "debit";
+  amount: number;
+  date: string; // YYYY-MM-DD
+  kind: string | null; // debit classification; ignored for credits
+  description: string;
+};
+
+/**
+ * Turns one bank_lines row into the single Zoho posting that records it.
+ *
+ * Unlike buildPayoutPostings, this never emits a pair — a plain bank line is
+ * one amount against one category account, not a net+fee split that must
+ * balance together.
+ */
+export function buildBankLinePosting(
+  input: BankLinePostingInput,
+  accounts: ZohoAccountMap,
+): ZohoPosting {
+  if (input.amount <= 0) {
+    throw new Error(`Bank line amount must be positive, got ${input.amount}`);
+  }
+  if (!accounts.bankAccountId) throw new Error("No Zoho bank account configured");
+
+  const amount = +input.amount.toFixed(2);
+  const referenceNumber = `${BANK_LINE_REFERENCE_PREFIX}${input.bankLineId}`;
+
+  if (input.direction === "credit") {
+    const incomeAccountId = accounts.defaultIncomeAccountId ?? "";
+    if (!incomeAccountId) {
+      throw new Error("No default income account mapped — map it under Settings → Zoho Books");
+    }
+    return {
+      referenceNumber,
+      transaction_type: "deposit",
+      from_account_id: incomeAccountId,
+      to_account_id: accounts.bankAccountId,
+      amount,
+      date: input.date,
+      description: input.description,
+    };
+  }
+
+  const kind = input.kind ?? "other";
+  const expenseAccountId = (accounts.expenseAccountByKind ?? {})[kind] ?? "";
+  if (!expenseAccountId) {
+    throw new Error(`No expense account mapped for kind "${kind}" — map it under Settings → Zoho Books`);
+  }
+  return {
+    referenceNumber,
+    transaction_type: "expense",
+    from_account_id: accounts.bankAccountId,
+    to_account_id: expenseAccountId,
+    amount,
+    date: input.date,
+    description: input.description,
+  };
+}
+
+/** What is still missing before any credit can post as a deposit. */
+export function missingIncomeMapping(accounts: ZohoAccountMap): string[] {
+  const missing: string[] = [];
+  if (!accounts.bankAccountId) missing.push("bank account");
+  if (!accounts.defaultIncomeAccountId) missing.push("default income account");
+  return missing;
+}
+
+/** What is still missing before a debit of this kind can post as an expense. */
+export function missingExpenseMappingFor(kind: string, accounts: ZohoAccountMap): string[] {
+  const missing: string[] = [];
+  if (!accounts.bankAccountId) missing.push("bank account");
+  if (!(accounts.expenseAccountByKind ?? {})[kind]) missing.push(`${kind} expense account`);
+  return missing;
 }

@@ -5,6 +5,7 @@ import {
   accountMapFromEnv,
   type ZohoAccountMap,
 } from "@/lib/integrations/zoho-banking";
+import { buildBankLinePosting, missingIncomeMapping, missingExpenseMappingFor } from "@/lib/integrations/zoho-banking";
 
 const ACCOUNTS: ZohoAccountMap = {
   bankAccountId: "BANK1",
@@ -121,4 +122,86 @@ test("accountMapFromEnv: names the missing key rather than failing vaguely", () 
   } finally {
     process.env = saved;
   }
+});
+
+const BANK_LINE_ACCOUNTS: ZohoAccountMap = {
+  bankAccountId: "BANK1",
+  feeAccountId: "FEES1",
+  clearingByGateway: {},
+  defaultIncomeAccountId: "INCOME1",
+  expenseAccountByKind: { salary: "EXP_SALARY", supplier: "EXP_SUPPLIER", fee: "EXP_FEE" },
+};
+
+test("buildBankLinePosting: a credit posts as a deposit from the default income account into the bank", () => {
+  const posting = buildBankLinePosting(
+    { bankLineId: "abc-123", direction: "credit", amount: 2462, date: "2026-07-11", kind: null, description: "ON TRACK DELIVERY" },
+    BANK_LINE_ACCOUNTS,
+  );
+  assert.equal(posting.transaction_type, "deposit");
+  assert.equal(posting.from_account_id, "INCOME1");
+  assert.equal(posting.to_account_id, "BANK1");
+  assert.equal(posting.amount, 2462);
+  assert.equal(posting.referenceNumber, "BANKLINE-abc-123");
+  assert.equal(posting.description, "ON TRACK DELIVERY");
+});
+
+test("buildBankLinePosting: a debit posts as an expense from the bank into its kind's mapped account", () => {
+  const posting = buildBankLinePosting(
+    { bankLineId: "def-456", direction: "debit", amount: 50, date: "2026-07-19", kind: "fee", description: "Outward SWIFT Charges" },
+    BANK_LINE_ACCOUNTS,
+  );
+  assert.equal(posting.transaction_type, "expense");
+  assert.equal(posting.from_account_id, "BANK1");
+  assert.equal(posting.to_account_id, "EXP_FEE");
+  assert.equal(posting.amount, 50);
+  assert.equal(posting.referenceNumber, "BANKLINE-def-456");
+});
+
+test("buildBankLinePosting: a debit with no kind falls back to 'other'", () => {
+  assert.throws(
+    () => buildBankLinePosting(
+      { bankLineId: "g1", direction: "debit", amount: 10, date: "2026-07-19", kind: null, description: "x" },
+      BANK_LINE_ACCOUNTS,
+    ),
+    /No expense account mapped for kind "other"/,
+  );
+});
+
+test("buildBankLinePosting: refuses a credit with no default income account mapped", () => {
+  assert.throws(
+    () => buildBankLinePosting(
+      { bankLineId: "g2", direction: "credit", amount: 10, date: "2026-07-19", kind: null, description: "x" },
+      { ...BANK_LINE_ACCOUNTS, defaultIncomeAccountId: "" },
+    ),
+    /No default income account mapped/,
+  );
+});
+
+test("buildBankLinePosting: refuses a debit whose kind has no mapped expense account", () => {
+  assert.throws(
+    () => buildBankLinePosting(
+      { bankLineId: "g3", direction: "debit", amount: 10, date: "2026-07-19", kind: "tax", description: "x" },
+      BANK_LINE_ACCOUNTS,
+    ),
+    /No expense account mapped for kind "tax"/,
+  );
+});
+
+test("buildBankLinePosting: refuses a non-positive amount", () => {
+  assert.throws(
+    () => buildBankLinePosting(
+      { bankLineId: "g4", direction: "credit", amount: 0, date: "2026-07-19", kind: null, description: "x" },
+      BANK_LINE_ACCOUNTS,
+    ),
+    /amount must be positive/,
+  );
+});
+
+test("missingIncomeMapping / missingExpenseMappingFor: name what's missing", () => {
+  assert.deepEqual(missingIncomeMapping({ bankAccountId: "", feeAccountId: "", clearingByGateway: {} }), [
+    "bank account",
+    "default income account",
+  ]);
+  assert.deepEqual(missingExpenseMappingFor("salary", BANK_LINE_ACCOUNTS), []);
+  assert.deepEqual(missingExpenseMappingFor("tax", BANK_LINE_ACCOUNTS), ["tax expense account"]);
 });
