@@ -53,7 +53,8 @@ test("Checkout: a parsed settlement resolves its bank credit to SETTLED with zer
       source: checkoutPayout.source, status: "uploaded", order_refs: checkoutPayout.orderRefs,
       original_currency: null, net_original: null,
       transactions: checkoutPayout.transactions!.map((t) => ({
-        order_ref: t.ref, is_refund: t.isRefund, quality: t.quality, net_aed: t.netShare,
+        order_ref: t.ref, is_refund: t.isRefund, quality: t.quality,
+        net_aed: t.netShare, gross_aed: t.grossShare, fee_aed: t.feeShare,
       })),
     }],
     orders: [{ order_number: "5300" }],

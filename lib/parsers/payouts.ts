@@ -532,7 +532,14 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
     const jFees = header.findIndex((c) => c === "total fees");
     const jCcy = header.findIndex((c) => c === "currency");
     const jTamaraId = header.findIndex((c) => c === "tamara order id");
+    // Refund signals, checked in combination because Tamara's real merchant
+    // statement has no "Merchant Refund ID" column at all — it carries
+    // "Refund Reason" plus an "Event" column ("Captured" / "Refunded").
+    // Detecting only the former meant refunds were silently counted as
+    // positive revenue on every real export.
     const jRefundId = header.findIndex((c) => c === "merchant refund id");
+    const jRefundReason = header.findIndex((c) => c === "refund reason");
+    const jEvent = header.findIndex((c) => c === "event");
 
     let net = 0, gross = 0, fees = 0, tx = 0, netOriginal = 0;
     const orderRefs: string[] = [];
@@ -542,7 +549,10 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       const ref = String(r[jRef] ?? "").trim();
       const tamaraId = jTamaraId >= 0 ? String(r[jTamaraId] ?? "").trim() : "";
       if (!ref || !tamaraId) continue; // skips blank + "Total" footer rows
-      const isRefund = jRefundId >= 0 && String(r[jRefundId] ?? "").trim() !== "";
+      const isRefund =
+        (jRefundId >= 0 && String(r[jRefundId] ?? "").trim() !== "") ||
+        (jRefundReason >= 0 && String(r[jRefundReason] ?? "").trim() !== "") ||
+        (jEvent >= 0 && /refund/i.test(String(r[jEvent] ?? "")));
       const sign = isRefund ? -1 : 1;
       const ccy = ((jCcy >= 0 && r[jCcy]?.trim()) || "AED").toUpperCase();
       currencies.add(ccy);

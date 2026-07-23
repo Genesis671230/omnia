@@ -71,7 +71,7 @@ export const PayoutsRepository = {
       id: string; gateway: string; net_amount: number; gross_amount: number | null; fee_amount: number | null;
       source: string | null; status: string; order_refs: string[];
       original_currency: string | null; net_original: number | null;
-      transactions: { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number }[];
+      transactions: { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number; gross_aed: number; fee_aed: number }[];
     }[]
   > {
     const { data: payouts, error } = await supabase
@@ -81,18 +81,23 @@ export const PayoutsRepository = {
 
     const { data: txs, error: txErr } = await supabase
       .from("payout_transactions")
-      .select("payout_id, order_ref, is_refund, quality, net_aed");
+      .select("payout_id, order_ref, is_refund, quality, net_aed, gross_aed, fee_aed");
     if (txErr) throw new Error(`payout_transactions select failed: ${txErr.message}`);
 
     const refsByPayout = new Map<string, string[]>();
-    const transactionsByPayout = new Map<string, { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number }[]>();
+    const transactionsByPayout = new Map<string, { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number; gross_aed: number; fee_aed: number }[]>();
     for (const t of txs ?? []) {
       const refs = refsByPayout.get(t.payout_id) ?? [];
       refs.push(t.order_ref);
       refsByPayout.set(t.payout_id, refs);
 
       const list = transactionsByPayout.get(t.payout_id) ?? [];
-      list.push({ order_ref: t.order_ref, is_refund: Boolean(t.is_refund), quality: t.quality, net_aed: Number(t.net_aed || 0) });
+      list.push({
+        order_ref: t.order_ref, is_refund: Boolean(t.is_refund), quality: t.quality,
+        net_aed: Number(t.net_aed || 0),
+        gross_aed: Number(t.gross_aed || 0),
+        fee_aed: Number(t.fee_aed || 0),
+      });
       transactionsByPayout.set(t.payout_id, list);
     }
     return (payouts ?? []).map((p) => ({

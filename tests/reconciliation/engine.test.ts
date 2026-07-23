@@ -65,3 +65,88 @@ test("computeReconLines: no matching payout leaves the credit AWAITING_PAYOUT", 
   assert.equal(lines[0].state, "AWAITING_PAYOUT");
   assert.equal(lines[0].payout, null);
 });
+
+/* ── FX rescale: per-order shares must foot to the bank-confirmed net ────────
+ * Parsers convert cross-currency payouts (Tabby SAR/KWD, non-UAE Tamara) to
+ * AED at UPLOAD time using the static estimate in lib/fx.ts. The engine then
+ * recomputes the authoritative net at MATCH time from the bank's own quoted
+ * wire rate in the narration. Those are two different rates, so the parser's
+ * per-order shares do NOT sum to the confirmed net whenever the bank's rate
+ * differs — which is exactly the cross-border case. Rescaling here keeps the
+ * proof table's rows and its header total in agreement to the cent.
+ */
+
+// 1000 SAR net at the parser's static estimate, then the bank's narration
+// quotes SAR/AED 1.00 — so the authoritative AED net is 1000.00, not 980.00.
+const SAR_CREDIT = {
+  id: "C900", statement_date: "2026-07-11",
+  description: "INWARD TELEX SAR/AED 1.00 TABBY SETTLEMENT",
+  reference: "FT900", amount: 1000, gateway_guess: "Tabby", confidence: "keyword" as const,
+};
+
+test("computeReconLines: bank-quoted FX rescales per-order shares to foot exactly to the confirmed net", () => {
+  const [line] = computeReconLines({
+    credits: [SAR_CREDIT],
+    payouts: [{
+      id: "TABBY-1", gateway: "Tabby", net_amount: 980, gross_amount: 1000, fee_amount: 20,
+      source: "tabby.xlsx", status: "uploaded", order_refs: ["SA1", "SA2"],
+      original_currency: "SAR", net_original: 1000,
+      transactions: [
+        { order_ref: "SA1", net_aed: 588, gross_aed: 600, fee_aed: 12, is_refund: false, quality: "clean" },
+        { order_ref: "SA2", net_aed: 392, gross_aed: 400, fee_aed: 8, is_refund: false, quality: "clean" },
+      ],
+    }],
+    orders: [{ order_number: "SA1" }, { order_number: "SA2" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.state, "SETTLED");
+  assert.equal(line.payout!.fxSource, "bank");
+  assert.equal(line.payout!.net, 1000);
+
+  const sum = +line.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  assert.equal(sum, line.payout!.net, "per-order shares must sum to the bank-confirmed net");
+  // 588 and 392 scaled by 1000/980
+  assert.equal(line.transactions.find((t) => t.ref === "SA1")!.netShare, 600);
+  assert.equal(line.transactions.find((t) => t.ref === "SA2")!.netShare, 400);
+});
+
+test("computeReconLines: rescale is a no-op when the rate came from our static estimate", () => {
+  const [line] = computeReconLines({
+    credits: [{ ...SAR_CREDIT, description: "INWARD TELEX TABBY SETTLEMENT (no rate quoted)" }],
+    payouts: [{
+      id: "TABBY-2", gateway: "Tabby", net_amount: 1000, gross_amount: 1020, fee_amount: 20,
+      source: "tabby.xlsx", status: "uploaded", order_refs: ["SA3"],
+      original_currency: "SAR", net_original: 1042,
+      transactions: [
+        { order_ref: "SA3", net_aed: 1000, gross_aed: 1020, fee_aed: 20, is_refund: false, quality: "clean" },
+      ],
+    }],
+    orders: [{ order_number: "SA3" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.payout!.fxSource, "estimate");
+  assert.equal(line.transactions[0].netShare, 1000, "estimate path must leave parser shares untouched");
+});
+
+test("computeReconLines: rescale rounding remainder lands on the largest share, never dropped", () => {
+  const [line] = computeReconLines({
+    credits: [{ ...SAR_CREDIT, amount: 100 }],
+    payouts: [{
+      id: "TABBY-3", gateway: "Tabby", net_amount: 99, gross_amount: 99, fee_amount: 0,
+      source: "tabby.xlsx", status: "uploaded", order_refs: ["SA4", "SA5", "SA6"],
+      original_currency: "SAR", net_original: 100,
+      transactions: [
+        { order_ref: "SA4", net_aed: 33, gross_aed: 33, fee_aed: 0, is_refund: false, quality: "clean" },
+        { order_ref: "SA5", net_aed: 33, gross_aed: 33, fee_aed: 0, is_refund: false, quality: "clean" },
+        { order_ref: "SA6", net_aed: 33, gross_aed: 33, fee_aed: 0, is_refund: false, quality: "clean" },
+      ],
+    }],
+    orders: [{ order_number: "SA4" }, { order_number: "SA5" }, { order_number: "SA6" }],
+    confirmations: new Map(),
+  });
+
+  const sum = +line.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  assert.equal(sum, line.payout!.net, "no cent may be lost to rounding");
+});

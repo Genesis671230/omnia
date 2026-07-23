@@ -55,10 +55,63 @@ export type ReconLine = {
   // blank/unparseable/multi/note Stripe descriptions, for manual review —
   // informational only, never changes `state`.
   qualityIssues: QualityIssue[];
+  // Per-order proof, rescaled so it always foots to `payout.net` above. Empty
+  // when the payout's parser produced no per-order breakdown (Telr, generic).
+  transactions: ReconTransactionShare[];
+  // How much of the AED figure moved because the bank's real wire rate differs
+  // from the static parse-time estimate — an artifact of OUR conversion, not
+  // money the gateway charged. null when no FX was involved.
+  rateDriftAed: number | null;
+  // The gateway's own cost of converting to AED on a cross-border settlement:
+  // gross (at the same authoritative rate) minus the net that actually landed.
+  // null when the payout is AED-native.
+  fxFeeAed: number | null;
   state: ReconState;
   confirmedBy: string | null;
   confirmedAt: string | null;
 };
+
+export type ReconTransactionShare = {
+  ref: string;
+  netShare: number;
+  grossShare: number;
+  feeShare: number;
+  isRefund: boolean;
+  quality: string | null;
+};
+
+// Parsers convert cross-currency payouts to AED at upload time with the static
+// estimate in lib/fx.ts; the engine recomputes the authoritative net from the
+// bank's own quoted wire rate. When those differ, the parser's per-order shares
+// no longer sum to the confirmed net — so scale every share by the same ratio.
+// The last cent of any rounding remainder is pushed onto the largest share
+// rather than dropped, so the proof table always foots exactly.
+function rescaleShares(
+  transactions: PayoutWithRefs["transactions"],
+  scale: number,
+  target: number,
+): ReconTransactionShare[] {
+  const shares = transactions.map((t) => ({
+    ref: t.order_ref,
+    netShare: +(t.net_aed * scale).toFixed(2),
+    grossShare: +(t.gross_aed * scale).toFixed(2),
+    feeShare: +(t.fee_aed * scale).toFixed(2),
+    isRefund: t.is_refund,
+    quality: t.quality,
+  }));
+  if (shares.length === 0) return shares;
+
+  const sum = +shares.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  const remainder = +(target - sum).toFixed(2);
+  if (remainder !== 0) {
+    let largest = 0;
+    for (let i = 1; i < shares.length; i++) {
+      if (Math.abs(shares[i].netShare) > Math.abs(shares[largest].netShare)) largest = i;
+    }
+    shares[largest].netShare = +(shares[largest].netShare + remainder).toFixed(2);
+  }
+  return shares;
+}
 
 // Order refs in payout files may carry store prefixes ("WA5204", "SA5204")
 // while the orders table stores bare numbers — match on the numeric tail too.
@@ -172,6 +225,9 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
         unresolvedRefs: [],
         refundedOrders: [],
         qualityIssues: [],
+        transactions: [],
+        rateDriftAed: null,
+        fxFeeAed: null,
         state: "AWAITING_PAYOUT",
       });
       continue;
@@ -180,6 +236,23 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     claimedPayouts.add(payout.id);
     const expected = expectedNetFor(payout, credit);
     const variance = +(Number(credit.amount) - expected.net).toFixed(2);
+
+    // Only the bank-quoted path re-derives the net; the estimate path returns
+    // payout.net_amount unchanged, so its shares are already consistent.
+    const scale =
+      expected.fxSource === "bank" && payout.net_amount !== 0
+        ? expected.net / payout.net_amount
+        : 1;
+    const transactions = rescaleShares(payout.transactions, scale, expected.net);
+
+    const rateDriftAed =
+      expected.fxSource === "bank" ? +(expected.net - payout.net_amount).toFixed(2) : null;
+    // Gross converted at the SAME authoritative rate as the net, so the fee is
+    // a like-for-like difference rather than a mix of two conversion rates.
+    const fxFeeAed =
+      expected.currency && expected.fxRate != null && payout.gross_amount
+        ? +(payout.gross_amount * scale - expected.net).toFixed(2)
+        : null;
 
     // per-ref refund/quality info, when the parser produced it (Stripe live
     // API + CSV uploads) — absent for older parsers (Telr/Tamara/Tabby/
@@ -230,6 +303,9 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       unresolvedRefs,
       refundedOrders,
       qualityIssues,
+      transactions,
+      rateDriftAed,
+      fxFeeAed,
       state,
     });
   }
