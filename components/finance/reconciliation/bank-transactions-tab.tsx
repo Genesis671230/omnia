@@ -10,6 +10,7 @@ import { BankTxnPostDialog } from "./bank-txn-post-dialog";
 import { resolveDraftPosting, normalizeAccountMap, type DraftPosting } from "@/lib/reconciliation/mapping-resolver";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
 import { AccountCombobox } from "./account-combobox";
+import { BankTxnTable } from "./bank-txn-table";
 
 export type ZohoAccount = { account_id: string; account_name: string; account_type: string };
 
@@ -29,12 +30,37 @@ export function BankTransactionsTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const [syncing, setSyncing] = useState(false);
+const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+
   // Sticky defaults: set once, apply automatically to every draft that
   // doesn't already have a real gateway match — not a one-off bulk-apply
   // to whatever's checked right now. From-account defaults to Omnia
   // Stores LLC's own bank account as soon as settings load.
   const [defaultFromAccountId, setDefaultFromAccountId] = useState(settings.bankAccountId || "");
   const [defaultToAccountId, setDefaultToAccountId] = useState("");
+
+
+
+const syncWithZoho = async () => {
+  setSyncing(true);
+  try {
+    const params = new URLSearchParams();
+    if (settings.bankAccountId) params.set("accountId", settings.bankAccountId);
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    const res = await fetch(`/api/integrations/zoho/sync-bank-transactions?${params}`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    toast.success(`Synced: ${json.verified} verified${json.missing ? `, ${json.missing} missing in Zoho` : ""}`);
+    setLastSyncedAt(json.syncedAt);
+    await load();
+  } catch (e) {
+    toast.error((e as Error).message);
+  } finally {
+    setSyncing(false);
+  }
+};
 
   useEffect(() => {
     if (!defaultFromAccountId && settings.bankAccountId) setDefaultFromAccountId(settings.bankAccountId);
@@ -123,14 +149,21 @@ export function BankTransactionsTab({
     () => visible.filter((l) => draftsByLineId.get(l.id)?.confidence === "ready").map((l) => l.id),
     [visible, draftsByLineId],
   );
-
+  const allReadySelected = readyIds.length > 0 && readyIds.every((id) => selected.has(id));
+  const toggleSelectAllReady = () => setSelected(allReadySelected ? new Set() : new Set(readyIds));
   const selectAllReady = () => setSelected(new Set(readyIds));
-
+const deSelectAll = ()=>setSelected(new Set())
   return (
     <>
       <BankTxnFilters query={query} onQuery={setQuery} direction={direction} onDirection={setDirection}
         postStatus={postStatus} onPostStatus={setPostStatus} fromDate={fromDate} toDate={toDate}
         onRange={onRange} resultCount={visible.length} totalCount={lines.length} />
+
+<button onClick={syncWithZoho} disabled={syncing}
+  className="rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16] disabled:opacity-50">
+  {syncing ? "Syncing…" : "Sync with Zoho"}
+</button>
+{lastSyncedAt && <span className="text-[11px] text-[#8A8175]">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
 
       <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
         <div className="w-56">
@@ -151,11 +184,10 @@ export function BankTransactionsTab({
       </div>
 
       {readyIds.length > 0 && (
-        <button onClick={selectAllReady}
-          className="mb-3 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16]">
-          Select all ready ({readyIds.length})
-        </button>
-      )}
+  <button onClick={toggleSelectAllReady} className="mb-3 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16]">
+    {allReadySelected ? "Deselect all" : `Select all ready (${readyIds.length})`}
+  </button>
+)}
 
       {loading ? (
         <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-[14px] text-[#8A8175]">
@@ -170,14 +202,21 @@ export function BankTransactionsTab({
           No lines match the current filters. {lines.length} line{lines.length === 1 ? " is" : "s are"} loaded.
         </div>
       ) : (
-        <div className="space-y-2 pb-16">
-          {visible.map((l) => (
-            <BankTxnRow key={l.id} line={l} posting={postings[l.id]} draft={draftsByLineId.get(l.id)}
-              selected={selected.has(l.id)} onToggleSelect={toggleSelect} onDescriptionSaved={onDescriptionSaved} />
-          ))}
-        </div>
+        // <div className="space-y-2 pb-16">
+        //   {visible.map((l) => (
+        //     <BankTxnRow key={l.id} line={l} posting={postings[l.id]} draft={draftsByLineId.get(l.id)}
+        //       selected={selected.has(l.id)} onToggleSelect={toggleSelect} onDescriptionSaved={onDescriptionSaved} />
+        //   ))}
+        // </div>
+            <BankTxnTable
+              lines={visible}
+              postings={postings}
+              draftsByLineId={draftsByLineId}
+              selected={selected}
+              onToggleSelect={toggleSelect}
+            />
       )}
-
+     
       {selected.size > 0 && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[#D6CCBA] bg-white px-5 py-3 shadow-lg">
           <span className="text-[13px] text-[#1F1B16]">{selected.size} selected</span>

@@ -22,13 +22,15 @@ export async function GET(request: Request) {
       ZohoBankTxnRepository.listPostings(),
     ]);
 
-    const postingsByLine: Record<string, { status: string; zohoTransactionId: string | null; error: string; postedAt: string }> = {};
+    const postingsByLine: Record<string, {verifiedAt:string, status: string; zohoTransactionId: string | null; error: string; postedAt: string,zohoStatus:string }> = {};
     for (const p of postings) {
       postingsByLine[p.bank_line_id] = {
         status: p.status,
         zohoTransactionId: p.zoho_transaction_id,
+        zohoStatus: p.zoho_status,
         error: p.error,
         postedAt: p.posted_at,
+        verifiedAt: p.verified_at,
       };
     }
 

@@ -10,15 +10,14 @@ export type ZohoBankTxnPostingRow = {
   reference_number: string;
   amount: number;
   zoho_transaction_id: string | null;
-  status: "posted" | "failed";
+  zoho_status: string; // Zoho's own status: categorized | uncategorized | matched | excluded
+  status: "posted" | "verified" | "missing_in_zoho" | "failed";
   error: string;
   posted_by: string;
   posted_at: string;
+  verified_at: string;
 };
 
-/** Tracks what the bulk bank-transactions feature has posted to Zoho — kept
- *  separate from zoho_postings (the gateway-payout flow's table), which is
- *  shaped for net/gross/fee triples, not a single categorized transaction. */
 export const ZohoBankTxnRepository = {
   async getPosting(bankLineId: string): Promise<ZohoBankTxnPostingRow | null> {
     const { data, error } = await supabase
@@ -39,11 +38,29 @@ export const ZohoBankTxnRepository = {
     return (data ?? []) as ZohoBankTxnPostingRow[];
   },
 
-  async recordPosting(row: Omit<ZohoBankTxnPostingRow, "posted_at">) {
+  async recordPosting(row: Omit<ZohoBankTxnPostingRow, "posted_at"> & { posted_at?: string }) {
     const { error } = await supabase.from("zoho_bank_txn_postings").upsert(
-      { ...row, tenant_id: TENANT, posted_at: new Date().toISOString() },
+      { ...row, tenant_id: TENANT, posted_at: row.posted_at ?? new Date().toISOString() },
       { onConflict: "bank_line_id" },
     );
     if (error) throw new Error(`zoho_bank_txn_postings write failed: ${error.message}`);
+  },
+
+  async markVerified(bankLineId: string, patch: { zoho_transaction_id: string; zoho_status: string }) {
+    const { error } = await supabase.from("zoho_bank_txn_postings").update({
+      status: "verified",
+      zoho_transaction_id: patch.zoho_transaction_id,
+      zoho_status: patch.zoho_status,
+      verified_at: new Date().toISOString(),
+    }).eq("bank_line_id", bankLineId);
+    if (error) throw new Error(`zoho_bank_txn_postings verify failed: ${error.message}`);
+  },
+
+  async markMissingInZoho(bankLineId: string) {
+    const { error } = await supabase.from("zoho_bank_txn_postings").update({
+      status: "missing_in_zoho",
+      verified_at: new Date().toISOString(),
+    }).eq("bank_line_id", bankLineId);
+    if (error) throw new Error(`zoho_bank_txn_postings mark-missing failed: ${error.message}`);
   },
 };

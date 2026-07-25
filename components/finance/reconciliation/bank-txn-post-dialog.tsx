@@ -181,6 +181,7 @@ export function BankTxnPostDialog({
   const updateDraft = (bankLineId: string, patch: Partial<DraftPosting>) => {
     setItems((prev) => prev.map((d) => (d.bankLineId === bankLineId ? { ...d, ...patch } : d)));
   };
+  
 
   const confirm = async () => {
     setPosting(true);
