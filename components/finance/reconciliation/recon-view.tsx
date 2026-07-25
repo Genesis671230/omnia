@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BarChart3, FileSpreadsheet, Flag, Landmark, Loader2, Package } from "lucide-react";
 import { groupLines, matchesQuery, type GroupMode } from "@/lib/reconciliation/filters";
 import { ReconFilters } from "./recon-filters";
 import { ReconGroupHeader } from "./recon-group";
 import { ReconRow } from "./recon-row";
 import { InsightsTab } from "./insights-tab";
-import { BankTransactionsTab } from "./bank-transactions-tab";
+import { BankTransactionsTab, ZohoSettings } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
+import { toast } from "sonner";
 
 /* The reconciliation surface: filters → tabs → grouped rows, or Insights.
  *
@@ -19,6 +20,20 @@ import type { ReconLine, ReconPayload } from "./types";
 
 type Tab = "all" | "settled" | "awaiting" | "exceptions" | "flagged" | "transactions" | "insights";
 
+
+
+type ZohoAccount = {
+  account_id: string;
+  account_name: string;
+  account_type: string;
+};
+
+type ZohoSettingsState = {
+  bankAccounts: ZohoAccount[];
+  allAccounts: ZohoAccount[];
+  saved: ZohoSettings;
+  effective: ZohoSettings;
+};  
 export function ReconView({
   recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor,
 }: {
@@ -32,6 +47,9 @@ export function ReconView({
   refresh: () => void;
   uploadSlotFor: (provider: string) => React.ReactNode;
 }) {
+
+
+
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [groupMode, setGroupMode] = useState<GroupMode>("gateway");
@@ -39,7 +57,19 @@ export function ReconView({
 
   const lines = useMemo(() => recon?.lines ?? [], [recon]);
   const postings = recon?.zohoPostings ?? {};
+  const [zohoSettingsState, setZohoSettingsState] = useState<ZohoSettingsState | null>(null);
 
+  console.log(zohoSettingsState,"the data is here")
+  useEffect(() => {
+    (async () => {
+      const res = await fetch("/api/integrations/zoho/account-config");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setZohoSettingsState(json);
+    })().catch((e) => toast.error((e as Error).message));
+  }, []);
+
+  
   // Search first, then the tab — so a tab's count always describes what the
   // search left behind, never the unfiltered set.
   const searched = useMemo(() => lines.filter((l) => matchesQuery(l, query)), [lines, query]);
@@ -121,7 +151,7 @@ export function ReconView({
       ) : tab === "insights" ? (
         <InsightsTab lines={visible} />
       ) : tab === "transactions" ? (
-        <BankTransactionsTab fromDate={fromDate} toDate={toDate} onRange={onRange} />
+        <BankTransactionsTab fromDate={fromDate} toDate={toDate} onRange={onRange} zohoSettings={zohoSettingsState?.bankAccounts} zohoAccounts={zohoSettingsState?.allAccounts ?? []} />
       ) : lines.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#8A8175]">
           No bank credits imported yet. Upload the daily bank statement — parsing turns it into credit lines, and each

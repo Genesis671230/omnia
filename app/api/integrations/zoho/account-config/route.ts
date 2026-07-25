@@ -37,6 +37,7 @@ export async function GET() {
       fetchZohoBankAccounts(token),
       fetchZohoChartOfAccounts(token),
     ]);
+    console.log(bankAccounts,allAccounts,"we are here now")
   } catch (e) {
     fetchError = (e as Error).message;
   }

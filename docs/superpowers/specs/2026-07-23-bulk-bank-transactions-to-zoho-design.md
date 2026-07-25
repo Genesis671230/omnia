@@ -56,6 +56,7 @@ In scope:
 6. Bulk select → preview → post to Zoho as categorized `deposit` (credit) or
    `expense` (debit) Bank Transactions, idempotent by a stable per-line reference.
 
+
 Out of scope:
 
 - Any change to the existing gateway-payout clearing-account posting flow.

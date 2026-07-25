@@ -245,12 +245,13 @@ async function booksFetch(
     // rather than that it expired — say so, because the fix is a
     // re-authorization, not a retry.
     const hint =
-      res.status === 401
-        ? " (the token likely lacks ZohoBooks.banking scopes — re-authorize)"
-        : "";
+    res.status === 401
+    ? " (the token likely lacks ZohoBooks.banking scopes — re-authorize)"
+    : "";
     throw new Error(`Zoho Books HTTP ${res.status}${hint} (${path}): ${text.slice(0, 300)}`);
   }
   const json = JSON.parse(text);
+
   if (json.code !== 0) throw new Error(`Zoho Books error ${json.code} (${path}): ${json.message}`);
   return json;
 }

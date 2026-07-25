@@ -66,7 +66,7 @@ export function BankTxnRow({
         <input type="checkbox" checked={selected} onChange={() => onToggleSelect(line.id)} className="h-4 w-4" />
         <button onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-3 text-left">
           <span className="w-24 flex-shrink-0 text-[12.5px] text-[#8A8175]">{line.date ?? "—"}</span>
-          <span className="flex-1 truncate text-[13px] text-[#1F1B16]">{line.description}</span>
+          <span className="flex-1 truncate text-[13px] text-[#1F1B16]">{line.description.slice(0,40)+"..."+line.description.slice(-40)}</span>
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
               line.direction === "credit" ? "bg-[#FBF3E6] text-[#6F5325]" : "bg-[#F3EFE7] text-[#8A8175]"

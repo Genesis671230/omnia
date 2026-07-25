@@ -1,0 +1,1 @@
+/Users/gaian/Projects/startups/omnia-finance-os/.claude/skills/gstack/devex-review/SKILL.md

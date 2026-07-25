@@ -74,6 +74,32 @@ function classifyDebit(narration: string): ParsedBankLine["kind"] {
   return "other";
 }
 
+/** Scan every date cell in the column: an unambiguous value (day or month > 12)
+ *  settles the file's format once. Ambiguous-only columns fall back to DD/MM
+ *  (matches the bank's native export, which is what CSV *should* be — this is
+ *  only a safety net for files Excel has silently reformatted). */
+function detectDateFormat(rows: string[][], dateColIdx: number): "dmy" | "mdy" {
+  for (const row of rows) {
+    const raw = (row[dateColIdx] ?? "").trim();
+    const m = /^(\d{2})[/-](\d{2})[/-]\d{4}$/.exec(raw);
+    if (!m) continue;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a > 12 && b <= 12) return "dmy";
+    if (b > 12 && a <= 12) return "mdy";
+  }
+  return "dmy";
+}
+
+function toIsoDateWithFormat(text: string, format: "dmy" | "mdy"): string {
+  const m = /\b(\d{2})[/-](\d{2})[/-](\d{4})\b/.exec(text);
+  if (m) {
+    const [, first, second, year] = m;
+    return format === "mdy" ? `${year}-${first}-${second}` : `${year}-${second}-${first}`;
+  }
+  const iso = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(text);
+  return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : "";
+}
 function toIsoDate(text: string): string {
   DATE_TOKEN_RE.lastIndex = 0;
   const m = DATE_TOKEN_RE.exec(text);
@@ -162,10 +188,13 @@ function tryParseCsvStatement(text: string): ParsedStatement | null {
   const idx = { c: 0, d: 0 };
   const credits: ParsedBankLine[] = [];
   const debits: ParsedBankLine[] = [];
+  const dataRows = rows.slice(headerAt + 1);
+  const dateFormat = detectDateFormat(dataRows, cols.date!);
 
-  for (const row of rows.slice(headerAt + 1)) {
+  for (const row of dataRows) {
+    
     const dateRaw = (row[cols.date!] ?? "").trim();
-    const date = toIsoDate(dateRaw);
+    const date = toIsoDateWithFormat(dateRaw,dateFormat);
     if (!date) continue; // footers, totals, blank separators
 
     const narration = (row[cols.description!] ?? "").replace(/\s+/g, " ").trim();

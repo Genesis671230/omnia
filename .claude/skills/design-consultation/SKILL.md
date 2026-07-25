@@ -1,0 +1,1 @@
+/Users/gaian/Projects/startups/omnia-finance-os/.claude/skills/gstack/design-consultation/SKILL.md
