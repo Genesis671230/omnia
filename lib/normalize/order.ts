@@ -29,6 +29,17 @@ export type OrderRow = {
   gateway_raw: string;
   telr_cartid: string;
   telr_tranref: string;
+  shipping_address1: string;
+  shipping_address2: string;
+  shipping_state: string;
+  shipping_postcode: string;
+  shipping_company: string;
+
+  billing_address1: string;
+  billing_address2: string;
+  billing_state: string;
+  billing_postcode: string;
+  billing_company: string;
   financial_status: string;
   fulfillment_status: string;
   city: string;
@@ -97,6 +108,17 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
     city: raw.shippingAddress?.city || "",
     country: raw.shippingAddress?.countryCodeV2 || "",
     customer_name: raw.customer?.displayName || "",
+    shipping_address1: raw.shippingAddress?.address1 || "",
+    shipping_address2: raw.shippingAddress?.address2 || "",
+    shipping_state: raw.shippingAddress?.province || "",
+    shipping_postcode: raw.shippingAddress?.zip || "",
+    shipping_company: raw.shippingAddress?.company || "",
+
+    billing_address1: raw.billingAddress?.address1 || "",
+    billing_address2: raw.billingAddress?.address2 || "",
+    billing_state: raw.billingAddress?.province || "",
+    billing_postcode: raw.billingAddress?.zip || "",
+    billing_company: raw.billingAddress?.company || "",
     customer_email: raw.email || "",
     // shippingAddress.phone (entered at checkout) is filled far more often
     // than customer.phone (Shopify's marketing-profile phone, opt-in only).
@@ -155,6 +177,17 @@ export function normalizeWooOrder(raw: WooRawOrder): OrderRow {
     customer_name: `${raw.billing?.first_name || ""} ${raw.billing?.last_name || ""}`.trim(),
     customer_email: raw.billing?.email || "",
     customer_phone: raw.billing?.phone || "",
+    shipping_address1: raw.shipping?.address_1 || raw.billing.address_1 || "",
+    shipping_address2: raw.shipping?.address_2 || raw.billing.address_2 || "",
+    shipping_state: raw.shipping?.state || raw.billing.state || "",
+    shipping_postcode: raw.shipping?.postcode || raw.billing.postcode || "",
+    shipping_company: raw.shipping?.company || raw.billing.company || "",
+
+    billing_address1: raw.billing.address_1 || "",
+    billing_address2: raw.billing.address_2 || "",
+    billing_state: raw.billing.state || "",
+    billing_postcode: raw.billing.postcode || "",
+    billing_company: raw.billing.company || "",
     customer_id: customerIdentityKey(raw.billing?.email, raw.billing?.phone)?.id ?? null,
     source: "woocommerce",
     payout_status: "awaiting",

@@ -8,16 +8,17 @@ import { computeFinanceStatuses } from "@/lib/orders-finance-status";
 // its finance chain: payout file seen? settled by bank?
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const { days, page, limit, store, location, q } = parseOrdersQuery(url.searchParams);
+  const { days, page, limit, store, location, q, fulfillableFrom } = parseOrdersQuery(url.searchParams);
   const from = days > 0 ? new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString() : undefined;
 
-  const [{ rows, total }, payouts] = await Promise.all([
-    OrdersRepository.listPage({ from, store, location, q, page, limit }),
+  const [{ rows, total }, payouts, coverage] = await Promise.all([
+    OrdersRepository.listPage({ from, store, location, q, fulfillableFrom, page, limit }),
     PayoutsRepository.listWithRefs(),
+    OrdersRepository.getCoverageCounts({ store, location, q }),
   ]);
 
   const stripped = rows.map(({ line_items: _li, ...o }) => o);
   const orders = computeFinanceStatuses(stripped, payouts);
 
-  return NextResponse.json({ orders, total, page, pageSize: limit });
+  return NextResponse.json({ orders, total, page, pageSize: limit, coverage });
 }

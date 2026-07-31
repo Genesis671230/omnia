@@ -1,0 +1,10 @@
+{
+    "crons": [
+      { "path": "/api/workers/reconcile-drain",       "schedule": "* * * * *" },
+      { "path": "/api/workers/drift-scanner",         "schedule": "*/5 * * * *" },
+      { "path": "/api/workers/pending-zoho-timeout",  "schedule": "*/5 * * * *" },
+      { "path": "/api/workers/webhook-health",        "schedule": "*/15 * * * *" },
+      { "path": "/api/integrations/zoho/sync",        "schedule": "*/2 * * * *" },
+      { "path": "/api/integrations/shopify/sync-all", "schedule": "*/2 * * * *" }
+    ]
+  }

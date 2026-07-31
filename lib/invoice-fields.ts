@@ -7,6 +7,7 @@ import type { InvoiceFields } from "@/lib/invoice";
 import type { IntlInvoiceFields } from "@/lib/invoice-intl";
 import { defaultCourier } from "@/lib/courier";
 
+
 export type InvoiceTemplate = "ontrack" | "intl";
 
 // Same AE/non-AE split as the courier: the UAE ships Ontrack (the simple
@@ -16,6 +17,46 @@ export function selectInvoiceTemplate(country: string): InvoiceTemplate {
   return defaultCourier(country) === "Ontrack" ? "ontrack" : "intl";
 }
 
+export type InvStatus =
+  | "oversell_risk"    // store selling, Zoho empty — refund risk
+  | "unlisted"         // Zoho has stock, listed on ZERO stores — dead cash
+  | "stock_mismatch"   // listed, but store qty ≠ Zoho beyond tolerance
+  | "out"              // Zoho at 0, not on stores either
+  | "critical"         // Zoho 1–3
+  | "low"              // Zoho 4–10
+  | "ok";
+
+const MISMATCH_ABS = 2;        // ±2 units of drift tolerated
+const MISMATCH_PCT = 0.10;     // OR 10% of Zoho, whichever is looser
+type StoreQty = { storeId: string; quantity: number | null; listed: boolean;tracking: boolean; };
+export function computeStatus(item: {
+  zohoStock: number;
+  stores: StoreQty[];
+}): InvStatus {
+  const { zohoStock, stores } = item;
+  const listed = stores.filter(s => s.listed);
+  const anyLiveQty = listed.some(s => (s.quantity ?? 0) > 0);
+
+  // 1. Store is selling something Zoho says we don't have → highest priority
+  if (zohoStock <= 0 && anyLiveQty) return "oversell_risk";
+
+  // 2. Zoho has stock but literally no store carries it → sales gap
+  if (zohoStock > 0 && listed.length === 0) return "unlisted";
+
+  // 3. Zoho at zero, no store carries stock either
+  if (zohoStock <= 0) return "out";
+
+  // 4. Listed, but store qty drifts from Zoho beyond tolerance
+  const tol = Math.max(MISMATCH_ABS, Math.floor(zohoStock * MISMATCH_PCT));
+  const maxDiff = Math.max(
+    ...listed.map(s => Math.abs(zohoStock - (s.quantity ?? 0)))
+  );
+  if (maxDiff > tol) return "stock_mismatch";
+
+  if (zohoStock <= 3)  return "critical";
+  if (zohoStock <= 10) return "low";
+  return "ok";
+}
 // "Paid" for invoice purposes = money already collected online. COD is money
 // still owed at delivery, so a COD order is never auto-marked paid. A store
 // may also send an explicit unpaid/pending/refunded financial_status.

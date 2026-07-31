@@ -4,7 +4,7 @@ import { SESSION_COOKIE } from "@/lib/auth-config";
 import { verifySession } from "@/lib/session";
 
 // Anything not matched by `config.matcher` below is public by default.
-const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm"];
+const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm","/api/inventory/warehouse-matrix",];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -12,7 +12,9 @@ export async function middleware(req: NextRequest) {
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
-
+  if (pathname.startsWith("/api/webhooks")) {
+    return NextResponse.next();
+}
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
     const url = req.nextUrl.clone();

@@ -3,11 +3,6 @@
 // and flags recent store orders with no matching Zoho sales order/reference.
 // Pure functions over already-fetched rows so the API route stays thin.
 
-// export type ZohoItemRow = { sku: string; name: string; stock_on_hand: number; available_stock: number; status: string };
-export type StoreInventoryRowDb = { store_id: string; sku: string; quantity: number | null; product_title: string; product_status: string };
-export type ZohoOrderRow = { salesorder_number: string; reference_number: string; order_status: string };
-export type OrderRow = { uid: string; order_number: string; store_id: string; order_date: string | null; gross_aed: number };
-
 // export type StockMismatch = {
 //   sku: string;
 //   name: string;
@@ -43,74 +38,105 @@ export type OrderRow = { uid: string; order_number: string; store_id: string; or
 //   return mismatches.sort((a, b) => b.maxDiff - a.maxDiff);
 // }
 
-// Exported for reuse anywhere else Zoho reference-number formatting drift
-// needs absorbing (e.g. the Customer Payment publish invoice lookup).
-export function normalizeRef(s: string): string {
-  return s.toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
 
-// Recent orders (default: last 30 days) with no matching Zoho salesorder
-// number or reference — a likely bookkeeping gap, not proof of one, since
-// Zoho reference formatting can vary by store.
-export function findOrdersMissingFromZoho(orders: OrderRow[], zohoOrders: ZohoOrderRow[], days = 30): OrderRow[] {
-  const zohoRefs = new Set<string>();
-  for (const o of zohoOrders) {
-    if (o.salesorder_number) zohoRefs.add(normalizeRef(o.salesorder_number));
-    if (o.reference_number) zohoRefs.add(normalizeRef(o.reference_number));
-  }
-
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return orders.filter((o) => {
-    if (!o.order_date || new Date(o.order_date).getTime() < cutoff) return false;
-    const ref = normalizeRef(o.order_number);
-    for (const zref of zohoRefs) {
-      if (zref.includes(ref) || ref.includes(zref)) return false;
-    }
-    return true;
-  });
-}
-
-
-// Inventory comparison: Zoho (authoritative stock_on_hand) vs live per-store
-// quantities, plus store orders with no matching Zoho sales order.
-//
-// This file adds buildInventoryItems() — the full per-SKU × per-store matrix
-// with a single server-side status classification — WITHOUT changing the
-// existing findStockMismatches / findOrdersMissingFromZoho signatures the
-// route already calls. The status rule lives here (one place) so the panel
-// never re-derives it and the two can't drift.
-
-/* ── shared input shapes (mirror the repositories) ──────────────────────── */
 export type ZohoItemRow = {
-  sku: string; name: string; stock_on_hand: number; available_stock: number; status: string;
+  sku: string;
+  name: string;
+  stock_on_hand: number;
+  available_stock: number;
+  status: string;
+  unit_cost_aed?: number;   // optional — enables dead-cash quantification
 };
+
 export type StoreInventoryRow = {
-  store_id: string; sku: string; quantity: number | null; product_title: string; product_status: string;
+  store_id: string;
+  sku: string;
+  quantity: number | null;
+  product_title: string;
+  product_status: string;
 };
 
-/* ── output shapes (consumed by the route → panel) ──────────────────────── */
-export type InvStatus = "oversell_risk" | "out" | "critical" | "low" | "ok";
+// Alias kept for anything still importing the old name.
+export type StoreInventoryRowDb = StoreInventoryRow;
 
-export type StoreQty = { storeId: string; quantity: number | null; listed: boolean };
+export type ZohoOrderRow = {
+  salesorder_number: string;
+  reference_number: string;
+  order_status: string;
+};
+
+export type OrderRow = {
+  uid: string;
+  order_number: string;
+  store_id: string;
+  order_date: string | null;
+  gross_aed: number;
+};
+
+/* ── output types the panel & API share ─────────────────────────────────── */
+export type InvStatus =
+  | "oversell_risk"     // store selling stock Zoho says isn't there
+  | "unlisted"          // Zoho has stock, listed on ZERO stores — dead cash
+  | "stock_mismatch"    // listed, but store qty diverges from Zoho beyond tolerance
+  | "out"               // Zoho at 0, no store carries it either
+  | "critical"          // Zoho 1..3
+  | "low"               // Zoho 4..10
+  | "ok";
+
+export type CoverageBucket =
+  | "everywhere"        // on Zoho AND every store we track
+  | "zoho_only"         // in Zoho, on zero stores — DEAD CASH
+  | "stores_only"       // on stores, not in Zoho — catalog gap
+  | "missing_channels"  // on Zoho + some stores, absent from ≥1
+  | "single_store"      // on exactly one store (± Zoho)
+  | "nowhere";          // shouldn't happen — data bug
+
+export interface StoreQty {
+  storeId: string;
+  quantity: number | null;
+  listed: boolean;
+}
 
 export type InventoryItem = {
   sku: string;
   name: string;
-  zohoStock: number;        // stock_on_hand — authoritative
-  available: number;        // available_stock — governs oversell (on_hand − committed)
-  stores: StoreQty[];       // one entry per configured store, SAME ORDER every row
+  zohoStock: number;              // stock_on_hand — authoritative
+  available: number;              // available_stock — governs oversell (on_hand − committed)
+  zohoExists: boolean;            // does the Zoho catalog have this SKU at all?
+  stores: StoreQty[];             // one entry per configured store, SAME ORDER every row
   totalStoreQty: number;
-  maxDiff: number;          // max |zohoStock − storeQty| across LISTED stores only
+  maxDiff: number;                // max |zohoStock − storeQty| across LISTED stores only
   status: InvStatus;
+
+  // coverage fields (Phase 1)
+  presentOn: string[];            // e.g. ["zoho", "UAE", "KSA"]
+  absentFrom: string[];           // e.g. ["WA", "WOO"]
+  coverageBucket: CoverageBucket;
+  deadCashAed: number;            // qty × unit_cost when coverageBucket === "zoho_only"
 };
 
-// Thresholds are a starting point. If Zoho ever syncs a per-SKU reorder level,
-// swap these constants for that field so a fast-mover and a slow-mover aren't
-// judged the same. Kept as named constants so there's one place to change.
+export type StockMismatch = {
+  sku: string;
+  name: string;
+  zohoStock: number;
+  storeStock: { storeId: string; quantity: number | null }[];
+  maxDiff: number;
+};
+
+/* ── thresholds ─────────────────────────────────────────────────────────── */
+// Kept as named constants so there's one place to change. When Zoho ever
+// exposes a per-SKU reorder level, swap these for that field so a fast-mover
+// and a slow-mover aren't judged the same.
 const CRITICAL_MAX = 3;   // 1..3  → critical
 const LOW_MAX = 10;       // 4..10 → low
 
-// Order stores deterministically so every row's `stores[]` lines up with the
+// stock_mismatch tolerance: max(absolute floor, percentage) — so a 5 AED hair
+// tie and a 1,500 AED pendant aren't held to the same absolute drift.
+const MISMATCH_ABS = 2;
+const MISMATCH_PCT = 0.10;
+
+/* ── store ordering ─────────────────────────────────────────────────────── */
+// Order stores deterministically so every row's stores[] lines up with the
 // route's storeIds[] column order. Known stores first in a sensible reading
 // order; any unexpected store_id falls to the end alphabetically rather than
 // being dropped.
@@ -126,19 +152,70 @@ export function orderStoreIds(ids: Iterable<string>): string[] {
   });
 }
 
-/* ── the classifier — the single source of truth for status ─────────────── */
+/* ── utilities ──────────────────────────────────────────────────────────── */
+// Exported for reuse anywhere Zoho reference-number formatting drift needs
+// absorbing (e.g. the Customer Payment publish invoice lookup).
+export function normalizeRef(s: string): string {
+  return s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/* ── status classifier — single source of truth ─────────────────────────── */
+// Priority order matters: highest-cost signal wins when a SKU trips multiple
+// rules. Oversell tops the list because refunds cost money; unlisted follows
+// because dead stock is unearned revenue.
 function classify(zohoStock: number, available: number, storeQ: StoreQty[]): InvStatus {
-  // Oversell risk is the most urgent: nothing available to sell in Zoho, yet a
-  // store is still listing it with live stock. That's selling air. We check
-  // available_stock (not stock_on_hand) because committed-but-not-shipped
-  // units are already spoken for.
-  const liveOnAStore = storeQ.some((s) => s.listed && (s.quantity ?? 0) > 0);
+  const listed = storeQ.filter((s) => s.listed);
+  const liveOnAStore = listed.some((s) => (s.quantity ?? 0) > 0);
+
+  // 1. Oversell: nothing available in Zoho, store still listing with stock.
+  //    Uses `available` (not stock_on_hand) — committed-but-unshipped units
+  //    are already spoken for and don't rescue this.
   if (available <= 0 && liveOnAStore) return "oversell_risk";
 
+  // 2. Unlisted: Zoho has real stock, but no store carries this SKU.
+  //    Dead-cash bucket — Fouad's #1 sales-gap signal.
+  if (zohoStock > 0 && listed.length === 0) return "unlisted";
+
+  // 3. Out: Zoho at zero, no store carrying it either.
   if (zohoStock <= 0) return "out";
+
+  // 4. Mismatch: listed on ≥1 store, max per-store drift exceeds tolerance.
+  const tol = Math.max(MISMATCH_ABS, Math.floor(zohoStock * MISMATCH_PCT));
+  const maxDiff = listed.length
+    ? Math.max(...listed.map((s) => Math.abs(zohoStock - (s.quantity ?? 0))))
+    : 0;
+  if (maxDiff > tol) return "stock_mismatch";
+
   if (zohoStock <= CRITICAL_MAX) return "critical";
   if (zohoStock <= LOW_MAX) return "low";
   return "ok";
+}
+
+/* ── coverage classifier — which channels carry this SKU ────────────────── */
+function classifyCoverage(
+  zohoExists: boolean,
+  stores: StoreQty[],
+  allStoreIds: string[],
+): Pick<InventoryItem, "presentOn" | "absentFrom" | "coverageBucket"> {
+  const present: string[] = [];
+  if (zohoExists) present.push("zoho");
+  for (const s of stores) if (s.listed) present.push(s.storeId);
+
+  const allChannels = ["zoho", ...allStoreIds];
+  const absent = allChannels.filter((c) => !present.includes(c));
+
+  const hasZoho = present.includes("zoho");
+  const storeCount = present.filter((c) => c !== "zoho").length;
+
+  let bucket: CoverageBucket;
+  if (present.length === 0) bucket = "nowhere";
+  else if (absent.length === 0) bucket = "everywhere";
+  else if (hasZoho && storeCount === 0) bucket = "zoho_only";
+  else if (!hasZoho && storeCount > 0) bucket = "stores_only";
+  else if (storeCount === 1) bucket = "single_store";
+  else bucket = "missing_channels";
+
+  return { presentOn: present, absentFrom: absent, coverageBucket: bucket };
 }
 
 /* ── build the full matrix ──────────────────────────────────────────────── */
@@ -164,8 +241,7 @@ export function buildInventoryItems(
 
   // Build the SKU universe from Zoho items (authoritative catalog). Also fold
   // in any SKU that exists on a store but NOT in Zoho — those are exactly the
-  // oversell candidates you'd otherwise never see, so they must not be
-  // dropped just because Zoho has no row.
+  // oversell / stores_only candidates you'd otherwise never see.
   const zohoBySku = new Map<string, ZohoItemRow>();
   for (const z of zohoItems) {
     const sku = (z.sku ?? "").trim();
@@ -178,6 +254,7 @@ export function buildInventoryItems(
     const z = zohoBySku.get(sku);
     const zohoStock = z?.stock_on_hand ?? 0;
     const available = z?.available_stock ?? 0;
+    const zohoExists = !!z;
     // name: prefer Zoho's, fall back to whatever a store titled it
     const name =
       z?.name ||
@@ -192,49 +269,109 @@ export function buildInventoryItems(
     const totalStoreQty = stores.reduce((s, q) => s + (q.quantity ?? 0), 0);
 
     // maxDiff across LISTED stores only — a store that doesn't sell this SKU
-    // isn't a "difference", it's an absence. Comparing against a phantom 0
-    // there would flag every multi-store SKU as mismatched.
+    // isn't a "difference", it's an absence.
     const listed = stores.filter((s) => s.listed);
     const maxDiff = listed.length
       ? Math.max(...listed.map((s) => Math.abs(zohoStock - (s.quantity ?? 0))))
       : 0;
 
+    const coverage = classifyCoverage(zohoExists, stores, storeIds);
+
+    // Dead cash: only meaningful for zoho_only SKUs (nobody's selling them).
+    // Requires unit_cost_aed on the ZohoItemRow; falls back to 0 (count-based
+    // filter still works, just no AED number).
+    const deadCashAed =
+      coverage.coverageBucket === "zoho_only" ? zohoStock * (z?.unit_cost_aed ?? 0) : 0;
+
     items.push({
-      sku, name, zohoStock, available, stores, totalStoreQty, maxDiff,
+      sku,
+      name,
+      zohoStock,
+      available,
+      zohoExists,
+      stores,
+      totalStoreQty,
+      maxDiff,
       status: classify(zohoStock, available, stores),
+      ...coverage,
+      deadCashAed,
     });
   }
 
   // Sort by urgency, then largest divergence, then SKU — so the default order
   // is already action-ordered even before the panel sorts.
-  const rank: Record<InvStatus, number> = { oversell_risk: 0, out: 1, critical: 2, low: 3, ok: 4 };
-  items.sort((a, b) =>
-    rank[a.status] - rank[b.status] || b.maxDiff - a.maxDiff || a.sku.localeCompare(b.sku),
+  const rank: Record<InvStatus, number> = {
+    oversell_risk: 0,
+    unlisted: 1,
+    stock_mismatch: 2,
+    out: 3,
+    critical: 4,
+    low: 5,
+    ok: 6,
+  };
+  items.sort(
+    (a, b) =>
+      rank[a.status] - rank[b.status] || b.maxDiff - a.maxDiff || a.sku.localeCompare(b.sku),
   );
   return items;
 }
 
-// Summary counts the panel's alert KPIs read directly.
+/* ── aggregates the panel's KPI row & filter pills read directly ────────── */
 export function countInventory(items: InventoryItem[]) {
   return {
     outOfStock: items.filter((i) => i.status === "out").length,
     critical: items.filter((i) => i.status === "critical").length,
     oversellRisk: items.filter((i) => i.status === "oversell_risk").length,
+    unlisted: items.filter((i) => i.status === "unlisted").length,
+    stockMismatch: items.filter((i) => i.status === "stock_mismatch").length,
   };
 }
 
-/* ────────────────────────────────────────────────────────────────────────
-   EXISTING finders — unchanged behavior, included here so this file stays the
-   single home of inventory comparison. If your current implementations differ,
-   keep yours; only the additions above are new. findStockMismatches now
-   trivially derives from the same matrix to guarantee it never disagrees with
-   the full view.
-   ──────────────────────────────────────────────────────────────────────── */
-export type StockMismatch = {
-  sku: string; name: string; zohoStock: number;
-  storeStock: { storeId: string; quantity: number | null }[]; maxDiff: number;
-};
+export function countCoverage(items: InventoryItem[]): Record<CoverageBucket, number> {
+  return {
+    everywhere: items.filter((i) => i.coverageBucket === "everywhere").length,
+    zoho_only: items.filter((i) => i.coverageBucket === "zoho_only").length,
+    stores_only: items.filter((i) => i.coverageBucket === "stores_only").length,
+    missing_channels: items.filter((i) => i.coverageBucket === "missing_channels").length,
+    single_store: items.filter((i) => i.coverageBucket === "single_store").length,
+    nowhere: items.filter((i) => i.coverageBucket === "nowhere").length,
+  };
+}
 
+// Per-channel "how many SKUs are absent from this channel?" — drives the
+// "Not on Woo / Not on KSA" sub-filters under Missing channels.
+export function countMissingFrom(
+  items: InventoryItem[],
+  storeIds: string[],
+): Record<string, number> {
+  const channels = ["zoho", ...storeIds];
+  const out: Record<string, number> = {};
+  for (const c of channels) out[c] = items.filter((i) => i.absentFrom.includes(c)).length;
+  return out;
+}
+
+// Per-store "how many SKUs live ONLY on this store?" — drives the sub-filters
+// under Single store. Zoho excluded (zoho_only is its own top-level bucket).
+export function countOnlyOn(
+  items: InventoryItem[],
+  storeIds: string[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of storeIds) {
+    out[c] = items.filter(
+      (i) => i.coverageBucket === "single_store" && i.presentOn.includes(c),
+    ).length;
+  }
+  return out;
+}
+
+export function sumDeadCash(items: InventoryItem[]): number {
+  return items
+    .filter((i) => i.coverageBucket === "zoho_only")
+    .reduce((sum, i) => sum + i.deadCashAed, 0);
+}
+
+/* ── legacy finders — derive from the same matrix so they never drift ───── */
 export function findStockMismatches(
   zohoItems: ZohoItemRow[],
   storeInventory: StoreInventoryRow[],
@@ -244,8 +381,37 @@ export function findStockMismatches(
   return buildInventoryItems(zohoItems, storeInventory, cols)
     .filter((i) => i.maxDiff > 0)
     .map((i) => ({
-      sku: i.sku, name: i.name, zohoStock: i.zohoStock,
-      storeStock: i.stores.filter((s) => s.listed).map((s) => ({ storeId: s.storeId, quantity: s.quantity })),
+      sku: i.sku,
+      name: i.name,
+      zohoStock: i.zohoStock,
+      storeStock: i.stores
+        .filter((s) => s.listed)
+        .map((s) => ({ storeId: s.storeId, quantity: s.quantity })),
       maxDiff: i.maxDiff,
     }));
+}
+
+// Recent orders (default: last 30 days) with no matching Zoho salesorder
+// number or reference — a likely bookkeeping gap, not proof of one, since
+// Zoho reference formatting can vary by store.
+export function findOrdersMissingFromZoho(
+  orders: OrderRow[],
+  zohoOrders: ZohoOrderRow[],
+  days = 30,
+): OrderRow[] {
+  const zohoRefs = new Set<string>();
+  for (const o of zohoOrders) {
+    if (o.salesorder_number) zohoRefs.add(normalizeRef(o.salesorder_number));
+    if (o.reference_number) zohoRefs.add(normalizeRef(o.reference_number));
+  }
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return orders.filter((o) => {
+    if (!o.order_date || new Date(o.order_date).getTime() < cutoff) return false;
+    const ref = normalizeRef(o.order_number);
+    for (const zref of zohoRefs) {
+      if (zref.includes(ref) || ref.includes(zref)) return false;
+    }
+    return true;
+  });
 }

@@ -450,3 +450,5 @@ create unique index if not exists zoho_bank_txn_postings_line_idx on zoho_bank_t
 -- account per debit kind (salary/supplier/fee/tax/transfer/other).
 alter table zoho_account_config add column if not exists default_income_account_id text not null default '';
 alter table zoho_account_config add column if not exists expense_account_by_kind jsonb not null default '{}';
+
+

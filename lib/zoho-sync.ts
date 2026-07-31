@@ -8,11 +8,12 @@
 // down (e.g. a stale Shopify store handle) must not block the others.
 
 import { zohoConfigured, fetchZohoItems, fetchZohoSalesOrders } from "@/lib/integrations/zoho";
-import { getShopifyStores, fetchShopifyInventory } from "@/lib/integrations/shopify";
+import { getShopifyStores, fetchShopifyVariantMap } from "@/lib/integrations/shopify";
 import { wooConfigured, fetchWooProducts } from "@/lib/integrations/woo";
 import { ZohoRepository } from "@/lib/repositories/zoho.repository";
 import { StoreInventoryRepository, type StoreInventoryRow } from "@/lib/repositories/store-inventory.repository";
 import type { ZohoSourceResult } from "@/lib/repositories/zoho-sync-runs.repository";
+import { normalizeSku } from "@/lib/sku";
 
 export async function syncZohoAndInventory(): Promise<ZohoSourceResult[]> {
   const results: ZohoSourceResult[] = [];
@@ -35,10 +36,10 @@ export async function syncZohoAndInventory(): Promise<ZohoSourceResult[]> {
     }
   }
 
-  console.log(getShopifyStores(),":stores");
+
   for (const store of getShopifyStores()) {
     try {
-      const inventory = await fetchShopifyInventory(store);
+      const inventory = await fetchShopifyVariantMap(store);
       const rows: StoreInventoryRow[] = inventory.map((r) => ({
         storeId: store.code,
         sku: r.sku ?? "",
@@ -59,7 +60,7 @@ export async function syncZohoAndInventory(): Promise<ZohoSourceResult[]> {
       const products = await fetchWooProducts();
       const rows: StoreInventoryRow[] = products.map((p) => ({
         storeId: "WOO",
-        sku: p.sku ?? "",
+        sku: normalizeSku(p.sku),
         quantity: p.manage_stock ? p.stock_quantity : null,
         productTitle: p.name ?? "",
         productStatus: p.status ?? "",

@@ -10,9 +10,28 @@ const wooLimiter = new Bottleneck({
 });
 
 async function wooFetch(url: string, init?: RequestInit) {
-  return wooLimiter.schedule(() =>
-    fetch(url, init)
-  );
+  const maxAttempts = 3;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await wooLimiter.schedule(() => fetch(url, init));
+      if (response.status !== 429 && response.status < 500) return response;
+      if (attempt === maxAttempts) return response;
+
+      const retryAfterSeconds = Number(response.headers.get("Retry-After") ?? "0");
+      const delayMs = retryAfterSeconds > 0
+        ? retryAfterSeconds * 1000
+        : 250 * 2 ** (attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** (attempt - 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Woo request failed");
 }
 export type WooRawOrder = {
   id: number;
@@ -26,7 +45,30 @@ export type WooRawOrder = {
   discount_total: string;
   payment_method: string; // e.g. "telr"
   payment_method_title: string; // e.g. "Credit / Debit Card (Telr)"
-  billing: { first_name: string; last_name: string; email: string; city: string; country: string; phone: string };
+  billing: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+    email: string;
+    phone: string;
+  };
+  shipping: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+  };
   meta_data: { key: string; value: unknown }[];
   line_items: {
     name: string;
@@ -110,38 +152,74 @@ export async function testWooRateLimit(n = 50): Promise<{
 
 export type WooProduct = {
   id: number;
+  parent_id?: number;
+  variation_id?: number;
+  type: string;
   sku: string;
   name: string;
   stock_quantity: number | null;
   manage_stock: boolean;
   status: string;
+  purchasable?: boolean;
 };
+
+type WooProductResponse = Omit<WooProduct, "variation_id">;
+
+async function fetchWooProductPage(url: string): Promise<WooProductResponse[]> {
+  const auth = Buffer.from(
+    `${process.env.WOO_CONSUMER_KEY}:${process.env.WOO_CONSUMER_SECRET}`,
+  ).toString("base64");
+  const response = await wooFetch(url, {
+    headers: { Authorization: `Basic ${auth}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Woo HTTP ${response.status}: ${body.slice(0, 300)}`);
+  }
+  return (await response.json()) as WooProductResponse[];
+}
+
+async function fetchWooVariations(base: string, productId: number): Promise<WooProduct[]> {
+  const variations: WooProduct[] = [];
+  for (let page = 1; ; page += 1) {
+    const url = `${base}/wp-json/wc/v3/products/${productId}/variations?status=publish&per_page=100&page=${page}&orderby=id&order=asc`;
+    const batch = await fetchWooProductPage(url);
+    variations.push(...batch
+      .filter((variation) => variation.status === "publish")
+      .map((variation) => ({
+        ...variation,
+        type: "variation",
+        parent_id: productId,
+        variation_id: variation.id,
+      })));
+    if (batch.length < 100) break;
+  }
+  return variations;
+}
 
 // Live stock per SKU, independent of orders.
 export async function fetchWooProducts(): Promise<WooProduct[]> {
   const base = (process.env.WOO_URL || "").replace(/\/+$/, "");
-  const auth = Buffer.from(
-    `${process.env.WOO_CONSUMER_KEY}:${process.env.WOO_CONSUMER_SECRET}`,
-  ).toString("base64");
-
-  const products: WooProduct[] = [];
+  const parents: WooProductResponse[] = [];
   let page = 1;
   for (;;) {
-    const url = `${base}/wp-json/wc/v3/products?per_page=100&page=${page}&orderby=id&order=asc`;
-    const res = await wooFetch(url, {
-      headers: { Authorization: `Basic ${auth}` },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Woo HTTP ${res.status}: ${body.slice(0, 300)}`);
-    }
-    const batch = (await res.json()) as WooProduct[];
-    products.push(...batch);
+    const url = `${base}/wp-json/wc/v3/products?status=publish&per_page=100&page=${page}&orderby=id&order=asc`;
+    const batch = await fetchWooProductPage(url);
+    parents.push(...batch);
     if (batch.length < 100) break;
     page += 1;
   }
-  return products;
+
+  const productGroups = await Promise.all(parents.map(async (parent): Promise<WooProduct[]> => {
+    if (parent.type === "variable") {
+      return fetchWooVariations(base, parent.id);
+    }
+    if (parent.type === "external" || parent.type === "grouped") return [];
+    if (parent.status !== "publish") return [];
+    return [{ ...parent, variation_id: undefined }];
+  }));
+  return productGroups.flat();
 }
 
 // Telr refs live in Woo order meta; key names vary by plugin version.

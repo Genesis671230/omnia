@@ -4,11 +4,26 @@ import { keywordsForLocation } from "@/lib/orders-locations";
 import { dropClobberRiskFields } from "@/lib/orders-clobber-guard";
 
 const ORDER_COLUMNS =
-  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
+  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status,shipping_address1, shipping_address2,shipping_state,shipping_postcode,shipping_company,billing_address1,billing_address2,billing_state,billing_postcode,billing_company, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
 
+  export type OrdersQuery = {
+    days: number; page: number; limit: number;
+    store: string | null; location: string | null; q: string;
+    fulfillableFrom: "KSA" | "UAE" | null;
+  };
 export type OrderRowRaw = {
   uid: string; store_id: string; order_number: string; order_date: string | null;
   customer_name: string; customer_email: string; customer_phone: string; customer_id: string | null;
+  shipping_address1:string;
+  shipping_address2:string;
+  shipping_state:string;
+  shipping_postcode:string;
+  shipping_company:string;
+  billing_address1:string;
+  billing_address2:string;
+  billing_state:string;
+  billing_postcode:string;
+  billing_company:string;
   city: string; country: string;
   currency: string; gross_original: number; gross_aed: number; gateway: string;
   gateway_raw: string; financial_status: string; fulfillment_status: string;
@@ -20,10 +35,6 @@ export type OrderRowRaw = {
   awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
 };
 
-export type OrdersQuery = {
-  days: number; page: number; limit: number;
-  store: string | null; location: string | null; q: string;
-};
 
 // Pure — turns URL search params into clamped, normalized query args. Kept
 // separate from the DB call so it's unit-testable without Supabase.
@@ -43,7 +54,9 @@ export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
   const locationRaw = (params.get("location") || "All locations").trim();
   const location = locationRaw.toLowerCase() === "all locations" ? null : locationRaw;
   const q = (params.get("q") || "").trim();
-  return { days, page, limit, store, location, q };
+  const fulfillRaw = (params.get("fulfillableFrom") || "").trim().toUpperCase();
+  const fulfillableFrom = fulfillRaw === "KSA" || fulfillRaw === "UAE" ? fulfillRaw : null;
+  return { days, page, limit, store, location, q, fulfillableFrom };
 }
 
 // Supabase's fluent query builder returns an increasingly specific generic
@@ -52,12 +65,14 @@ export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
 // the caller re-asserts the final row shape it actually wants.
 function applyOrdersFilters(
   query: any,
-  opts: { from?: string; to?: string; store?: string | null; location?: string | null; q?: string },
+  opts: { from?: string; to?: string; store?: string | null; location?: string | null; q?: string;fulfillableFrom?: "KSA" | "UAE" | null; },
 ): any {
   let qy = query;
   if (opts.from) qy = qy.gte("order_date", opts.from);
   if (opts.to) qy = qy.lte("order_date", opts.to);
   if (opts.store) qy = qy.eq("store_id", opts.store);
+  if (opts.fulfillableFrom === "KSA") qy = qy.eq("stock_coverage_ksa", true);
+  if (opts.fulfillableFrom === "UAE") qy = qy.eq("stock_coverage_uae", true);
   if (opts.location) {
     const keywords = keywordsForLocation(opts.location);
     if (keywords && keywords.length > 0) {
@@ -255,12 +270,12 @@ export const OrdersRepository = {
   // UI-facing paginated + filtered query — the ledger's data source going
   // forward. listAll() stays untouched for the reconciler, which needs the
   // full book regardless of any UI filter.
-  async listPage({ from, to, store, location, q, page, limit }: {
+  async listPage({ from, to, store, location, q, page, limit ,fulfillableFrom}: {
     from?: string; to?: string; store?: string | null; location?: string | null;
-    q?: string; page: number; limit: number;
+    q?: string; fulfillableFrom?: "KSA" | "UAE" | null;page: number; limit: number;
   }) {
     let query = supabase.from("orders").select(ORDER_COLUMNS, { count: "exact" });
-    query = applyOrdersFilters(query, { from, to, store, location, q });
+    query = applyOrdersFilters(query, { from, to, store, location, q ,fulfillableFrom});
     const fromIdx = (page - 1) * limit;
     const { data, error, count } = await query
       .order("order_date", { ascending: false })
@@ -269,6 +284,37 @@ export const OrdersRepository = {
     return { rows: (data ?? []) as OrderRowRaw[], total: count ?? 0 };
   },
 
+  async getDispatchDetailsByUids(uids: string[]) {
+    if (uids.length === 0) return [];
+    const out: any[] = [];
+    for (let i = 0; i < uids.length; i += 200) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "uid, order_number, order_date, store_id, customer_name, customer_phone, city, country, currency, gross_aed, gateway, shipping_address1, shipping_address2, shipping_state, shipping_postcode, line_items",
+        )
+        .in("uid", uids.slice(i, i + 200));
+      if (error) throw new Error(`dispatch detail select failed: ${error.message}`);
+      out.push(...(data ?? []));
+    }
+    return out;
+  },
+  async getCoverageCounts(_opts: any = {}) {
+    // Deliberately no filters — proves the .eq() alone works.
+    const ksaRes = await supabase
+      .from("orders")
+      .select("uid", { count: "exact", head: true })
+      .eq("stock_coverage_ksa", true);
+    const uaeRes = await supabase
+      .from("orders")
+      .select("uid", { count: "exact", head: true })
+      .eq("stock_coverage_uae", true);
+  
+    console.log("[coverage] ksa:", ksaRes.count, "err:", ksaRes.error?.message);
+    console.log("[coverage] uae:", uaeRes.count, "err:", uaeRes.error?.message);
+  
+    return { ksa: ksaRes.count ?? 0, uae: uaeRes.count ?? 0, neither: 0 };
+  },
   // Full rows within a date window (+ optional store), for dashboard
   // aggregation that needs every row in range, not one page of it. Still
   // pages past Supabase's 1000-row cap internally like listAll(), just only

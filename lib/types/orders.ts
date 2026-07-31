@@ -14,6 +14,16 @@ export type OrderRow = {
   currency: string;
   gross_original: number;
   gross_aed: number;
+  shipping_address1: string;
+  shipping_address2:string;
+  shipping_state:string;
+  shipping_postcode:string;
+  shipping_company:string;
+  billing_address1:string;
+  billing_address2:string;
+  billing_state:string;
+  billing_postcode:string;
+  billing_company:string;
   gateway: string;
   gateway_raw: string;
   financial_status: string;

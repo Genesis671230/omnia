@@ -64,8 +64,31 @@ const ORDERS_QUERY = /* GraphQL */ `
         displayFulfillmentStatus
         paymentGatewayNames
         customer { displayName phone defaultAddress { phone } }
-        shippingAddress { city countryCodeV2 phone }
-        billingAddress { phone }
+        shippingAddress {
+            firstName
+            lastName
+            company
+            address1
+            address2
+            city
+            province
+            zip
+            countryCodeV2
+            phone
+          }
+
+          billingAddress {
+            firstName
+            lastName
+            company
+            address1
+            address2
+            city
+            province
+            zip
+            countryCodeV2
+            phone
+          }
         currentTotalPriceSet { shopMoney { amount currencyCode } }
         currentSubtotalPriceSet { shopMoney { amount } }
         totalShippingPriceSet { shopMoney { amount } }
@@ -97,8 +120,31 @@ export type ShopifyRawOrder = {
   displayFulfillmentStatus: string | null;
   paymentGatewayNames: string[];
   customer: { displayName: string; phone: string | null; defaultAddress: { phone: string | null } | null } | null;
-  shippingAddress: { city: string | null; countryCodeV2: string | null; phone: string | null } | null;
-  billingAddress: { phone: string | null } | null;
+  shippingAddress: {
+    firstName: string | null;
+    lastName: string | null;
+    company: string | null;
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+    zip: string | null;
+    countryCodeV2: string | null;
+    phone: string | null;
+  } | null;
+  
+  billingAddress: {
+    firstName: string | null;
+    lastName: string | null;
+    company: string | null;
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+    zip: string | null;
+    countryCodeV2: string | null;
+    phone: string | null;
+  } | null;
   currentTotalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   currentSubtotalPriceSet: { shopMoney: { amount: string } } | null;
   totalShippingPriceSet: { shopMoney: { amount: string } } | null;
@@ -228,4 +274,115 @@ export async function fetchShopifyOrders(
   } while (after);
 
   return orders;
+}
+
+
+
+// lib/integrations/shopify.ts — extended
+
+const VARIANT_INVENTORY_QUERY = /* GraphQL */ `
+  query VariantInventory($first: Int!, $after: String) {
+    productVariants(first: $first, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        sku
+        inventoryQuantity
+        product { id title status }
+        inventoryItem {
+          id
+          tracked
+          inventoryLevels(first: 20) {
+            nodes {
+              id
+              quantities(names: ["available"]) { name quantity }
+              location {
+                id
+                name
+                isActive
+                fulfillsOnlineOrders
+                # Detects 3PL/fulfillment-service locations we can't write to.
+                # If any of these is true we mark the row read-only.
+                fulfillmentService { serviceName type }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export type ShopifyVariantMapRow = {
+  store_id: ShopifyStoreCode;
+  variant_id: string;                      // gid://shopify/ProductVariant/...
+  sku: string;
+  inventory_item_id: string;               // gid://shopify/InventoryItem/...
+  location_id: string;                     // gid://shopify/Location/...
+  location_name: string;
+  is_readonly: boolean;                    // true for fulfillment service locations
+  fulfillment_service: string | null;
+  product_status: string;
+  tracked: boolean;
+  inventoryQuantity: number | null;
+  product: { title: string; status: string } | null;
+  available: number;
+};
+
+export async function fetchShopifyVariantMap(store: ShopifyStoreConfig): Promise<ShopifyVariantMapRow[]> {
+  const endpoint = `${store.url}/admin/api/${API_VERSION}/graphql.json`;
+  const rows: ShopifyVariantMapRow[] = [];
+  let after: string | null = null;
+
+  do {
+    let json: any;
+    for (let attempt = 1; ; attempt++) {
+      const res = await shopifyFetchWithRetry(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": store.token },
+        body: JSON.stringify({ query: VARIANT_INVENTORY_QUERY, variables: { first: 100, after } }),
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      json = await res.json();
+      if (isThrottledGraphQLError(json) && attempt < MAX_RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, throttleDelayMs(json, attempt)));
+        continue;
+      }
+      if (json.errors) throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+      break;
+    }
+
+    for (const v of json.data.productVariants.nodes) {
+      const sku = v.sku ? v.sku.trim().toUpperCase() : "";
+      if (!sku || !v.inventoryItem?.tracked) continue;
+      for (const level of v.inventoryItem.inventoryLevels.nodes) {
+        if (!level.location.isActive) continue;
+        const svc = level.location.fulfillmentService?.serviceName ?? null;
+        // Manual location is Shopify's default; anything else is a service integration
+        // and typically read-only from Admin API's perspective.
+        const isReadonly = Boolean(svc) && svc !== "manual";
+        rows.push({
+          store_id: store.code,
+          variant_id: v.id,
+          sku,
+          inventory_item_id: v.inventoryItem.id,
+          location_id: level.location.id,
+          location_name: level.location.name,
+          is_readonly: isReadonly,
+          fulfillment_service: svc,
+          product_status: v.product.status,
+          tracked: v.inventoryItem.tracked,
+          available: level.quantities?.[0]?.quantity ?? 0,
+          inventoryQuantity: v.inventoryQuantity,
+          product: v.product
+        });
+      }
+    }
+
+    after = json.data.productVariants.pageInfo.hasNextPage
+      ? json.data.productVariants.pageInfo.endCursor : null;
+  } while (after);
+
+  return rows;
 }
