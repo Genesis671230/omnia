@@ -19,7 +19,7 @@ function verifyWooSignature(raw: string, header: string | null): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export async function POST(req: Request, { params }: { params: { topic: string } }) {
+export async function POST(req: Request, { params }: { params: { topics: string } }) {
   const raw = await req.text();
   const sig = req.headers.get("x-wc-webhook-signature");
   const webhookId = req.headers.get("x-wc-webhook-id") ?? "";
@@ -37,25 +37,25 @@ export async function POST(req: Request, { params }: { params: { topic: string }
     return NextResponse.json({ ok: true, dedup: true });
   }
 
-  await markHeartbeat("woo", params.topic, deliveryId);
+  await markHeartbeat("woo", params.topics, deliveryId);
 
   const payload = JSON.parse(raw);
 
   try {
-    if (params.topic === "product-updated" || params.topic === "product-restored") {
+    if (params.topics === "product-updated" || params.topics === "product-restored") {
       await handleWooProductUpdate(payload);
-    } else if (params.topic === "product-deleted") {
+    } else if (params.topics === "product-deleted") {
       await handleWooProductDelete(payload);
-    } else if (params.topic === "order-created") {
+    } else if (params.topics === "order-created") {
       await handleWooOrderCreated(payload);
-    } else if (params.topic === "order-updated") {
+    } else if (params.topics === "order-updated") {
       // Fires on status changes — process refunds/cancels here.
       await handleWooOrderUpdated(payload);
     }
   } catch (e) {
     // Log but return 200. Woo doesn't retry; we'll catch missed changes on
     // the next scanner pass.
-    console.error(`woo webhook ${params.topic} failed:`, (e as Error).message);
+    console.error(`woo webhook ${params.topics} failed:`, (e as Error).message);
   }
 
   return NextResponse.json({ ok: true });
