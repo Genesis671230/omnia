@@ -974,7 +974,7 @@ export function InventoryPanel() {
 }
 
   const INVENTORY_CSS = `
-    .inventory { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+    .inventory { display: flex; flex-direction: column; gap: 16px;  }
     .inventory * { box-sizing: border-box; }
     .mono { font-variant-numeric: tabular-nums; }
     .num { text-align: right; }
@@ -1107,7 +1107,7 @@ export function InventoryPanel() {
 .activity-head { display: flex; justify-content: space-between; align-items: baseline; }
 .activity-title { font-size: 12.5px; font-weight: 600; }
 .activity-total { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.activity-bars { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; align-items: end; height: 140px; }
+.activity-bars { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; align-items: end; height: 22rem; }
 .activity-col { height: 100%; display: flex; align-items: end; }
 .activity-stack { width: 100%; min-height: 2px; display: flex; flex-direction: column-reverse; border-radius: 3px; overflow: hidden; transition: height 400ms ease; }
 .activity-legend { display: flex; gap: 12px; font-size: 10.5px; color: var(--muted); flex-wrap: wrap; }

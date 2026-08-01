@@ -28,9 +28,11 @@ export function StorePulseRow() {
   const [rows, setRows] = useState<StoreHealth[]>([]);
 
   useEffect(() => {
-    const load = () =>
-      fetch("/api/inventory/store-health").then((r) => r.json()).then((d) => setRows(d.health ?? []));
-    load();
+     function load() {
+
+     return fetch("/api/inventory/store-health").then((r) => r.json()).then((d) => setRows(d.health ?? []));
+    }
+     load();
     const id = setInterval(load, 15_000);
     return () => clearInterval(id);
   }, []);

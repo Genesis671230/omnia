@@ -39,6 +39,7 @@ export function ActivityChart() {
         <span className="activity-title">Activity · last 4 hours</span>
         <span className="activity-total">{total} events</span>
       </div>
+      
       <div className="activity-bars">
         {buckets.map((b) => {
           const sum = b.shopify_uae + b.shopify_ksa + b.shopify_wa + b.woo + b.zoho;

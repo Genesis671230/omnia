@@ -237,19 +237,19 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
          */}
         <header className="top">
         <div>
-          <p className="eyebrow">Omnia financial operations</p>
-          <h1>{meta.title}</h1>
-          <p className="sub">{meta.sub}</p>
+          {/* <p className="eyebrow">{meta.title}</p> */}
+          {/* <h1>{meta.title}</h1> */}
+          {/* <p className="sub">{meta.sub}</p> */}
         </div>
         <div className="top-right">
-          <div className="role">
+          {/* <div className="role">
             <span className="role-label">Viewing as</span>
             <div className="role-switch">
               <button className={isFounder ? "on" : ""} onClick={() => setIsFounder(true)}>Founder</button>
               <button className={!isFounder ? "on" : ""} onClick={() => setIsFounder(false)}>Operator</button>
             </div>
-          </div>
-          <div className="top-actions">
+          </div> */}
+          <div className="top-actions fixed top-6">
             <button className="btn" disabled={syncing} onClick={sync}>
               {syncing ? <Loader2 size={14} className="spin" /> : <RefreshCcw size={14} />} Sync stores
             </button>

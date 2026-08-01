@@ -12,7 +12,7 @@ export async function middleware(req: NextRequest) {
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
-  if (pathname.startsWith("/api/webhooks")) {
+  if (pathname.includes("/api/webhooks")) {
     return NextResponse.next();
 }
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);

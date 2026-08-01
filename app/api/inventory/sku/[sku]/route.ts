@@ -4,7 +4,8 @@ import { supabase } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: { sku: string } }) {
-  const sku = decodeURIComponent(params.sku);
+  const storeParams = await params
+  const sku = decodeURIComponent(storeParams.sku);
 
   const [zohoRes, storesRes, eventsRes] = await Promise.all([
     supabase.from("zoho_items").select("name, available_stock, stock_on_hand").eq("sku", sku).maybeSingle(),

@@ -1,6 +1,8 @@
 // Shopify Admin GraphQL client — one client, three stores (WA / UAE / KSA).
 // Only this file talks to Shopify. Tokens come from env, never hardcoded.
 
+import { supabase } from "../supabase";
+
 export type ShopifyStoreCode = "WA" | "UAE" | "KSA";
 
 export type ShopifyStoreConfig = {
@@ -385,4 +387,201 @@ export async function fetchShopifyVariantMap(store: ShopifyStoreConfig): Promise
   } while (after);
 
   return rows;
+}
+
+
+
+
+
+
+
+const VARIANT_BY_SKU_QUERY = /* GraphQL */ `
+  query VariantBySku($query: String!) {
+    productVariants(first: 5, query: $query) {
+      nodes {
+        id
+        sku
+        product { status }
+        inventoryItem {
+          id
+          tracked
+          inventoryLevels(first: 20) {
+            nodes {
+              location {
+                id
+                name
+                isActive
+                fulfillmentService { serviceName type }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const INVENTORY_SET_MUTATION = /* GraphQL */ `
+  mutation InventorySetQuantities($input: InventorySetQuantitiesInput!) {
+    inventorySetQuantities(input: $input) {
+      inventoryAdjustmentGroup {
+        createdAt
+        changes { name delta quantityAfterChange }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+type ResolvedTarget = {
+  variantId: string;
+  inventoryItemId: string;
+  locationId: string;
+  locationName: string;
+};
+
+
+// Cache-first (shopify_variant_map) then live GraphQL fallback. Only
+// returns a WRITABLE (is_readonly = false) location — a readonly hit
+// is treated as "no writable target," never silently written anyway.
+async function resolveWritableTarget(store: ShopifyStoreConfig, sku: string): Promise<  { ok: true; target: ResolvedTarget } | { ok: false; reason: string } > {
+  const skuNorm = sku.trim().toUpperCase();
+
+  const { data: cached } = await supabase
+    .from("shopify_variant_map")
+    .select("variant_id, inventory_item_id, location_id, location_name, is_readonly")
+    .eq("store_id", store.code)
+    .eq("sku", skuNorm)
+    .order("synced_at", { ascending: false });
+
+  const writableCached = (cached ?? []).find((r) => !r.is_readonly);
+  if (writableCached) {
+    return {
+      ok: true,
+      target: {
+        variantId: writableCached.variant_id,
+        inventoryItemId: writableCached.inventory_item_id,
+        locationId: writableCached.location_id,
+        locationName: writableCached.location_name ?? "",
+      },
+    };
+  }
+
+  const onlyReadonlyCached = (cached ?? []).length > 0 && (cached ?? []).every((r) => r.is_readonly);
+  if (onlyReadonlyCached) {
+    const names = (cached ?? []).map((r) => r.location_name).join(", ");
+    return { ok: false, reason: `readonly_location: only fulfillment-service locations found (${names})` };
+  }
+
+  // Cold cache — live lookup.
+  let json: any;
+  try {
+    json = await graphqlRequest(store, VARIANT_BY_SKU_QUERY, { query: `sku:${skuNorm}` });
+  } catch (e) {
+    return { ok: false, reason: `lookup_failed: ${(e as Error).message}` };
+  }
+
+  const node = json.data.productVariants.nodes.find((v: any) => v.sku?.trim().toUpperCase() === skuNorm);
+  if (!node) return { ok: false, reason: "sku_not_found_on_store" };
+  if (!node.inventoryItem?.tracked) return { ok: false, reason: "untracked_on_shopify" };
+
+  const levels = node.inventoryItem.inventoryLevels.nodes.filter((l: any) => l.location.isActive);
+  const writable = levels.find((l: any) => {
+    const svc = l.location.fulfillmentService?.serviceName ?? null;
+    return !svc || svc === "manual";
+  });
+  if (!writable) {
+    const names = levels.map((l: any) => l.location.name).join(", ");
+    return { ok: false, reason: `readonly_location: only fulfillment-service locations found (${names})` };
+  }
+
+  const target: ResolvedTarget = {
+    variantId: node.id,
+    inventoryItemId: node.inventoryItem.id,
+    locationId: writable.location.id,
+    locationName: writable.location.name,
+  };
+
+
+  await supabase.from("shopify_variant_map").upsert(
+    {
+      store_id: store.code,
+      variant_id: target.variantId,
+      sku: skuNorm,
+      inventory_item_id: target.inventoryItemId,
+      location_id: target.locationId,
+      location_name: target.locationName,
+      is_readonly: false,
+      fulfillment_service: null,
+      product_status: node.product?.status ?? null,
+      synced_at: new Date().toISOString(),
+    },
+    { onConflict: "store_id,variant_id,location_id" },
+  ).then(undefined, () => {});
+
+  return { ok: true, target };
+}
+async function graphqlRequest(store: ShopifyStoreConfig, query: string, variables: Record<string, unknown>) {
+  const endpoint = `${store.url}/admin/api/${API_VERSION}/graphql.json`;
+  let json: any;
+  for (let attempt = 1; ; attempt++) {
+    const res = await shopifyFetchWithRetry(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": store.token },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Shopify ${store.code} HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    json = await res.json();
+    if (isThrottledGraphQLError(json) && attempt < MAX_RETRY_ATTEMPTS) {
+      await new Promise((r) => setTimeout(r, throttleDelayMs(json, attempt)));
+      continue;
+    }
+    if (json.errors) throw new Error(`Shopify ${store.code} GraphQL: ${JSON.stringify(json.errors).slice(0, 300)}`);
+    return json;
+  }
+}
+
+
+export type ShopifyPushResult =
+  | { ok: true; store: ShopifyStoreCode; fromQty: number | null; toQty: number; location: string }
+  | { ok: false; store: ShopifyStoreCode; reason: string };
+
+// The actual write. inventorySetQuantities with ignoreCompareQuantity:true
+// sets an absolute on-hand value — no need to know Shopify's current qty
+// going in, which sidesteps compareQuantity race-condition rejections.
+export async function pushShopifyInventoryQuantity(
+  storeCode: ShopifyStoreCode,
+  sku: string,
+  targetQty: number,
+  currentQtyInDb: number | null,
+): Promise<ShopifyPushResult> {
+  const store = getShopifyStores().find((s) => s.code === storeCode);
+  if (!store) return { ok: false, store: storeCode, reason: "store_not_configured" };
+
+  const resolved = await resolveWritableTarget(store, sku);
+  if (!resolved.ok) return { ok: false, store: storeCode, reason: resolved.reason };
+
+  const { inventoryItemId, locationId, locationName } = resolved.target;
+
+  let json: any;
+  try {
+    json = await graphqlRequest(store, INVENTORY_SET_MUTATION, {
+      input: {
+        name: "available",
+        reason: "correction",
+        ignoreCompareQuantity: true,
+        quantities: [{ inventoryItemId, locationId, quantity: targetQty }],
+      },
+    });
+  } catch (e) {
+    return { ok: false, store: storeCode, reason: `mutation_failed: ${(e as Error).message}` };
+  }
+
+  const userErrors = json.data?.inventorySetQuantities?.userErrors ?? [];
+  if (userErrors.length > 0) {
+    return { ok: false, store: storeCode, reason: `shopify_rejected: ${userErrors.map((e: any) => e.message).join("; ")}` };
+  }
+
+  return { ok: true, store: storeCode, fromQty: currentQtyInDb, toQty: targetQty, location: locationName };
 }
