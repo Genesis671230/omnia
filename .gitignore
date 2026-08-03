@@ -28,3 +28,6 @@ next-env.d.ts
 
 .claude/skills/gstack/
 gstack/
+
+# Isolated implementation worktrees
+/.worktrees/
