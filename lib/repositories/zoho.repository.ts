@@ -14,6 +14,7 @@ export const ZohoRepository = {
       stock_on_hand: i.stock_on_hand ?? 0,
       available_stock: i.available_stock ?? 0,
       rate: i.rate ?? 0,
+      purchase_rate: i.purchase_rate ?? 0,
       status: i.status ?? "",
       synced_at: new Date().toISOString(),
     }));

@@ -19,6 +19,7 @@ async function renderPdf(order: OrderRow, template: InvoiceTemplate, edits: Reco
     const fields: IntlInvoiceFields = { ...base, ...(edits as Partial<IntlInvoiceFields>) };
     return buildIntlInvoicePdf(fields);
   }
+  console.log(order,"the order ")
   const base = ontrackPrefill(order);
   const fields: InvoiceFields = { ...base, ...(edits as Partial<InvoiceFields>) };
   return buildInvoicePdf(fields);

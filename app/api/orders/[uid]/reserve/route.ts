@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ uid: st
   const prev = order.fulfillment_stage || "new";
 
   const result = await InventoryReservationsRepository.reserve(uid, wh, actor);
-
+console.log(result)
   if (result.ok) {
     await OrderEventsRepository.log(uid, actor, "reservation.created", prev, "reserved", {
       warehouse_id: result.warehouse_id,

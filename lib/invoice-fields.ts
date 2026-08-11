@@ -77,6 +77,7 @@ export type OrderForInvoice = {
   order_date?: string | null;
   customer_name?: string;
   customer_email?: string;
+  shipping_address1?:string;
   customer_phone?: string;
   city?: string;
   country?: string;
@@ -92,6 +93,14 @@ export type IntlLineItem = { title?: string; qty?: number; total_aed?: number };
 function displayDate(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
 }
+function generateInvoiceNo(orderNumber: string): string {
+  let hash = 0;
+  for (let i = 0; i < orderNumber.length; i++) {
+    hash = (hash * 31 + orderNumber.charCodeAt(i)) >>> 0;
+  }
+
+  return `${hash.toString(16).toUpperCase().padStart(8, "0")}`;
+}
 
 // Ontrack (UAE) prefill. When the order is already paid online the founder's
 // invoice shows REMARKS=PAID, a flat AED 30 shipping, the order value, and the
@@ -103,11 +112,13 @@ export function ontrackPrefill(o: OrderForInvoice): InvoiceFields {
   const isCod = (o.gateway || "").toUpperCase() === "COD";
   return {
     orderNumber: o.order_number,
-    invoiceNo: o.order_number,
-    customerId: "",
+    invoiceNo: generateInvoiceNo(o.order_number),
+    customerId:o.order_number|| "",
     date: displayDate(o.order_date),
     customerName: o.customer_name || "",
-    address1: "",
+    shipping_address1:o.shipping_address1||"",
+    city:o.city||"",
+    address1:o.shipping_address1|| "",
     address2: [o.city, o.country].filter(Boolean).join(", "),
     mobile: o.customer_phone || "",
     additionalNotes: "",

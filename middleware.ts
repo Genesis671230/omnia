@@ -15,6 +15,13 @@ export async function middleware(req: NextRequest) {
   if (pathname.includes("/api/webhooks")) {
     return NextResponse.next();
 }
+  // n8n-facing endpoint — no browser session, guards itself with its own
+  // Bearer-secret check (PAYMENT_CONFIRM_WEBHOOK_SECRET, fail-closed if
+  // unset) in app/api/payments/confirm/route.ts, same posture as the HMAC
+  // checks on the webhook routes above.
+  if (pathname === "/api/payments/confirm") {
+    return NextResponse.next();
+  }
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
     const url = req.nextUrl.clone();

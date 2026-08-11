@@ -164,7 +164,7 @@ export function FulfillmentSpine({
 
           {FLOW.map((step, i) => {
             const done = idx > i;
-            const active = idx === i || (idx === -1 && i === 0);
+            const active = idx + 1 === i;
             const busy = busyStep === step.key;
             const StepIcon = step.icon;
             return (

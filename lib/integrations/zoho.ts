@@ -76,6 +76,7 @@ export type ZohoItem = {
   stock_on_hand: number;
   available_stock: number;
   rate: number;
+  purchase_rate: number;
   status: string;
 };
 

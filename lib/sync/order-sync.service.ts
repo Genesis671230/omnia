@@ -6,6 +6,7 @@ import { fetchWooOrders, wooConfigured } from "@/lib/integrations/woo";
 import { normalizeShopifyOrder, normalizeWooOrder } from "@/lib/normalize/order";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { CustomersRepository } from "@/lib/repositories/customers.repository";
+import { sendNewOrderAlerts } from "@/lib/alerts/order-alerts";
 
 const DEFAULT_WINDOW_DAYS = 60;
 
@@ -30,6 +31,9 @@ export async function syncAllStores(windowDays = DEFAULT_WINDOW_DAYS): Promise<S
           const raw = await fetchShopifyOrders(store, since);
           const rows = raw.map((o) => normalizeShopifyOrder(o, store.code));
           const upserted = await OrdersRepository.upsertMany(rows);
+          // Best-effort — a Telegram outage must never fail the sync itself,
+          // the orders are already safely upserted above.
+          await sendNewOrderAlerts(rows).catch((e) => console.error("[order-alert] shopify batch failed:", (e as Error).message));
           return { store: store.code, fetched: raw.length, upserted };
         } catch (e) {
           return { store: store.code, fetched: 0, upserted: 0, error: (e as Error).message };
@@ -45,6 +49,7 @@ export async function syncAllStores(windowDays = DEFAULT_WINDOW_DAYS): Promise<S
           const raw = await fetchWooOrders(`${since}T00:00:00`);
           const rows = raw.map(normalizeWooOrder);
           const upserted = await OrdersRepository.upsertMany(rows);
+          await sendNewOrderAlerts(rows).catch((e) => console.error("[order-alert] woo batch failed:", (e as Error).message));
           return { store: "WOO", fetched: raw.length, upserted };
         } catch (e) {
           return { store: "WOO", fetched: 0, upserted: 0, error: (e as Error).message };

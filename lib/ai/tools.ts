@@ -14,6 +14,7 @@ import { BankRepository } from "@/lib/repositories/bank.repository";
 import { telrConfigured } from "@/lib/integrations/telr";
 import { stripeConfigured } from "@/lib/integrations/stripe";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
+import { buildFinancialReport } from "@/lib/reports/cfo-digest";
 
 const STORES = ["ALL", "WA", "UAE", "KSA", "WOO"];
 const cancelled = new Set(["voided", "refunded", "cancelled"]);
@@ -36,6 +37,18 @@ export const AI_TOOLS = [
         days: { type: "integer", description: "Lookback window in days (1-365).", default: 30 },
         store: { type: "string", description: "Store code to filter to, or ALL for every store.", enum: STORES, default: "ALL" },
       },
+    },
+  },
+  {
+    name: "get_financial_report",
+    description: "Revenue, COGS, and profit for a specific Dubai-calendar date range, computed from PAID orders only (financial_status=\"paid\"), plus a full order-count breakdown by status and a totalOrders figure that includes pending/cancelled/failed/refunded/voided/expired orders too. Use this for 'last week', 'last month', 'this month', a specific date, or any named date-range profit/revenue/COGS/margin question — NOT get_sales_summary, which is a rolling N-day window over all non-cancelled orders (including unpaid ones) and has no COGS/profit. Resolve the relative range to concrete YYYY-MM-DD dates yourself using today's date before calling this.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Start date, inclusive, YYYY-MM-DD (Dubai calendar day)." },
+        to: { type: "string", description: "End date, inclusive, YYYY-MM-DD (Dubai calendar day). Same as `from` for a single day." },
+      },
+      required: ["from", "to"],
     },
   },
   {
@@ -107,6 +120,24 @@ export const AI_TOOLS = [
     },
   },
   {
+    name: "get_dispatch_report",
+    description: "Orders in an EXACT time window (not a rolling N-day lookback), optionally filtered by courier tier and fulfillment stage. \"SMSA\", \"DHL\", or \"international\" all mean the same thing in this business and map to courier_tier=international (every non-UAE order — this is the exact rule the dispatch sheet itself uses to route an order to the \"SMSA Orders\" tab; SMSA and DHL aren't tracked as separate carriers anywhere in this system, they're one routing bucket). \"OnTrack\" or \"local\" maps to courier_tier=local (UAE orders). Use this for anything with a specific clock-time boundary (\"from 1pm yesterday to 1pm today\", \"since 9am\") or a courier-tier/dispatch-stage question that get_sales_summary and get_financial_report can't answer (they only do rolling-day or calendar-day windows with no courier or dispatch-stage filter). Resolve relative times ('yesterday 1pm') to concrete Dubai-local (UTC+4) ISO datetimes yourself using the current date/time before calling this — pass them as UTC ISO strings (e.g. Dubai 1pm = UTC 09:00, so 'yesterday 1pm Dubai to today 1pm Dubai' becomes from=<yesterday>T09:00:00Z, to=<today>T09:00:00Z).",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Window start, inclusive, UTC ISO datetime (e.g. 2026-08-07T09:00:00Z)." },
+        to: { type: "string", description: "Window end, exclusive, UTC ISO datetime." },
+        date_field: { type: "string", description: "Which timestamp the window applies to: order_date (when the order came in — default) or shipped_at (when it was actually dispatched, rarely populated today — see the response note).", enum: ["order_date", "shipped_at"], default: "order_date" },
+        courier_tier: { type: "string", description: "international = SMSA/DHL (any non-UAE order); local = OnTrack (UAE orders). Omit for both.", enum: ["international", "local"] },
+        courier: { type: "string", description: "Advanced/rarely useful: filter by the literal checkout-time shipping-method label text (e.g. \"Express Shipping\") — NOT the same as courier_tier and NOT a real carrier name. Only use this if courier_tier doesn't fit the question." },
+        fulfillment_stage: { type: "string", description: "Filter to one fulfillment stage. Omit for all stages.", enum: ["new", "processing", "packed", "shipped", "delivered"] },
+        store: { type: "string", enum: STORES, default: "ALL" },
+        limit: { type: "integer", description: "Max order rows to return in the sample (max 50).", default: 20 },
+      },
+      required: ["from", "to"],
+    },
+  },
+  {
     name: "get_campaign_performance",
     description: "Individual ad campaigns (Meta/Google/TikTok/Snap) ranked by spend over a recent window, with impressions, clicks, and platform-reported conversions per campaign. Use for 'what's our best/worst campaign' / 'what's running right now' questions.",
     input_schema: {
@@ -148,6 +179,10 @@ async function get_sales_summary(input: { days?: number; store?: string }) {
     by_store: [...byStore.entries()].map(([s, v]) => ({ store: s, revenue_aed: +v.revenue.toFixed(2), orders: v.orders })).sort((a, b) => b.revenue_aed - a.revenue_aed),
     by_gateway: [...byGateway.entries()].map(([g, v]) => ({ gateway: g, revenue_aed: +v.revenue.toFixed(2), orders: v.orders })).sort((a, b) => b.revenue_aed - a.revenue_aed),
   };
+}
+
+async function get_financial_report(input: { from: string; to: string }) {
+  return buildFinancialReport(input.from, input.to);
 }
 
 async function get_reconciliation_status() {
@@ -330,6 +365,59 @@ async function get_ad_spend(input: { days?: number; store?: string }) {
   };
 }
 
+async function get_dispatch_report(input: {
+  from: string; to: string; date_field?: "order_date" | "shipped_at";
+  courier_tier?: "international" | "local"; courier?: string;
+  fulfillment_stage?: string; store?: string; limit?: number;
+}) {
+  const dateField = input.date_field ?? "order_date";
+  const store = (input.store ?? "ALL").toUpperCase();
+  const courier = (input.courier ?? "").trim().toLowerCase();
+  const stage = (input.fulfillment_stage ?? "").trim().toLowerCase();
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
+
+  const orders = await OrdersRepository.listAll();
+  const matches = orders.filter((o) => {
+    const ts = dateField === "shipped_at" ? o.shipped_at : o.order_date;
+    if (!ts || ts < input.from || ts >= input.to) return false;
+    if (store !== "ALL" && o.store_id !== store) return false;
+    // Same country-based routing rule the dispatch sheet itself uses
+    // (tabForOrder in lib/integrations/dispatch-sheet.ts): UAE = local /
+    // OnTrack, everything else = international / SMSA-DHL. This is the
+    // correct way to answer "how many SMSA orders" — the `courier` column
+    // never contains a carrier name at all (see the note below).
+    if (input.courier_tier === "local" && o.country !== "AE") return false;
+    if (input.courier_tier === "international" && o.country === "AE") return false;
+    if (courier && !(o.courier || "").toLowerCase().includes(courier)) return false;
+    if (stage && (o.fulfillment_stage || "new").toLowerCase() !== stage) return false;
+    return true;
+  });
+
+  const byStage = new Map<string, number>();
+  for (const o of matches) {
+    const s = o.fulfillment_stage || "new";
+    byStage.set(s, (byStage.get(s) ?? 0) + 1);
+  }
+  const withAwb = matches.filter((o) => o.awb_number).length;
+
+  return {
+    window: { from: input.from, to: input.to, date_field: dateField },
+    filters: {
+      store, courier_tier: input.courier_tier ?? null, courier: input.courier ?? null,
+      fulfillment_stage: input.fulfillment_stage ?? null,
+    },
+    count: matches.length,
+    dispatched_with_live_awb: withAwb,
+    by_fulfillment_stage: [...byStage.entries()].map(([fulfillment_stage, count]) => ({ fulfillment_stage, count })),
+    note:
+      "`count` is orders in the window matching the filters (received, not necessarily confirmed dispatched). `dispatched_with_live_awb` is how many of those have an actual courier API tracking number on file — as of now that's almost always 0, because dispatch confirmation through this system's own fulfillment flow / SMSA API integration is barely used yet (fulfillment_stage sits at \"processing\" for nearly every order). So `count` answers 'how many orders came in for this courier tier' reliably; `dispatched_with_live_awb` UNDER-counts real-world dispatches — for the actual dispatched/not question, say `count` plus this caveat, and point to the physical dispatch sheet (Google Sheets) for what Sinan/Yaseen have actually confirmed shipped.",
+    sample_orders: matches.slice(0, limit).map((o) => ({
+      order_number: o.order_number, store: o.store_id, order_date: o.order_date, country: o.country,
+      fulfillment_stage: o.fulfillment_stage || "new", awb_number: o.awb_number || null, shipped_at: o.shipped_at,
+    })),
+  };
+}
+
 async function get_campaign_performance(input: { days?: number; store?: string; limit?: number }) {
   const days = Math.min(Math.max(input.days ?? 30, 1), 365);
   const store = (input.store ?? "ALL").toUpperCase();
@@ -370,12 +458,14 @@ async function get_campaign_performance(input: { days?: number; store?: string; 
 
 const EXECUTORS: Record<ToolName, (input: any) => Promise<unknown>> = {
   get_sales_summary,
+  get_financial_report,
   get_reconciliation_status,
   get_payout_sync_status,
   search_orders,
   get_top_products,
   get_low_stock_products,
   get_daily_settlement_report,
+  get_dispatch_report,
   get_ad_spend,
   get_campaign_performance,
 };

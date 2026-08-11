@@ -38,7 +38,8 @@ export type WooRawOrder = {
   number: string;
   status: string; // processing / completed / refunded ...
   currency: string;
-  date_created: string;
+  date_created: string; // site-local time (Asia/Dubai) — do NOT use for order_date, see date_created_gmt
+  date_created_gmt: string; // true UTC — this is what order_date must be stored as
   total: string;
   shipping_total: string;
   total_tax: string;

@@ -6,58 +6,64 @@ import { logStockEvent } from "@/lib/stock-events";
 import { reconcile } from "@/lib/reconciler";
 import { supabase } from "@/lib/supabase";
 import { markHeartbeat, alreadyProcessed } from "@/lib/webhook-plumbing";
+import { ingestWooOrderWebhook } from "@/lib/sync/order-webhook-ingest";
 
 export const maxDuration = 30;
-
 function verifyWooSignature(raw: string, header: string | null): boolean {
   if (!header) return false;
-  const secret = process.env.WOO_CONSUMER_SECRET!;
-  const digest = crypto.createHmac("sha256", secret).update(raw).digest("base64");
+
+  console.log(header)
+  const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET!;
+  const digest = crypto.createHmac("sha256", secret).update(raw,"utf-8").digest("base64");
   // Length differences would throw in timingSafeEqual — normalize first.
   const a = Buffer.from(header);
   const b = Buffer.from(digest);
+  console.log(a,b,a.length === b.length)
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 export async function POST(req: Request, { params }: { params: { topics: string } }) {
+
+  const { topics } = await params;
   const raw = await req.text();
-  const sig = req.headers.get("x-wc-webhook-signature");
-  const webhookId = req.headers.get("x-wc-webhook-id") ?? "";
-  const deliveryId = req.headers.get("x-wc-webhook-delivery-id") ?? "";
-
-  // Woo pings with an empty body when saving the webhook — accept those quietly.
-  if (raw.length === 0) return NextResponse.json({ ok: true });
-
-  if (!verifyWooSignature(raw, sig)) {
-    return NextResponse.json({ error: "bad signature" }, { status: 401 });
-  }
-
-  // Dedup on delivery ID. Same event replayed = no-op.
-  if (deliveryId && await alreadyProcessed("woo", deliveryId)) {
-    return NextResponse.json({ ok: true, dedup: true });
-  }
-
-  await markHeartbeat("woo", params.topics, deliveryId);
-
-  const payload = JSON.parse(raw);
-
-  try {
-    if (params.topics === "product-updated" || params.topics === "product-restored") {
-      await handleWooProductUpdate(payload);
-    } else if (params.topics === "product-deleted") {
-      await handleWooProductDelete(payload);
-    } else if (params.topics === "order-created") {
-      await handleWooOrderCreated(payload);
-    } else if (params.topics === "order-updated") {
-      // Fires on status changes — process refunds/cancels here.
-      await handleWooOrderUpdated(payload);
-    }
-  } catch (e) {
-    // Log but return 200. Woo doesn't retry; we'll catch missed changes on
-    // the next scanner pass.
-    console.error(`woo webhook ${params.topics} failed:`, (e as Error).message);
-  }
-
+  console.log(raw,"we have this data")
+   const sig = req.headers.get("x-wc-webhook-signature");
+    const webhookId = req.headers.get("x-wc-webhook-id") ?? "";
+    const deliveryId = req.headers.get("x-wc-webhook-delivery-id") ?? "";
+  console.log(webhookId,deliveryId,"we got the data here to play with")
+    // Woo pings with an empty body when saving the webhook — accept those quietly.
+    if (raw.length === 0) return NextResponse.json({ ok: true });
+    if (!verifyWooSignature(raw, sig)) {
+        return NextResponse.json({ error: "bad signature" }, { status: 401 });
+      }
+      
+      console.log(raw.length,"we got thelength",topics,"deliveryId",deliveryId)
+      // Dedup on delivery ID. Same event replayed = no-op.
+      if (deliveryId && await alreadyProcessed("woo", deliveryId)) {
+        return NextResponse.json({ ok: true, dedup: true });
+      }
+      
+      await markHeartbeat("woo", topics, deliveryId);
+      
+    const payload = JSON.parse(raw);
+  console.log(payload,"here is payload")
+  
+    try {
+      if (topics === "product-updated" || topics === "product-restored") {
+  console.log("we are updating the products")
+  await handleWooProductUpdate(payload);
+      } else if (topics === "product-deleted") {
+        await handleWooProductDelete(payload);
+      } else if (topics === "order-created") {
+        await handleWooOrderCreated(payload);
+      } else if (topics === "order-updated") {
+        // Fires on status changes — process refunds/cancels here.
+        await handleWooOrderUpdated(payload);
+      }
+    } catch (e) {
+      // Log but return 200. Woo doesn't retry; we'll catch missed changes on
+      // the next scanner pass.
+    }  
   return NextResponse.json({ ok: true });
 }
 
@@ -106,6 +112,16 @@ async function handleWooProductUpdate(payload: any) {
 }
 
 async function handleWooOrderCreated(payload: any) {
+  // Instant path: normalize + upsert into `orders` + alert, right now,
+  // instead of waiting for the next 2-minute order-sync-scheduler poll.
+  // Best-effort — a failure here must not block the inventory-decrement
+  // logic below, which is this handler's original job.
+  try {
+    await ingestWooOrderWebhook(payload);
+  } catch (e) {
+    console.error("[wh:woo] instant order ingest failed:", (e as Error).message);
+  }
+
   // Every line item creates a pending_zoho_sync row + a decrement event.
   for (const li of payload.line_items ?? []) {
     const sku = normalizeSku(li.sku);
@@ -118,7 +134,9 @@ async function handleWooOrderCreated(payload: any) {
     await logStockEvent({
       sku, source: "woo", event_type: "order_decrement",
       delta: -li.quantity, correlation: String(payload.id),
-      occurred_at: new Date(payload.date_created ?? Date.now()),
+      // date_created is WooCommerce site-local time (Asia/Dubai, UTC+4); use
+      // the _gmt variant so this timestamp is true UTC like everywhere else.
+      occurred_at: new Date(payload.date_created_gmt ?? Date.now()),
       raw: { order_id: payload.id },
     });
 
@@ -127,6 +145,16 @@ async function handleWooOrderCreated(payload: any) {
 }
 
 async function handleWooOrderUpdated(payload: any) {
+  // Keep the orders table's financial_status current (e.g. pending -> paid)
+  // — sendNewOrderAlerts' own dedup means this never re-sends the original
+  // alert, it just refreshes the row (and catches up the dispatch sheet if
+  // that hasn't happened yet for this order).
+  try {
+    await ingestWooOrderWebhook(payload);
+  } catch (e) {
+    console.error("[wh:woo] instant order update ingest failed:", (e as Error).message);
+  }
+
   // Refunds/cancellations UNDO the decrement. On status change to refunded
   // or cancelled, clear the pending row and issue a compensating event.
   if (payload.status === "cancelled" || payload.status === "refunded") {

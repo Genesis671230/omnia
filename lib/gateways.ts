@@ -9,10 +9,11 @@ export type Gateway =
   | "Tamara"
   | "Shopify Payments"
   | "COD"
+  | "SHOPIFY"
   | "Unclassified";
 
 export const GATEWAYS: Gateway[] = [
-  "Stripe", "Telr", "Checkout", "Tabby", "Tamara", "Shopify Payments", "COD",
+  "Stripe", "Telr", "Checkout", "Tabby", "Tamara", "Shopify Payments","SHOPIFY", "COD",
 ];
 
 // Store-side: "Pay By Stripe", "Checkout.com - Onsite Payments", "Tamara Split

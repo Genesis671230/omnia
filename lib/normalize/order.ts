@@ -155,7 +155,11 @@ export function normalizeWooOrder(raw: WooRawOrder): OrderRow {
     store_id: "WOO",
     order_id: String(raw.id),
     order_number: raw.number,
-    order_date: raw.date_created,
+    // date_created is WooCommerce's site-local time (Asia/Dubai, UTC+4), not
+    // UTC — using it directly shifted every WOO order 4h into the future,
+    // spilling evening orders across the Dubai midnight boundary into "the
+    // next day"'s counts. date_created_gmt is the true UTC timestamp.
+    order_date: raw.date_created_gmt,
     currency: raw.currency,
     gross_original: gross,
     gross_aed: toAed(gross, raw.currency),

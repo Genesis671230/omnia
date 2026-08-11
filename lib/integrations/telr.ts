@@ -7,8 +7,22 @@
 // otherwise the workspace relies on manually uploaded payout files.
 // Response field names aren't documented publicly, so normalizeTelrPayout()
 // probes the common variants defensively, same spirit as the generic CSV parser.
+//
+// KNOWN BLOCKED (2026-08-08): this /api/v1 surface returns 403 for this
+// account — confirmed external account/access issue on Telr's side (API
+// access not enabled and/or IP not allowlisted for this merchant), not a
+// credentials or code bug. The separate /tools/api/xml transaction-lookup
+// surface below (a different, older Telr API family) was probed the same
+// day with all 3 plausible Basic-auth credential pairs (username:password,
+// storeId:authKey, accountId:password) and got the identical signature: a
+// blank-body 403 straight from Telr's origin (via Cloudflare, not a
+// Cloudflare challenge page) — the same class of block, not a wrong-auth
+// 401. Telr access needs to be granted before either surface works; the
+// code below is ready to go the moment that happens, same as this file's
+// existing payouts client.
 
 const BASE = "https://secure.telr.com/api/v1";
+const TOOLS_BASE = "https://secure.telr.com/tools/api/xml";
 
 export function telrConfigured(): boolean {
   return Boolean(process.env.TELR_STORE_ID && process.env.TELR_AUTHENTICATION_KEY);
@@ -87,4 +101,91 @@ export function normalizeTelrTransactions(raw: unknown): string[] {
     }
   }
   return refs;
+}
+
+// ── Transaction "tools" API — https://docs.telr.com/reference, the older
+// XML-based lookup surface (separate from the /api/v1 payouts JSON API
+// above; different Basic-auth credential pair, TELR_API_USERNAME +
+// TELR_API_PASSWORD, not TELR_STORE_ID/TELR_AUTHENTICATION_KEY). Used for
+// per-order payment confirmation (lib/sync/telr-payment-confirm.ts) —
+// looking a single order's already-captured reference up directly, rather
+// than bulk-listing (the bulk "recent transactions" endpoint only covers
+// the last 48h / 30 rows, too narrow for a useful confirmation window). ──
+
+export function telrToolsConfigured(): boolean {
+  return Boolean(process.env.TELR_API_USERNAME && process.env.TELR_API_PASSWORD);
+}
+
+function toolsAuthHeader(): string {
+  const token = Buffer.from(`${process.env.TELR_API_USERNAME}:${process.env.TELR_API_PASSWORD}`).toString("base64");
+  return `Basic ${token}`;
+}
+
+async function toolsGet(path: string): Promise<string> {
+  const res = await fetch(`${TOOLS_BASE}${path}`, {
+    headers: { Authorization: toolsAuthHeader() },
+    cache: "no-store",
+  });
+  const body = await res.text();
+  if (!res.ok) throw new Error(`Telr tools API HTTP ${res.status}: ${body.slice(0, 300)}`);
+  return body;
+}
+
+export type TelrToolsTransaction = {
+  id: string;
+  amount: number;
+  currency: string;
+  cartId: string;
+  authorised: boolean; // <auth><status> === "A"
+  date: string; // GMT, Telr's own format
+};
+
+function toArray<T>(v: T | T[] | undefined | null): T[] {
+  if (v == null) return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+// Lazily constructed — fast-xml-parser's constructor does real work, and
+// most processes never call into the tools API (telrToolsConfigured() gates
+// every caller), so there's no reason to pay for it at module load.
+let xmlParser: import("fast-xml-parser").XMLParser | null = null;
+async function parseTelrXml(xml: string): Promise<Record<string, any>> {
+  if (!xmlParser) {
+    const { XMLParser } = await import("fast-xml-parser");
+    xmlParser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true });
+  }
+  return xmlParser.parse(xml);
+}
+
+function parseTelrToolsTransaction(row: Record<string, unknown>): TelrToolsTransaction {
+  const auth = (row.auth ?? {}) as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ""),
+    amount: parseFloat(String(row.amount ?? "0")) || 0,
+    currency: String(row.currency ?? "").toUpperCase(),
+    cartId: String(row.cartid ?? ""),
+    authorised: String(auth.status ?? "").toUpperCase() === "A",
+    date: String(row.date ?? ""),
+  };
+}
+
+// Direct lookup by the reference already captured on the order at sync time
+// (telr_tranref, from the store's Telr plugin order metadata — see
+// telrRefsFromMeta above) — the authoritative match, no fuzzy parsing.
+export async function getTelrTransactionByRef(tranref: string): Promise<TelrToolsTransaction | null> {
+  const xml = await toolsGet(`/transaction/${encodeURIComponent(tranref)}`);
+  const parsed = await parseTelrXml(xml);
+  const row = parsed?.transaction as Record<string, unknown> | undefined;
+  if (!row || !row.id) return null;
+  return parseTelrToolsTransaction(row);
+}
+
+// Fallback for orders that only have a cart ID captured (no tranref) —
+// returns every transaction event tied to that cart (sale, capture, refund,
+// ...); caller picks the one it cares about (e.g. the authorised sale).
+export async function getTelrTransactionsByCartId(cartId: string): Promise<TelrToolsTransaction[]> {
+  const xml = await toolsGet(`/transaction/${encodeURIComponent(cartId)}/cart`);
+  const parsed = await parseTelrXml(xml);
+  const rows = toArray(parsed?.transactions?.transaction as Record<string, unknown> | Record<string, unknown>[] | undefined);
+  return rows.map(parseTelrToolsTransaction);
 }

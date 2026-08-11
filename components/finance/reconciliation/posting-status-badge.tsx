@@ -14,8 +14,8 @@ export function PostingStatusBadge({
 }: { status: PostingStatus; zohoStatus?: string | null }) {
   const s = STATUS_STYLE[status] ?? STATUS_STYLE.not_posted;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full capitalize px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
-      {s.label}{status === "verified" && zohoStatus ? ` · ${zohoStatus.replace("_"," ")}` : ""}
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full capitalize px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
+      {s.label}{status === "verified" && zohoStatus ? `` : ""}
     </span>
   );
 }

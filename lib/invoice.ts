@@ -18,6 +18,8 @@ export type InvoiceFields = {
   date: string; // display string, already formatted by the caller
   customerName: string;
   address1: string;
+  city:string;
+  shipping_address1:string;
   address2: string;
   mobile: string;
   additionalNotes: string;
@@ -113,8 +115,8 @@ function drawBlock(page: PDFPage, top: number, f: InvoiceFields, fonts: Fonts) {
 
   const shipRows: [string, string][] = [
     ["Name:", f.customerName || "—"],
-    ["Address:", f.address1 || "—"],
-    ["Address:", f.address2 || "—"],
+    ["Address:", f.shipping_address1 || "—"],
+    // ["Address:", f.address2|| f.shipping_address1 || "—"],
     ["Mobile:", f.mobile || "—"],
     ["Additional Notes:", f.additionalNotes || ""],
   ];
@@ -161,7 +163,7 @@ export async function buildInvoicePdf(fields: InvoiceFields): Promise<Uint8Array
   const safeFields: InvoiceFields = {
     ...fields,
     customerName: winAnsiSafe(fields.customerName),
-    address1: winAnsiSafe(fields.address1),
+    address1: winAnsiSafe(fields.shipping_address1),
     address2: winAnsiSafe(fields.address2),
     additionalNotes: fields.additionalNotes ? winAnsiSafe(fields.additionalNotes) : "",
     remarks: fields.remarks ? winAnsiSafe(fields.remarks) : "—",

@@ -195,6 +195,12 @@ create table if not exists zoho_items (
 );
 create index if not exists zoho_items_sku_idx on zoho_items (sku);
 
+-- purchase_rate: Zoho's own cost basis for the item (its /items API already
+-- returns this alongside rate — we just weren't storing it). rate is the
+-- SALE price, not cost; the CFO digest's profit/COGS math needs the real
+-- cost basis, not list price.
+alter table zoho_items add column if not exists purchase_rate numeric not null default 0;
+
 -- zoho_orders: Zoho sales orders, used to detect store orders that never
 -- made it into Zoho (missing invoice/salesorder = a bookkeeping gap).
 create table if not exists zoho_orders (
@@ -450,5 +456,71 @@ create unique index if not exists zoho_bank_txn_postings_line_idx on zoho_bank_t
 -- account per debit kind (salary/supplier/fee/tax/transfer/other).
 alter table zoho_account_config add column if not exists default_income_account_id text not null default '';
 alter table zoho_account_config add column if not exists expense_account_by_kind jsonb not null default '{}';
+
+-- telegram_poll_state: one row per bot (long-polling, not a webhook — no
+-- public URL needed). last_update_id is Telegram's own cursor; persisting it
+-- means a restart resumes from where it left off instead of either
+-- replaying old messages or silently skipping ones that arrived while down.
+create table if not exists telegram_poll_state (
+  bot            text primary key,  -- 'ops' | 'cfo'
+  last_update_id bigint not null default 0,
+  updated_at     timestamptz not null default now()
+);
+
+-- group_members: who's in the Omnia ops Telegram group and what they do,
+-- captured via the welcome-flow so the bots can later reference/assign work
+-- by role instead of treating everyone as an anonymous tagger.
+create table if not exists group_members (
+  user_id          bigint primary key,
+  tenant_id        text not null default 'omnia',
+  username         text not null default '',
+  display_name     text not null default '',
+  role_description text not null default '',
+  awaiting_role    boolean not null default false,
+  joined_at        timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+-- group_messages: raw log of group chat text, feeding the daily rollup
+-- below. Kept lean (no media/attachments) — this is for "what did the team
+-- discuss today", not a full chat archive.
+create table if not exists group_messages (
+  id         bigserial primary key,
+  tenant_id  text not null default 'omnia',
+  chat_id    text not null,
+  user_id    bigint,
+  username   text not null default '',
+  text       text not null default '',
+  sent_at    timestamptz not null default now()
+);
+create index if not exists group_messages_sent_at_idx on group_messages (sent_at desc);
+
+-- group_daily_summaries: one AI-generated rollup per Dubai calendar day, so
+-- the CFO/ops bots have continuity across days without re-reading the full
+-- raw log every time.
+create table if not exists group_daily_summaries (
+  date_iso_day text primary key,
+  tenant_id    text not null default 'omnia',
+  summary      text not null default '',
+  message_count integer not null default 0,
+  created_at   timestamptz not null default now()
+);
+
+-- order_sync_runs: audit trail for the persistent order-sync scheduler
+-- (Shopify + Woo -> orders table -> Telegram/Sheets alerts, every ~2min).
+-- Added after the scheduler silently stopped ticking during dev (a Next.js
+-- hot-reload disrupted the long-running setInterval) with zero visibility
+-- into it — this makes that detectable instead of having to reverse-engineer
+-- it from webhook_inbox timestamps.
+create table if not exists order_sync_runs (
+  id             uuid primary key default gen_random_uuid(),
+  tenant_id      text not null default 'omnia',
+  trigger        text not null default 'scheduler',
+  started_at     timestamptz not null default now(),
+  finished_at    timestamptz,
+  store_results  jsonb not null default '[]',  -- [{store, fetched, upserted, error?}]
+  error          text
+);
+create index if not exists order_sync_runs_started_idx on order_sync_runs (started_at desc);
 
 

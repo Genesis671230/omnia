@@ -75,3 +75,40 @@ export async function payoutOrderRefs(
   }
   return { net: +net.toFixed(2), refs, transactions };
 }
+
+export type StripeChargeRef = { ref: string; amount: number; currency: string; created: number; description: string };
+
+// Recent charges NOT scoped to a payout — used to confirm an individual
+// order got paid before its payout has even been assembled/paid out.
+// Charges made through the store's Stripe gateway carry the same order-ref
+// convention in their description as the CSV/payout export does (see
+// stripeOrderRefs), so this reuses that exact parser rather than a second
+// ad-hoc one. Refunds are excluded — a refunded charge is not "paid".
+export async function listRecentChargeRefs(sinceUnixSeconds: number, limit = 100): Promise<StripeChargeRef[]> {
+  const results: StripeChargeRef[] = [];
+  let startingAfter: string | undefined;
+  for (;;) {
+    const qs = new URLSearchParams({ type: "charge", limit: String(limit) });
+    qs.set("created[gte]", String(sinceUnixSeconds));
+    if (startingAfter) qs.set("starting_after", startingAfter);
+    const json = await stripeGet(`/balance_transactions?${qs}`);
+    const rows = json.data ?? [];
+    for (const row of rows) {
+      const desc = String(row.description || "");
+      const { refs, isRefund } = stripeOrderRefs(desc);
+      if (isRefund) continue;
+      for (const ref of refs) {
+        results.push({
+          ref,
+          amount: Number(row.amount || 0) / 100,
+          currency: String(row.currency || "").toUpperCase(),
+          created: row.created,
+          description: desc,
+        });
+      }
+    }
+    if (!json.has_more || rows.length === 0) break;
+    startingAfter = rows[rows.length - 1].id;
+  }
+  return results;
+}
