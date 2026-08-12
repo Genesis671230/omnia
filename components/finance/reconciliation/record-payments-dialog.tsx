@@ -29,7 +29,8 @@ import type { SettlementRecord } from "@/lib/repositories/settlements.repository
 export type PaymentRowStatus =
   | { status: "ready" }
   | { status: "posted"; paymentId: string }
-  | { status: "failed"; error: string; needsManualReview: boolean };
+  | { status: "failed"; error: string; needsManualReview: boolean }
+  | { status: "review"; reason: string };
 
 type ZohoAccount = { account_id: string; account_name: string; account_type: string; is_active: boolean };
 
@@ -99,9 +100,11 @@ function RecordPaymentsDialog({
           new Map(
             rows.map((s) => [
               s.order_number,
-              (s.zoho_payment_id
-                ? { status: "posted", paymentId: s.zoho_payment_id }
-                : { status: "ready" }) as PaymentRowStatus,
+              (s.zoho_payment_id?.startsWith("CLAIMED:")
+                ? { status: "review", reason: "Mid-flight publish — check Zoho before retrying" }
+                : s.zoho_payment_id
+                  ? { status: "posted", paymentId: s.zoho_payment_id }
+                  : { status: "ready" }) as PaymentRowStatus,
             ]),
           ),
         );
@@ -148,6 +151,11 @@ function RecordPaymentsDialog({
       for (const r of json.results ?? []) {
         const orderNumber = orderNumberBySettlementId.get(r.settlementId);
         if (!orderNumber) continue;
+        if (!r.ok && r.error === "Already published" && next.get(orderNumber)?.status === "posted") {
+          // Harmless, expected result of resubmitting a partially-posted
+          // payout — don't clobber a row that already shows "posted".
+          continue;
+        }
         next.set(
           orderNumber,
           r.ok
@@ -284,7 +292,7 @@ function RecordPaymentsDialog({
               </button>
               <button
                 onClick={submit}
-                disabled={posting || postable.length === 0 || accounts.length === 0}
+                disabled={posting || postable.length === 0 || accounts.length === 0 || !accountId}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#6F5325] px-4 py-2 text-[13px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:cursor-not-allowed disabled:bg-[#B8B0A0]"
               >
                 {posting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
@@ -303,9 +311,17 @@ export function PaymentRowPill({ s }: { s: PaymentRowStatus }) {
     ready: { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "ready" },
     posted: { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
     failed: { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
+    review: { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
   } as const;
   const cfg = map[s.status];
-  const title = s.status === "posted" ? `payment ${s.paymentId}` : s.status === "failed" ? s.error : undefined;
+  const title =
+    s.status === "posted"
+      ? `payment ${s.paymentId}`
+      : s.status === "failed"
+        ? s.error
+        : s.status === "review"
+          ? s.reason
+          : undefined;
   return (
     <span title={title} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ${cfg.cls}`}>
       {s.status === "posted" && <ExternalLink size={9} />}

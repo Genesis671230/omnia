@@ -157,22 +157,15 @@ function ProofRow({ t, order, missing, open, onToggle, zoho }: {
         <td className="px-3 py-2 text-right font-mono tabular-nums">{aed2(t.feeShare)}</td>
         <td className="px-3 py-2 text-right font-mono font-medium tabular-nums">{aed2(t.netShare)}</td>
         <td className="px-3 py-2 text-right">
-          {t.isRefund && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-2 py-0.5 text-[11px] font-medium text-[#8A8175]">
-              <RotateCcw size={10} /> refund
-            </span>
-          )}
+          <span className="inline-flex flex-wrap items-center justify-end gap-1">
+            {t.isRefund && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-2 py-0.5 text-[11px] font-medium text-[#8A8175]">
+                <RotateCcw size={10} /> refund
+              </span>
+            )}
+            {zoho && <PaymentRowPill s={zoho} />}
+          </span>
         </td>
-        <td className="px-3 py-2 text-right">
-    <span className="inline-flex flex-wrap items-center justify-end gap-1">
-      {t.isRefund && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-2 py-0.5 text-[11px] font-medium text-[#8A8175]">
-          <RotateCcw size={10} /> refund
-        </span>
-      )}
-      {zoho && <PaymentRowPill s={zoho} />}
-    </span>
-  </td>
       </tr>
       {open && (
         <tr>
