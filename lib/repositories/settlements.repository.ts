@@ -210,6 +210,19 @@ export const SettlementsRepository = {
     return (data ?? []) as SettlementRecord[];
   },
 
+  // Powers both the Record Payments dialog (preview: which orders in this
+  // payout are ready/already posted) and /api/settlements/publish's
+  // bankLineId mode.
+  async listByBankLineId(bankLineId: string): Promise<SettlementRecord[]> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("*")
+      .eq("bank_line_id", bankLineId)
+      .order("order_number", { ascending: true });
+    if (error) throw new Error(`settlement_records select failed: ${error.message}`);
+    return (data ?? []) as SettlementRecord[];
+  },
+
   // For the order ledger's row-expand Settlement tracker — a single order
   // has at most one settlement_records row (id is order_uid + bank_line_id,
   // but an order settles via exactly one bank credit in practice).
