@@ -21,15 +21,27 @@ export async function POST(request: Request) {
   }
   const body = await request.json().catch(() => ({}));
   const settlementIds = Array.isArray(body.settlementIds) ? body.settlementIds.map(String) : [];
-  if (settlementIds.length === 0) {
-    return NextResponse.json({ error: "settlementIds is required" }, { status: 400 });
+  const bankLineId = typeof body.bankLineId === "string" && body.bankLineId ? body.bankLineId : null;
+  const accountId = typeof body.accountId === "string" && body.accountId ? body.accountId : undefined;
+  const referenceNumberOverride =
+    typeof body.referenceNumberOverride === "string" && body.referenceNumberOverride
+      ? body.referenceNumberOverride
+      : undefined;
+
+  if (settlementIds.length === 0 && !bankLineId) {
+    return NextResponse.json({ error: "settlementIds or bankLineId is required" }, { status: 400 });
+  }
+  if (settlementIds.length > 0 && bankLineId) {
+    return NextResponse.json({ error: "pass settlementIds or bankLineId, not both" }, { status: 400 });
   }
 
   const runId = await ZohoPublishRunsRepository.start();
   const results: ZohoPublishResult[] = [];
 
   try {
-    const settlements = await SettlementsRepository.listByIds(settlementIds);
+    const settlements = bankLineId
+      ? await SettlementsRepository.listByBankLineId(bankLineId)
+      : await SettlementsRepository.listByIds(settlementIds);
     // Fetched once per batch, not once per settlement — createZohoCustomerPayment
     // takes it as a parameter instead of fetching its own token per call.
     const accessToken = await getAccessToken();
@@ -59,6 +71,9 @@ export async function POST(request: Request) {
             amount: s.gross_aed,
             gateway: s.gateway,
             bankReference: s.bank_reference,
+            date: s.settlement_date ?? undefined,
+            accountId,
+            referenceNumberOverride,
           },
           accessToken,
         );
