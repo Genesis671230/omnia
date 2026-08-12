@@ -123,6 +123,9 @@ export type ZohoCustomerPaymentInput = {
   amount: number;
   gateway: string;
   bankReference: string;
+  date?: string;                    // yyyy-mm-dd; defaults to today when omitted
+  accountId?: string;               // Zoho chart-of-accounts id for the deposit account
+  referenceNumberOverride?: string; // replaces bankReference in what's sent to Zoho
 };
 
 const AMOUNT_TOLERANCE_AED = 0.01; // absorbs FX-conversion rounding drift only
@@ -133,6 +136,34 @@ type ZohoInvoiceListRow = {
   customer_id: string;
   balance: number;
 };
+
+export type CustomerPaymentBody = {
+  customer_id: string;
+  payment_mode: string;
+  amount: number;
+  date: string;
+  reference_number: string;
+  account_id?: string;
+  invoices: Array<{ invoice_id: string; amount_applied: number }>;
+};
+
+// Pure: builds the exact JSON body sent to POST /customerpayments. Split out
+// from createZohoCustomerPayment so the date/account/reference-override
+// logic is unit-testable without a network call — same pattern as
+// buildPayoutPostings in lib/integrations/zoho-banking.ts.
+export function buildCustomerPaymentBody(
+  input: ZohoCustomerPaymentInput & { customerId: string; invoiceId: string },
+): CustomerPaymentBody {
+  return {
+    customer_id: input.customerId,
+    payment_mode: zohoPaymentModeFor(input.gateway),
+    amount: input.amount,
+    date: input.date ?? new Date().toISOString().slice(0, 10),
+    reference_number: input.referenceNumberOverride || input.bankReference,
+    ...(input.accountId ? { account_id: input.accountId } : {}),
+    invoices: [{ invoice_id: input.invoiceId, amount_applied: input.amount }],
+  };
+}
 
 // Finds the Zoho invoice matching our order_number, tolerating Zoho's
 // reference-number formatting drift the same way lib/inventory-compare.ts's
@@ -172,6 +203,11 @@ async function findZohoInvoice(orderNumber: string, accessToken: string, orgId: 
 // payment — covers the case where a prior attempt's Zoho write actually
 // succeeded but the caller's own DB write failed (timeout/5xx), which the
 // route's claim mechanism alone can't distinguish from "never attempted".
+// Note: this check is keyed on bankReference specifically, so a payment
+// posted with a referenceNumberOverride won't be found by it on a later
+// retry — accepted, since the primary defense (the caller's atomic claim
+// before any Zoho call) is unaffected, and truly ambiguous failures are
+// routed to manual review rather than blindly retried.
 export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput, accessToken: string): Promise<{ payment_id: string }> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
   const invoice = await findZohoInvoice(input.invoiceReferenceNumber, accessToken, orgId);
@@ -199,14 +235,9 @@ export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput,
   const paymentRes = await fetch(`${API_BASE}/customerpayments?organization_id=${orgId}`, {
     method: "POST",
     headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      customer_id: invoice.customer_id,
-      payment_mode: zohoPaymentModeFor(input.gateway),
-      amount: input.amount,
-      date: new Date().toISOString().slice(0, 10),
-      reference_number: input.bankReference,
-      invoices: [{ invoice_id: invoice.invoice_id, amount_applied: input.amount }],
-    }),
+    body: JSON.stringify(
+      buildCustomerPaymentBody({ ...input, customerId: invoice.customer_id, invoiceId: invoice.invoice_id }),
+    ),
     cache: "no-store",
   });
   if (!paymentRes.ok) {
