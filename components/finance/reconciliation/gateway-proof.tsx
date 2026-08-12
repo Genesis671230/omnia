@@ -5,7 +5,7 @@ import {
   ChevronRight, Loader2, Package, RotateCcw, ShieldCheck, Truck, AlertTriangle, Download,
 } from "lucide-react";
 import { aed2, type LineItem, type OrderDetail, type ReconLine, type ReconTxn } from "./types";
-
+import { RecordPaymentsBar, PaymentRowPill, type PaymentRowStatus } from "./record-payments-dialog";
 /* Per-order proof, and the products behind each order.
  *
  * The reader is a bookkeeper, not an engineer: this leads with one plain
@@ -127,12 +127,13 @@ function OrderProducts({ order, missing }: { order: OrderDetail | undefined; mis
 
 /* ── One row of the proof table, expandable to its products ─────────────── */
 
-function ProofRow({ t, order, missing, open, onToggle }: {
+function ProofRow({ t, order, missing, open, onToggle, zoho }: {
   t: ReconTxn;
   order: OrderDetail | undefined;
   missing: boolean;
   open: boolean;
   onToggle: () => void;
+  zoho?: PaymentRowStatus;
 }) {
   return (
     <>
@@ -162,6 +163,16 @@ function ProofRow({ t, order, missing, open, onToggle }: {
             </span>
           )}
         </td>
+        <td className="px-3 py-2 text-right">
+    <span className="inline-flex flex-wrap items-center justify-end gap-1">
+      {t.isRefund && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-2 py-0.5 text-[11px] font-medium text-[#8A8175]">
+          <RotateCcw size={10} /> refund
+        </span>
+      )}
+      {zoho && <PaymentRowPill s={zoho} />}
+    </span>
+  </td>
       </tr>
       {open && (
         <tr>
@@ -185,7 +196,7 @@ export function GatewayProof({ r, live }: {
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrdersResponse | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
-
+  const [zohoByRef, setZohoByRef] = useState<Map<string, PaymentRowStatus>>(new Map());
   const txns = live?.transactions ?? r.transactions;
   const net = live?.net ?? r.payout?.net ?? 0;
   const sourceLabel = live?.sourceLabel ?? `from ${r.payout?.source ?? r.payout?.id ?? "payout file"}`;
@@ -235,17 +246,24 @@ export function GatewayProof({ r, live }: {
   return (
     <div className="mb-3.5 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3.5">
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6F5325]">
-          <ShieldCheck size={13} className="text-[#B08343]" /> {r.provider} proof
-        </span>
-        <span className="text-[11px] text-[#8A8175]">{sourceLabel}</span>
-        <button
-          onClick={exportCsv}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-2.5 py-1 text-[12px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
-        >
-          <Download size={12} /> Export CSV
-        </button>
-      </div>
+  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6F5325]">
+    <ShieldCheck size={13} className="text-[#B08343]" /> {r.provider} proof
+  </span>
+  <span className="text-[11px] text-[#8A8175]">{sourceLabel}</span>
+
+  <div className="ml-auto flex flex-wrap items-center gap-2">
+    <button
+      onClick={exportCsv}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-2.5 py-1 text-[12px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
+    >
+      <Download size={12} /> Export CSV
+    </button>
+    <RecordPaymentsBar
+      line={r}
+      onResult={setZohoByRef}
+    />
+  </div>
+</div>
 
       <p className="mb-2 text-[13px] leading-relaxed text-[#1F1B16]">
         {foots ? (
@@ -292,16 +310,17 @@ export function GatewayProof({ r, live }: {
             </tr>
           </thead>
           <tbody>
-            {txns.map((t, i) => (
-              <ProofRow
-                key={t.ref + i}
-                t={t}
-                order={orderByNumber.get(t.ref)}
-                missing={orders != null && missingSet.has(t.ref)}
-                open={openRow === t.ref + i}
-                onToggle={() => setOpenRow(openRow === t.ref + i ? null : t.ref + i)}
-              />
-            ))}
+          {txns.map((t, i) => (
+  <ProofRow
+    key={t.ref + i}
+    t={t}
+    order={orderByNumber.get(t.ref)}
+    missing={orders != null && missingSet.has(t.ref)}
+    open={openRow === t.ref + i}
+    onToggle={() => setOpenRow(openRow === t.ref + i ? null : t.ref + i)}
+    zoho={zohoByRef.get(t.ref)}
+  />
+))}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-[#D6CCBA] bg-[#FBF8F1]">
