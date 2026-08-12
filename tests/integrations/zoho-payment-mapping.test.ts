@@ -2,17 +2,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { zohoPaymentModeFor } from "@/lib/integrations/zoho";
 
-test("zohoPaymentModeFor: maps each known gateway to its own distinct Zoho payment mode", () => {
-  // Distinct per gateway — collapsing all of these to "Bank Transfer" (the
-  // old behavior) erased which gateway actually paid, defeating the point
-  // of an audit trail.
+test("zohoPaymentModeFor: COD is Cash on Delivery, case-insensitively", () => {
   assert.equal(zohoPaymentModeFor("COD"), "Cash on Delivery");
-  assert.equal(zohoPaymentModeFor("Stripe"), "Stripe");
-  assert.equal(zohoPaymentModeFor("Tabby"), "Tabby");
-  assert.equal(zohoPaymentModeFor("Tamara"), "Tamara");
-  assert.equal(zohoPaymentModeFor("Checkout.com"), "Checkout.com");
+  assert.equal(zohoPaymentModeFor("cod"), "Cash on Delivery");
 });
 
-test("zohoPaymentModeFor: unknown gateway falls back to Bank Transfer", () => {
-  assert.equal(zohoPaymentModeFor("Unclassified"), "Bank Transfer");
+test("zohoPaymentModeFor: every other gateway is Credit Card", () => {
+  // Collapsed deliberately: this Zoho org's payment_mode picklist is Credit
+  // Card / Cash on Delivery, not one custom mode per gateway. Which gateway
+  // actually paid is still recorded on our side, in settlement_records.gateway
+  // — the audit trail doesn't depend on Zoho's own payment_mode field.
+  assert.equal(zohoPaymentModeFor("Stripe"), "Credit Card");
+  assert.equal(zohoPaymentModeFor("Tabby"), "Credit Card");
+  assert.equal(zohoPaymentModeFor("Tamara"), "Credit Card");
+  assert.equal(zohoPaymentModeFor("Checkout.com"), "Credit Card");
+  assert.equal(zohoPaymentModeFor("Unclassified"), "Credit Card");
 });

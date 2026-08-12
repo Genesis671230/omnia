@@ -115,14 +115,7 @@ export async function fetchZohoInvoices(): Promise<ZohoInvoice[]> {
 }
 
 export function zohoPaymentModeFor(gateway: string): string {
-  const map: Record<string, string> = {
-    COD: "Cash on Delivery",
-    Stripe: "Stripe",
-    Tabby: "Tabby",
-    Tamara: "Tamara",
-    "Checkout.com": "Checkout.com",
-  };
-  return map[gateway] ?? "Bank Transfer";
+  return gateway.toUpperCase() === "COD" ? "Cash on Delivery" : "Credit Card";
 }
 
 export type ZohoCustomerPaymentInput = {
