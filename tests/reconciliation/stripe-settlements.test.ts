@@ -92,7 +92,30 @@ test("re-running the same payout is idempotent — same-id existing record is ke
     arrivalDate: null,
     transactions: [tx("3347")],
     orders: [order({})],
-    existing: [{ id: "UAE_1_STRIPE-po_3", order_uid: "UAE_1" }],
+    existing: [{ id: "UAE_1_STRIPE-po_3", order_uid: "UAE_1", zoho_payment_id: null, zoho_published_at: null }],
   });
   assert.equal(rows.length, 1);
+});
+
+test("a payout-sync recompute after Zoho publish must not wipe zoho_payment_id back to null", () => {
+  // Regression: the payout-sync poller reruns buildStripeSettlementRows on
+  // every poll. Before this fix, the row it re-emits hardcoded
+  // zoho_payment_id/zoho_published_at to null unconditionally, so any
+  // already-published order would look unpublished again after the next
+  // poll — risking a duplicate Zoho Customer Payment.
+  const rows = buildStripeSettlementRows({
+    payoutId: "STRIPE-po_3",
+    arrivalDate: null,
+    transactions: [tx("3347")],
+    orders: [order({})],
+    existing: [{
+      id: "UAE_1_STRIPE-po_3",
+      order_uid: "UAE_1",
+      zoho_payment_id: "1234",
+      zoho_published_at: "2026-07-20T10:00:00Z",
+    }],
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].zoho_payment_id, "1234", "an already-published order must stay published on recompute");
+  assert.equal(rows[0].zoho_published_at, "2026-07-20T10:00:00Z");
 });

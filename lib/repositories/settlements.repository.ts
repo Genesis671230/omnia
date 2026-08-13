@@ -36,6 +36,19 @@ export type SettlementRecord = {
   zoho_published_at: string | null;
 };
 
+export type ExistingSettlementRecord = Pick<
+  SettlementRecord,
+  | "id"
+  | "order_uid"
+  | "evidence_type"
+  | "evidence_confirmed"
+  | "evidence_confirmed_by"
+  | "evidence_confirmed_at"
+  | "evidence_document_id"
+  | "zoho_payment_id"
+  | "zoho_published_at"
+>;
+
 export const SettlementsRepository = {
   async upsertMany(rows: Omit<SettlementRecord, "recorded_at">[]): Promise<void> {
     if (rows.length === 0) return;
@@ -85,16 +98,22 @@ export const SettlementsRepository = {
       .sort((a, b) => (a.date < b.date ? 1 : -1));
   },
 
-  // Which of these orders already have a settlement record, and under what
-  // id — both the engine and the Stripe-API path check this before writing,
-  // so one order can never accumulate two publishable records (= two Zoho
-  // Customer Payments). Chunked for .in() URL length.
-  async listExistingByOrderUids(orderUids: string[]): Promise<{ id: string; order_uid: string }[]> {
-    const out: { id: string; order_uid: string }[] = [];
+  // Which of these orders already have a settlement record, under what id,
+  // and with what evidence/publish state — both the engine and the
+  // Stripe-API path check the id before writing, so one order can never
+  // accumulate two publishable records (= two Zoho Customer Payments); the
+  // engine also uses the evidence/zoho fields to carry forward a row's prior
+  // confirmation and publish state on recompute (see persistResults in
+  // lib/reconciliation/engine.ts) instead of resetting it to blank every
+  // time reconciliation re-runs. Chunked for .in() URL length.
+  async listExistingByOrderUids(orderUids: string[]): Promise<ExistingSettlementRecord[]> {
+    const out: ExistingSettlementRecord[] = [];
     for (let i = 0; i < orderUids.length; i += 200) {
       const { data, error } = await supabase
         .from("settlement_records")
-        .select("id, order_uid")
+        .select(
+          "id, order_uid, evidence_type, evidence_confirmed, evidence_confirmed_by, evidence_confirmed_at, evidence_document_id, zoho_payment_id, zoho_published_at",
+        )
         .in("order_uid", orderUids.slice(i, i + 200));
       if (error) throw new Error(`settlement_records existing select failed: ${error.message}`);
       out.push(...(data ?? []));
@@ -213,14 +232,37 @@ export const SettlementsRepository = {
   // Powers both the Record Payments dialog (preview: which orders in this
   // payout are ready/already posted) and /api/settlements/publish's
   // bankLineId mode.
+  //
+  // A payout's settlement_records can be split across two bank_line_ids:
+  // stripe-settlements.ts writes evidence-confirmed rows under a synthetic
+  // "STRIPE-API:po_<id>" id the moment Stripe's own API reports a payout
+  // PAID, before any bank statement exists; when the real bank credit is
+  // later matched (a different bank_line_id), engine.ts's persistResults()
+  // only writes rows for the orders Stripe hadn't already claimed. So a
+  // single bank_line_id's own rows can be a strict subset of the payout's
+  // orders — pull in same-payout_id siblings filed under other bank_line_ids
+  // too, matching what the proof table already shows (it reads the payout
+  // directly, not settlement_records).
   async listByBankLineId(bankLineId: string): Promise<SettlementRecord[]> {
     const { data, error } = await supabase
       .from("settlement_records")
       .select("*")
-      .eq("bank_line_id", bankLineId)
-      .order("order_number", { ascending: true });
+      .eq("bank_line_id", bankLineId);
     if (error) throw new Error(`settlement_records select failed: ${error.message}`);
-    return (data ?? []) as SettlementRecord[];
+    const own = (data ?? []) as SettlementRecord[];
+
+    const payoutId = own.find((r) => r.payout_id)?.payout_id;
+    let siblings: SettlementRecord[] = [];
+    if (payoutId) {
+      const { data: sibData, error: sibErr } = await supabase
+        .from("settlement_records")
+        .select("*")
+        .eq("payout_id", payoutId)
+        .neq("bank_line_id", bankLineId);
+      if (sibErr) throw new Error(`settlement_records sibling select failed: ${sibErr.message}`);
+      siblings = (sibData ?? []) as SettlementRecord[];
+    }
+    return [...own, ...siblings].sort((a, b) => a.order_number.localeCompare(b.order_number));
   },
 
   // For the order ledger's row-expand Settlement tracker — a single order

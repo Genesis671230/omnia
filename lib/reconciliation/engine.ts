@@ -440,17 +440,40 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
   // earlier bank line) already wrote a record for this order under a
   // different id, don't add a second one — two evidence-confirmed records
   // would mean two publishable Zoho Customer Payments for the same order.
-  // Re-upserting the SAME id stays allowed, keeping recompute idempotent.
+  // Re-upserting the SAME id stays allowed, keeping recompute idempotent —
+  // but idempotent means preserving that row's evidence/publish state, not
+  // just its identity: a plain re-upsert with this object's hardcoded blanks
+  // (evidence_confirmed: false, zoho_payment_id: null, ...) would silently
+  // wipe a founder's confirmation, or a real Zoho payment_id, every time
+  // reconciliation recomputes — which happens on every new upload, not just
+  // once. Carry forward the existing row's evidence/zoho fields by id.
   if (settlementRows.length > 0) {
     const existing = await SettlementsRepository.listExistingByOrderUids(
       settlementRows.map((r) => r.order_uid),
     );
+    const existingById = new Map(existing.map((e) => [e.id, e]));
     const foreign = new Set<string>();
     for (const e of existing) {
       const candidate = settlementRows.find((r) => r.order_uid === e.order_uid);
       if (candidate && e.id !== candidate.id) foreign.add(e.order_uid);
     }
-    const rows = settlementRows.filter((r) => !foreign.has(r.order_uid));
+    const rows = settlementRows
+      .filter((r) => !foreign.has(r.order_uid))
+      .map((r) => {
+        const prior = existingById.get(r.id);
+        return prior
+          ? {
+              ...r,
+              evidence_type: prior.evidence_type,
+              evidence_confirmed: prior.evidence_confirmed,
+              evidence_confirmed_by: prior.evidence_confirmed_by,
+              evidence_confirmed_at: prior.evidence_confirmed_at,
+              evidence_document_id: prior.evidence_document_id,
+              zoho_payment_id: prior.zoho_payment_id,
+              zoho_published_at: prior.zoho_published_at,
+            }
+          : r;
+      });
     if (rows.length > 0) await SettlementsRepository.upsertMany(rows);
   }
 

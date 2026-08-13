@@ -8,7 +8,7 @@
 
 import type { PayoutTransactionShare } from "@/lib/parsers/payouts";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
-import { SettlementsRepository, type SettlementRecord } from "@/lib/repositories/settlements.repository";
+import { SettlementsRepository, type SettlementRecord, type ExistingSettlementRecord } from "@/lib/repositories/settlements.repository";
 
 export type StripeSettlementOrder = {
   uid: string;
@@ -47,7 +47,7 @@ export function buildStripeSettlementRows(opts: {
   arrivalDate: string | null;
   transactions: PayoutTransactionShare[];
   orders: StripeSettlementOrder[];
-  existing: { id: string; order_uid: string }[];
+  existing: Pick<ExistingSettlementRecord, "id" | "order_uid" | "zoho_payment_id" | "zoho_published_at">[];
 }): Omit<SettlementRecord, "recorded_at">[] {
   const { payoutId, arrivalDate, transactions, orders, existing } = opts;
 
@@ -62,6 +62,7 @@ export function buildStripeSettlementRows(opts: {
   }
 
   const foreignRecordUids = new Set<string>();
+  const existingById = new Map(existing.map((e) => [e.id, e]));
   for (const e of existing) {
     if (e.id !== `${e.order_uid}_${payoutId}`) foreignRecordUids.add(e.order_uid);
   }
@@ -73,8 +74,16 @@ export function buildStripeSettlementRows(opts: {
     const order = matchOrder(ref, byNumber);
     if (!order || seenUids.has(order.uid) || foreignRecordUids.has(order.uid)) continue;
     seenUids.add(order.uid);
+    const id = `${order.uid}_${payoutId}`;
+    // Evidence fields are always re-asserted true/stripe_api here — that's
+    // this row's whole point, so no data loss there. But a later Zoho
+    // publish sets zoho_payment_id on this same id, and this function reruns
+    // on every payout-sync poll: without carrying it forward, the next poll
+    // would silently wipe a real payment_id back to null, making the row
+    // look unpublished and risking a duplicate Zoho Customer Payment.
+    const prior = existingById.get(id);
     rows.push({
-      id: `${order.uid}_${payoutId}`,
+      id,
       order_uid: order.uid,
       order_number: order.order_number,
       store_id: order.store_id,
@@ -93,8 +102,8 @@ export function buildStripeSettlementRows(opts: {
       evidence_confirmed_by: "stripe-api",
       evidence_confirmed_at: confirmedAt,
       evidence_document_id: null,
-      zoho_payment_id: null,
-      zoho_published_at: null,
+      zoho_payment_id: prior?.zoho_payment_id ?? null,
+      zoho_published_at: prior?.zoho_published_at ?? null,
     });
   }
   return rows;
