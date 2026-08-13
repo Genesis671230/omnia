@@ -109,11 +109,25 @@ function rescaleShares(
   const sum = +shares.reduce((s, t) => s + t.netShare, 0).toFixed(2);
   const remainder = +(target - sum).toFixed(2);
   if (remainder !== 0) {
-    let largest = 0;
-    for (let i = 1; i < shares.length; i++) {
-      if (Math.abs(shares[i].netShare) > Math.abs(shares[largest].netShare)) largest = i;
+    if (sum === 0) {
+      // Every parsed share is zero — there is no real per-order split to
+      // correct (e.g. payout_transactions persisted before the parser
+      // tracked per-row shares). Dumping the whole remainder onto one
+      // "largest" share would misrepresent a single order as carrying the
+      // entire payout. Split it evenly instead: the proof table still
+      // foots exactly, without falsely attributing the total to one row.
+      const even = +(remainder / shares.length).toFixed(2);
+      for (const s of shares) s.netShare = even;
+      const evenSum = +(even * shares.length).toFixed(2);
+      const residual = +(remainder - evenSum).toFixed(2);
+      if (residual !== 0) shares[0].netShare = +(shares[0].netShare + residual).toFixed(2);
+    } else {
+      let largest = 0;
+      for (let i = 1; i < shares.length; i++) {
+        if (Math.abs(shares[i].netShare) > Math.abs(shares[largest].netShare)) largest = i;
+      }
+      shares[largest].netShare = +(shares[largest].netShare + remainder).toFixed(2);
     }
-    shares[largest].netShare = +(shares[largest].netShare + remainder).toFixed(2);
   }
   return shares;
 }

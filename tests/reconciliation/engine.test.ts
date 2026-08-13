@@ -150,3 +150,38 @@ test("computeReconLines: rescale rounding remainder lands on the largest share, 
   const sum = +line.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
   assert.equal(sum, line.payout!.net, "no cent may be lost to rounding");
 });
+
+test("computeReconLines: rescale never dumps the whole payout onto one row when every parsed share is zero (stale pre-fix data)", () => {
+  // Real-world trigger: payout_transactions rows persisted before the parser
+  // tracked per-order shares (quality: null, every share 0) — the "give the
+  // rounding remainder to the largest share" logic must not treat the
+  // entire payout net as a single row's rounding remainder.
+  const [line] = computeReconLines({
+    credits: [{
+      id: "C901", statement_date: "2026-07-11", description: "TABBY SETTLEMENT",
+      reference: "FT901", amount: 100, gateway_guess: "Tabby", confidence: "keyword",
+    }],
+    payouts: [{
+      id: "TABBY-STALE", gateway: "Tabby", net_amount: 100, gross_amount: 107, fee_amount: 7,
+      source: "tabby.xlsx", status: "uploaded", order_refs: ["SA7", "SA8", "SA9", "SA10"],
+      original_currency: null, net_original: null,
+      transactions: [
+        { order_ref: "SA7", net_aed: 0, gross_aed: 0, fee_aed: 0, is_refund: false, quality: null },
+        { order_ref: "SA8", net_aed: 0, gross_aed: 0, fee_aed: 0, is_refund: false, quality: null },
+        { order_ref: "SA9", net_aed: 0, gross_aed: 0, fee_aed: 0, is_refund: false, quality: null },
+        { order_ref: "SA10", net_aed: 0, gross_aed: 0, fee_aed: 0, is_refund: false, quality: null },
+      ],
+    }],
+    orders: [{ order_number: "SA7" }, { order_number: "SA8" }, { order_number: "SA9" }, { order_number: "SA10" }],
+    confirmations: new Map(),
+  });
+
+  const sum = +line.transactions.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  assert.equal(sum, line.payout!.net, "total must still foot exactly");
+
+  const maxShare = Math.max(...line.transactions.map((t) => Math.abs(t.netShare)));
+  assert.ok(
+    maxShare < line.payout!.net,
+    "no single row may silently absorb the entire payout total when the underlying data has no real per-order split",
+  );
+});
