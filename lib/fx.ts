@@ -8,9 +8,9 @@
 // out of the credit's narration ("<CCY>/AED <rate>") when one is present.
 export const FX_TO_AED: Record<string, number> = {
   AED: 1,
-  SAR: 0.9588,
+  SAR: 0.98,
   USD: 3.6725,
-  KWD: 11.7296,
+  KWD: 11.99,
 };
 
 export function toAed(amount: number, currency: string): number {
