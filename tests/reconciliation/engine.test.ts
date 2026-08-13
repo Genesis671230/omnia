@@ -151,6 +151,62 @@ test("computeReconLines: rescale rounding remainder lands on the largest share, 
   assert.equal(sum, line.payout!.net, "no cent may be lost to rounding");
 });
 
+test("computeReconLines: an estimate-sourced FX payout reaches SETTLED (not stuck at PAYOUT_VARIANCE) when its variance is within the same window candidate-selection already used", () => {
+  // Regression: a Tabby/Tamara SAR payout whose bank narration does NOT
+  // quote a rate falls back to the static FX estimate (lib/fx.ts), which
+  // will not exactly match the bank's real wire rate for the day. This
+  // credit is 50 AED short of the estimate's 9,550 AED net — well past the
+  // flat 1 AED tolerance that used to gate state classification
+  // unconditionally, but inside the 2% candidate window (2% of 9500 = 190)
+  // that already accepted this payout as the credit's best match.
+  const [line] = computeReconLines({
+    credits: [{
+      id: "C910", statement_date: "2026-07-11",
+      description: "INWARD TELEX TABBY SETTLEMENT (no rate quoted)",
+      reference: "FT910", amount: 9500, gateway_guess: "Tabby", confidence: "keyword",
+    }],
+    payouts: [{
+      id: "TABBY-EST", gateway: "Tabby", net_amount: 9550, gross_amount: 9750, fee_amount: 200,
+      source: "tabby.xlsx", status: "uploaded", order_refs: ["SA100"],
+      original_currency: "SAR", net_original: 9948,
+      transactions: [
+        { order_ref: "SA100", net_aed: 9550, gross_aed: 9750, fee_aed: 200, is_refund: false, quality: "clean" },
+      ],
+    }],
+    orders: [{ order_number: "SA100" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.payout!.fxSource, "estimate", "narration has no quoted rate, so this must be the estimate path");
+  assert.equal(line.variance, -50, "50 AED variance from the estimate, same as before the fix");
+  assert.equal(line.state, "SETTLED", "estimate-sourced variance within the 2% candidate window must not block confirmation");
+});
+
+test("computeReconLines: a non-FX payout with a genuine >1 AED variance still lands in PAYOUT_VARIANCE — the looser window is estimate-only", () => {
+  // Same shape and same 50 AED variance as the estimate case above, but no
+  // currency conversion at all (original_currency: null) — a real,
+  // unexplained AED mismatch on a domestic payout is exactly what
+  // PAYOUT_VARIANCE exists to catch, and the fix must not have loosened
+  // the bar for this case.
+  const [line] = computeReconLines({
+    credits: [{
+      id: "C911", statement_date: "2026-07-11", description: "TEST NARRATION",
+      reference: "INV911", amount: 9500, gateway_guess: "COD", confidence: "keyword",
+    }],
+    payouts: [{
+      id: "COD-911", gateway: "COD", net_amount: 9550, gross_amount: 9550, fee_amount: 0,
+      source: "test.csv", status: "uploaded", order_refs: ["5911"],
+      original_currency: null, net_original: null, transactions: [],
+    }],
+    orders: [{ order_number: "5911" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.payout!.fxSource, null, "no currency conversion on this line");
+  assert.equal(line.variance, -50);
+  assert.equal(line.state, "PAYOUT_VARIANCE", "a genuine AED-native mismatch must still be flagged, not silently settled");
+});
+
 test("computeReconLines: rescale never dumps the whole payout onto one row when every parsed share is zero (stale pre-fix data)", () => {
   // Real-world trigger: payout_transactions rows persisted before the parser
   // tracked per-order shares (quality: null, every share 0) — the "give the

@@ -311,8 +311,20 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       }
     }
 
+    // Candidate selection above already accepted this payout within a
+    // percentage-based window (max(TOLERANCE_AED, 2%)) because an
+    // estimate-sourced net is inherently approximate — the bank's real wire
+    // rate for the day isn't known unless the narration quotes it. Applying
+    // the flat 1 AED tolerance here regardless of fxSource meant every
+    // cross-currency payout whose narration doesn't quote a rate (most
+    // Tabby/Tamara SAR/KWD payouts) could never pass this stricter check —
+    // permanently stuck at PAYOUT_VARIANCE, "Confirm settlement" never
+    // appearing, even though it was the correct, best-available match. Use
+    // the same window candidate-selection already trusted for this line.
+    const varianceTolerance =
+      expected.fxSource === "estimate" ? Math.max(TOLERANCE_AED, Number(credit.amount) * 0.02) : TOLERANCE_AED;
     let state: ReconState;
-    if (Math.abs(variance) > TOLERANCE_AED) state = "PAYOUT_VARIANCE";
+    if (Math.abs(variance) > varianceTolerance) state = "PAYOUT_VARIANCE";
     else if (unresolvedRefs.length > 0) state = "ORDERS_UNRESOLVED";
     else if (resolvedOrders.length > 0) state = "SETTLED";
     else state = "ORDERS_UNRESOLVED"; // payout matched but carried no chargeable refs
