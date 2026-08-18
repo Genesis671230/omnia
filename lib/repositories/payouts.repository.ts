@@ -58,6 +58,9 @@ export const PayoutsRepository = {
           net_aed: share?.netShare ?? 0,
           is_refund: share?.isRefund ?? false,
           quality: share?.quality ?? null,
+          gross_original: share?.grossOriginal ?? null,
+          fee_original: share?.feeOriginal ?? null,
+          net_original: share?.netOriginal ?? null,
         };
       });
       const { error: insErr } = await supabase.from("payout_transactions").insert(txRows);
@@ -71,7 +74,11 @@ export const PayoutsRepository = {
       id: string; gateway: string; net_amount: number; gross_amount: number | null; fee_amount: number | null;
       source: string | null; status: string; order_refs: string[];
       original_currency: string | null; net_original: number | null;
-      transactions: { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number; gross_aed: number; fee_aed: number }[];
+      transactions: {
+        order_ref: string; is_refund: boolean; quality: string | null;
+        net_aed: number; gross_aed: number; fee_aed: number;
+        net_original: number | null; gross_original: number | null; fee_original: number | null;
+      }[];
     }[]
   > {
     const { data: payouts, error } = await supabase
@@ -81,11 +88,18 @@ export const PayoutsRepository = {
 
     const { data: txs, error: txErr } = await supabase
       .from("payout_transactions")
-      .select("payout_id, order_ref, is_refund, quality, net_aed, gross_aed, fee_aed");
+      .select("payout_id, order_ref, is_refund, quality, net_aed, gross_aed, fee_aed, net_original, gross_original, fee_original");
     if (txErr) throw new Error(`payout_transactions select failed: ${txErr.message}`);
 
     const refsByPayout = new Map<string, string[]>();
-    const transactionsByPayout = new Map<string, { order_ref: string; is_refund: boolean; quality: string | null; net_aed: number; gross_aed: number; fee_aed: number }[]>();
+    const transactionsByPayout = new Map<
+      string,
+      {
+        order_ref: string; is_refund: boolean; quality: string | null;
+        net_aed: number; gross_aed: number; fee_aed: number;
+        net_original: number | null; gross_original: number | null; fee_original: number | null;
+      }[]
+    >();
     for (const t of txs ?? []) {
       const refs = refsByPayout.get(t.payout_id) ?? [];
       refs.push(t.order_ref);
@@ -97,6 +111,9 @@ export const PayoutsRepository = {
         net_aed: Number(t.net_aed || 0),
         gross_aed: Number(t.gross_aed || 0),
         fee_aed: Number(t.fee_aed || 0),
+        net_original: t.net_original != null ? Number(t.net_original) : null,
+        gross_original: t.gross_original != null ? Number(t.gross_original) : null,
+        fee_original: t.fee_original != null ? Number(t.fee_original) : null,
       });
       transactionsByPayout.set(t.payout_id, list);
     }

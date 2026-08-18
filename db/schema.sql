@@ -172,6 +172,16 @@ create index if not exists ad_sync_runs_started_idx on ad_sync_runs (started_at 
 -- reviewable exceptions instead of silently mis-resolving.
 alter table payout_transactions add column if not exists quality text;
 
+-- payout_transactions: the per-order amounts exactly as they appear in the
+-- source payout file, before any AED conversion — e.g. a Tabby SAR row's own
+-- Order Amount/Total Deduction/Transferred amount. Nullable: AED-native
+-- payouts (COD, Stripe, Checkout) have no separate "original" currency, and
+-- older rows parsed before this column existed have none recorded. The
+-- payout's own original_currency (above) says what currency these are in.
+alter table payout_transactions add column if not exists gross_original numeric;
+alter table payout_transactions add column if not exists fee_original   numeric;
+alter table payout_transactions add column if not exists net_original   numeric;
+
 -- recon_lines: refund refs (matched to an order but reversing money, not
 -- settling it) and quality-flagged transactions, surfaced separately from
 -- resolved_orders/unresolved_refs so a founder can review them without the

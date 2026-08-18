@@ -83,6 +83,14 @@ export type ReconTransactionShare = {
   feeShare: number;
   isRefund: boolean;
   quality: string | null;
+  // This order's own amounts exactly as the source payout file quoted them
+  // (e.g. a Tabby SAR row's own Order Amount/Total Deduction/Transferred
+  // amount) — never rescaled, since they're literal source numbers, not an
+  // AED estimate. Null for AED-native payouts or rows parsed before this
+  // was tracked.
+  netOriginal: number | null;
+  grossOriginal: number | null;
+  feeOriginal: number | null;
 };
 
 // Parsers convert cross-currency payouts to AED at upload time with the static
@@ -103,6 +111,9 @@ function rescaleShares(
     feeShare: +(t.fee_aed * scale).toFixed(2),
     isRefund: t.is_refund,
     quality: t.quality,
+    netOriginal: t.net_original,
+    grossOriginal: t.gross_original,
+    feeOriginal: t.fee_original,
   }));
   if (shares.length === 0) return shares;
 

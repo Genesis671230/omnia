@@ -23,6 +23,14 @@ export type PayoutTransactionShare = {
   feeShare: number;
   isRefund: boolean;
   quality: StripeQuality;
+  // This order's own amounts exactly as the source file quoted them, before
+  // AED conversion (e.g. a Tabby SAR row's Order Amount/Total Deduction/
+  // Transferred amount). Only meaningful when the payout's originalCurrency
+  // is set and non-AED (Tabby/Tamara SAR & KWD statements) — otherwise these
+  // equal the AED share and the UI should not show a redundant column.
+  netOriginal?: number;
+  grossOriginal?: number;
+  feeOriginal?: number;
 };
 
 export type ParsedPayout = {
@@ -559,7 +567,10 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
       const rowGrossAed = jGross >= 0 ? sign * Math.abs(toAed(num(r[jGross]), ccy)) : 0;
       const rowFeeAed = jFees >= 0 ? Math.abs(toAed(num(r[jFees]), ccy)) : 0;
-      netOriginal += sign * Math.abs(num(r[jNet]));
+      const rowNetOriginal = sign * Math.abs(num(r[jNet]));
+      const rowGrossOriginal = jGross >= 0 ? sign * Math.abs(num(r[jGross])) : 0;
+      const rowFeeOriginal = jFees >= 0 ? Math.abs(num(r[jFees])) : 0;
+      netOriginal += rowNetOriginal;
       net += rowNetAed;
       if (jGross >= 0) gross += rowGrossAed;
       if (jFees >= 0) fees += rowFeeAed;
@@ -577,6 +588,9 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
               feeShare: +(prior.feeShare + rowFeeAed).toFixed(2),
               isRefund: prior.isRefund || isRefund,
               quality: "multi",
+              netOriginal: +((prior.netOriginal ?? 0) + rowNetOriginal).toFixed(2),
+              grossOriginal: +((prior.grossOriginal ?? 0) + rowGrossOriginal).toFixed(2),
+              feeOriginal: +((prior.feeOriginal ?? 0) + rowFeeOriginal).toFixed(2),
             }
           : {
               ref: clean,
@@ -585,6 +599,9 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
               feeShare: +rowFeeAed.toFixed(2),
               isRefund,
               quality: isRefund ? "refund" : "clean",
+              netOriginal: +rowNetOriginal.toFixed(2),
+              grossOriginal: +rowGrossOriginal.toFixed(2),
+              feeOriginal: +rowFeeOriginal.toFixed(2),
             });
       }
     }
@@ -647,7 +664,10 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
       const rowGrossAed = jGross >= 0 ? sign * Math.abs(toAed(num(r[jGross]), ccy)) : 0;
       const rowFeeAed = jFees >= 0 ? Math.abs(toAed(num(r[jFees]), ccy)) : 0;
-      netOriginal += sign * Math.abs(num(r[jNet]));
+      const rowNetOriginal = sign * Math.abs(num(r[jNet]));
+      const rowGrossOriginal = jGross >= 0 ? sign * Math.abs(num(r[jGross])) : 0;
+      const rowFeeOriginal = jFees >= 0 ? Math.abs(num(r[jFees])) : 0;
+      netOriginal += rowNetOriginal;
       net += rowNetAed;
       if (jGross >= 0) gross += rowGrossAed;
       if (jFees >= 0) fees += rowFeeAed;
@@ -665,6 +685,9 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
               feeShare: +(prior.feeShare + rowFeeAed).toFixed(2),
               isRefund: prior.isRefund || isRefund,
               quality: "multi",
+              netOriginal: +((prior.netOriginal ?? 0) + rowNetOriginal).toFixed(2),
+              grossOriginal: +((prior.grossOriginal ?? 0) + rowGrossOriginal).toFixed(2),
+              feeOriginal: +((prior.feeOriginal ?? 0) + rowFeeOriginal).toFixed(2),
             }
           : {
               ref: clean,
@@ -673,6 +696,9 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
               feeShare: +rowFeeAed.toFixed(2),
               isRefund,
               quality: isRefund ? "refund" : "clean",
+              netOriginal: +rowNetOriginal.toFixed(2),
+              grossOriginal: +rowGrossOriginal.toFixed(2),
+              feeOriginal: +rowFeeOriginal.toFixed(2),
             });
       }
     }

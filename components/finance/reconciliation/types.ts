@@ -8,6 +8,14 @@ export type ReconTxn = {
   feeShare: number;
   isRefund: boolean;
   quality: string | null;
+  // This order's own amounts exactly as the source payout file quoted them,
+  // before AED conversion — e.g. a Tabby SAR row's own Order Amount/Total
+  // Deduction/Transferred amount. Null for AED-native payouts or rows
+  // parsed before this was tracked; pair with ReconLine.payout.currency to
+  // label the unit (only meaningful when payout.currency is set, non-AED).
+  netOriginal: number | null;
+  grossOriginal: number | null;
+  feeOriginal: number | null;
 };
 
 export type ReconLine = {
@@ -107,6 +115,13 @@ export const aed2 = (v: number) =>
 
 export const aed0 = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(v);
+
+// Amount-then-code (e.g. "19,002.90 SAR"), not a currency-symbol format —
+// the reader here is comparing this against an AED figure right next to
+// it, so a plain number with the code spelled out reads faster than a
+// locale-dependent symbol they may not recognize for SAR/KWD.
+export const fmtOriginal = (v: number, currency: string) =>
+  `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} ${currency}`;
 
 export const STATE_META = {
   SETTLED: { label: "Settled", tone: "ok" },

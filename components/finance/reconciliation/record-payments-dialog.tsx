@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { aed2, type ReconLine } from "./types";
 import type { SettlementRecord } from "@/lib/repositories/settlements.repository";
-
+import type { InvoiceStatus } from "@/app/api/reconcile/line/[id]/invoices/route";
 /* Record customer payments for every order in a settled, confirmed payout —
  * batch-marks the underlying Zoho invoices paid. Distinct from ReconRow's
  * "Preview & post to Zoho" button, which posts a journal TRANSFER (clearing
@@ -30,8 +30,21 @@ export type PaymentRowStatus =
   | { status: "ready" }
   | { status: "posted"; paymentId: string }
   | { status: "failed"; error: string; needsManualReview: boolean }
-  | { status: "review"; reason: string };
+  | { status: "review"; reason: string }
+  | { status: "paid_external"; invoiceId: string; invoiceStatus: "paid" | "partially_paid" }
+  | { status: "overdue"; invoiceId: string }
+  | { status: "not_in_zoho" };
 
+  const map = {
+    ready:          { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "ready" },
+    posted:         { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
+    failed:         { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
+    review:         { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+    paid_external:  { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "already paid" },
+    not_in_zoho:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },
+  } as const;
+
+  
 type ZohoAccount = { account_id: string; account_name: string; account_type: string; is_active: boolean };
 
 type PublishResult = { settlementId: string; ok: boolean; error?: string; paymentId?: string; needsManualReview?: boolean };
@@ -89,25 +102,32 @@ function RecordPaymentsDialog({
   useEffect(() => {
     let alive = true;
     Promise.all([
-      fetch(`/api/reconcile/line/${encodeURIComponent(line.id)}/settlements`).then((r) => r.json()),
-      fetch("/api/integrations/zoho/account-config").then((r) => r.json()),
+      fetch(`/api/reconcile/line/${encodeURIComponent(line.id)}/settlements`).then(r => r.json()),
+      fetch("/api/integrations/zoho/account-config").then(r => r.json()),
+      fetch(`/api/reconcile/line/${encodeURIComponent(line.id)}/invoices`).then(r => r.json()),
     ])
-      .then(([settlementsJson, configJson]) => {
+      .then(([settlementsJson, configJson, invoicesJson]) => {
         if (!alive) return;
         const rows: SettlementRecord[] = settlementsJson.settlements ?? [];
+        console.log(invoicesJson,"we have all invoices")
+        const statuses: Record<string, InvoiceStatus> = invoicesJson.statuses ?? {};
         setSettlements(rows);
-        setRowStatus(
-          new Map(
-            rows.map((s) => [
-              s.order_number,
-              (s.zoho_payment_id?.startsWith("CLAIMED:")
-                ? { status: "review", reason: "Mid-flight publish — check Zoho before retrying" }
-                : s.zoho_payment_id
-                  ? { status: "posted", paymentId: s.zoho_payment_id }
-                  : { status: "ready" }) as PaymentRowStatus,
-            ]),
-          ),
-        );
+    
+        // Status comes ONLY from Zoho — has the invoice got a recorded
+        // payment against it or not? Local zoho_payment_id is not consulted;
+        // if we posted it last time, Zoho reflects that now and this returns
+        // paid_external. If someone manually paid it in Zoho, same thing.
+        setRowStatus(new Map(rows.map((s) => {
+          const iv = statuses[s.order_number];
+          if (iv?.status === "paid" || iv?.status === "partially_paid") {
+            return [s.order_number, { status: "paid_external", invoiceId: iv.invoiceId, invoiceStatus: iv.status }];
+          }
+          if (iv?.status === "overdue") {
+            return [s.order_number, { status: "overdue", invoiceId: iv.invoiceId }];
+          }
+          return [s.order_number, { status: "ready" as const }];
+        })));
+    
         setAccounts(configJson.bankAccounts ?? []);
         const def = configJson.effective?.bankAccountId ?? "";
         setDefaultAccountId(def);
@@ -120,7 +140,10 @@ function RecordPaymentsDialog({
     };
   }, [line.id]);
 
-  const postable = (settlements ?? []).filter((s) => rowStatus.get(s.order_number)?.status === "ready");
+  const postable = (settlements ?? []).filter((s) => {
+    const st = rowStatus.get(s.order_number)?.status;
+    return st === "ready" || st === "overdue";
+  });
   const modeSummary = (() => {
     const cod = postable.filter((s) => s.gateway.toUpperCase() === "COD").length;
     const card = postable.length - cod;
@@ -308,20 +331,26 @@ function RecordPaymentsDialog({
 
 export function PaymentRowPill({ s }: { s: PaymentRowStatus }) {
   const map = {
-    ready: { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "ready" },
-    posted: { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
-    failed: { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
-    review: { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+    ready:          { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "unpaid" },       // was "ready" — meaningless on main panel
+    posted:         { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
+    failed:         { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
+    review:         { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+    paid_external:  { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "paid" },         // green — Zoho says paid, not by us
+    overdue:        { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "overdue" },      // red — past due date
+    not_in_zoho:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },   // red — sync problem
   } as const;
+
+
   const cfg = map[s.status];
-  const title =
-    s.status === "posted"
-      ? `payment ${s.paymentId}`
-      : s.status === "failed"
-        ? s.error
-        : s.status === "review"
-          ? s.reason
-          : undefined;
+    const title =
+      s.status === "posted"        ? `payment ${s.paymentId}` :
+      s.status === "failed"        ? s.error :
+      s.status === "review"        ? s.reason :
+      s.status === "paid_external" ? `Zoho invoice ${s.invoiceId} — ${s.invoiceStatus}` :
+      s.status === "overdue"       ? `Zoho invoice ${s.invoiceId} — past due` :
+      s.status === "not_in_zoho"   ? "No matching Zoho invoice — run a sync" :
+      undefined;
+
   return (
     <span title={title} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium ${cfg.cls}`}>
       {s.status === "posted" && <ExternalLink size={9} />}
