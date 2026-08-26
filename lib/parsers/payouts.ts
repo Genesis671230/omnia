@@ -175,29 +175,108 @@ export function parseTelrXls(buf: Buffer | ArrayBuffer, filename: string): Parse
 
   const header = rows[headerIdx].map((c) => String(c).trim().toLowerCase());
   const jCart = header.indexOf("cartid");
-  const jNet = header.indexOf("net");
+  const jType = header.indexOf("type");
+  const jNet  = header.lastIndexOf("net");
+  const jMdr  = header.indexOf("mdr");
+  const jXFee = header.indexOf("fees"); // "Fees" is the extra-fee column, not the total
+  const jTax  = header.indexOf("tax");
 
-  let net = 0;
-  let tx = 0;
+  // Settlement pair sits immediately before MDR; Authorisation is the first pair.
+  // Fall back gracefully if a future export flattens to a single Amount column.
+  const currencyIdxs: number[] = [];
+  const amountIdxs:   number[] = [];
+  header.forEach((c, i) => {
+    if (c === "currency") currencyIdxs.push(i);
+    if (c === "amount")   amountIdxs.push(i);
+  });
+  const jAuthCcy   = currencyIdxs[0] ?? -1;
+  const jAuthAmt   = amountIdxs[0]   ?? -1;
+  const jSettleAmt = amountIdxs.length > 1
+    ? [...amountIdxs].reverse().find((i) => jMdr < 0 || i < jMdr) ?? amountIdxs[amountIdxs.length - 1]
+    : jAuthAmt;
+
+  if (jSettleAmt < 0 || jNet < 0) {
+    throw new Error("Telr header row missing Settlement Amount or Net column.");
+  }
+
+  const parseNum = (v: unknown) => {
+    const n = parseFloat(String(v ?? "").replace(/,/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  let net = 0, gross = 0, fees = 0, sales = 0, refunds = 0;
   const orderRefs: string[] = [];
+  const shareByRef = new Map<string, PayoutTransactionShare>();
+
   for (const r of rows.slice(headerIdx + 1)) {
     const cart = String(r[jCart] ?? "").trim();
     if (!cart) continue;
-    const n = parseFloat(String(r[jNet]));
-    if (Number.isNaN(n)) continue;
-    net += n;
-    tx += 1;
-    const prefix = cart.split("_")[0]; // CartID prefix = order number
-    if (prefix && !orderRefs.includes(prefix)) orderRefs.push(prefix);
+    const rowNet = parseNum(r[jNet]);
+    // Sub-header / total / disclaimer rows have a CartID cell but no numeric Net.
+    if (!/\d/.test(String(r[jNet] ?? ""))) continue;
+
+    const ref = cart.split("_")[0]; // CartID = "802831_6a78ea1f11a68" → "802831"
+    if (!ref) continue;
+
+    const type = jType >= 0 ? String(r[jType] ?? "").trim().toLowerCase() : "";
+    const isRefund = /refund/.test(type) || rowNet < 0;
+
+    // Settlement Amount is the AED gross the bank moved for this transaction.
+    // MDR / Fees / Tax are stored negative in the file — absolute-value them
+    // and sum for the row's fee total. Net in the file already equals
+    // Settlement − |MDR| − |Fees| − |Tax|, so we trust the Net column directly
+    // rather than re-deriving it (avoids ±0.01 rounding drift vs the bank).
+    const rowGross = parseNum(r[jSettleAmt]);
+    const rowFee = Math.abs(parseNum(r[jMdr])) + Math.abs(parseNum(r[jXFee])) + Math.abs(parseNum(r[jTax]));
+
+    net   += rowNet;
+    gross += rowGross;
+    fees  += rowFee;
+    if (isRefund) refunds += 1; else sales += 1;
+    if (!orderRefs.includes(ref)) orderRefs.push(ref);
+
+    // Retries / partial captures on one order → merge (same pattern as Tabby/Tamara)
+    // rather than emit duplicate rows in the proof table.
+    const prior = shareByRef.get(ref);
+    shareByRef.set(ref, prior
+      ? {
+          ref,
+          netShare:   +(prior.netShare   + rowNet).toFixed(2),
+          grossShare: +(prior.grossShare + rowGross).toFixed(2),
+          feeShare:   +(prior.feeShare   + rowFee).toFixed(2),
+          isRefund:   prior.isRefund || isRefund,
+          quality:    "multi",
+        }
+      : {
+          ref,
+          netShare:   +rowNet.toFixed(2),
+          grossShare: +rowGross.toFixed(2),
+          feeShare:   +rowFee.toFixed(2),
+          isRefund,
+          quality:    isRefund ? "refund" : "clean",
+        });
+  }
+
+  // Sniff the currency mix for the notes line — useful diagnostic when a Telr
+  // payout foots off by a rounding cent (usually a mixed SAR+AED batch).
+  const ccyMix = new Set<string>();
+  if (jAuthCcy >= 0) {
+    for (const r of rows.slice(headerIdx + 1)) {
+      const c = String(r[jAuthCcy] ?? "").trim().toUpperCase();
+      if (c && /^[A-Z]{3}$/.test(c)) ccyMix.add(c);
+    }
   }
 
   return [{
     id: `TELR-${payoutId}`,
     provider: "Telr",
-    net: +net.toFixed(2),
+    net:   +net.toFixed(2),
+    gross: +gross.toFixed(2),
+    fees:  +fees.toFixed(2),
     orderRefs,
     source: filename,
-    notes: `${tx} transactions; net = sum of Net column`,
+    notes: `${sales} sales${refunds ? `, ${refunds} refunds` : ""} · settled AED${ccyMix.size ? ` · authorised in ${[...ccyMix].sort().join("/")}` : ""}`,
+    transactions: [...shareByRef.values()],
   }];
 }
 

@@ -1,86 +1,3 @@
-// "use client";
-// import { useEffect, useState } from "react";
-// import { AlertTriangle, Loader2, Check } from "lucide-react";
-// import { toast } from "sonner";
-
-// type DriftRow = {
-//   sku: string; name: string; zoho_available: number;
-//   stores: { channel: string; quantity: number | null; diff: number }[];
-//   worstDiff: number;
-// };
-
-// export function DriftPanel({ onSelectSku }: { onSelectSku?: (sku: string) => void }) {
-//   const [rows, setRows] = useState<DriftRow[]>([]);
-//   const [pushing, setPushing] = useState<string | null>(null);
-//   const [loaded, setLoaded] = useState(false);
-
-//   const load = async () => {
-//     try {
-//       const r = await fetch("/api/inventory/drift", { cache: "no-store" });
-//       setRows((await r.json()).rows ?? []);
-//     } finally { setLoaded(true); }
-//   };
-//   useEffect(() => { load(); const id = setInterval(load, 20_000); return () => clearInterval(id); }, []);
-
-//   const push = async (sku: string) => {
-//     setPushing(sku);
-//     try {
-//       const res = await fetch(`/api/inventory/sku/${encodeURIComponent(sku)}/push`, { method: "POST" });
-//       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
-//       toast.success(`${sku} synced to all stores`);
-//       await load();
-//     } catch (e) {
-//       toast.error(`Push failed: ${(e as Error).message}`);
-//     } finally { setPushing(null); }
-//   };
-
-//   if (!loaded) return null;
-
-//   return (
-//     <div className="drift">
-//       <div className="drift-head">
-//         <span className="drift-title">
-//           <AlertTriangle size={13} /> Stock drift
-//           <b className="drift-count">{rows.length}</b>
-//         </span>
-//         <span className="drift-sub">
-//           {rows.length === 0 ? "All stores match Zoho." : "Stores disagree with Zoho — click a row to push."}
-//         </span>
-//       </div>
-
-//       {rows.length === 0 ? (
-//         <div className="drift-empty"><Check size={14} /> Nothing to reconcile.</div>
-//       ) : (
-//         <ul className="drift-list">
-//           {rows.slice(0, 10).map((r) => (
-//             <li key={r.sku} className="drift-row" onClick={() => onSelectSku?.(r.sku)}>
-//               <div className="drift-sku-cell">
-//                 <span className="mono">{r.sku}</span>
-//                 <span className="drift-name">{r.name}</span>
-//               </div>
-//               <div className="drift-cells">
-//                 <span className="drift-pill zoho">Zoho <b>{r.zoho_available}</b></span>
-//                 {r.stores.map((s) => (
-//                   <span key={s.channel} className={`drift-pill ${s.diff !== 0 ? "off" : ""}`}>
-//                     {s.channel.replace("shopify_", "").toUpperCase()} <b>{s.quantity ?? "—"}</b>
-//                     {s.diff !== 0 && <em>{s.diff > 0 ? "+" : ""}{s.diff}</em>}
-//                   </span>
-//                 ))}
-//               </div>
-//               <button
-//                 className="drift-btn"
-//                 disabled={pushing === r.sku}
-//                 onClick={(e) => { e.stopPropagation(); push(r.sku); }}
-//               >
-//                 {pushing === r.sku ? <Loader2 size={11} className="spin" /> : "Push"}
-//               </button>
-//             </li>
-//           ))}
-//         </ul>
-//       )}
-//     </div>
-//   );
-// }
 
 
 // components/inventory/drift-panel.tsx  — REPLACES the broken one
@@ -119,7 +36,7 @@ const load = async () => {
       // && s.tracking
        && s.quantity !== null && s.quantity !== it.zohoStock))
       .sort((a, b) => b.maxDiff - a.maxDiff)
-      .slice(0, 20);
+      .slice(0, 40);
 
     setRows(drifted);
   } finally { setLoaded(true); }

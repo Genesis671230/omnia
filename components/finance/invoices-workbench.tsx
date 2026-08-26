@@ -28,6 +28,95 @@ const STATUS_LABELS: Record<string, string> = {
   paid: "Paid", sent: "Sent", draft: "Draft", viewed: "Viewed", void: "Void",
 };
 
+type OrderGatewayResult = {
+  order_number: string;
+  gateway: string | null;
+  gateway_raw?: string | null;
+};
+const gatewayCache = new Map<string, string>();
+
+export async function getGatewaysForUnknownInvoices(
+  invoices: Array<{
+    orderNumber?: string | null;
+    gateway?: string | null;
+  }>
+): Promise<Map<string, string>> {
+  const unknownOrderNumbers = [
+    ...new Set(
+      invoices
+        .filter(
+          (invoice) =>
+            !invoice.gateway ||
+            invoice.gateway.toLowerCase() === "unknown"
+        )
+        .map((invoice) => invoice.orderNumber?.trim())
+        .filter(Boolean) as string[]
+    ),
+  ];
+
+  if (unknownOrderNumbers.length === 0) {
+    return new Map();
+  }
+
+  const result = new Map<string, string>();
+
+  const missing = unknownOrderNumbers.filter(
+    (number) => !gatewayCache.has(number)
+  );
+
+  // Use cached values immediately.
+  for (const number of unknownOrderNumbers) {
+    const cached = gatewayCache.get(number);
+
+    if (cached) {
+      result.set(number, cached);
+    }
+  }
+
+  if (missing.length === 0) {
+    return result;
+  }
+
+  const params = new URLSearchParams({
+    orderNumbers: missing.join(","),
+  });
+
+  const response = await fetch(
+    `/api/orders?${params.toString()}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Gateway lookup failed: ${response.status}`
+    );
+  }
+
+  const data = await response.json();
+
+  for (const order of data.orders ?? []) {
+    const number = String(order.order_number).trim();
+
+    const gateway =
+      order.gateway ||
+      order.gateway_raw ||
+      "Unknown";
+    console.log(gateway,"we have it")
+    gatewayCache.set(number, gateway);
+    result.set(number, gateway);
+  }
+
+  // Cache orders that weren't found too,
+  // so we don't repeatedly query missing orders.
+  for (const number of missing) {
+    if (!gatewayCache.has(number)) {
+      gatewayCache.set(number, "Unknown");
+      result.set(number, "Unknown");
+    }
+  }
+
+  return result;
+}
+
 const STATUS_TONE: Record<string, string> = {
   overdue: "bg-[#F9ECE7] text-[#A6472F] border-transparent",
   unpaid: "bg-[#F3EFE7] text-[#6F5325] border-transparent",
@@ -59,6 +148,71 @@ export function InvoicesWorkbench() {
   const [customRef, setCustomRef] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
 
+
+  type GatewayOrder = {
+    order_number: string;
+    gateway: string | null;
+    gateway_raw: string | null;
+    country: string | null;
+  };
+  
+  type OrderEnrichment = {
+    gateway: string;
+    country: string | null;
+  };
+  
+  async function fetchUnknownGateways(
+    invoices: WorkbenchInvoice[],
+  ): Promise<Map<string, OrderEnrichment>> {
+    const orderNumbers = [
+      ...new Set(
+        invoices
+          .filter(
+            (invoice) =>
+              !invoice.gateway ||
+              invoice.gateway.toLowerCase() === "unknown",
+          )
+          .map((invoice) => invoice.orderNumber?.trim())
+          .filter((v): v is string => Boolean(v)),
+      ),
+    ];
+  
+    if (orderNumbers.length === 0) {
+      return new Map();
+    }
+  
+    const params = new URLSearchParams({
+      orderNumbers: orderNumbers.join(","),
+    });
+  
+    const res = await fetch(`/api/orders?${params.toString()}`, {
+      cache: "no-store",
+    });
+  
+    if (!res.ok) {
+      throw new Error(`Gateway lookup failed: ${res.status}`);
+    }
+  
+    const json = await res.json();
+  
+    const result = new Map<string, OrderEnrichment>();
+  
+    for (const order of (json.orders ?? []) as GatewayOrder[]) {
+      const number = String(order.order_number).trim();
+  
+      const gateway =
+        order.gateway?.trim() ||
+        order.gateway_raw?.trim() ||
+        "Unknown";
+  
+      result.set(number, {
+        gateway,
+        country: order.country?.trim() || null,
+      });
+    }
+  
+    return result;
+  }
   // Load accounts once
   useEffect(() => {
     fetch("/api/integrations/zoho/account-config")
@@ -90,14 +244,53 @@ export function InvoicesWorkbench() {
       url.searchParams.set("pageSize", String(pageSize));
   
       const res = await fetch(url.toString());
+
+      const json: WorkbenchResponse = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json.error || `HTTP ${res.status}`);
+        }
+
+        const orderMap = await fetchUnknownGateways(json.invoices);
+
+        const invoices: WorkbenchInvoice[] = json.invoices.map((invoice) => {
+          const orderNumber = invoice.orderNumber?.trim();
+        
+          const order = orderNumber
+            ? orderMap.get(orderNumber)
+            : undefined;
+        
+          if (!order) {
+            return invoice;
+          }
+        
+          return {
+            ...invoice,
+            gateway: order.gateway,
+            gatewaySource: "orders" as const,
+            country: order.country,
+          };
+        });
+        // Recalculate counts using the enriched invoices.
+        const gatewayCounts = invoices.reduce<Record<string, number>>(
+          (counts, invoice) => {
+            const gateway = invoice.gateway || "Unknown";
+        
+            counts[gateway] = (counts[gateway] ?? 0) + 1;
+        
+            return counts;
+          },
+          {},
+        );
+        
+        setData({
+          ...json,
+          invoices,
+          gatewayCounts,
+        });
+        
+        setSelected(new Set());
   
-      const json = await res.json();
-  
-      if (!res.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`);
-      }
-  
-      setData(json);
       setSelected(new Set());
     } catch (e) {
       setError((e as Error).message);
@@ -303,6 +496,7 @@ export function InvoicesWorkbench() {
               <ColHead>Order</ColHead>
               <ColHead>Customer</ColHead>
               <ColHead>Gateway</ColHead>
+              <ColHead>Country</ColHead>
               <ColHead align="right">Total</ColHead>
               <ColHead align="right">Balance</ColHead>
               <ColHead>Status</ColHead>
@@ -435,6 +629,9 @@ function InvoiceRow({ row, selected, onToggle }: {
           {row.gateway}
         </Badge>
       </TableCell>
+      <TableCell className="py-2 text-[12.5px] text-[#1F1B16]">
+      {row.country ?? "—"}
+    </TableCell>
       <TableCell className="py-2 text-right font-mono text-[12.5px] tabular-nums text-[#8A8175]">
         {aed(row.total)}
       </TableCell>

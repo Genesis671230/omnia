@@ -19,6 +19,7 @@ export type WorkbenchInvoice = {
   customerName: string;
   orderNumber: string | null;
   gateway: string;
+  country: string | null;
   gatewaySource: "settlement" | "order" | "cod" | "unknown";
   settlementId: string | null;
   hasBankCredit: boolean;

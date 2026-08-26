@@ -1,5 +1,5 @@
 "use client";
-
+import { GroupClassificationPanel } from "@/components/reconciliation/group-panel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,8 @@ import { resolveDraftPosting, normalizeAccountMap, type DraftPosting } from "@/l
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
 import { AccountCombobox } from "./account-combobox";
 import { BankTxnTable } from "./bank-txn-table";
-
+import { BankChargesPanel } from "../../reconciliation/bank-charges-panel";
+import type { BankChargeSettings } from "@/lib/reconciliation/bank-charge-detector";
 export type ZohoAccount = { account_id: string; account_name: string; account_type: string };
 
 export function BankTransactionsTab({
@@ -21,6 +22,16 @@ export function BankTransactionsTab({
   zohoSettings: ZohoAccountMap; zohoAccounts: ZohoAccount[];
 }) {
   const settings = normalizeAccountMap(zohoSettings);
+  console.log(settings,"we have all ")
+  // Bank-charges settings are on the same config blob but not yet in ZohoAccountMap.
+// Cast until you add these two fields to /api/integrations/zoho/account-config's
+// response type: bankChargesAccountId (Bank Fees and Charges) + vatStandard5Id (VAT 5%).
+const chargeSettings: BankChargeSettings = {
+  bankAccountId: "2330082000000236001",
+  bankChargesAccountId: (settings as any).bankChargesAccountId ?? "2330082000000000409",
+  vatStandard5Id: (settings as any).vatStandard5Id ?? "",
+  placeOfSupply: (settings as any).placeOfSupply ?? "DU",
+};
   const [lines, setLines] = useState<BankTxnLine[]>([]);
   const [postings, setPostings] = useState<Record<string, BankTxnPostingState>>({});
   const [loading, setLoading] = useState(true);
@@ -163,9 +174,19 @@ const deSelectAll = ()=>setSelected(new Set())
   className="rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16] disabled:opacity-50">
   {syncing ? "Syncing…" : "Sync with Zoho"}
 </button>
-{lastSyncedAt && <span className="text-[11px] text-[#8A8175]">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
 
-      <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
+
+{lastSyncedAt && <span className="text-[11px] text-[#8A8175]">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
+<GroupClassificationPanel
+  lines={lines}
+  postings={postings}
+  onPosted={load}
+  syncWithZoho={syncWithZoho}
+/>
+<BankChargesPanel lines={lines} postings={postings}  onPosted={load} />
+
+
+   <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
         <div className="w-56">
           <div className="mb-1 text-[11px] text-[#8A8175]">Default from-account (fallback)</div>
           <AccountCombobox accounts={zohoAccounts} value={defaultFromAccountId}

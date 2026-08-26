@@ -46,7 +46,6 @@ if (settlements.length === 0) {
 
     for (const s of settlements) {
       const attemptId = crypto.randomUUID();
-console.log(attemptId,"this is attemptId from publish route");
       // if (s.zoho_payment_id) {
       //   console.log(s.zoho_payment_id,"this is s.zoho_payment_id from publish route");
       //   console.log(results,"this is results from publish route");
@@ -73,17 +72,7 @@ console.log(attemptId,"this is attemptId from publish route");
 
       const useInvoiceBalanceAsAmount = body.useInvoiceBalanceAsAmount === true;
       try {
-        console.log(s.customer_name,"this is s.customer_name from publish route");
-        console.log(s.order_number + " " + s.customer_name,"this is s.order_number + ' ' + s.customer_name from publish route");
-        console.log(s.gross_aed,"this is s.gross_aed from publish route");
-        console.log(s.gateway,"this is s.gateway from publish route");
-        console.log(s.bank_reference,"this is s.bank_reference from publish route");
-        console.log(s.settlement_date ?? undefined,"this is s.settlement_date ?? undefined from publish route");
-        console.log(accountId,"this is accountId from publish route");
-        console.log(referenceNumberOverride,"this is referenceNumberOverride from publish route");
-        console.log("Settlement for order " + s.order_number,"this is 'Settlement for order ' + s.order_number from publish route");
-        console.log(0,"this is 0 from publish route");
-        console.log([],"this is [] from publish route");
+    
         const { payment_id, outcome } = await createZohoCustomerPayment(
           {
             customerName: s.customer_name,

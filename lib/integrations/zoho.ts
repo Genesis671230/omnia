@@ -1,14 +1,4 @@
-// Zoho Inventory API client. Zoho Inventory and Zoho Books share the same
-// organization's items/sales orders/invoices when both apps are linked to
-// one org (confirmed live: org 721369942 "Omniastores LLC" has AppList
-// ["books","inventory"]), so the Inventory API surfaces both without needing
-// a separately-scoped Books OAuth grant.
-//
-// Every function here is read-only EXCEPT createZohoCustomerPayment, which
-// writes a real Customer Payment against a real invoice — callers must go
-// through the idempotency-safe claim flow in
-// app/api/settlements/publish/route.ts, never call it directly from a
-// retry loop. Reference: https://www.zoho.com/inventory/api/v1/
+
 
 import { normalizeRef } from "@/lib/inventory-compare";
 import { NextResponse } from "next/server";
@@ -195,7 +185,6 @@ export async function getAccessToken(): Promise<string> {
     return cachedAccessToken.token;
   }
 
-  // Prevent concurrent requests from all refreshing simultaneously.
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -203,7 +192,7 @@ export async function getAccessToken(): Promise<string> {
   refreshPromise = refreshZohoAccessToken();
 
   try {
-    const token = await refreshPromise;
+    const token = await refreshZohoAccessToken();
     return token;
   } finally {
     refreshPromise = null;
@@ -254,27 +243,6 @@ async function refreshZohoAccessToken(): Promise<string> {
 
   return json.access_token;
 }
-// export async function getAccessToken(): Promise<string> {
-  
-//   const res = await fetch(`${ACCOUNTS_BASE}/oauth/v2/token`, {
-//     method: "POST",
-//     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-//     body: new URLSearchParams({
-//       grant_type: "refresh_token",
-//       client_id: process.env.ZOHO_CLIENT_ID!,
-//       client_secret: process.env.ZOHO_CLIENT_SECRET!,
-//       refresh_token: process.env.ZOHO_REFRESH_TOKEN!,
-//     }),
-//     cache: "no-store",
-//   });
-//   if (!res.ok) {
-//     const body = await res.text();
-//     throw new Error(`Zoho OAuth token refresh HTTP ${res.status}: ${body.slice(0, 300)}`);
-//   }
-//   const json = await res.json();
-//   if (!json.access_token) throw new Error(`Zoho OAuth token refresh: no access_token in response — ${JSON.stringify(json).slice(0, 300)}`);
-//   return json.access_token as string;
-// }
 
 export async function zohoGetPaginated<T>(path: string, listKey: string, accessToken: string): Promise<T[]> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
@@ -543,27 +511,6 @@ export function resolveCustomFields(
     );
   });
 }
-// Pure: builds the exact JSON body sent to POST /customerpayments. Split out
-// from createZohoCustomerPayment so the date/account/reference-override
-// logic is unit-testable without a network call — same pattern as
-// buildPayoutPostings in lib/integrations/zoho-banking.ts.
-// export function buildCustomerPaymentBody(
-//   input: ZohoCustomerPaymentInput & { customerId: string; invoiceId: string },
-// ): CustomerPaymentBody {
-//   return {
-//     customer_id: input.customerId,
-//     payment_mode: zohoPaymentModeFor(input.gateway),
-//     amount: input.amount,
-//     date: input.date ?? new Date().toISOString().slice(0, 10),
-//     customer_name: input.customerName,
-//     reference_number: input.referenceNumberOverride || input.bankReference,
-//     ...(input.accountId ? { account_id: input.accountId } : {}),
-//     ...(input.description ? { description: input.description } : {}),
-//     ...(input.bankCharges ? { bank_charges: input.bankCharges } : {}),
-//     ...(input.customFields ? { custom_fields: input.customFields } : {}),
-//     invoices: [{ invoice_id: input.invoiceId, amount_applied: input.amount }],
-//   }
-// }
 export function buildCustomerPaymentBody(
   input: ZohoCustomerPaymentInput & { customerId: string; invoiceId: string; amountApplied: number; balance: number },
 ): CustomerPaymentBody {
@@ -581,67 +528,6 @@ export function buildCustomerPaymentBody(
     invoices: [{ invoice_id: input.invoiceId, amount_applied:input.amountApplied }],
   };
 }
-
-// async function findZohoInvoice(orderNumber: string, accessToken: string, orgId: string): Promise<ZohoInvoiceListRow> {
-//   console.log(orderNumber,"this is orderNumber from findZohoInvoice");
-//   const wanted = orderNumber.trim();
-//   console.log(wanted,"this is wanted from findZohoInvoice");
-//   const bare = orderNumber.replace(/^(WA|UAE|KSA|WOO|SA)/i, "").trim();
-//   console.log(bare,"this is bare from findZohoInvoice");
-
-//   const fetchByName = async (name: string): Promise<ZohoInvoiceListRow[]> => {
-//     const qs = new URLSearchParams({ organization_id: orgId, customer_name: name });
-    
-//     const res = await fetch(`${API_BASE}/invoices?${qs}`, {
-//       headers: {
-//         Authorization: `Zoho-oauthtoken ${accessToken}`,
-//         "X-com-zoho-books-organizationid": orgId,   // ← was missing
-//       },
-//       cache: "no-store",
-//     });
-   
-//     const json = await res.json();
-//     console.log("[ZOHO] invoices returned:", {
-//       requested: name,
-//       invoices: (json.invoices ?? []).map((r: any) => ({
-//         invoice_id: r.invoice_id,
-//         invoice_number: r.invoice_number,
-//         reference_number: r.reference_number,
-//         customer_name: r.customer_name,
-//         customer_id: r.customer_id,
-//         balance: r.balance,
-//         status: r.status,
-//       })),
-//     });
-    
-//     if (!res.ok) throw new Error(`Zoho invoice lookup HTTP ${res.status}`);
-//     return (json.invoices ?? []) as ZohoInvoiceListRow[];
-//   };
-//   console.log(fetchByName,"this is fetchByName from findZohoInvoice");
-//   const startsWithRef = (name: string, needle: string) => {
-//     const n = (name || "").trim();
-//     if (!n.toLowerCase().startsWith(needle.toLowerCase())) return false;
-//     const next = n.charAt(needle.length);
-//     return next === "" || /\s/.test(next);
-//   };
-//   console.log(startsWithRef,"this is startsWithRef from findZohoInvoice");
-//   let matches = (await fetchByName(wanted)).filter((r) => startsWithRef(r.customer_name, wanted));
-//   console.log(matches,"this is matches from findZohoInvoice");
-//   if (matches.length === 0 && bare !== wanted) {
-//     matches = (await fetchByName(bare)).filter((r) => startsWithRef(r.customer_name, bare));
-//   }
-//   console.log(matches,"this is matches from findZohoInvoice");
-//   if (matches.length === 0) throw new Error(`No Zoho invoice found for customer_name starting with ${orderNumber}`);
-//   // Multiple matches on the same order = exchange / re-issue. Prefer the one
-//   // that still has balance; if all are paid, upstream balance-0 check handles it.
-//   if (matches.length > 1) {
-//     const withBalance = matches.filter((m) => (m.balance || 0) > 0.01);
-//     if (withBalance.length === 1) return withBalance[0];
-//     if (withBalance.length === 0) return matches[0];
-//     throw new Error(`Ambiguous Zoho invoice match for ${orderNumber} (${withBalance.length} with balance) — resolve manually in Zoho`);
-//   }
-//   return matches[0];
-// }
 
 export async function findZohoInvoice(
   orderNumber: string,
@@ -731,7 +617,6 @@ export async function findZohoInvoice(
 // routed to manual review rather than blindly retried.
 export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput & { writeOffResidualAsFee?: boolean,invoiceId:string,paymentMode:string,referenceNumber:string }, accessToken: string,opts?: { customFieldSchema?: ZohoPaymentCustomFieldMeta[] },
 ): Promise<CreatePaymentResult> {
-console.log(input.invoice,"lotyldata ")
   let invoiceDetail = input.invoice;
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
   let invoice = input.invoice;
@@ -768,7 +653,7 @@ if(!invoiceDetail){
     );
   }
   
-  invoiceDetail = invoice ? invoice: detailJson.invoice;
+  invoiceDetail = detailJson.invoice?detailJson.invoice: invoice;
   
   
   if (!invoiceDetail) {
@@ -841,6 +726,8 @@ const amountApplied = looksLikeFee ? input.amount + bankCharges : input.amount;
       ? resolveCustomFields(input.customFields, opts.customFieldSchema)
       : input.customFields;
 
+
+
   const body = buildCustomerPaymentBody({
     ...input,
     amount: balance,
@@ -853,7 +740,6 @@ const amountApplied = looksLikeFee ? input.amount + bankCharges : input.amount;
 
 
 try {
-console.log(invoice.customer_id,invoice.invoice_id,"we checking ")
   const existingPayment = await findExistingCustomerPayment(
     invoice.invoice_id,
     invoice.customer_id,
@@ -913,7 +799,7 @@ console.log(invoice.customer_id,invoice.invoice_id,"we checking ")
       outcome: "updated" as const,
     };
   }else{
-
+console.log(body,"amount balance etc niovice")
 const createRes = await fetch(
   `${API_BASE}/customerpayments?organization_id=${orgId}`,
   {
@@ -961,13 +847,7 @@ export async function getZohoInvoiceDetail(
   accessToken: string,
   orgId: string,
 ): Promise<ZohoInvoiceListRow> {
-  // const res = await fetch(`${API_BASE}/invoices/${invoiceId}?organization_id=${orgId}`, {
-  //   headers: {
-  //     Authorization: `Zoho-oauthtoken ${accessToken}`,
-  //     "X-com-zoho-books-organizationid": orgId,
-  //   },
-  //   cache: "no-store",
-  // });
+
   const res = await zohoFetch(
     `${API_BASE}/invoices/${invoiceId}?organization_id=${orgId}`,
     accessToken,
@@ -1001,13 +881,7 @@ export async function listZohoInvoices(
   if (params.dateStart) qs.set("date_start", params.dateStart);
   if (params.dateEnd) qs.set("date_end", params.dateEnd);
 
-  // const res = await fetch(`${API_BASE}/invoices?${qs.toString()}`, {
-  //   headers: {
-  //     Authorization: `Zoho-oauthtoken ${accessToken}`,
-  //     "X-com-zoho-books-organizationid": orgId,
-  //   },
-  //   cache: "no-store",
-  // });
+
   const res = await zohoFetch(
     `${API_BASE}/invoices?${qs.toString()}`,
     accessToken,

@@ -66,7 +66,7 @@ export function SkuDrawer({ sku, onClose }: { sku: string | null; onClose: () =>
                   <div key={s.channel} className={`drawer-cell ${diff !== 0 ? "off" : ""}`}>
                     <span className="drawer-lbl">{s.channel.replace("shopify_", "").toUpperCase()}</span>
                     <b>{s.quantity ?? "—"}</b>
-                    <em>{diff === 0 ? "in sync" : `${diff > 0 ? "+" : ""}${diff} vs Zoho`}</em>
+                    {/* <em>{diff === 0 ? "in sync" : `${diff > 0 ? "+" : ""}${diff} vs Zoho`}</em> */}
                   </div>
                 );
               })}

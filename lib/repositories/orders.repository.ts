@@ -7,9 +7,14 @@ const ORDER_COLUMNS =
   "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status,shipping_address1, shipping_address2,shipping_state,shipping_postcode,shipping_company,billing_address1,billing_address2,billing_state,billing_postcode,billing_company, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
 
   export type OrdersQuery = {
-    days: number; page: number; limit: number;
-    store: string | null; location: string | null; q: string;
+    days: number;
+    page: number;
+    limit: number;
+    store: string | null;
+    location: string | null;
+    q: string;
     fulfillableFrom: "KSA" | "UAE" | null;
+    orderNumbers: string[];
   };
 export type OrderRowRaw = {
   uid: string; store_id: string; order_number: string; order_date: string | null;
@@ -35,7 +40,6 @@ export type OrderRowRaw = {
   awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
 };
 
-
 // Pure — turns URL search params into clamped, normalized query args. Kept
 // separate from the DB call so it's unit-testable without Supabase.
 export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
@@ -55,8 +59,17 @@ export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
   const location = locationRaw.toLowerCase() === "all locations" ? null : locationRaw;
   const q = (params.get("q") || "").trim();
   const fulfillRaw = (params.get("fulfillableFrom") || "").trim().toUpperCase();
+
+  const orderNumbers = [
+    ...new Set(
+      (params.get("orderNumbers") || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+    ),
+  ];
   const fulfillableFrom = fulfillRaw === "KSA" || fulfillRaw === "UAE" ? fulfillRaw : null;
-  return { days, page, limit, store, location, q, fulfillableFrom };
+  return { days, page, limit, store, location, q, fulfillableFrom,orderNumbers };
 }
 
 // Supabase's fluent query builder returns an increasingly specific generic
@@ -98,6 +111,8 @@ function applyOrdersFilters(
   // separately rather than merging into a single .or() string.
   return qy;
 }
+
+
 
 export const OrdersRepository = {
   // Upsert synced orders WITHOUT touching settlement fields — payout_id /
@@ -179,6 +194,36 @@ export const OrdersRepository = {
     return rows as OrderRowRaw[];
   },
 
+
+  async getGatewaysByOrderNumbers(numbers: string[]) {
+    if (numbers.length === 0) return [];
+  
+    const out: {
+      order_number: string;
+      gateway: string | null;
+      gateway_raw: string | null;
+      country:string|null
+    }[] = [];
+  
+    for (let i = 0; i < numbers.length; i += 200) {
+      const chunk = numbers.slice(i, i + 200);
+  
+      const { data, error } = await supabase
+        .from("orders")
+        .select("order_number, gateway, gateway_raw, country")
+        .in("order_number", chunk);
+  
+      if (error) {
+        throw new Error(
+          `gateway lookup failed: ${error.message}`,
+        );
+      }
+  
+      out.push(...(data ?? []));
+    }
+  
+    return out;
+  },
   // Minimal rows for matching payout refs → orders (Stripe API settlement
   // creation). Chunked: a payout batch can name hundreds of numbers and
   // .in() rides in the request URL.
