@@ -17,17 +17,22 @@ export async function GET(request: Request) {
   
     const accessToken = await getAccessToken();
     const zohoTxns = await listZohoBankTransactions({ accountId, dateStart: from, dateEnd: to }, accessToken);
-    const byReference = new Map(zohoTxns.map((t) => [t.reference_number, t]));
+    const norm = (s?: string | null) => (s ?? "").trim().toUpperCase();
+
+    const byReference = new Map(
+      zohoTxns.filter((t) => t.reference_number).map((t) => [norm(t.reference_number), t])
+    );
+    
   
-    const localPostings = await ZohoBankTxnRepository.listPostings();
+    const localPostings = await ZohoBankTxnRepository.listPostings({ from, to });
     const toCheck = localPostings.filter((p) => p.status === "posted" || p.status === "verified" || p.status === "missing_in_zoho");
   
     let verified = 0;
     let missing = 0;
   
     for (const p of toCheck) {
-      const match = byReference.get(p.reference_number);
-      if (match) {
+      const match = byReference.get(norm(p.reference_number));
+            if (match) {
         await ZohoBankTxnRepository.markVerified(p.bank_line_id, {
           zoho_transaction_id: match.transaction_id,
           zoho_status: match.status,
@@ -40,4 +45,5 @@ export async function GET(request: Request) {
     }
   
     return NextResponse.json({ checked: toCheck.length, verified, missing, syncedAt: new Date().toISOString() });
+   
 }

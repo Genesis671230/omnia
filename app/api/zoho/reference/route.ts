@@ -20,13 +20,13 @@ async function fetchTaxes(path: string, token: string, query: Record<string, str
     url.searchParams.set("organization_id", ORG_ID);
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
     const res = await fetch(url.toString(), {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      headers: { Authorization: `Zoho-oauthtoken 1000.05b35d3516299eae39a115ec01a0f35b.97aef488728f3aacbd6acbc21fecf8e3` },
     });
     const json = await res.json().catch((e) => {
       console.log(e,"gt error ")
     });
     
-    console.log(json,"the response is here")
+    console.log(json,"the taxes will appear if you have access")
     // if (!res.ok || (json.code !== undefined && json.code !== 0)) {
     //   throw new Error(json.message || `Zoho ${path} failed HTTP ${res.status}`);
     // }
@@ -50,7 +50,7 @@ async function fetchZoho(path: string, token: string, query: Record<string, stri
       console.log(e,"gt error ")
     });
     
-    console.log(json,"the response is here")
+    console.log(json,"all other accounts")
     // if (!res.ok || (json.code !== undefined && json.code !== 0)) {
     //   throw new Error(json.message || `Zoho ${path} failed HTTP ${res.status}`);
     // }

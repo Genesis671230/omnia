@@ -29,15 +29,27 @@ export const ZohoBankTxnRepository = {
     return data as ZohoBankTxnPostingRow;
   },
 
-  async listPostings(): Promise<ZohoBankTxnPostingRow[]> {
-    const { data, error } = await supabase
-      .from("zoho_bank_txn_postings")
-      .select("*")
-      .order("posted_at", { ascending: false });
-    if (error) return [];
-    return (data ?? []) as ZohoBankTxnPostingRow[];
+  async listPostings(range?: { from?: string; to?: string }): Promise<ZohoBankTxnPostingRow[]> {
+    let lineIds: string[] | null = null;
+  
+    if (range?.from || range?.to) {
+      let lineQuery = supabase.from("bank_lines").select("id");
+      if (range.from) lineQuery = lineQuery.gte("date", range.from);
+      if (range.to) lineQuery = lineQuery.lte("date", range.to);
+      const { data: lineRows, error: lineErr } = await lineQuery;
+      if (lineErr) throw new Error(`listPostings (bank_lines lookup) failed: ${lineErr.message}`);
+      lineIds = (lineRows ?? []).map((r) => r.id);
+      if (lineIds.length === 0) return []; // nothing in range, skip the second query
+    }
+  
+    let query = supabase.from("zoho_bank_txn_postings").select("*");
+    if (lineIds) query = query.in("bank_line_id", lineIds);
+  
+    const { data, error } = await query;
+    if (error) throw new Error(`listPostings failed: ${error.message}`);
+    return (data as ZohoBankTxnPostingRow[]) ?? [];
   },
-
+  
   async recordPosting(row: Omit<ZohoBankTxnPostingRow, "posted_at"> & { posted_at?: string }) {
     const { error } = await supabase.from("zoho_bank_txn_postings").upsert(
       { ...row, tenant_id: TENANT, posted_at: row.posted_at ?? new Date().toISOString() },
