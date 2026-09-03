@@ -162,6 +162,14 @@ export type WooProduct = {
   manage_stock: boolean;
   status: string;
   purchasable?: boolean;
+  images?: {
+    id: number;
+    src: string;
+    name?: string;
+    alt?: string;
+  }[];
+
+  image_url?: string | null;
 };
 
 type WooProductResponse = Omit<WooProduct, "variation_id">;
@@ -193,6 +201,7 @@ async function fetchWooVariations(base: string, productId: number): Promise<WooP
         type: "variation",
         parent_id: productId,
         variation_id: variation.id,
+        image_url: variation.images?.[0]?.src ?? null,
       })));
     if (batch.length < 100) break;
   }
@@ -218,7 +227,7 @@ export async function fetchWooProducts(): Promise<WooProduct[]> {
     }
     if (parent.type === "external" || parent.type === "grouped") return [];
     if (parent.status !== "publish") return [];
-    return [{ ...parent, variation_id: undefined }];
+    return [{ ...parent, variation_id: undefined, image_url: parent.images?.[0]?.src ?? null, }];
   }));
   return productGroups.flat();
 }
@@ -234,4 +243,176 @@ export function telrRefsFromMeta(meta: WooRawOrder["meta_data"]): { cartId: stri
     if (!tranref && (k.includes("tranref") || k.includes("tran_ref"))) tranref = v;
   }
   return { cartId, tranref };
+}
+
+
+
+
+
+
+
+
+const exportWooLimiter = new Bottleneck({
+  reservoir: 20,
+  reservoirRefreshAmount: 20,
+  reservoirRefreshInterval: 10_000,
+  maxConcurrent: 2,
+});
+
+async function exportWooFetch(
+  url: string,
+  init?: RequestInit,
+) {
+  const maxAttempts = 3;
+
+  for (
+    let attempt = 1;
+    attempt <= maxAttempts;
+    attempt++
+  ) {
+    try {
+      const response =
+        await exportWooLimiter.schedule(
+          () => fetch(url, init),
+        );
+
+      if (
+        response.status !== 429 &&
+        response.status < 500
+      ) {
+        return response;
+      }
+
+      if (attempt === maxAttempts) {
+        return response;
+      }
+
+      const retryAfter =
+        Number(
+          response.headers.get(
+            "Retry-After",
+          ) ?? "0",
+        );
+
+      const delay =
+        retryAfter > 0
+          ? retryAfter * 1000
+          : 250 * 2 ** (attempt - 1);
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, delay),
+      );
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          250 * 2 ** (attempt - 1),
+        ),
+      );
+    }
+  }
+
+  throw new Error(
+    "Woo export request failed",
+  );
+}
+
+export type WooInventoryExportProduct = {
+  id: number;
+  variation_id: number | null;
+  sku: string;
+  name: string;
+  stock_quantity: number | null;
+  image_url: string | null;
+};
+
+export function wooExportConfigured(): boolean {
+  return Boolean(
+    process.env.WOO_URL &&
+    process.env.WOO_CONSUMER_KEY &&
+    process.env.WOO_CONSUMER_SECRET,
+  );
+}
+
+
+export async function fetchWooInventoryBySku(
+  sku: string,
+): Promise<WooInventoryExportProduct[]> {
+  const base = (process.env.WOO_URL || "").replace(/\/+$/, "");
+  const auth = Buffer.from(
+    `${process.env.WOO_CONSUMER_KEY}:${process.env.WOO_CONSUMER_SECRET}`,
+  ).toString("base64");
+  const headers = { Authorization: `Basic ${auth}` };
+  const normalizedSku = sku.trim();
+  if (!normalizedSku) return [];
+
+  // 1. Direct match — covers simple products and variable-parent SKUs.
+  const directUrl = `${base}/wp-json/wc/v3/products?sku=${encodeURIComponent(normalizedSku)}&per_page=100`;
+  const directRes = await exportWooFetch(directUrl, { headers, cache: "no-store" });
+  if (!directRes.ok) {
+    const body = await directRes.text();
+    throw new Error(`Woo export HTTP ${directRes.status}: ${body.slice(0, 300)}`);
+  }
+  const directProducts = await directRes.json();
+  const directMatches = directProducts.filter(
+    (p: any) => p.sku?.trim().toUpperCase() === normalizedSku.toUpperCase(),
+  );
+  if (directMatches.length > 0) {
+    return directMatches.map((p: any) => ({
+      id: p.id,
+      variation_id: null,
+      sku: p.sku,
+      name: p.name,
+      stock_quantity: p.stock_quantity ?? null,
+      image_url: p.images?.[0]?.src ?? null,
+    }));
+  }
+
+  // 2. Fallback — sku likely belongs to a variation. `search` also matches
+  // SKU text in WooCommerce, so this stays scoped to a few candidate
+  // parents instead of paging the whole catalog. Worth confirming on your
+  // store, but it avoids the full crawl either way.
+  const searchUrl = `${base}/wp-json/wc/v3/products?search=${encodeURIComponent(normalizedSku)}&per_page=20`;
+  const searchRes = await exportWooFetch(searchUrl, { headers, cache: "no-store" });
+  if (!searchRes.ok) return [];
+  const candidates = await searchRes.json();
+
+  const results: WooInventoryExportProduct[] = [];
+  for (const parent of candidates) {
+    if (parent.type !== "variable") continue;
+    for (let page = 1; ; page += 1) {
+      const varUrl = `${base}/wp-json/wc/v3/products/${parent.id}/variations?per_page=100&page=${page}`;
+      const varRes = await exportWooFetch(varUrl, { headers, cache: "no-store" });
+      if (!varRes.ok) break;
+      const variations = await varRes.json();
+      for (const v of variations) {
+        if (v.sku?.trim().toUpperCase() === normalizedSku.toUpperCase()) {
+          results.push({
+            id: parent.id,
+            variation_id: v.id,
+            sku: v.sku,
+            name: `${parent.name} ${v.attributes?.map((a: any) => a.option).join(" / ") ?? ""}`.trim(),
+            stock_quantity: v.stock_quantity ?? null,
+            image_url: v.image?.src ?? parent.images?.[0]?.src ?? null,
+          });
+        }
+      }
+      if (variations.length < 100) break;
+    }
+  }
+  return results;
+}
+
+// batch wrapper — one call per SKU, all throttled by the same exportWooLimiter
+export async function fetchWooInventoryBySkus(
+  skus: string[],
+): Promise<WooInventoryExportProduct[]> {
+  const results = await Promise.all(
+    skus.map((sku) => fetchWooInventoryBySku(sku)),
+  );
+  return results.flat();
 }

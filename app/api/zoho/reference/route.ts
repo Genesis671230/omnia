@@ -16,17 +16,16 @@ async function fetchTaxes(path: string, token: string, query: Record<string, str
   try {
     
     
-    const url = new URL(`${BOOKS_BASE}${path}`);
-    url.searchParams.set("organization_id", ORG_ID);
-    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Zoho-oauthtoken 1000.05b35d3516299eae39a115ec01a0f35b.97aef488728f3aacbd6acbc21fecf8e3` },
+    const url = new URL(`https://www.zohoapis.com/books/v3/settings/taxes`);
+    // url.searchParams.set("organization_id", ORG_ID);
+    // for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
+    const res = await fetch(`https://www.zohoapis.com/books/v3/settings/taxes?organization_id=${ORG_ID}`, {
+      headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
     const json = await res.json().catch((e) => {
       console.log(e,"gt error ")
     });
     
-    console.log(json,"the taxes will appear if you have access")
     // if (!res.ok || (json.code !== undefined && json.code !== 0)) {
     //   throw new Error(json.message || `Zoho ${path} failed HTTP ${res.status}`);
     // }
@@ -50,7 +49,6 @@ async function fetchZoho(path: string, token: string, query: Record<string, stri
       console.log(e,"gt error ")
     });
     
-    console.log(json,"all other accounts")
     // if (!res.ok || (json.code !== undefined && json.code !== 0)) {
     //   throw new Error(json.message || `Zoho ${path} failed HTTP ${res.status}`);
     // }
@@ -69,15 +67,18 @@ export async function GET(request: Request) {
   // }
 
   try {
-    // const token = "1000.189e853c9a15d09e69aa6302386b66e1.d72e917f794c234681f1f03714c66868";
+
     const token = await getAccessToken();
     // Chart of accounts pulled twice (Expense + Equity filters) so the dropdowns
     // stay tight — otherwise we'd load thousands of irrelevant accounts.
+    
     const [expenseAccounts, equityAccounts, bankAccounts] = await Promise.all([
       fetchZoho("/chartofaccounts", token, { filter_by: "AccountType.Expense" }),
       fetchZoho("/chartofaccounts", token, { filter_by: "AccountType.Equity" }),
       fetchZoho("/bankaccounts", token),
     ]);
+
+    console.log(token,"token")
     
     const taxes = await fetchTaxes("/settings/taxes", token)
 

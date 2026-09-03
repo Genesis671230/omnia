@@ -1,42 +1,4 @@
-// Comparison logic for the inventory panel — diffs Zoho's authoritative
-// stock_on_hand against live Shopify/WooCommerce quantities (keyed on SKU),
-// and flags recent store orders with no matching Zoho sales order/reference.
-// Pure functions over already-fetched rows so the API route stays thin.
 
-// export type StockMismatch = {
-//   sku: string;
-//   name: string;
-//   zohoStock: number;
-//   storeStock: { storeId: string; quantity: number | null }[];
-//   maxDiff: number;
-// };
-
-// Flags a SKU whenever ANY store's live quantity differs from Zoho's
-// stock_on_hand — the founder decides which side is stale.
-// export function findStockMismatches(zohoItems: ZohoItemRow[], storeInventory: StoreInventoryRowDb[]): StockMismatch[] {
-//   const zohoBySku = new Map(zohoItems.map((i) => [i.sku, i]));
-//   const storeBySku = new Map<string, { storeId: string; quantity: number | null }[]>();
-//   for (const row of storeInventory) {
-//     const list = storeBySku.get(row.sku) ?? [];
-//     list.push({ storeId: row.store_id, quantity: row.quantity });
-//     storeBySku.set(row.sku, list);
-//   }
-
-//   const mismatches: StockMismatch[] = [];
-//   for (const [sku, stores] of storeBySku) {
-//     const zoho = zohoBySku.get(sku);
-//     if (!zoho) continue; // SKU not in Zoho at all — a different exception, not a stock mismatch
-//     let maxDiff = 0;
-//     for (const s of stores) {
-//       if (s.quantity === null) continue;
-//       maxDiff = Math.max(maxDiff, Math.abs(s.quantity - zoho.stock_on_hand));
-//     }
-//     if (maxDiff > 0) {
-//       mismatches.push({ sku, name: zoho.name, zohoStock: zoho.stock_on_hand, storeStock: stores, maxDiff });
-//     }
-//   }
-//   return mismatches.sort((a, b) => b.maxDiff - a.maxDiff);
-// }
 
 
 export type ZohoItemRow = {
@@ -232,6 +194,7 @@ export function buildInventoryItems(
   // index live store quantities by "store|sku"
   const storeByKey = new Map<string, StoreInventoryRow>();
   const skusFromStores = new Set<string>();
+
   for (const r of storeInventory) {
     const sku = (r.sku ?? "").trim();
     if (!sku) continue;
@@ -254,6 +217,7 @@ export function buildInventoryItems(
     const z = zohoBySku.get(sku);
     const zohoStock = z?.stock_on_hand ?? 0;
     const available = z?.available_stock ?? 0;
+    // const available = level.quantities?.find((q: any) => q.name === "available",)?.quantity ?? 0;
     const zohoExists = !!z;
     // name: prefer Zoho's, fall back to whatever a store titled it
     const name =

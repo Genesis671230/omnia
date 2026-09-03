@@ -1,0 +1,182 @@
+<h2>Small polish pass: tinted backgrounds + marketing spend fix</h2>
+<p class="subtitle">Each KPI tile now carries a faint background tint (4% of its accent color, still flat — no gradient) instead of plain white, so the category reads at a glance. Also fixed marketing spend: it had a red down-arrow implying "bad", but spend isn't a trend to judge that way — replaced with a neutral efficiency line instead.</p>
+
+<style>
+  .preview5 { width:100%; min-height: 440px; border-radius: 10px; overflow:hidden; position:relative; font-family: -apple-system, "Inter", ui-sans-serif, system-ui, sans-serif; border:1px solid #E3E5E8; background:#fff; }
+  .p5-sidebar { position:absolute; top:0; left:0; bottom:0; width:168px; background:#16181D; display:flex; flex-direction:column; }
+  .p5-main { position:absolute; top:0; left:168px; right:0; bottom:0; padding: 20px 24px; background:#FAFAFB; }
+
+  .p5-brand { padding: 16px 16px 14px; display:flex; align-items:center; gap:8px; }
+  .p5-mark { width:18px; height:18px; border-radius:5px; background:#F4F4F5; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#16181D; flex-shrink:0; }
+  .p5-brand-text { color:#F4F4F5; font-size:12px; font-weight:600; letter-spacing:0.04em; }
+
+  .p5-nav { padding: 4px 8px; display:flex; flex-direction:column; gap:1px; }
+  .p5-navitem { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:6px; font-size:12px; color:#8B8F98; position:relative; }
+  .p5-navitem.active { background:#1F2127; color:#F4F4F5; font-weight:500; }
+  .p5-navitem.active::before { content:""; position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:2px; height:14px; background:#635BFF; border-radius:1px; }
+
+  .p5-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .p5-eyebrow { font-size:11px; color:#8B8F98; font-weight:500; margin-bottom:3px; display:block; }
+  .p5-title { font-size:18px; font-weight:600; color:#16181D; letter-spacing:-0.01em; }
+  .p5-btn { font-size:12px; padding:6px 12px; border-radius:6px; font-weight:500; background:#fff; color:#16181D; border:1px solid #DEDFE3; display:inline-flex; align-items:center; gap:6px; }
+
+  .p5-kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; margin-bottom:20px; }
+  .p5-kpi { border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; border:1px solid transparent; }
+  .p5-kpi .head { display:flex; align-items:center; gap:6px; }
+  .p5-kpi .l { font-size:11px; font-weight:600; }
+  .p5-kpi .v { font-size:22px; font-weight:600; color:#16181D; font-variant-numeric: tabular-nums; letter-spacing:-0.01em; }
+  .p5-kpi .n { font-size:11px; font-weight:500; display:flex; align-items:center; gap:3px; color:#6C7080; }
+
+  .p5-chart-card { border:1px solid #E3E5E8; border-radius:8px; padding:16px 18px; background:#fff; margin-bottom: 14px; }
+  .p5-chart-title { font-size:12px; font-weight:600; color:#16181D; margin-bottom:2px; }
+  .p5-chart-sub { font-size:11px; color:#8B8F98; margin-bottom:14px; }
+  .chart-area5 { position:relative; height:110px; }
+  .chart-axis5 { display:flex; justify-content:space-between; margin-top:6px; }
+  .chart-axis5 span { font-size:9.5px; color:#A8ABB3; font-weight:500; }
+
+  .p5-table { border:1px solid #E3E5E8; border-radius:8px; overflow:hidden; background:#fff; }
+  .p5-trow { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid #F0F1F3; }
+  .p5-trow:last-child { border-bottom:0; }
+  .p5-trow .a { font-size:12px; font-weight:500; color:#16181D; }
+  .status-pill5 { font-size:10px; font-weight:600; padding:2px 7px; border-radius:4px; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: tinted KPI backgrounds + marketing spend fix</div>
+  <div class="mockup-body" style="padding:0;">
+    <div class="preview5">
+      <div class="p5-sidebar">
+        <div class="p5-brand">
+          <div class="p5-mark">O</div>
+          <span class="p5-brand-text">OMNIA</span>
+        </div>
+        <div class="p5-nav">
+          <div class="p5-navitem active">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            Dashboard
+          </div>
+          <div class="p5-navitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.6a2 2 0 0 0 2-1.6L22 6H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg>
+            Orders
+          </div>
+          <div class="p5-navitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            Reconciliation
+          </div>
+          <div class="p5-navitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+            Marketing
+          </div>
+          <div class="p5-navitem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>
+            Customers
+          </div>
+        </div>
+      </div>
+
+      <div class="p5-main">
+        <div class="p5-header">
+          <div>
+            <span class="p5-eyebrow">Workspace</span>
+            <span class="p5-title">Dashboard</span>
+          </div>
+          <span class="p5-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0 1 14.85-4.36L21 8M20.5 15a9 9 0 0 1-14.85 4.36L3 16"/></svg>
+            Sync stores
+          </span>
+        </div>
+
+        <div class="p5-kpis">
+          <div class="p5-kpi" style="background:#F0EEFF; border-color:#E3DFFC;">
+            <div class="head">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B4FE0" stroke-width="2"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.6a2 2 0 0 0 2-1.6L22 6H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg>
+              <span class="l" style="color:#5B4FE0;">Daily orders</span>
+            </div>
+            <span class="v">142</span>
+            <span class="n" style="color:#0F7A3D;">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="#0F7A3D"><path d="M12 4l8 10H4z"/></svg>
+              12% vs yesterday
+            </span>
+          </div>
+
+          <div class="p5-kpi" style="background:#EAF8EF; border-color:#D7F0DF;">
+            <div class="head">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0F7A3D" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><path d="M19 8v6M22 11h-6" stroke-linecap="round"/></svg>
+              <span class="l" style="color:#0F7A3D;">New customers</span>
+            </div>
+            <span class="v">38</span>
+            <span class="n">this week</span>
+          </div>
+
+          <div class="p5-kpi" style="background:#FDF4E3; border-color:#F8E8C8;">
+            <div class="head">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#96690A" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              <span class="l" style="color:#96690A;">Returning</span>
+            </div>
+            <span class="v">61%</span>
+            <span class="n">of this week's orders</span>
+          </div>
+
+          <!-- marketing spend: fixed — no misleading down-arrow, warm neutral tint, efficiency context instead of a fake trend -->
+          <div class="p5-kpi" style="background:#FCEEEC; border-color:#F6D9D4;">
+            <div class="head">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B03A2A" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+              <span class="l" style="color:#B03A2A;">Marketing spend</span>
+            </div>
+            <span class="v">AED 12.4k</span>
+            <span class="n">trailing 30d · 3.1x blended ROAS</span>
+          </div>
+        </div>
+
+        <div class="p5-chart-card">
+          <div class="p5-chart-title">Orders vs. new customers</div>
+          <div class="p5-chart-sub">Last 7 days</div>
+          <div class="chart-area5">
+            <svg class="chart-svg" viewBox="0 0 320 100" preserveAspectRatio="none" width="100%" height="100%">
+              <line x1="0" y1="25" x2="320" y2="25" stroke="#F0F1F3" stroke-width="1"/>
+              <line x1="0" y1="50" x2="320" y2="50" stroke="#F0F1F3" stroke-width="1"/>
+              <line x1="0" y1="75" x2="320" y2="75" stroke="#F0F1F3" stroke-width="1"/>
+              <polyline points="0,55 46,42 91,48 137,20 183,32 229,14 274,6 320,10" fill="none" stroke="#5B4FE0" stroke-width="2"/>
+              <polyline points="0,85 46,80 91,82 137,70 183,75 229,65 274,58 320,55" fill="none" stroke="#0F7A3D" stroke-width="2"/>
+              <circle cx="320" cy="10" r="3" fill="#5B4FE0"/>
+              <circle cx="320" cy="55" r="3" fill="#0F7A3D"/>
+            </svg>
+          </div>
+          <div class="chart-axis5">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
+        </div>
+
+        <div class="p5-table">
+          <div class="p5-trow">
+            <span class="a">#4821 · Fatima A.</span>
+            <span><span class="status-pill5" style="background:#E7F6EC; color:#0F7A3D;">Settled</span> &nbsp; AED 340</span>
+          </div>
+          <div class="p5-trow">
+            <span class="a">#4820 · Sara K.</span>
+            <span><span class="status-pill5" style="background:#FCF1D6; color:#8A6100;">Awaiting payout</span> &nbsp; AED 210</span>
+          </div>
+          <div class="p5-trow">
+            <span class="a">#4819 · Mona R.</span>
+            <span><span class="status-pill5" style="background:#FBE7E5; color:#A1291F;">Exception</span> &nbsp; AED 95</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="section" style="margin-top:14px; font-size:12px; opacity:0.75;">
+  Each tile's tint = 4% of its accent color as background, ~15% as border, label text recolored to match — everything else (number, icon stroke) stays the same weight as before. Marketing spend's icon/label went from red-implies-bad to a warm neutral tone, and the down-arrow (which was implying "spend decreasing = bad direction", which isn't even true here) was replaced with a real number: blended ROAS.
+</p>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>This is it — proceed to written design</h3><p>Lock this and move to the spec.</p></div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content"><h3>Still needs work</h3><p>Tell me what's off in the terminal.</p></div>
+  </div>
+</div>

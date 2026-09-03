@@ -17,33 +17,7 @@ const UPSERT_BATCH = 500;
 
 export const StoreInventoryRepository = {
   async upsertMany(rows: StoreInventoryRow[]): Promise<number> {
-    // const withSku = rows.filter((r) => r.sku);
-    // if (withSku.length === 0) return 0;
-
-    // // Some catalogs reuse one SKU across multiple variants (e.g. color-only
-    // // variants sharing a base SKU) — a single upsert() call can't touch the
-    // // same (store_id, sku) row twice, so keep the last-seen quantity per key.
-    // const bySkuKey = new Map<string, StoreInventoryRow>();
-    // for (const r of withSku) bySkuKey.set(`${r.storeId}|${r.sku}`, r);
-
-    // const dbRows = [...bySkuKey.entries()].map(([id, r]) => ({
-    //   id,
-    //   tenant_id: TENANT,
-    //   store_id: r.storeId,
-    //   sku: r.sku,
-    //   quantity: r.quantity,
-    //   product_title: r.productTitle,
-    //   product_status: r.productStatus,
-    //   synced_at: new Date().toISOString(),
-    // }));
-
-    // for (let i = 0; i < dbRows.length; i += UPSERT_BATCH) {
-    //   const chunk = dbRows.slice(i, i + UPSERT_BATCH);
-    //   const { error } = await supabase.from("store_inventory").upsert(chunk, { onConflict: "id" });
-    //   if (error) throw new Error(`store_inventory upsert failed: ${error.message}`);
-    // }
-    // return dbRows.length;
-
+    
     const withSku = rows
   .map((r) => ({ ...r, sku: r.sku.trim() }))
   .filter((r) => r.sku);

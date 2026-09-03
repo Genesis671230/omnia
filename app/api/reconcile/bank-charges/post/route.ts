@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const actor = String(body.actor ?? "founder");
   if (drafts.length === 0) return NextResponse.json({ error: "drafts required" }, { status: 400 });
 
-  // const accessToken = dryRun ? "" : "1000.189e853c9a15d09e69aa6302386b66e1.d72e917f794c234681f1f03714c66868";
+
   const accessToken = dryRun ? "" : await getAccessToken();
   const results: Result[] = [];
 

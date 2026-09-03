@@ -1,0 +1,185 @@
+<h2>Branded icon treatment</h2>
+<p class="subtitle">Swapped generic outline-library icons for a custom duotone mark set: gradient squircle badges, solid bespoke glyphs, and a repeating "notch" accent that ties every icon back to the OMNIA sidebar mark — reads as designed, not dropped in from Lucide.</p>
+
+<style>
+  .preview3 { width:100%; min-height: 440px; border-radius: 12px; overflow:hidden; position:relative; font-family: ui-sans-serif, system-ui, sans-serif; border:1px solid #E4E6EB; background:#fff; }
+  .p3-sidebar { position:absolute; top:0; left:0; bottom:0; width:170px; background:#0B0D12; display:flex; flex-direction:column; }
+  .p3-main { position:absolute; top:0; left:170px; right:0; bottom:0; padding: 22px 26px; }
+  .p3-brand { padding: 18px 16px 16px; display:flex; align-items:center; gap:9px; border-bottom:1px solid #171A22; }
+  .p3-mark { width:26px; height:26px; border-radius:8px; background:linear-gradient(135deg,#3D8BFF,#0072B2); position:relative; flex-shrink:0; }
+  .p3-mark::after { content:""; position:absolute; top:-2px; right:-2px; width:8px; height:8px; border-radius:2.5px; background:#0B0D12; border:2px solid #F0E442; }
+  .p3-brand-text { color:#EDEEF2; font-size:12.5px; font-weight:700; letter-spacing:0.13em; }
+  .p3-nav { padding: 10px 10px; display:flex; flex-direction:column; gap:2px; }
+  .p3-navitem { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:6px; font-size:12px; color:#8891A5; }
+  .p3-navitem.active { background:#171A22; color:#EDEEF2; font-weight:600; }
+
+  .p3-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; }
+  .p3-eyebrow { font-size:10px; letter-spacing:0.12em; font-weight:700; color:#6B7385; display:block; margin-bottom:5px; }
+  .p3-title { font-size:22px; font-weight:700; color:#12131A; }
+  .p3-btn { font-size:12px; padding:8px 14px; border-radius:7px; font-weight:600; background:#12131A; color:#fff; display:inline-flex; align-items:center; gap:6px; }
+
+  .p3-kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:20px; }
+  .p3-kpi { border-radius:14px; padding:16px; border:1px solid #ECEEF2; background:#fff; display:flex; flex-direction:column; gap:10px; position:relative; overflow:hidden; }
+  .p3-kpi:hover { box-shadow: 0 4px 14px rgba(18,19,26,0.06); }
+
+  /* the bespoke badge: gradient squircle + white glyph + repeating "notch" signature */
+  .glyph-badge { width:38px; height:38px; border-radius:11px; position:relative; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow: inset 0 -6px 10px rgba(0,0,0,0.12); }
+  .glyph-badge::after { content:""; position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:3px; background:#fff; border:2.5px solid var(--notch); }
+  .glyph-badge svg { position:relative; z-index:1; }
+
+  .p3-kpi .l { font-size:10.5px; font-weight:700; color:#6B7385; letter-spacing:0.02em; }
+  .p3-kpi .v { font-size:25px; font-weight:800; color:#12131A; font-variant-numeric: tabular-nums; }
+  .p3-kpi .n { font-size:10.5px; color:#8891A5; font-weight:600; display:flex; align-items:center; gap:4px; }
+
+  .p3-chart-card { border:1px solid #ECEEF2; border-radius:12px; padding:16px 18px; background:#fff; margin-bottom: 14px; }
+  .p3-chart-title { font-size:12px; font-weight:700; color:#12131A; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+  .bars3 { display:flex; align-items:flex-end; gap:10px; height:90px; }
+  .bar-col3 { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+  .bar3 { width:100%; max-width:22px; border-radius:4px 4px 0 0; }
+  .bar-label3 { font-size:9px; color:#8891A5; font-weight:600; }
+
+  .icon-key { display:flex; gap:16px; flex-wrap:wrap; margin: 14px 0 4px; font-size:11px; color:#6B7385; font-weight:600; }
+  .icon-key span { display:flex; align-items:center; gap:6px; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: branded glyph set on direction B</div>
+  <div class="mockup-body" style="padding:0;">
+    <div class="preview3">
+      <div class="p3-sidebar">
+        <div class="p3-brand">
+          <div class="p3-mark"></div>
+          <span class="p3-brand-text">OMNIA</span>
+        </div>
+        <div class="p3-nav">
+          <div class="p3-navitem active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
+            Dashboard
+          </div>
+          <div class="p3-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h2l2 12h11l2-8H7"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+            Orders
+          </div>
+          <div class="p3-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12a8 8 0 0 1 14-5.3L20 5v5h-5l1.6-1.6A6 6 0 1 0 18 12h2a8 8 0 0 1-16 0z"/></svg>
+            Reconciliation
+          </div>
+          <div class="p3-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2 12l20-9-8 20-3-8-9-3z"/></svg>
+            Marketing
+          </div>
+          <div class="p3-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7z"/><circle cx="18" cy="8" r="3" opacity="0.55"/></svg>
+            Customers
+          </div>
+        </div>
+      </div>
+
+      <div class="p3-main">
+        <div class="p3-header">
+          <div>
+            <span class="p3-eyebrow">WORKSPACE</span>
+            <span class="p3-title">Dashboard</span>
+          </div>
+          <span class="p3-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0 1 14.85-4.36L21 8M20.5 15a9 9 0 0 1-14.85 4.36L3 16"/></svg>
+            Sync stores
+          </span>
+        </div>
+
+        <div class="p3-kpis">
+          <!-- Daily orders: bespoke stacked-parcel glyph, blue gradient -->
+          <div class="p3-kpi">
+            <div class="glyph-badge" style="--notch:#F0E442; background:linear-gradient(135deg,#3D8BFF,#0058A6);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2L12 3z" fill="#fff" fill-opacity="0.92"/>
+                <path d="M12 3v9l8-4.8M12 12L4 7.2M12 12v9" stroke="#0058A6" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="l">DAILY ORDERS</span>
+            <span class="v">142</span>
+            <span class="n" style="color:#009E73;">▲ 12% vs yesterday</span>
+          </div>
+
+          <!-- New customers: bespoke burst + figure, green gradient -->
+          <div class="p3-kpi">
+            <div class="glyph-badge" style="--notch:#3D8BFF; background:linear-gradient(135deg,#26C99A,#00825F);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <circle cx="10" cy="9" r="4" fill="#fff" fill-opacity="0.92"/>
+                <path d="M3 21c0-4.4 3.1-7.5 7-7.5s7 3.1 7 7.5" fill="#fff" fill-opacity="0.92"/>
+                <path d="M18 5v5M15.5 7.5h5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="l">NEW CUSTOMERS</span>
+            <span class="v">38</span>
+            <span class="n">this week</span>
+          </div>
+
+          <!-- Returning: bespoke orbit-loop glyph, amber gradient -->
+          <div class="p3-kpi">
+            <div class="glyph-badge" style="--notch:#D55E00; background:linear-gradient(135deg,#FFB238,#C77A00);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <path d="M4.5 12a7.5 7.5 0 0 1 12.6-5.5" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
+                <path d="M19.5 12a7.5 7.5 0 0 1-12.6 5.5" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
+                <path d="M17.1 6.5h3.4V3" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6.9 17.5H3.5V21" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="l">RETURNING</span>
+            <span class="v">61%</span>
+            <span class="n">of this week's orders</span>
+          </div>
+
+          <!-- Marketing spend: bespoke rocket/trail glyph, vermillion gradient -->
+          <div class="p3-kpi">
+            <div class="glyph-badge" style="--notch:#26C99A; background:linear-gradient(135deg,#FF7A52,#B8420A);">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2c3 3 4.5 6.8 4.5 10.2 0 2-1 3.8-2.3 5.1L12 22l-2.2-4.7c-1.3-1.3-2.3-3.1-2.3-5.1C7.5 8.8 9 5 12 2z" fill="#fff" fill-opacity="0.92"/>
+                <circle cx="12" cy="10.5" r="2" fill="#B8420A"/>
+                <path d="M8.5 16.5L6 20M15.5 16.5L18 20" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="l">MARKETING SPEND</span>
+            <span class="v">12.4k</span>
+            <span class="n">AED · trailing 30d</span>
+          </div>
+        </div>
+
+        <div class="p3-chart-card">
+          <div class="p3-chart-title">
+            <span>Orders vs. new customers, last 7 days</span>
+            <span class="icon-key" style="margin:0;">
+              <span><svg width="9" height="9" viewBox="0 0 24 24" fill="#0058A6"><rect width="24" height="24" rx="6"/></svg>Orders</span>
+              <span><svg width="9" height="9" viewBox="0 0 24 24" fill="#00825F"><rect width="24" height="24" rx="6"/></svg>New customers</span>
+            </span>
+          </div>
+          <div class="bars3">
+            <div class="bar-col3"><div class="bar3" style="height:38px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:14px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Mon</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:52px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:20px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Tue</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:44px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:16px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Wed</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:66px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:26px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Thu</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:58px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:22px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Fri</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:70px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:30px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Sat</span></div>
+            <div class="bar-col3"><div class="bar3" style="height:76px; background:linear-gradient(180deg,#3D8BFF,#0058A6);"></div><div class="bar3" style="height:34px; background:linear-gradient(180deg,#26C99A,#00825F); margin-top:2px;"></div><span class="bar-label3">Sun</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="section" style="margin-top:14px; font-size:12px; opacity:0.75;">
+  Design signature: each badge is a gradient squircle (not a flat tint), the glyph is a custom filled shape (not a stroked stock icon), and every badge carries a small notch dot in the <em>next</em> metric's color — a repeating detail that only shows up if you designed the set as one family, which is what reads as "branded" rather than "picked from a library."
+</p>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>This works — proceed</h3><p>Lock this icon treatment and move to the written design.</p></div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content"><h3>Still needs work</h3><p>Tell me what's off in the terminal.</p></div>
+  </div>
+</div>

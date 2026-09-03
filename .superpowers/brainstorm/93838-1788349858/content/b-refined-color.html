@@ -1,0 +1,194 @@
+<h2>B, refined — colorblind-safe palette + icons</h2>
+<p class="subtitle">Same neutral-SaaS shell. Metrics now carry color <em>and</em> icon <em>and</em> shape, so nothing depends on red/green alone. Palette is Okabe–Ito, the standard colorblind-safe categorical set (deuteranopia/protanopia/tritanopia all tested).</p>
+
+<style>
+  .legend-row { display:flex; gap:14px; flex-wrap:wrap; margin: 10px 0 20px; padding: 12px 14px; background:#F7F8FA; border:1px solid #ECEEF2; border-radius: 10px; }
+  .legend-chip { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#3A4150; }
+  .legend-swatch { width:12px; height:12px; border-radius:3px; display:inline-block; }
+
+  .preview2 { width:100%; min-height: 420px; border-radius: 12px; overflow:hidden; position:relative; font-family: ui-sans-serif, system-ui, sans-serif; border:1px solid #E4E6EB; background:#fff; }
+  .p2-sidebar { position:absolute; top:0; left:0; bottom:0; width:170px; background:#0B0D12; display:flex; flex-direction:column; }
+  .p2-main { position:absolute; top:0; left:170px; right:0; bottom:0; padding: 22px 26px; }
+  .p2-brand { padding: 18px 18px 16px; color:#EDEEF2; font-size:13px; font-weight:700; letter-spacing:0.14em; border-bottom:1px solid #171A22; }
+  .p2-nav { padding: 10px 10px; display:flex; flex-direction:column; gap:2px; }
+  .p2-navitem { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:6px; font-size:12px; color:#8891A5; }
+  .p2-navitem.active { background:#171A22; color:#EDEEF2; font-weight:600; }
+  .p2-navitem svg { flex-shrink:0; }
+
+  .p2-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; }
+  .p2-eyebrow { font-size:10px; letter-spacing:0.12em; font-weight:700; color:#6B7385; display:block; margin-bottom:5px; }
+  .p2-title { font-size:22px; font-weight:700; color:#12131A; }
+  .p2-btn { font-size:12px; padding:8px 14px; border-radius:7px; font-weight:600; background:#12131A; color:#fff; display:inline-flex; align-items:center; gap:6px; }
+
+  .p2-kpis { display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:20px; }
+  .p2-kpi { border-radius:12px; padding:14px 16px; border:1px solid #ECEEF2; background:#fff; display:flex; flex-direction:column; gap:6px; position:relative; overflow:hidden; }
+  .p2-kpi .strip { position:absolute; top:0; left:0; right:0; height:3px; }
+  .p2-kpi .head { display:flex; align-items:center; gap:7px; }
+  .p2-kpi .icon-badge { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .p2-kpi .l { font-size:10.5px; font-weight:700; color:#6B7385; letter-spacing:0.02em; }
+  .p2-kpi .v { font-size:24px; font-weight:800; color:#12131A; font-variant-numeric: tabular-nums; }
+  .p2-kpi .n { font-size:10.5px; color:#8891A5; display:flex; align-items:center; gap:4px; font-weight:600; }
+
+  .p2-chart-card { border:1px solid #ECEEF2; border-radius:12px; padding:16px 18px; background:#fff; margin-bottom: 14px; }
+  .p2-chart-title { font-size:12px; font-weight:700; color:#12131A; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+  .bars { display:flex; align-items:flex-end; gap:10px; height:90px; }
+  .bar-col { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; }
+  .bar { width:100%; max-width:22px; border-radius:3px 3px 0 0; }
+  .bar-label { font-size:9px; color:#8891A5; font-weight:600; }
+
+  .p2-row { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border:1px solid #ECEEF2; border-radius:8px; margin-bottom:6px; background:#fff; }
+  .p2-row .a { font-size:12px; font-weight:600; color:#12131A; }
+  .p2-row .b { font-size:11px; color:#6B7385; font-weight:600; }
+  .status-dot { width:7px; height:7px; border-radius:2px; display:inline-block; margin-right:6px; }
+</style>
+
+<div class="legend-row">
+  <span class="legend-chip"><span class="legend-swatch" style="background:#0072B2;"></span>Blue — orders / info</span>
+  <span class="legend-chip"><span class="legend-swatch" style="background:#009E73;"></span>Green — new / growth</span>
+  <span class="legend-chip"><span class="legend-swatch" style="background:#E69F00;"></span>Amber — returning / attention</span>
+  <span class="legend-chip"><span class="legend-swatch" style="background:#D55E00;"></span>Vermillion — spend / risk</span>
+  <span class="legend-chip"><span class="legend-swatch" style="background:#CC79A7;"></span>Purple — reserved (5th series)</span>
+  <span class="legend-chip" style="opacity:0.7;">Every color is paired with an icon and a shape — never color alone.</span>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: Dashboard, direction B refined</div>
+  <div class="mockup-body" style="padding:0;">
+    <div class="preview2">
+      <div class="p2-sidebar">
+        <div class="p2-brand">OMNIA</div>
+        <div class="p2-nav">
+          <div class="p2-navitem active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            Dashboard
+          </div>
+          <div class="p2-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.6a2 2 0 0 0 2-1.6L22 6H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg>
+            Orders
+          </div>
+          <div class="p2-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            Reconciliation
+          </div>
+          <div class="p2-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+            Marketing
+          </div>
+          <div class="p2-navitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3" opacity="0.5"/></svg>
+            Customers
+          </div>
+        </div>
+      </div>
+
+      <div class="p2-main">
+        <div class="p2-header">
+          <div>
+            <span class="p2-eyebrow">WORKSPACE</span>
+            <span class="p2-title">Dashboard</span>
+          </div>
+          <span class="p2-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0 1 14.85-4.36L21 8M20.5 15a9 9 0 0 1-14.85 4.36L3 16"/></svg>
+            Sync stores
+          </span>
+        </div>
+
+        <div class="p2-kpis">
+          <div class="p2-kpi">
+            <span class="strip" style="background:#0072B2;"></span>
+            <div class="head">
+              <span class="icon-badge" style="background:#E7F1FA;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0072B2" stroke-width="2.4"><path d="M3 3h2l2.4 12.2a2 2 0 0 0 2 1.8h8.6a2 2 0 0 0 2-1.6L22 6H6"/><circle cx="9" cy="21" r="1"/><circle cx="18" cy="21" r="1"/></svg>
+              </span>
+              <span class="l">DAILY ORDERS</span>
+            </div>
+            <span class="v">142</span>
+            <span class="n" style="color:#009E73;">▲ 12% vs yesterday</span>
+          </div>
+
+          <div class="p2-kpi">
+            <span class="strip" style="background:#009E73;"></span>
+            <div class="head">
+              <span class="icon-badge" style="background:#E4F5EF;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#009E73" stroke-width="2.4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+              </span>
+              <span class="l">NEW CUSTOMERS</span>
+            </div>
+            <span class="v">38</span>
+            <span class="n">this week</span>
+          </div>
+
+          <div class="p2-kpi">
+            <span class="strip" style="background:#E69F00;"></span>
+            <div class="head">
+              <span class="icon-badge" style="background:#FCF1DE;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E69F00" stroke-width="2.4"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              </span>
+              <span class="l">RETURNING</span>
+            </div>
+            <span class="v">61%</span>
+            <span class="n">of this week's orders</span>
+          </div>
+
+          <div class="p2-kpi">
+            <span class="strip" style="background:#D55E00;"></span>
+            <div class="head">
+              <span class="icon-badge" style="background:#FBE7DC;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D55E00" stroke-width="2.4"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+              </span>
+              <span class="l">MARKETING SPEND</span>
+            </div>
+            <span class="v">12.4k</span>
+            <span class="n">AED · trailing 30d</span>
+          </div>
+        </div>
+
+        <div class="p2-chart-card">
+          <div class="p2-chart-title">
+            <span>Orders vs. new customers, last 7 days</span>
+            <span style="font-size:10px; color:#8891A5; font-weight:600;">▲ blue = orders &nbsp; ● green = new customers</span>
+          </div>
+          <div class="bars">
+            <div class="bar-col"><div class="bar" style="height:38px; background:#0072B2;"></div><div class="bar" style="height:14px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Mon</span></div>
+            <div class="bar-col"><div class="bar" style="height:52px; background:#0072B2;"></div><div class="bar" style="height:20px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Tue</span></div>
+            <div class="bar-col"><div class="bar" style="height:44px; background:#0072B2;"></div><div class="bar" style="height:16px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Wed</span></div>
+            <div class="bar-col"><div class="bar" style="height:66px; background:#0072B2;"></div><div class="bar" style="height:26px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Thu</span></div>
+            <div class="bar-col"><div class="bar" style="height:58px; background:#0072B2;"></div><div class="bar" style="height:22px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Fri</span></div>
+            <div class="bar-col"><div class="bar" style="height:70px; background:#0072B2;"></div><div class="bar" style="height:30px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Sat</span></div>
+            <div class="bar-col"><div class="bar" style="height:76px; background:#0072B2;"></div><div class="bar" style="height:34px; background:#009E73; margin-top:2px;"></div><span class="bar-label">Sun</span></div>
+          </div>
+        </div>
+
+        <div class="p2-row">
+          <span class="a"><span class="status-dot" style="background:#009E73;"></span>#4821 · Fatima A. · settled</span>
+          <span class="b">AED 340</span>
+        </div>
+        <div class="p2-row">
+          <span class="a"><span class="status-dot" style="background:#E69F00;"></span>#4820 · Sara K. · awaiting payout</span>
+          <span class="b">AED 210</span>
+        </div>
+        <div class="p2-row">
+          <span class="a"><span class="status-dot" style="background:#D55E00;"></span>#4819 · Mona R. · exception</span>
+          <span class="b">AED 95</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:20px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>This works — proceed</h3>
+      <p>Lock this direction (B + Okabe–Ito palette + icons) and move to the written design.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content">
+      <h3>Close, but adjust something</h3>
+      <p>Tell me what to change in the terminal — palette saturation, icon style, chart type, row-status colors, etc.</p>
+    </div>
+  </div>
+</div>
