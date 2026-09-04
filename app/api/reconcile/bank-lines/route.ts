@@ -69,13 +69,19 @@ export async function GET(request: Request) {
   const from = searchParams.get("from") || undefined;
   const to = searchParams.get("to") || undefined;
   const accountId = searchParams.get("accountId") || undefined;
-
   try {
     const lines = await BankRepository.listAll({ from, to });
-
+    
     const postingsByLine: Record<string, { status: string; zohoTransactionId: string | null; zohoStatus?: string }> = {};
+    console.log({from, to, accountId},"hbesharafere a")
 
-    if (zohoConfigured()) {
+    // dateStart/dateEnd are required by listZohoBankTransactions — an
+    // unbounded Zoho fetch here would page through the org's entire
+    // transaction history on every load. accountId stays optional (Zoho
+    // returns transactions across every account when it's omitted); no
+    // reason to 400 the whole tab just because the account map isn't
+    // configured yet.
+    if (zohoConfigured() && from && to) {
       const accessToken = await getAccessToken();
       // same window as `lines` — no mismatch possible
       const zohoTxns = await listZohoBankTransactions({ accountId, dateStart: from, dateEnd: to }, accessToken);

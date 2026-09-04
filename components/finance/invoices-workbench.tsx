@@ -16,9 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { PublishProgressDialog } from "./publish-progress-dialog";
+import { SheetMatchPanel } from "./sheet-match-panel";
+import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
 import type { WorkbenchInvoice, WorkbenchResponse, ZohoInvoiceStatus } from "@/lib/finance/types";
-
-type ZohoAccount = { account_id: string; account_name: string };
+import { SheetInsightsStrip } from "./sheet-insights-strip";
 
 const AED = new Intl.NumberFormat("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const aed = (n: number) => AED.format(n);
@@ -28,95 +29,6 @@ const STATUS_LABELS: Record<string, string> = {
   paid: "Paid", sent: "Sent", draft: "Draft", viewed: "Viewed", void: "Void",
 };
 
-type OrderGatewayResult = {
-  order_number: string;
-  gateway: string | null;
-  gateway_raw?: string | null;
-};
-const gatewayCache = new Map<string, string>();
-
-export async function getGatewaysForUnknownInvoices(
-  invoices: Array<{
-    orderNumber?: string | null;
-    gateway?: string | null;
-  }>
-): Promise<Map<string, string>> {
-  const unknownOrderNumbers = [
-    ...new Set(
-      invoices
-        .filter(
-          (invoice) =>
-            !invoice.gateway ||
-            invoice.gateway.toLowerCase() === "unknown"
-        )
-        .map((invoice) => invoice.orderNumber?.trim())
-        .filter(Boolean) as string[]
-    ),
-  ];
-
-  if (unknownOrderNumbers.length === 0) {
-    return new Map();
-  }
-
-  const result = new Map<string, string>();
-
-  const missing = unknownOrderNumbers.filter(
-    (number) => !gatewayCache.has(number)
-  );
-
-  // Use cached values immediately.
-  for (const number of unknownOrderNumbers) {
-    const cached = gatewayCache.get(number);
-
-    if (cached) {
-      result.set(number, cached);
-    }
-  }
-
-  if (missing.length === 0) {
-    return result;
-  }
-
-  const params = new URLSearchParams({
-    orderNumbers: missing.join(","),
-  });
-
-  const response = await fetch(
-    `/api/orders?${params.toString()}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Gateway lookup failed: ${response.status}`
-    );
-  }
-
-  const data = await response.json();
-
-  for (const order of data.orders ?? []) {
-    const number = String(order.order_number).trim();
-
-    const gateway =
-      order.gateway ||
-      order.gateway_raw ||
-      "Unknown";
-    console.log(gateway,"we have it")
-    gatewayCache.set(number, gateway);
-    result.set(number, gateway);
-  }
-
-  // Cache orders that weren't found too,
-  // so we don't repeatedly query missing orders.
-  for (const number of missing) {
-    if (!gatewayCache.has(number)) {
-      gatewayCache.set(number, "Unknown");
-      result.set(number, "Unknown");
-    }
-  }
-
-  return result;
-}
-
 const STATUS_TONE: Record<string, string> = {
   overdue: "bg-[#F9ECE7] text-[#A6472F] border-transparent",
   unpaid: "bg-[#F3EFE7] text-[#6F5325] border-transparent",
@@ -125,6 +37,8 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export function InvoicesWorkbench() {
+  const [mode, setMode] = useState<"manual" | "sheet">("manual");
+
   // Filters
   const [range, setRange] = useState<DateRange>({ from: subDays(new Date(), 7), to: new Date() });
   const [status, setStatus] = useState<ZohoInvoiceStatus | "all">("unpaid");
@@ -141,8 +55,10 @@ export function InvoicesWorkbench() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Publish setup
-  const [accounts, setAccounts] = useState<ZohoAccount[]>([]);
+  // Publish setup — deposit account list comes from the shared Zoho config
+  // context (fetched once per reconciliation visit, not by this tab).
+  const { config: zohoConfig } = useZohoSettings();
+  const accounts = zohoConfig?.bankAccounts ?? [];
   const [accountId, setAccountId] = useState("");
   const [publishDate, setPublishDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [customRef, setCustomRef] = useState("");
@@ -213,16 +129,14 @@ export function InvoicesWorkbench() {
   
     return result;
   }
-  // Load accounts once
+  // Default the deposit account to Zoho's configured bank account as soon
+  // as the shared config loads — but only if the user hasn't already
+  // picked one.
   useEffect(() => {
-    fetch("/api/integrations/zoho/account-config")
-      .then((r) => r.json())
-      .then((d) => {
-        setAccounts(d.bankAccounts ?? []);
-        setAccountId(d.effective?.bankAccountId ?? "");
-      })
-      .catch(() => {});
-  }, []);
+    if (!accountId && zohoConfig?.effective?.bankAccountId) {
+      setAccountId(zohoConfig.effective.bankAccountId);
+    }
+  }, [accountId, zohoConfig]);
   useEffect(() => {
     setPage(1);
   }, [range.from, range.to, status]);
@@ -358,6 +272,27 @@ export function InvoicesWorkbench() {
 
   return (
     <div className="space-y-4">
+      {/* ── Mode toggle ────────────────────────────────────────────── */}
+      <div className="inline-flex gap-1 rounded-lg border border-[#DBEAFE] bg-white p-1">
+        {(["manual", "sheet"] as const).map((m,i) => (
+          <button
+            key={i}
+            onClick={() => setMode(m)}
+            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+              mode === m ? "bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] text-white" : "text-[#64748B] hover:text-[#0F172A]"
+            }`}
+          >
+            {m === "manual" ? "Manual" : "From payments sheet"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "sheet" ? (
+        <SheetMatchPanel />
+      ) : (
+      <>
+
+      <SheetInsightsStrip/>
       {/* ── Filter bar ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#EAE3D6] bg-white p-3 shadow-sm">
         <DateRangePicker range={range} onChange={setRange} />
@@ -576,6 +511,8 @@ export function InvoicesWorkbench() {
           onClose={() => setPublishOpen(false)}
           onDone={onPublishDone}
         />
+      )}
+      </>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 // is actually still there (an accountant may have voided/edited it in Zoho
 // directly), and catches drift our own "posted" status can't see on its own.
 
-import { getAccessToken } from "@/lib/integrations/zoho"; // adjust path if getAccessToken/zohoConfigured actually live elsewhere
+
 
 const BOOKS_API_BASE = "https://www.zohoapis.com/books/v3";
 
@@ -19,7 +19,7 @@ export type ZohoBankTransaction = {
 };
 
 export async function listZohoBankTransactions(
-  params: { accountId?: string; dateStart?: string; dateEnd?: string },
+  params: { accountId?: string; dateStart: string; dateEnd: string },
   accessToken: string,
 ): Promise<ZohoBankTransaction[]> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;

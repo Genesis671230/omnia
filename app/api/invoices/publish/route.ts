@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
                 invoiceReferenceNumber: detail.order_number,
                 date,
                 accountId,
-                description: "Settlement for order " + detail.order_number,
+                description: "Settlement for order " + detail.customer_name.split(" ")[0],
                 bankCharges: 0,
                 customFields: [],
                 invoiceId:detail.invoice_id,

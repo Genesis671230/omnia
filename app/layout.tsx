@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Cormorant_Garamond, Noto_Sans_Arabic } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/sonner"
+import { QueryProvider } from "@/components/providers/query-provider"
 import "./globals.css"
 
 const notoSans = Noto_Sans_Arabic({ subsets: ["arabic"], variable: "--font-noto-sans" })
@@ -16,5 +17,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f7f3eb", width: "device-width", initialScale: 1 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`bg-background ${notoSans.variable} ${cormorant.variable}`}><body className="font-sans antialiased">{children}<Toaster richColors/><Analytics/></body></html>
+  return <html lang="en" className={`bg-background ${notoSans.variable} ${cormorant.variable}`}><body className="font-sans antialiased"><QueryProvider>{children}<Toaster richColors/></QueryProvider><Analytics/></body></html>
 }

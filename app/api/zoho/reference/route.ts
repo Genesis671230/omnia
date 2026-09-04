@@ -78,7 +78,6 @@ export async function GET(request: Request) {
       fetchZoho("/bankaccounts", token),
     ]);
 
-    console.log(token,"token")
     
     const taxes = await fetchTaxes("/settings/taxes", token)
 

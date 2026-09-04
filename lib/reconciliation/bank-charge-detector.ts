@@ -48,7 +48,7 @@ export function detectBankChargeDrafts(
     if (bucket) bucket.push(l);
     else byRef.set(key, [l]);
   }
-  console.log(settings,"hbesharafere a")
+
 
   const mappingReady = Boolean(settings.bankChargesAccountId && settings.bankAccountId);
   const drafts: BankChargeDraft[] = [];

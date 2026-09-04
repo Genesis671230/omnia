@@ -19,10 +19,9 @@ export function BankTransactionsTab({
   fromDate, toDate, onRange, zohoSettings, zohoAccounts,
 }: {
   fromDate: string; toDate: string; onRange: (from: string, to: string) => void;
-  zohoSettings: ZohoAccountMap; zohoAccounts: ZohoAccount[];
+  zohoSettings: Partial<ZohoAccountMap> | undefined; zohoAccounts: ZohoAccount[];
 }) {
   const settings = normalizeAccountMap(zohoSettings);
-  console.log(settings,"we have all ")
   // Bank-charges settings are on the same config blob but not yet in ZohoAccountMap.
 // Cast until you add these two fields to /api/integrations/zoho/account-config's
 // response type: bankChargesAccountId (Bank Fees and Charges) + vatStandard5Id (VAT 5%).
@@ -57,7 +56,7 @@ const syncWithZoho = async () => {
   setSyncing(true);
   try {
     const params = new URLSearchParams();
-    if (settings.bankAccountId) params.set("accountId", settings.bankAccountId);
+    if (settings.bankAccountId) params.set("accountId", "2330082000000236001");
     if (fromDate) params.set("from", fromDate);
     if (toDate) params.set("to", toDate);
     const res = await fetch(`/api/integrations/zoho/sync-bank-transactions?${params}`);
@@ -84,6 +83,7 @@ const syncWithZoho = async () => {
       const params = new URLSearchParams();
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
+      if (settings.bankAccountId) params.set("accountId", "2330082000000236001");
       const r = await fetch(`/api/reconcile/bank-lines?${params}`).then((x) => x.json());
       if (r.error) throw new Error(r.error);
       setLines(r.lines);
@@ -93,7 +93,11 @@ const syncWithZoho = async () => {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate]);
+    // The Zoho account config (and settings.bankAccountId with it) loads
+    // asynchronously after this component mounts — without it in the deps,
+    // this closure keeps the empty bankAccountId from the first render
+    // forever, and /api/reconcile/bank-lines now 400s without an accountId.
+  }, [fromDate, toDate, settings.bankAccountId]);
 
   useEffect(() => { load(); }, [load]);
 

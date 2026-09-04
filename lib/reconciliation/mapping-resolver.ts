@@ -75,10 +75,10 @@ export function normalizeZohoSettings(raw: Partial<ZohoSettings> | undefined | n
 /** Guards every field with a fallback so downstream code never hits `.property of undefined`. */
 export function normalizeAccountMap(raw: Partial<ZohoAccountMap> | undefined | null): ZohoAccountMap {
   return {
-    bankAccountId: raw?.bankAccountId ?? "",
+    bankAccountId: raw?.bankAccountId ?? "2330082000000236001",
     feeAccountId: raw?.feeAccountId ?? "",
     clearingByGateway: raw?.clearingByGateway ?? {},
-    defaultIncomeAccountId: raw?.defaultIncomeAccountId ?? "",
+    defaultIncomeAccountId: raw?.defaultIncomeAccountId ?? "2330082000000000409",
     expenseAccountByKind: raw?.expenseAccountByKind ?? {},
   };
 }

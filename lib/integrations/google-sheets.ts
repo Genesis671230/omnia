@@ -28,6 +28,17 @@ export function googleSheetsConfigured(): boolean {
   );
 }
 
+// Every function below takes an optional spreadsheetId, defaulting to the
+// dispatch sheet's env var — existing callers are unaffected. Other sheets
+// (e.g. the payments-tracking sheet in lib/finance/payments-sheet.ts) pass
+// their own id explicitly; same service account, just needs Editor access
+// shared on that sheet too.
+function resolveSpreadsheetId(spreadsheetId?: string): string {
+  const id = spreadsheetId || process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  if (!id) throw new Error("No spreadsheetId given and GOOGLE_SHEETS_SPREADSHEET_ID is not set");
+  return id;
+}
+
 function base64url(input: Buffer | string): string {
   return (Buffer.isBuffer(input) ? input : Buffer.from(input)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -61,10 +72,10 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.value;
 }
 
-export async function listTabNames(): Promise<string[]> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+export async function listTabNames(spreadsheetId?: string): Promise<string[]> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties.title`, {
+  const res = await fetch(`${SHEETS_API}/${id}?fields=sheets.properties.title`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -72,27 +83,34 @@ export async function listTabNames(): Promise<string[]> {
   return (json.sheets ?? []).map((s: { properties: { title: string } }) => s.properties.title);
 }
 
-let cachedTabNames: string[] | null = null;
+// Keyed by spreadsheetId — more than one sheet is read in-process now (the
+// dispatch sheet and the payments sheet), each with its own tab names.
+const cachedTabNamesBySheet = new Map<string, string[]>();
 
 // Real tab titles can carry stray leading/trailing whitespace (this sheet
 // has one literally named " Local orders") that silently 400s every API
 // call if hardcoded wrong. Resolve by trimmed/case-insensitive match against
 // the actual titles instead of assuming the logical name is the real one.
-export async function resolveTabName(logicalName: string): Promise<string> {
-  if (!cachedTabNames) cachedTabNames = await listTabNames();
-  const match = cachedTabNames.find((t) => t.trim().toLowerCase() === logicalName.trim().toLowerCase());
-  if (!match) throw new Error(`No tab found matching "${logicalName}" — actual tabs: ${cachedTabNames.join(", ")}`);
+export async function resolveTabName(logicalName: string, spreadsheetId?: string): Promise<string> {
+  const id = resolveSpreadsheetId(spreadsheetId);
+  let cached = cachedTabNamesBySheet.get(id);
+  if (!cached) {
+    cached = await listTabNames(id);
+    cachedTabNamesBySheet.set(id, cached);
+  }
+  const match = cached.find((t) => t.trim().toLowerCase() === logicalName.trim().toLowerCase());
+  if (!match) throw new Error(`No tab found matching "${logicalName}" — actual tabs: ${cached.join(", ")}`);
   return match;
 }
 
 // Row 1 of a tab — used to auto-map fields to whatever columns actually
 // exist rather than guessing a fixed column order against a live sheet the
 // whole team edits.
-export async function readHeaderRow(tabName: string): Promise<string[]> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+export async function readHeaderRow(tabName: string, spreadsheetId?: string): Promise<string[]> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
   const range = encodeURIComponent(`${tabName}!1:1`);
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values/${range}`, {
+  const res = await fetch(`${SHEETS_API}/${id}/values/${range}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -103,11 +121,11 @@ export async function readHeaderRow(tabName: string): Promise<string[]> {
 // Whole tab, header row included — used to find already-existing order
 // numbers before appending, so a system restart or backfill never creates a
 // duplicate row next to one Sinan/Yaseen already has.
-export async function readAllValues(tabName: string): Promise<string[][]> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+export async function readAllValues(tabName: string, spreadsheetId?: string): Promise<string[][]> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
   const range = encodeURIComponent(tabName);
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values/${range}`, {
+  const res = await fetch(`${SHEETS_API}/${id}/values/${range}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -117,10 +135,10 @@ export async function readAllValues(tabName: string): Promise<string[][]> {
 
 // Numeric sheetId (gid) by title — needed for structural operations
 // (batchUpdate) that the values API's tab-name-in-range addressing can't do.
-async function getSheetId(tabName: string): Promise<number> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+async function getSheetId(tabName: string, spreadsheetId?: string): Promise<number> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties(sheetId,title)`, {
+  const res = await fetch(`${SHEETS_API}/${id}?fields=sheets.properties(sheetId,title)`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -135,11 +153,11 @@ async function getSheetId(tabName: string): Promise<number> {
 // corrupted the dispatch sheet's header (see the comment on
 // appendOrderToDispatchSheet in dispatch-sheet.ts). A structural sheet
 // setting, not a data write; safe to call repeatedly (idempotent).
-export async function freezeHeaderRow(tabName: string): Promise<void> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+export async function freezeHeaderRow(tabName: string, spreadsheetId?: string): Promise<void> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
-  const sheetId = await getSheetId(tabName);
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+  const sheetId = await getSheetId(tabName, spreadsheetId);
+  const res = await fetch(`${SHEETS_API}/${id}:batchUpdate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -157,11 +175,11 @@ export async function freezeHeaderRow(tabName: string): Promise<void> {
   if (!res.ok) throw new Error(`Sheets freeze-header failed (${tabName}): ${json.error?.message || res.status}`);
 }
 
-export async function appendRow(tabName: string, row: (string | number)[]): Promise<void> {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+export async function appendRow(tabName: string, row: (string | number)[], spreadsheetId?: string): Promise<void> {
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
   const range = encodeURIComponent(`${tabName}!A1`);
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
+  const res = await fetch(`${SHEETS_API}/${id}/values/${range}:append?valueInputOption=USER_ENTERED`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ values: [row] }),
@@ -187,15 +205,15 @@ export function columnLetter(index: number): string {
 // fill in a handful of cells (payment confirmation) on a row this system
 // already appended, without touching anything else a human has since edited
 // on that row.
-export async function updateCells(tabName: string, updates: { row: number; col: number; value: string }[]): Promise<void> {
+export async function updateCells(tabName: string, updates: { row: number; col: number; value: string }[], spreadsheetId?: string): Promise<void> {
   if (updates.length === 0) return;
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+  const id = resolveSpreadsheetId(spreadsheetId);
   const token = await getAccessToken();
   const data = updates.map((u) => ({
     range: `${tabName}!${columnLetter(u.col)}${u.row}`,
     values: [[u.value]],
   }));
-  const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchUpdate`, {
+  const res = await fetch(`${SHEETS_API}/${id}/values:batchUpdate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),

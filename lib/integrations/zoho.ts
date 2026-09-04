@@ -203,9 +203,6 @@ async function refreshZohoAccessToken(): Promise<string> {
   const refreshToken = process.env.ZOHO_REFRESH_TOKEN!;
   const clientId = process.env.ZOHO_CLIENT_ID!;
   const clientSecret = process.env.ZOHO_CLIENT_SECRET!;
-console.log("refreshToken",refreshToken)
-console.log("clientId",clientId)
-console.log("clientSecret",clientSecret)
   const accountsUrl =
     process.env.ZOHO_ACCOUNTS_URL ?? "https://accounts.zoho.com";
 
