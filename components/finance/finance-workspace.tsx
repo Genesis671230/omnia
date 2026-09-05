@@ -41,7 +41,7 @@ import { CustomersPanel } from "@/components/finance/customers-panel";
 import { ReconView } from "@/components/finance/reconciliation/recon-view";
 import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-settings-panel";
 import { InvoicesWorkbench } from "@/components/finance/invoices-workbench";
-import { useReconciliation } from "@/lib/hooks/use-reconciliation";
+import { useReconciliation } from "@/lib/hooks/use-reconciliation-query";
 import { ZohoSettingsProvider } from "@/lib/hooks/use-zoho-settings";
 import type { ReconPayload } from "@/components/finance/reconciliation/types";
 

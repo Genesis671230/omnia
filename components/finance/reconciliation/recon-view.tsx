@@ -12,6 +12,7 @@ import { BankTransactionsTab } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
 import { gatewayFilterOptionsFromZohoAccounts, regionForLine } from "@/lib/reconciliation/gateway-filter";
+import { getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
 
 /* The reconciliation surface: filters → tabs → grouped rows, or Insights.
  *
@@ -85,7 +86,26 @@ export function ReconView({
   }), [searched]);
 
   const visible: ReconLine[] = buckets[tab];
-  const groups = useMemo(() => groupLines(visible, groupMode), [visible, groupMode]);
+
+  const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
+  const columns = useMemo<ColumnDef<ReconLine>[]>(() => [
+    { id: "date", accessorFn: (r) => r.date ?? "" },
+    { id: "bankAmount", accessorFn: (r) => r.bankAmount },
+    { id: "provider", accessorFn: (r) => r.provider },
+  ], []);
+  const table = useReactTable({
+    data: visible,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+  // Sorting only reorders the flat ("All credits") view — grouped modes
+  // (by gateway/state/day) already impose their own order via groupLines,
+  // and re-sorting within each group is a separate, later decision.
+  const sortedVisible = groupMode === "none" ? table.getRowModel().rows.map((r) => r.original) : visible;
+  const groups = useMemo(() => groupLines(sortedVisible, groupMode), [sortedVisible, groupMode]);
 
   const toggleGroup = (key: string) => {
     const next = new Set(collapsed);
@@ -142,6 +162,25 @@ export function ReconView({
           ))}
         </div>
       )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[12px] text-[#8A8175]">
+        <span className="mr-1">Sort:</span>
+        {(["date", "bankAmount", "provider"] as const).map((col) => {
+          const active = sorting[0]?.id === col;
+          return (
+            <button
+              key={col}
+              onClick={() => setSorting([{ id: col, desc: active ? !sorting[0].desc : true }])}
+              className={`rounded-full border px-2.5 py-1 font-medium transition-colors ${
+                active ? "border-[#B08343] bg-[#FBF3E6] text-[#6F5325]" : "border-[#EAE3D6] bg-white hover:border-[#D6CCBA]"
+              }`}
+            >
+              {col === "bankAmount" ? "Amount" : col === "provider" ? "Gateway" : "Date"}
+              {active && (sorting[0].desc ? " ↓" : " ↑")}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-1.5">
         {TABS.map(([k, label, n]) => (
