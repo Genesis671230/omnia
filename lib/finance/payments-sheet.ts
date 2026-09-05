@@ -48,6 +48,7 @@
 
 import { resolveTabName, readAllValues } from "@/lib/integrations/google-sheets";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
+import { PaymentSheetMonthsRepository, type PaymentSheetMonth } from "@/lib/repositories/payment-sheet-months.repository";
 import type { PartyInfo, PaymentSheetRow, SheetTabKey } from "@/lib/finance/payments-sheet-insights";
 
 export * from "@/lib/finance/payments-sheet-insights";
@@ -293,6 +294,22 @@ export async function readAllPaymentRows(spreadsheetId?: string): Promise<Paymen
   const id = resolveId(spreadsheetId);
   const [smsa, local] = await Promise.all([readTab("smsa", id), readTab("local", id)]);
   return [...smsa, ...local];
+}
+
+// Every row across every registered month's spreadsheet, fetched in
+// parallel. A single month's read failing (bad/revoked sharing on one
+// spreadsheet, say) does not need to sink every other month — but for now
+// this surfaces any failure immediately (Promise.all) so a broken month is
+// visible rather than silently missing from the dashboard; if that proves
+// too strict in practice, switching to Promise.allSettled with a per-month
+// error list is the natural next step, not a silent partial result.
+export async function readAllPaymentRowsAllMonths(): Promise<{
+  months: PaymentSheetMonth[];
+  rows: PaymentSheetRow[];
+}> {
+  const months = await PaymentSheetMonthsRepository.list();
+  const perMonth = await Promise.all(months.map((m) => readAllPaymentRows(m.spreadsheetId)));
+  return { months, rows: perMonth.flat() };
 }
 
 // Rows where ops has confirmed payment receipt — candidates for the sheet
