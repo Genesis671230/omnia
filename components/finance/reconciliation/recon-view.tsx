@@ -10,6 +10,7 @@ import { InsightsTab } from "./insights-tab";
 import { BankTransactionsTab } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
+import { gatewayFilterOptionsFromZohoAccounts, regionForLine } from "@/lib/reconciliation/gateway-filter";
 
 /* The reconciliation surface: filters → tabs → grouped rows, or Insights.
  *
@@ -40,14 +41,30 @@ export function ReconView({
   const [query, setQuery] = useState("");
   const [groupMode, setGroupMode] = useState<GroupMode>("gateway");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [gatewayFilter, setGatewayFilter] = useState<string | null>(null); // null = All gateways
 
   const lines = useMemo(() => recon?.lines ?? [], [recon]);
   const postings = recon?.zohoPostings ?? {};
   const { config: zohoConfig } = useZohoSettings();
 
+  const gatewayOptions = useMemo(
+    () => gatewayFilterOptionsFromZohoAccounts(zohoConfig?.allAccounts ?? []),
+    [zohoConfig],
+  );
+
+  const gatewayFiltered = useMemo(() => {
+    if (!gatewayFilter) return lines;
+    const opt = gatewayOptions.find((o) => o.key === gatewayFilter);
+    if (!opt) return lines;
+    return lines.filter((l) => l.provider === opt.gateway && regionForLine(l) === opt.region);
+  }, [lines, gatewayFilter, gatewayOptions]);
+
   // Search first, then the tab — so a tab's count always describes what the
   // search left behind, never the unfiltered set.
-  const searched = useMemo(() => lines.filter((l) => matchesQuery(l, query)), [lines, query]);
+  const searched = useMemo(
+    () => gatewayFiltered.filter((l) => matchesQuery(l, query)),
+    [gatewayFiltered, query],
+  );
 
   const buckets = useMemo(() => ({
     all: searched,
@@ -94,6 +111,34 @@ export function ReconView({
         groupMode={groupMode} onGroupMode={setGroupMode}
         resultCount={searched.length} totalCount={lines.length}
       />
+
+      {gatewayOptions.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setGatewayFilter(null)}
+            className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
+              gatewayFilter === null
+                ? "border-[#1F1B16] bg-[#1F1B16] text-[#FBF8F1]"
+                : "border-[#EAE3D6] bg-white text-[#8A8175] hover:border-[#D6CCBA] hover:text-[#1F1B16]"
+            }`}
+          >
+            All gateways
+          </button>
+          {gatewayOptions.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setGatewayFilter(gatewayFilter === opt.key ? null : opt.key)}
+              className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
+                gatewayFilter === opt.key
+                  ? "border-[#1F1B16] bg-[#1F1B16] text-[#FBF8F1]"
+                  : "border-[#EAE3D6] bg-white text-[#8A8175] hover:border-[#D6CCBA] hover:text-[#1F1B16]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-1.5">
         {TABS.map(([k, label, n]) => (
