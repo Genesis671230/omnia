@@ -70,6 +70,9 @@ export type PeriodStats = {
   /** "Returns" and "cancelled" collapse to one metric — the sheet has a
    *  single "Cancelled / Refunded Amount" column, no signal to split them. */
   cancelled: { count: number; amountAed: number };
+  grossAed: number;
+  feesAed: number;
+  netAed: number;
 };
 
 export type SheetInsights = {
@@ -95,7 +98,22 @@ export type SheetInsightsResponse = SheetInsights & {
 };
 
 export function emptyPeriodStats(): PeriodStats {
-  return { totalOrders: 0, received: { count: 0, amountAed: 0 }, pending: { count: 0 }, exchange: { count: 0 }, cancelled: { count: 0, amountAed: 0 } };
+  return {
+    totalOrders: 0, received: { count: 0, amountAed: 0 }, pending: { count: 0 },
+    exchange: { count: 0 }, cancelled: { count: 0, amountAed: 0 },
+    grossAed: 0, feesAed: 0, netAed: 0,
+  };
+}
+
+// Gross prefers the gateway's own reported figure (Task 3) over Omnia's FX
+// estimate (amountAed) when present; net trusts the sheet's own Amount
+// After Deduction exactly when present, only deriving gross-fees as a
+// fallback (never a guessed/estimated figure when a real one is missing).
+function grossFeeNetForRow(row: PaymentSheetRow): { gross: number; fees: number; net: number } {
+  const gross = row.gatewayGrossAed ?? row.amountAed;
+  const fees = row.feeDeductedAed;
+  const net = row.netAfterFeeAed ?? +(gross - fees).toFixed(2);
+  return { gross, fees, net };
 }
 
 // A row can be exchange AND received (paid) AND have a cancelled amount
@@ -112,6 +130,11 @@ function addRowToStats(stats: PeriodStats, row: PaymentSheetRow): void {
   if (row.isExchange) stats.exchange.count++;
   if (isReceived) { stats.received.count++; stats.received.amountAed += row.amountAed; }
   else if (!isCancelled) stats.pending.count++;
+
+  const { gross, fees, net } = grossFeeNetForRow(row);
+  stats.grossAed += gross;
+  stats.feesAed += fees;
+  stats.netAed += net;
 }
 
 // Dubai-local (UTC+4) day boundaries, matching the convention already used
@@ -155,6 +178,9 @@ export type GatewayBreakdownRow = {
   pending: { count: number };
   exchange: { count: number };
   cancelled: { count: number; amountAed: number };
+  grossAed: number;
+  feesAed: number;
+  netAed: number;
 };
 
 function inDateWindow(row: PaymentSheetRow, from: string | null, to: string | null): boolean {
@@ -177,7 +203,10 @@ export function computeGatewayBreakdown(rows: PaymentSheetRow[], from: string | 
     const key = row.gatewayLabel ?? "Unresolved";
     let bucket = byGateway.get(key);
     if (!bucket) {
-      bucket = { gatewayLabel: key, totalOrders: 0, received: { count: 0, amountAed: 0 }, pending: { count: 0 }, exchange: { count: 0 }, cancelled: { count: 0, amountAed: 0 } };
+      bucket = {
+        gatewayLabel: key, totalOrders: 0, received: { count: 0, amountAed: 0 }, pending: { count: 0 },
+        exchange: { count: 0 }, cancelled: { count: 0, amountAed: 0 }, grossAed: 0, feesAed: 0, netAed: 0,
+      };
       byGateway.set(key, bucket);
     }
     bucket.totalOrders++;
@@ -187,6 +216,11 @@ export function computeGatewayBreakdown(rows: PaymentSheetRow[], from: string | 
     if (row.isExchange) bucket.exchange.count++;
     if (isReceived) { bucket.received.count++; bucket.received.amountAed += row.amountAed; }
     else if (!isCancelled) bucket.pending.count++;
+
+    const { gross, fees, net } = grossFeeNetForRow(row);
+    bucket.grossAed += gross;
+    bucket.feesAed += fees;
+    bucket.netAed += net;
   }
 
   return [...byGateway.values()].sort((a, b) => b.totalOrders - a.totalOrders);
@@ -208,4 +242,22 @@ export function listExchangeRows(rows: PaymentSheetRow[], from: string | null, t
   return rows
     .filter((r) => r.isExchange && r.orderNumber && inDateWindow(r, from, to))
     .map((r) => ({ tab: r.tab, rowNumber: r.rowNumber, orderNumber: r.orderNumber!, date: r.date, saleType: r.saleType, gatewayLabel: r.gatewayLabel }));
+}
+
+export type FeeRanking = {
+  best: { gatewayLabel: string; feePercent: number } | null;
+  worst: { gatewayLabel: string; feePercent: number } | null;
+};
+
+// "Highest/lowest, based on the analytics" = best/worst gateway by fee % —
+// confirmed with the founder. Only gateways that actually processed volume
+// (grossAed > 0) are eligible, so a gateway with nothing run through it
+// this period can never spuriously win or lose on a 0/0 fee percent.
+export function bestWorstGatewayByFeePercent(breakdown: GatewayBreakdownRow[]): FeeRanking {
+  const eligible = breakdown
+    .filter((b) => b.grossAed > 0)
+    .map((b) => ({ gatewayLabel: b.gatewayLabel, feePercent: +((b.feesAed / b.grossAed) * 100).toFixed(2) }));
+  if (eligible.length === 0) return { best: null, worst: null };
+  const sorted = [...eligible].sort((a, b) => a.feePercent - b.feePercent);
+  return { best: sorted[0], worst: sorted[sorted.length - 1] };
 }
