@@ -155,7 +155,7 @@ export function parseStripeCsv(text: string, filename: string): ParsedPayout[] {
 const PAYOUT_ID_RE = /PAYOUT\s*ID\s*(\d+)/i;
 const FNAME_ID_RE = /(\d{6,})/;
 
-export function parseTelrXls(buf: Buffer | ArrayBuffer, filename: string): ParsedPayout[] {
+export function parseTelrXls(buf: Buffer | ArrayBuffer, filename: string, provider: Gateway = "Telr"): ParsedPayout[] {
   const wb = XLSX.read(buf, { type: buf instanceof ArrayBuffer ? "array" : "buffer" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
@@ -267,9 +267,17 @@ export function parseTelrXls(buf: Buffer | ArrayBuffer, filename: string): Parse
     }
   }
 
+  // This exact file shape (banner + CartID + Auth/Settlement pairs + MDR/
+  // Fees/Tax/Net) is also what the store's Network-rail card settlements use
+  // for Stripe-classified bank credits (see BANK_DESCRIPTOR_RULES' "NETWORK"
+  // → "Stripe" rule in lib/gateways.ts) — same computation, different
+  // provider tag. NETWORK- (not STRIPE-) keeps this out of recon-row.tsx's
+  // `isStripe` live-API-proof path, which only real STRIPE-po_… ids should
+  // trigger; this file's own transactions[] should render directly instead.
+  const idPrefix = provider === "Stripe" ? "NETWORK" : "TELR";
   return [{
-    id: `TELR-${payoutId}`,
-    provider: "Telr",
+    id: `${idPrefix}-${payoutId}`,
+    provider,
     net:   +net.toFixed(2),
     gross: +gross.toFixed(2),
     fees:  +fees.toFixed(2),
@@ -826,7 +834,11 @@ export function parsePayoutFile(
   }
 
   if (/PAYOUT\s*ID\s*\d/.test(sniff) || (sniff.includes("CARTID") && sniff.includes("NET"))) {
-    return parseTelrXls(buffer, filename);
+    // This file shape is shared by Telr and the Network-rail Stripe
+    // settlement export — only the hint disambiguates which one it is.
+    // Any other hint (Tabby/Tamara/Checkout/COD/undefined) keeps today's
+    // default of tagging it Telr, since that's the shape's primary source.
+    return parseTelrXls(buffer, filename, hint === "Stripe" ? "Stripe" : "Telr");
   }
   if (sniff.includes("TAMARA")) return parseTamaraXlsx(buffer, filename);
   if (sniff.includes("TABBY") || sniff.includes("TRANSFERRED AMOUNT")) return parseTabbyXlsx(buffer, filename);
