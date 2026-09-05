@@ -92,7 +92,11 @@ export function ReconRow({ r, isFounder, posting, onConfirm, refresh, uploadSlot
   refresh: () => void;
   uploadSlot: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  // Rows open by default now — a founder scanning the list should see each
+  // payout's per-order transaction breakdown directly, not need to click a
+  // dropdown first. The chevron toggle stays for anyone who wants to
+  // collapse a row back down (e.g. to scan just the chain-link summary).
+  const [open, setOpen] = useState(true);
   const [showZoho, setShowZoho] = useState(false);
   const [flagging, setFlagging] = useState(false);
   const [flagged, setFlagged] = useState(r.reviewFlag);
