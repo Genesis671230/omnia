@@ -41,6 +41,25 @@ export type PaymentSheetRow = {
   amountAed: number;
   cancelledAmount: number;
   isDuplicateFlagged: boolean;
+  /** The gateway's own reported gross for this order (SMSA's "Total Amt
+   *  from Gateway") — more accurate than amountAed for Gross Sales when
+   *  present, since amountAed is Omnia's own FX estimate and this is the
+   *  gateway's actual converted figure. Null when the column is absent or
+   *  blank on this row (older rows, or a month registered before this
+   *  column existed) — never derived/guessed. */
+  gatewayGrossAed: number | null;
+  /** "Fee Deducted" — 0 when absent (never null; a fee genuinely is 0 when
+   *  not yet confirmed, so this participates in sums safely by default). */
+  feeDeductedAed: number;
+  /** "Amount After Deduction" — null when absent. Callers that need a net
+   *  figure and get null should derive gatewayGrossAed - feeDeductedAed
+   *  themselves rather than this file silently doing it, so it's always
+   *  clear which figure is the sheet's own vs. computed. */
+  netAfterFeeAed: number | null;
+  /** "Fee%" (SMSA) / "% Charged" (Local) as literally entered in the sheet
+   *  — null when absent. Not the same as a computed fee percentage; kept
+   *  separate so a discrepancy between the two is visible, not hidden. */
+  feePercentRaw: number | null;
 };
 
 export type PeriodStats = {

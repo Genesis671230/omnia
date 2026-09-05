@@ -182,11 +182,14 @@ function headerIndex(headers: string[], name: string): number {
 const TAB_COLUMNS: Record<SheetTabKey, {
   order: string; party: string; saleType: string; status: string; received: string;
   date: string; amount: string; cancelled: string; currency: string | null;
+  gatewayGross: string | null; feeDeducted: string | null; netAfterFee: string | null; feePercent: string | null;
 }> = {
   smsa: {
     order: "Order #", party: "Party", saleType: "Part", status: "Actual Payment Status",
     received: "Payment Received Date", date: "Date", amount: "In AED",
     cancelled: "Cancelled / Refunded Amount", currency: "Currency",
+    gatewayGross: "Total Amt from Gateway", feeDeducted: "Fee Deducted",
+    netAfterFee: "Amount After Deduction", feePercent: "Fee%",
   },
   // Local orders is UAE-only (single currency) — "Total" is its order-total
   // column, there's no separate original/AED split like SMSA has, and no
@@ -195,6 +198,7 @@ const TAB_COLUMNS: Record<SheetTabKey, {
     order: "Order #", party: "Party", saleType: "Type of Sale", status: "Actual Payment Status",
     received: "Payment Received on", date: "Date", amount: "Total",
     cancelled: "Cancelled / Refunded Amount", currency: null,
+    gatewayGross: null, feeDeducted: "Fee Deducted", netAfterFee: "Amount After Deduction", feePercent: "% Charged",
   },
 };
 
@@ -215,12 +219,27 @@ async function readTab(key: SheetTabKey, spreadsheetId: string): Promise<Payment
     amount: headerIndex(headers, cols.amount),
     cancelled: headerIndex(headers, cols.cancelled),
     currency: cols.currency ? headerIndex(headers, cols.currency) : -1,
+    gatewayGross: cols.gatewayGross ? headerIndex(headers, cols.gatewayGross) : -1,
+    feeDeducted: cols.feeDeducted ? headerIndex(headers, cols.feeDeducted) : -1,
+    netAfterFee: cols.netAfterFee ? headerIndex(headers, cols.netAfterFee) : -1,
+    feePercent: cols.feePercent ? headerIndex(headers, cols.feePercent) : -1,
     dup1: headerIndex(headers, "Duplicate customer"),
     dup2: headerIndex(headers, "Duplicate Check"),
   };
   if (idx.order === -1 || idx.party === -1 || idx.status === -1 || idx.received === -1) {
     throw new Error(`${SHEET_TABS[key]}: expected columns not found in header row (${headers.join(" | ")})`);
   }
+
+  // parseAmount() swallows both "blank" and "unparseable" to 0 (it's built
+  // for sums where that's the right default) — this needs to tell "the
+  // column says 0" apart from "the cell is blank/garbage", so it re-parses
+  // directly instead of reusing parseAmount's NaN-swallowing behavior.
+  const numOrNull = (raw: string | undefined): number | null => {
+    const v = (raw ?? "").trim();
+    if (!v) return null;
+    const n = Number(v.replace(/,/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
 
   const rows: PaymentSheetRow[] = [];
   for (let i = 1; i < values.length; i++) {
@@ -253,6 +272,10 @@ async function readTab(key: SheetTabKey, spreadsheetId: string): Promise<Payment
       amountAed: idx.amount !== -1 ? parseAmount(row[idx.amount]) : 0,
       cancelledAmount: idx.cancelled !== -1 ? parseAmount(row[idx.cancelled]) : 0,
       isDuplicateFlagged: Boolean((idx.dup1 !== -1 && row[idx.dup1]?.trim()) || (idx.dup2 !== -1 && row[idx.dup2]?.trim())),
+      gatewayGrossAed: idx.gatewayGross !== -1 ? numOrNull(row[idx.gatewayGross]) : null,
+      feeDeductedAed: idx.feeDeducted !== -1 ? parseAmount(row[idx.feeDeducted]) : 0,
+      netAfterFeeAed: idx.netAfterFee !== -1 ? numOrNull(row[idx.netAfterFee]) : null,
+      feePercentRaw: idx.feePercent !== -1 ? numOrNull(row[idx.feePercent]) : null,
     });
   }
   return rows;
