@@ -40,6 +40,7 @@ import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { CustomersPanel } from "@/components/finance/customers-panel";
 import { ReconView } from "@/components/finance/reconciliation/recon-view";
 import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-settings-panel";
+import { PaymentSheetMonthsPanel } from "@/components/finance/payment-sheet-months-panel";
 import { InvoicesWorkbench } from "@/components/finance/invoices-workbench";
 import { useReconciliation } from "@/lib/hooks/use-reconciliation-query";
 import { ZohoSettingsProvider } from "@/lib/hooks/use-zoho-settings";
@@ -417,7 +418,7 @@ function ReconciliationTabs({
           forceMount={visited.has("invoices") || undefined}
           className={activeTab === "invoices" ? "mt-0" : "mt-0 hidden"}
         >
-          {visited.has("invoices") && <InvoicesWorkbench />}
+          {visited?.has("invoices") && <InvoicesWorkbench />}
         </TabsContent>
       </Tabs>
     </ZohoSettingsProvider>
@@ -661,7 +662,10 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           ) : showOrders ? (
             <OrdersLedger />
           ) : view === "settings" ? (
-            <ZohoSettingsPanel />
+            <div className="space-y-6">
+              <ZohoSettingsPanel />
+              <PaymentSheetMonthsPanel />
+            </div>
           ) : (
             <ReconciliationTabs
               recon={recon}
