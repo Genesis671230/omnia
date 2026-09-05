@@ -7,6 +7,7 @@ import { ReconFilters } from "./recon-filters";
 import { ReconGroupHeader } from "./recon-group";
 import { ReconRow } from "./recon-row";
 import { InsightsTab } from "./insights-tab";
+import { PayoutSummaryBar } from "./payout-summary-bar";
 import { BankTransactionsTab } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
@@ -105,6 +106,8 @@ export function ReconView({
 
   return (
     <>
+      <PayoutSummaryBar lines={gatewayFiltered} />
+
       <ReconFilters
         query={query} onQuery={setQuery}
         fromDate={fromDate} toDate={toDate} onRange={onRange}
