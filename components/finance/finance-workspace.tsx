@@ -418,7 +418,7 @@ function ReconciliationTabs({
           forceMount={visited.has("invoices") || undefined}
           className={activeTab === "invoices" ? "mt-0" : "mt-0 hidden"}
         >
-          {visited?.has("invoices") && <InvoicesWorkbench />}
+          {visited.has("invoices") && <InvoicesWorkbench />}
         </TabsContent>
       </Tabs>
     </ZohoSettingsProvider>
