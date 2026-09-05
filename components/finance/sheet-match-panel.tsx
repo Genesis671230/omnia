@@ -103,15 +103,15 @@ export function SheetMatchPanel() {
   const matches = useMemo<ResolvedMatch[]>(() => {
     if (!data) return [];
     return data.matches.map((m) => {
-      const resolved = resolveZohoAccountForSheetRow(m.sheetGateway, m.sheetTab, m.region, allAccounts);
       const isCod = (m.sheetGateway ?? "").toLowerCase() === "cod";
-      const account = resolved ?? defaultAccount;
+      const resolved = resolveZohoAccountForSheetRow(m.sheetGateway, m.sheetTab, m.region, allAccounts);
+      const account = resolved ?resolved: defaultAccount;
       const effectiveFlags = [...m.flags];
       if (!resolved && !isCod) effectiveFlags.push("account-unresolved");
       return {
         ...m,
         resolvedAccountId: account?.account_id ?? null,
-        resolvedAccountName: account?.account_name ?? (isCod ? "Default account" : "No account resolved"),
+        resolvedAccountName: account?.account_name ?? (isCod ? "On Track" : "No account resolved"),
         effectiveFlags,
       };
     });

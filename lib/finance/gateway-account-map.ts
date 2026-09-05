@@ -37,6 +37,7 @@
 export type ZohoAccountRef = { account_id: string; account_name: string; account_type?: string };
 
 const CLEARING_ACCOUNT_TYPE = "payment_clearing";
+const COD_ACCOUNT_ID = "2330082000000257821";
 
 // Every non-UAE region token that can show up in an account name — used to
 // EXCLUDE region-specific accounts when resolving the "shared" (Local/UAE)
@@ -68,7 +69,7 @@ function clearingAccounts(accounts: ZohoAccountRef[]): ZohoAccountRef[] {
 
 // Gateways with exactly one clearing account, used no matter which sheet
 // tab or currency the order came from.
-const SHARED_GATEWAYS = new Set(["telr", "stripe", "checkout", "shopify"]);
+const SHARED_GATEWAYS = new Set(["telr", "stripe", "checkout", "shopify","cod"]);
 // Gateways whose clearing account genuinely differs by tab/region.
 const REGIONAL_GATEWAYS = new Set(["tabby", "tamara"]);
 
@@ -81,6 +82,11 @@ export function resolveZohoAccountForSheetRow(
   if (!gatewayCanonical) return null;
   const keyword = gatewayCanonical.toLowerCase();
   const pool = clearingAccounts(accounts);
+  if (keyword === "cod") {
+    return pool.find(
+      (a) => a.account_id === COD_ACCOUNT_ID
+    ) ?? null;
+  }
 
   if (SHARED_GATEWAYS.has(keyword)) {
     // Exclude any account that carries a non-UAE region token — this is
