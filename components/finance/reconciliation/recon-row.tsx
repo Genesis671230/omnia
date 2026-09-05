@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle, ArrowRight, BadgeCheck, BookCheck, Check, ChevronDown, Clock, Copy, Download,
-  FileSpreadsheet, Flag, HelpCircle, Landmark, Loader2, Lock, Package, RotateCcw, Upload,
+  FileSpreadsheet, Flag, HelpCircle, Landmark, Loader2, Lock, Package, RotateCcw, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { GatewayProof } from "./gateway-proof";
 import { ZohoPostDialog } from "./zoho-post-dialog";
 import { gatewayColor, STATE_COLORS } from "./colors";
@@ -92,6 +96,7 @@ export function ReconRow({ r, isFounder, posting, onConfirm, refresh, uploadSlot
   const [showZoho, setShowZoho] = useState(false);
   const [flagging, setFlagging] = useState(false);
   const [flagged, setFlagged] = useState(r.reviewFlag);
+  const [deleting, setDeleting] = useState(false);
 
   const meta = STATE_META[r.state];
   const Icon = STATE_ICON[r.state];
@@ -129,6 +134,22 @@ export function ReconRow({ r, isFounder, posting, onConfirm, refresh, uploadSlot
       toast.error((e as Error).message);
     } finally {
       setFlagging(false);
+    }
+  };
+
+  const deletePayout = async () => {
+    if (!r.payout) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/payouts/${encodeURIComponent(r.payout.id)}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Delete failed");
+      toast.success(`Payout ${r.payout.id} deleted — credit reverted to Awaiting payout`);
+      refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -323,6 +344,34 @@ export function ReconRow({ r, isFounder, posting, onConfirm, refresh, uploadSlot
               >
                 <Download size={14} /> Payout file
               </a>
+            )}
+
+            {r.payout && !r.confirmedBy && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#A6472F] transition-colors hover:border-[#A6472F] hover:bg-[#F9ECE7] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete payout
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this payout?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This removes {r.payout.id} and its per-order breakdown. The bank credit reverts to
+                      &quot;Awaiting payout&quot; so you can re-upload the correct file. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={deletePayout} className="bg-[#A6472F] hover:bg-[#8E3A25]">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
 
             <ActionButton icon={Copy} label="Copy reference" onClick={copyRef} />

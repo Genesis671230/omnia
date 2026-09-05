@@ -4,7 +4,22 @@ import type { ParsedPayout, PayoutTransactionShare } from "@/lib/parsers/payouts
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 
+// Factory (not just a plain method) so the delete-order contract —
+// payout_transactions before payouts, both scoped to id — is testable
+// against a fake client without a live database. PayoutsRepository.
+// deletePayout below is this, wired to the real supabase client.
+export function makeDeletePayout(client: typeof supabase) {
+  return async function deletePayout(id: string): Promise<void> {
+    const { error: txErr } = await client.from("payout_transactions").delete().eq("payout_id", id);
+    if (txErr) throw new Error(`payout_transactions delete failed: ${txErr.message}`);
+    const { error } = await client.from("payouts").delete().eq("id", id);
+    if (error) throw new Error(`payouts delete failed: ${error.message}`);
+  };
+}
+
 export const PayoutsRepository = {
+  deletePayout: makeDeletePayout(supabase),
+
   async upsertPayouts(payouts: ParsedPayout[]): Promise<number> {
     if (payouts.length === 0) return 0;
 
