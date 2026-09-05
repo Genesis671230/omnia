@@ -533,4 +533,16 @@ create table if not exists order_sync_runs (
 );
 create index if not exists order_sync_runs_started_idx on order_sync_runs (started_at desc);
 
+-- payment_sheet_months: registry mapping a calendar month to the Google
+-- Sheet spreadsheet id that holds that month's payments-tracking data —
+-- the founder confirmed each month is a genuinely separate spreadsheet
+-- file, not a tab within one continuously-growing sheet, so there is no
+-- way to auto-discover "this month's sheet" without the founder telling us
+-- its id once. See lib/finance/payments-sheet.ts's readAllPaymentRowsAllMonths.
+create table if not exists payment_sheet_months (
+  month_key      text primary key,  -- 'YYYY-MM', e.g. '2026-09'
+  spreadsheet_id text not null,
+  label          text not null,     -- e.g. 'September 2026'
+  created_at     timestamptz not null default now()
+);
 
