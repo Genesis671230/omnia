@@ -170,6 +170,113 @@
   border-color: var(--rule);
 }
 
+/* Integration marks — one ink, one optical weight across the whole rail */
+[data-ramza] .r-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-60);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+[data-ramza] .r-logo-word {
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+}
+[data-ramza] .r-logo-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.875rem 1.75rem;
+}
+[data-ramza] .r-logo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+}
+/* Dim the rail as a set, bring the hovered mark forward. Pointer-only, so
+   touch never leaves the rail stuck at half strength. */
+@media (hover: hover) {
+  [data-ramza] .r-logo-rail:hover .r-logo {
+    opacity: 0.45;
+  }
+  [data-ramza] .r-logo-rail .r-logo:hover {
+    opacity: 1;
+    color: var(--brand);
+  }
+}
+
+/* Texture: paper grain, ledger rules, engraved numerals, a cancelled stamp.
+   All procedural — no raster assets, so it costs nothing and stays crisp. */
+[data-ramza] .r-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  [data-ramza] .r-grain::after {
+    mix-blend-mode: overlay;
+    opacity: 0.35;
+  }
+}
+/* Ruled ledger paper — the horizontal rules a reconciliation lives on */
+[data-ramza] .r-ruled {
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 31px,
+    color-mix(in srgb, var(--rule) 70%, transparent) 31px,
+    color-mix(in srgb, var(--rule) 70%, transparent) 32px
+  );
+}
+/* A single hairline column rule, for the left margin of a ledger */
+[data-ramza] .r-margin-rule {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 2.25rem,
+    color-mix(in srgb, var(--stamp) 28%, transparent) 2.25rem,
+    color-mix(in srgb, var(--stamp) 28%, transparent) calc(2.25rem + 1px),
+    transparent calc(2.25rem + 1px)
+  );
+}
+/* Oversized engraved numeral / glyph used as a section watermark */
+[data-ramza] .r-engraved {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 600;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--brand) 22%, transparent);
+  user-select: none;
+  pointer-events: none;
+}
+/* Rubber-stamp motif — rotated, outlined, deliberately imperfect */
+[data-ramza] .r-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1.5px solid color-mix(in srgb, var(--ledger) 55%, transparent);
+  border-radius: 0.35rem;
+  color: color-mix(in srgb, var(--ledger) 88%, var(--ink));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+  opacity: 0.9;
+}
+[data-ramza] .r-stamp-overdue {
+  border-color: color-mix(in srgb, var(--stamp) 55%, transparent);
+  color: var(--stamp);
+}
+
 /* Dotted grid + halos + progress */
 [data-ramza] .r-dotgrid {
   background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
