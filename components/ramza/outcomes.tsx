@@ -21,30 +21,30 @@ export function Outcomes() {
         {OUTCOMES.map((o, i) => (
           <Reveal key={o.title} delay={i * 0.08}>
             <article className="r-glass r-grain relative h-full overflow-hidden rounded-2xl">
-              <div
-                aria-hidden
-                className="r-ruled r-margin-rule absolute inset-0 opacity-[0.55]"
-              />
+              <div aria-hidden className="r-ruled r-margin-rule absolute inset-0" />
 
-              <div className="relative z-[1] p-6 pl-12 sm:p-8 sm:pl-14">
-                <div className="flex items-start justify-between gap-4">
-                  <h3
-                    className="r-h2 text-[1.375rem] sm:text-[1.5rem]"
-                    style={{ color: "var(--ink)" }}
-                  >
-                    {o.title}
-                  </h3>
-                  <span className="r-stamp mt-1 shrink-0">{o.stamp}</span>
-                </div>
+              {/* Flex column with the checklist pushed down, so the two cards'
+                  bullet lists bottom-align however the headings wrap. */}
+              <div className="relative z-[1] flex h-full flex-col p-6 pl-12 sm:p-8 sm:pl-14">
+                {/* Stamp above the title, not beside it, so both headings get
+                    the full column and land on the same baseline across the
+                    pair however they wrap. */}
+                <span className="r-stamp">{o.stamp}</span>
+                <h3
+                  className="r-h2 mt-4 text-[1.375rem] sm:text-[1.5rem]"
+                  style={{ color: "var(--ink)", textWrap: "balance" }}
+                >
+                  {o.title}
+                </h3>
 
                 <p
-                  className="mt-4 text-[0.9375rem] leading-relaxed"
+                  className="mt-3 text-[0.9375rem] leading-relaxed"
                   style={{ color: "var(--ink-60)" }}
                 >
                   {o.body}
                 </p>
 
-                <ul className="mt-6 space-y-2.5">
+                <ul className="mt-6 space-y-2.5 pt-2 sm:mt-auto">
                   {o.points.map((p) => (
                     <li key={p} className="flex gap-2.5 text-[0.875rem] leading-relaxed">
                       <Check
