@@ -76,9 +76,9 @@ export function VideoIntro() {
           <p className="r-lead r-measure mt-4" style={{ color: "var(--ink-60)" }}>
             {VIDEO_INTRO_BODY}
           </p>
-          <p className="mt-5 text-[0.8125rem]" style={{ color: "var(--ink-40)" }}>
-            Runs 58 seconds. Real payout files, numbers changed.
-          </p>
+          {/* No duration or provenance claim here until the real walkthrough
+              is cut. public/ramza/intro.mp4 is currently a 47s stock clip,
+              not a product recording. */}
         </div>
 
         <div
@@ -133,9 +133,11 @@ export function VideoIntro() {
               className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-5 py-4 text-left"
             >
               <span className="text-[0.8125rem] font-semibold text-white/95">
-                March close, start to finish
+                Watch the walkthrough
               </span>
-              <span className="tnum text-[0.75rem] font-medium text-white/70">0:58</span>
+              <span className="text-[0.75rem] font-medium text-white/70">
+                Full screen
+              </span>
             </span>
           </button>
         </div>
@@ -166,6 +168,10 @@ function Lightbox({ onClose }: { onClose: () => void }) {
 
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    /* The sticky header carries its own backdrop-filter, which makes it its
+       own backdrop root and lets it stay sharp and bright through the scrim
+       even though it sits below it. Take it out of the picture instead. */
+    document.documentElement.setAttribute("data-ramza-modal", "open");
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -186,6 +192,7 @@ function Lightbox({ onClose }: { onClose: () => void }) {
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      document.documentElement.removeAttribute("data-ramza-modal");
     };
   }, [onClose]);
 

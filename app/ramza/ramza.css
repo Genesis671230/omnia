@@ -400,6 +400,13 @@
   }
 }
 
+/* Sticky chrome steps aside for a modal. */
+[data-ramza-modal="open"] [data-ramza] header {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
 [data-ramza] .r-lightbox,
 .r-lightbox {
   position: fixed;
@@ -409,9 +416,9 @@
   align-items: center;
   justify-content: center;
   padding: clamp(0.75rem, 4vw, 3rem);
-  background: rgba(6, 11, 30, 0.82);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  background: rgba(5, 9, 26, 0.93);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
   animation: r-fade 0.22s ease-out;
 }
 .r-lightbox-frame {
