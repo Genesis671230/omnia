@@ -11,13 +11,28 @@ export function Backdrop() {
         }}
       />
       <div className="r-dotgrid absolute inset-0 opacity-70" />
+      {/* Sized in vmax so the halos scale with the viewport instead of hanging
+          620px off a 390px phone, which pushed documentElement.scrollWidth to
+          628 and gave the page a horizontal scrollbar on mobile. */}
       <div
         className="r-halo"
-        style={{ width: 620, height: 620, top: -220, left: -160, background: "var(--halo-a)" }}
+        style={{
+          width: "min(620px, 90vw)",
+          height: "min(620px, 90vw)",
+          top: "-18vw",
+          left: "-14vw",
+          background: "var(--halo-a)",
+        }}
       />
       <div
         className="r-halo"
-        style={{ width: 520, height: 520, top: 240, right: -220, background: "var(--halo-b)" }}
+        style={{
+          width: "min(520px, 80vw)",
+          height: "min(520px, 80vw)",
+          top: "22vh",
+          right: "-16vw",
+          background: "var(--halo-b)",
+        }}
       />
     </div>
   );

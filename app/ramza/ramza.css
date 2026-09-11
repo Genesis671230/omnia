@@ -49,6 +49,9 @@
   color-scheme: light;
   background: var(--paper);
   color: var(--ink);
+  /* Belt and braces against a sideways scrollbar on phones: clip rather than
+     hidden, so sticky and fixed children still work. */
+  overflow-x: clip;
   font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -189,10 +192,14 @@
   align-items: center;
   gap: 0.875rem 1.75rem;
 }
+/* Tappable marks carry a 44px target even though the ink inside is small. */
 [data-ramza] .r-logo-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  min-height: 2.75rem;
+  padding-inline: 0.5rem;
+  margin-inline: -0.5rem;
   border-radius: 0.5rem;
 }
 /* Dim the rail as a set, bring the hovered mark forward. Pointer-only, so

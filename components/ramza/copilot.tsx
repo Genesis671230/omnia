@@ -30,7 +30,7 @@ export function Copilot() {
                   <button
                     onClick={() => setOpen(isOpen ? null : i)}
                     aria-expanded={isOpen}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors"
+                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors"
                     style={{
                       color: "var(--ink)",
                       background: isOpen

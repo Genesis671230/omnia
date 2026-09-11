@@ -87,12 +87,12 @@ export function Footer({
             >
               On this page
             </h2>
-            <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3">
+            <ul className="mt-2 grid grid-cols-2 gap-x-6">
               {NAV.map((l) => (
                 <li key={l.href}>
                   <a
                     href={l.href}
-                    className="text-[0.9375rem] transition-colors hover:text-[var(--brand)]"
+                    className="inline-flex min-h-11 items-center text-[0.9375rem] transition-colors hover:text-[var(--brand)]"
                     style={{ color: "var(--ink-60)" }}
                   >
                     {l.label}
@@ -134,7 +134,10 @@ export function Footer({
             &copy; {year} RAMZA. {legalLine}
           </p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <a href="/privacy" className="transition-colors hover:text-[var(--brand)]">
+            <a
+              href="/privacy"
+              className="-mx-1 inline-flex min-h-11 min-w-11 items-center justify-center px-1 transition-colors hover:text-[var(--brand)]"
+            >
               Privacy
             </a>
             <span>

@@ -166,7 +166,7 @@ export function AuditForm() {
                       type="button"
                       onClick={() => toggleGateway(g)}
                       aria-pressed={on}
-                      className="rounded-lg border px-3 py-1.5 text-sm transition-colors"
+                      className="inline-flex min-h-11 items-center rounded-lg border px-3.5 text-sm transition-colors"
                       style={{
                         borderColor: on ? "var(--ledger)" : "var(--rule)",
                         background: on
