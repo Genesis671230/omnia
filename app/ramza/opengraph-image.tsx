@@ -46,7 +46,9 @@ export default function OgImage() {
               padding: "16px 20px",
               fontSize: 26,
               background: "#ffffff",
-              width: "fit-content",
+              // Satori has no fit-content; alignSelf gets the same shrink-wrap
+              // and, unlike width:"fit-content", does not abort the build.
+              alignSelf: "flex-start",
             }}
           >
             <span style={{ color: "#5b6472" }}>Bank credit</span>
