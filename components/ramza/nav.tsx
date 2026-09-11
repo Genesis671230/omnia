@@ -7,6 +7,7 @@ import { CTA_PRIMARY } from "@/lib/ramza/copy";
 
 const LINKS = [
   { label: "How it works", href: "#how-it-works" },
+  { label: "What it produces", href: "#outcomes" },
   { label: "Integrations", href: "#integrations" },
   { label: "Pricing", href: "#pricing" },
 ];

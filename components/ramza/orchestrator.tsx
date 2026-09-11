@@ -56,7 +56,7 @@ export function Orchestrator() {
   }, [active, reduce]);
 
   return (
-    <Section field>
+    <Section>
       <SectionHeading>One orchestrator, four specialists</SectionHeading>
       <p className="r-lead r-measure mt-4" style={{ color: "var(--ink-60)" }}>
         {ORCHESTRATOR_INTRO}

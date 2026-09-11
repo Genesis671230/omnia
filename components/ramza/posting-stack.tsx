@@ -45,7 +45,7 @@ export function PostingStack() {
   }, [tick, reduce, maxTick]);
 
   return (
-    <Section>
+    <Section field>
       <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
         <div>
           <SectionHeading>Every line gets an account and a date</SectionHeading>

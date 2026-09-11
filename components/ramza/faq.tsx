@@ -10,7 +10,7 @@ export function Faq() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <Section id="faq" field>
+    <Section id="faq">
       <SectionHeading>Questions</SectionHeading>
       <div className="mt-8 max-w-3xl border-t r-hairline">
         {FAQ.map((item, i) => {

@@ -241,6 +241,40 @@ export const POSTING_ROWS: {
   { description: "Refund, order SA-4471", account: "Refunds payable", date: "11 Mar", amount: "AED 150.85", negative: true },
 ];
 
+/* What the reconciliation is actually for. Two outcomes, each backed by the
+   specific mechanics elsewhere on the page rather than by an adjective. */
+export const OUTCOMES_HEADING = "Reconciled books are the deliverable";
+export const OUTCOMES_INTRO =
+  "Matching payouts is the work. These are the two things it buys you, and both of them have a deadline attached.";
+
+export const OUTCOMES: {
+  stamp: string;
+  title: string;
+  body: string;
+  points: string[];
+}[] = [
+  {
+    stamp: "Tax ready",
+    title: "Tax-ready books",
+    body: "Every gateway fee is posted to bank charges with the VAT on the fee recorded as input tax, so the return is built from the ledger instead of reconstructed from statements the week it is due.",
+    points: [
+      "Gateway fees and the VAT on them split out per payout",
+      "AED and SAR held separately, FX difference booked",
+      "Nothing parked in a suspense or residual account",
+    ],
+  },
+  {
+    stamp: "Investor ready",
+    title: "Investor-ready financials",
+    body: "Revenue is recognised against the order that earned it, not the day the gateway happened to settle, so a month closes once and stays closed when a payout lands late.",
+    points: [
+      "Revenue on order date, cash on payout date, both available",
+      "Cross-month payouts split rather than dropped",
+      "Every exception listed with the reason it was left open",
+    ],
+  },
+];
+
 export const VIDEO_INTRO_HEADING = "See a month close in under a minute";
 export const VIDEO_INTRO_BODY =
   "A short walkthrough: payout files in, every line matched to the bank, fees and VAT split out, invoices closed in Zoho.";

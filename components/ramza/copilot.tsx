@@ -12,7 +12,7 @@ export function Copilot() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <Section field>
+    <Section>
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
         <div>
           <SectionHeading>RAMZA copilot</SectionHeading>

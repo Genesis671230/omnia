@@ -12,6 +12,7 @@ import { Orchestrator } from "@/components/ramza/orchestrator";
 import { PostingStack } from "@/components/ramza/posting-stack";
 import { AccountantView } from "@/components/ramza/accountant-view";
 import { Copilot } from "@/components/ramza/copilot";
+import { Outcomes } from "@/components/ramza/outcomes";
 import { Integrations } from "@/components/ramza/integrations";
 import { AuditForm } from "@/components/ramza/audit-form";
 import { FoundingPartners } from "@/components/ramza/founding-partners";
@@ -109,20 +110,24 @@ export default async function RamzaPage({
       />
 
       <Nav whatsappHref={wa} />
+      {/* Arc: name the pain, turn, show it, explain the mechanism, state the
+          payoff, prove compatibility, price it, clear objections, then ask.
+          The walkthrough sits after the turn so there is a reason to watch. */}
       <main>
         <Hero h1={h1} whatsappHref={wa} />
-        <VideoIntro />
         <PainStrip />
         <ContrastLine />
+        <VideoIntro />
         <HowItWorks />
         <Orchestrator />
         <AccountantView />
         <PostingStack />
         <Copilot />
+        <Outcomes />
         <Integrations />
-        <AuditForm />
         <FoundingPartners />
         <Faq />
+        <AuditForm />
       </main>
       <Footer whatsappHref={wa} email={EMAIL} legalLine={LEGAL_LINE} />
     </RamzaShell>

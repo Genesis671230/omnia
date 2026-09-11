@@ -346,6 +346,113 @@
   color: var(--brand);
 }
 
+/* Video card + lightbox */
+[data-ramza] .r-video-card {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  background: var(--panel);
+  transition: transform 0.45s cubic-bezier(0.22, 0.7, 0.3, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+@media (hover: hover) {
+  [data-ramza] .r-video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 46px 110px -34px rgba(16, 28, 78, 0.48);
+  }
+}
+[data-ramza] .r-video-play {
+  background: var(--ledger);
+  color: var(--ledger-ink);
+  box-shadow: 0 18px 42px -14px color-mix(in srgb, var(--ledger) 80%, transparent);
+  transition: transform 0.35s cubic-bezier(0.22, 0.7, 0.3, 1), opacity 0.35s ease;
+}
+@media (hover: hover) {
+  [data-ramza] .r-video-card:hover .r-video-play {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+/* A soft ring that pulses outward from the play button, so the card reads as
+   playable before anyone hovers it. */
+[data-ramza] .r-video-play::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--ledger) 60%, transparent);
+  animation: r-ring 2.8s cubic-bezier(0.22, 0.7, 0.3, 1) infinite;
+}
+@keyframes r-ring {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.75;
+  }
+  70%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+[data-ramza] .r-lightbox,
+.r-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.75rem, 4vw, 3rem);
+  background: rgba(6, 11, 30, 0.82);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  animation: r-fade 0.22s ease-out;
+}
+.r-lightbox-frame {
+  position: relative;
+  width: min(100%, 78rem);
+  aspect-ratio: 16 / 9;
+  max-height: 100%;
+  border-radius: 1rem;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 60px 140px -40px rgba(0, 0, 0, 0.8);
+  animation: r-zoom 0.28s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+.r-lightbox-close {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background-color 0.2s ease;
+}
+.r-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.r-lightbox-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+@keyframes r-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes r-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+}
+
 /* Status pills */
 [data-ramza] .r-pill {
   display: inline-flex;

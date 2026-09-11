@@ -92,7 +92,7 @@ export function AuditForm() {
   }
 
   return (
-    <Section id="audit">
+    <Section id="audit" field>
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
         <div>
           <SectionHeading>Free payout audit</SectionHeading>
