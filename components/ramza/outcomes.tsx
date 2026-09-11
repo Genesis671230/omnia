@@ -29,7 +29,9 @@ export function Outcomes() {
                 {/* Stamp above the title, not beside it, so both headings get
                     the full column and land on the same baseline across the
                     pair however they wrap. */}
-                <span className="r-stamp">{o.stamp}</span>
+                {/* self-start: the card is a flex column, which would
+                    otherwise stretch the stamp across the full width. */}
+                <span className="r-stamp self-start">{o.stamp}</span>
                 <h3
                   className="r-h2 mt-4 text-[1.375rem] sm:text-[1.5rem]"
                   style={{ color: "var(--ink)", textWrap: "balance" }}

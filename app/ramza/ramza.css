@@ -271,6 +271,9 @@
 [data-ramza] .r-stamp {
   display: inline-flex;
   align-items: center;
+  /* Never let a flex or grid parent stretch the stamp into a rule. */
+  align-self: flex-start;
+  width: fit-content;
   gap: 0.4rem;
   padding: 0.3rem 0.7rem;
   border: 1.5px solid color-mix(in srgb, var(--ledger) 55%, transparent);
