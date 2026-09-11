@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -90,7 +90,15 @@ export function PaymentSheetMonthsPanel() {
           {months.map((m) => (
             <div key={m.monthKey} className="flex items-center justify-between rounded-lg border border-[#EAE3D6] px-3 py-2 text-[12.5px]">
               <span className="font-medium text-[#1F1B16]">{m.label}</span>
-              <span className="text-[#8A8175]">{m.monthKey} · {m.spreadsheetId.slice(0, 12)}…</span>
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${m.spreadsheetId}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[#8A8175] hover:text-[#1F1B16]"
+                title="Open in Google Sheets"
+              >
+                {m.monthKey} · {m.spreadsheetId.slice(0, 12)}… <ExternalLink size={12} />
+              </a>
               <button
                 onClick={() => removeMutation.mutate(m.monthKey)}
                 disabled={removeMutation.isPending}

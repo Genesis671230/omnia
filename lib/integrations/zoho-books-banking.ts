@@ -5,6 +5,8 @@
 
 
 
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+
 const BOOKS_API_BASE = "https://www.zohoapis.com/books/v3";
 
 export type ZohoBankTransaction = {
@@ -32,7 +34,7 @@ export async function listZohoBankTransactions(
     if (params.dateStart) qs.set("date_start", params.dateStart);
     if (params.dateEnd) qs.set("date_end", params.dateEnd);
 
-    const res = await fetch(`${BOOKS_API_BASE}/banktransactions?${qs.toString()}`, {
+    const res = await zohoThrottledFetch(`${BOOKS_API_BASE}/banktransactions?${qs.toString()}`, {
       headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
       cache: "no-store",
     });

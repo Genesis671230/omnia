@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AccountingPro - FTA Accounting Software</title>
+    <link rel="stylesheet" 
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.minhref="https://cdnjs.cloudflare.com/ajax/libs/fon-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #fff;
+            padding: 150px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -100px;
+            left: 100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent, 
+rgba(255,255,255,0.2));
+            transition: 1s;
+        }
+
+        .hero h1 {
+            font-size: 4em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 15px 40px;
+            background: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            text-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            padding: 60px 20px;
+            background: #f8fafc;
+            color: #16213e;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .feature-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .feature-icon {
+            font-size: 2.5em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            padding: 60px 20px;
+            background: #f8fafc;
+            color: #16213e;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .use-cases {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            padding: 60px 20px;
+            background: #f8fafc;
+            color: #16213e;
+        }
+
+        .use-case {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .use-case:hover {
+            transform: translateY(-10px);
+        }
+
+        .demo-section {
+            background: white;
+            padding: 60px 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            color: #16213e;
+        }
+
+        .demo-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            cursor: pointer;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .floating-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: gradient(to right, #4CAF50, #45a049);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+
+        .floating-button a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .floating-button a:hover {
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero">
+            <div class="hero::after">
+                <p class="floating-button">+1 (555) 123-4567</p>
+            </div>
+            <h1>Transform Your Accounting</h1>
+            <p>Advanced FTA Accounting Software for Business Growth</p>
+            <a href="#" class="cta-button">Get Started</a>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features">
+            <div class="feature-card">
+                <img src="https://via.placeholder.com/300x200" 
+alt="Software icon">
+                <div class="feature-icon">ERP</div>
+                <h3>Full-Time Accounting Automation</h3>
+                <p>Streamline your invoicing, GL journals, and payroll 
+processing with AI-powered automation.</p>
+            </div>
+
+            <div class="feature-card">
+                <img src="https://via.placeholder.com/300x200" alt="Data 
+Analysis icon">
+                <div class="feature-icon">Analytics</div>
+                <h3>Cloud-Based FTA Solutions</h3>
+                <p>Secure, scalable, and reliable cloud-based accounting 
+solutions for businesses of all sizes.</p>
+            </div>
+
+            <div class="feature-card">
+                <img src="https://via.placeholder.com/300x200" 
+alt="Employee icon">
+                <div class="feature-icon">HR</div>
+                <h3>Payroll & HR Integration</h3>
+                <p>Integrate with your existing payroll systems for 
+seamless employee management.</p>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats">
+            <div class="stat-card">
+                <h3>98%</h3>
+                <p>Customer Satisfaction</p>
+                <p>500+</p>
+                <p>Active Users</p>
+            </div>
+
+            <div class="stat-card">
+                <h3>24/7</h3>
+                <p>Support</p>
+                <p>Processing Speed</p>
+                <p>1ms</p>
+            </div>
+
+            <div class="stat-card">
+                <h3>AI-Powered</h3>
+                <p>Automation</p>
+                <p>4x Faster Processing</p>
+                <p>24/7</p>
+            </div>
+        </div>
+
+        <!-- Use Cases Section -->
+        <div class="use-cases">
+            <div class="use-case">
+                <h3>Small Business Owners</h3>
+                <p>Transform your accounting processes with AI-powered 
+automation</p>
+                <a href="#" class="cta-button">Start Free Trial</a>
+            </div>
+
+            <div class="use-case">
+                <h3>Mid-Level Accountants</h3>
+                <p>Save time with real-time analytics and reporting</p>
+                <a href="#" class="cta-button">Get Started</a>
+            </div>
+
+            <div class="use-case">
+                <h3>Large Corporations</h3>
+                <p>Scale your operations with secure cloud-based 
+solutions</p>
+                <a href="#" class="cta-button">Contact Sales</a>
+            </div>
+        </div>
+
+        <!-- Demo Section -->
+        <div class="demo-section">
+            <div class="demo-card">
+                <h3>Ready to Get Started?</h3>
+                <p>Join thousands of businesses using our FTA 
+solutions</p>
+                <a href="#" class="cta-button">Schedule a 
+Demo</a>
+            </div>
+
+            <div class="demo-card">
+                <div class="floating-button">
+                    <p>Easy Demo Booking</p>
+                    <a href="#" class="cta-button">+1 (555) 123-4567</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add demo functionality
+        const demoButton = document.querySelector('.floating-button');
+        demoButton.addEventListener('click', () => {
+            alert('Thank you for your interest! A member of our team will contact you shortly.');
+        });
+
+        // Add demo booking
+        const demoCard = document.querySelector('.demo-section button');
+        demoCard.addEventListener('click', () => {
+            // Add your demo booking logic here
+            alert('Booking a demo for you...');
+        });
+    </script>
+</body>
+</html>

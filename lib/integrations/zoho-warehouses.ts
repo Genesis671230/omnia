@@ -7,6 +7,7 @@
 // in the file — worth isolating so it doesn't get called by accident.
 
 import { getAccessToken } from "@/lib/integrations/zoho";
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 
 const API_BASE = "https://www.zohoapis.com/inventory/v1";
 
@@ -36,7 +37,7 @@ export type ZohoWarehouse = {
 export async function fetchZohoWarehouses(accessToken?: string): Promise<ZohoWarehouse[]> {
   const token = accessToken ?? (await getAccessToken());
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
-  const res = await fetch(`${API_BASE}/settings/warehouses?organization_id=${orgId}`, {
+  const res = await zohoThrottledFetch(`${API_BASE}/settings/warehouses?organization_id=${orgId}`, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
     cache: "no-store",
   });
@@ -85,7 +86,7 @@ export async function fetchZohoItemDetail(itemId: string, accessToken: string): 
   const url = `${API_BASE}/items/${itemId}?organization_id=${orgId}`;
 
   for (let attempt = 1; attempt <= 4; attempt++) {
-    const res = await fetch(url, {
+    const res = await zohoThrottledFetch(url, {
       headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
       cache: "no-store",
     });
@@ -128,7 +129,7 @@ export async function fetchZohoItemChangesSince(sinceIso: string | null, accessT
     // sync (returns whole catalog).
     if (sinceIso) qs.set("last_modified_time", sinceIso);
 
-    const res = await fetch(`${API_BASE}/items?${qs.toString()}`, {
+    const res = await zohoThrottledFetch(`${API_BASE}/items?${qs.toString()}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
       cache: "no-store",
     });

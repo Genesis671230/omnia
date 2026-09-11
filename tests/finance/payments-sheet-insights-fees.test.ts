@@ -8,7 +8,7 @@ function row(overrides: Partial<PaymentSheetRow>): PaymentSheetRow {
     tab: "smsa", rowNumber: 1, orderNumber: "O1", date: "2026-09-02",
     party: { raw: "telr", canonical: "Telr", isSplit: false }, saleType: "Paid", isExchange: false,
     currency: "AED", region: "UAE", gatewayLabel: "Telr", actualPaymentStatus: "Payment Received",
-    paymentReceivedRaw: "", paymentReceivedDate: null,
+    paymentReceivedRaw: "", paymentReceivedDate: null, paymentBatchTotalAed: null,
     amountAed: 1000, cancelledAmount: 0, isDuplicateFlagged: false,
     gatewayGrossAed: null, feeDeductedAed: 0, netAfterFeeAed: null, feePercentRaw: null,
     ...overrides,

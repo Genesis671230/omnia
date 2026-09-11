@@ -88,10 +88,18 @@ export function SheetMatchPanel() {
   const defaultAccountId =  "2330082000000236001";
   const defaultAccount = useMemo(() => allAccounts.find((a) => a.account_id === defaultAccountId) ?? null, [allAccounts, defaultAccountId]);
 
-  const { data, isLoading, isFetching, error, refetch } = useQuery({
+  // Matching pages Zoho's /invoices endpoint (via buildWorkbenchInvoices),
+  // so it never runs on its own — the operator triggers it with the button
+  // below. This keeps a page visit from silently spending Zoho's daily API
+  // budget before anyone has asked for a match.
+  const [hasRun, setHasRun] = useState(false);
+  const { data, isFetching, error, refetch } = useQuery({
     queryKey: ["sheet-matches", from, to],
     queryFn: () => fetchSheetMatches(from, to),
+    enabled: false,
   });
+  const isLoading = isFetching && !data;
+  const runMatching = () => { setHasRun(true); refetch(); };
 
   // Resolve each match's real Zoho clearing account here, client-side,
   // against the already-cached account list — zero extra Zoho calls. COD
@@ -245,12 +253,20 @@ export function SheetMatchPanel() {
           Payments sheet → unpaid Zoho invoices, {from} → {to}
         </span>
         <Button
-          size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}
-          className="ml-auto h-9 border-[#BFDBFE] text-[#1D4ED8] hover:bg-[#DBEAFE]"
+          size="sm" onClick={runMatching} disabled={isFetching}
+          className="ml-auto h-9 bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] text-white hover:opacity-90"
         >
-          {isFetching ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {isFetching ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <RefreshCw size={13} className="mr-1.5" />}
+          {hasRun ? "Re-run matching" : "Run matching"}
         </Button>
       </div>
+
+      {!hasRun && !isFetching && (
+        <div className="rounded-xl border border-dashed border-[#BFDBFE] bg-[#F8FAFF] px-4 py-6 text-center text-[12.5px] text-[#1E3A8A]">
+          Matching reads unpaid invoices from Zoho — click <b>Run matching</b> when you're ready.
+          Nothing is fetched until you do.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-[#FEF2F2] px-4 py-3 text-[13px] text-[#991B1B]">{(error as Error).message}</div>
@@ -266,18 +282,21 @@ export function SheetMatchPanel() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12.5px] text-[#334155]">
-        <span><b className="text-[#0F172A]">{matches.length}</b> matched</span>
-        {selectedMatches.length > 0 && (
-          <>
-            <span className="text-[#BFDBFE]">·</span>
-            <span className="text-[#1D4ED8]">
-              <b>{selectedMatches.length}</b> selected · <b className="tabular-nums">AED {aed(selectedBalance)}</b>
-            </span>
-          </>
-        )}
-      </div>
+      {hasRun && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12.5px] text-[#334155]">
+          <span><b className="text-[#0F172A]">{matches.length}</b> matched</span>
+          {selectedMatches.length > 0 && (
+            <>
+              <span className="text-[#BFDBFE]">·</span>
+              <span className="text-[#1D4ED8]">
+                <b>{selectedMatches.length}</b> selected · <b className="tabular-nums">AED {aed(selectedBalance)}</b>
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
+      {hasRun && (
       <div className="overflow-hidden rounded-xl border border-[#DBEAFE] bg-white shadow-sm">
         <Table>
           <TableHeader>
@@ -318,6 +337,7 @@ export function SheetMatchPanel() {
           </TableBody>
         </Table>
       </div>
+      )}
 
       {selectedMatches.length > 0 && (
         <motion.div

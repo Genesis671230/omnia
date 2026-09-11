@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getAccessToken } from "@/lib/integrations/zoho";
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 import { logStockEvent } from "@/lib/stock-events";
 
 // NOT called by the auto-reconciler — Zoho is the source of truth for
@@ -31,7 +32,7 @@ export async function pushZoho(
   const token = await getAccessToken();
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
 
-  const res = await fetch(
+  const res = await zohoThrottledFetch(
     `https://www.zohoapis.com/inventory/v1/inventoryadjustments?organization_id=${orgId}`,
     {
       method: "POST",

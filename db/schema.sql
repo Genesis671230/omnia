@@ -546,3 +546,100 @@ create table if not exists payment_sheet_months (
   created_at     timestamptz not null default now()
 );
 
+-- zoho_api_usage: one row per calendar day counting outbound Zoho API
+-- calls. Zoho caps the org at ~5,000 requests/day shared across Books +
+-- Inventory; every call routed through lib/integrations/zoho-throttle.ts
+-- reserves a unit here first via zoho_consume_quota() and is refused once
+-- the configured budget (ZOHO_DAILY_BUDGET, default 4500) is spent. The
+-- counter is authoritative across serverless invocations and instances.
+create table if not exists zoho_api_usage (
+  usage_date    date primary key default current_date,
+  request_count integer not null default 0,
+  updated_at    timestamptz not null default now()
+);
+
+-- Atomically reserve one unit of today's Zoho budget. Returns allowed=false
+-- (and does not consume) once request_count would exceed p_limit.
+create or replace function zoho_consume_quota(p_limit integer)
+returns table(allowed boolean, used integer)
+language plpgsql
+as $$
+declare
+  v_count integer;
+begin
+  insert into zoho_api_usage (usage_date, request_count, updated_at)
+  values (current_date, 1, now())
+  on conflict (usage_date)
+  do update set request_count = zoho_api_usage.request_count + 1,
+                updated_at = now()
+  returning zoho_api_usage.request_count into v_count;
+
+  if v_count > p_limit then
+    update zoho_api_usage
+      set request_count = zoho_api_usage.request_count - 1
+      where zoho_api_usage.usage_date = current_date;
+    return query select false, v_count - 1;
+  end if;
+
+  return query select true, v_count;
+end;
+$$;
+
+-- pilot_leads: inbound "book a pilot call" requests from the public
+-- /recon-copilot landing page. This is the demand-validation instrument for
+-- the commercial Recon Copilot product (see the office-hours design doc):
+-- every row is a merchant who saw the pitch and asked for a conversation.
+-- Written by app/api/recon-copilot/lead/route.ts (public, unauthenticated,
+-- rate-limited); read by the founder. No merchant data lives here, just
+-- contact + qualifying context.
+create table if not exists pilot_leads (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  email         text not null,
+  company       text not null,
+  role          text not null default '',
+  ecom_platform text not null default '',   -- shopify / woocommerce / other
+  accounting    text not null default '',   -- zoho / xero / quickbooks / sheets / other
+  monthly_orders text not null default '',  -- self-reported band, e.g. '500-2000'
+  message       text not null default '',
+  source        text not null default 'recon-copilot-landing',
+  utm           jsonb not null default '{}',
+  status        text not null default 'new', -- new / contacted / qualified / piloting / lost
+  user_agent    text not null default '',
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists pilot_leads_created_idx on pilot_leads (created_at desc);
+create index if not exists pilot_leads_status_idx on pilot_leads (status);
+
+-- leads: inbound "free payout audit" requests from the public RAMZA landing
+-- page (/ramza). Written by app/api/lead/route.ts (public, unauthenticated,
+-- honeypot + 24h email dedupe). Carries Meta ad attribution captured in a
+-- first-party cookie on first visit so the founder can tie a lead back to the
+-- campaign, plus event_id for Meta Pixel <-> Conversions API dedup.
+create table if not exists leads (
+  id              uuid primary key default gen_random_uuid(),
+  created_at      timestamptz not null default now(),
+  name            text not null,
+  whatsapp        text not null,
+  email           text not null,
+  store_url       text not null default '',
+  gateways        text[] not null default '{}',
+  monthly_orders  text not null default '',   -- '<500' | '500-2000' | '2000-10000' | '10000+'
+  accounting_tool text not null default '',   -- 'zoho' | 'xero' | 'quickbooks' | 'excel-none'
+  utm_source      text not null default '',
+  utm_medium      text not null default '',
+  utm_campaign    text not null default '',
+  utm_content     text not null default '',
+  fbc             text not null default '',
+  fbp             text not null default '',
+  referrer        text not null default '',
+  landing_path    text not null default '',
+  event_id        text not null default '',
+  status          text not null default 'new', -- new / contacted / audited / call-booked / won / lost
+  user_agent      text not null default '',
+  source          text not null default 'ramza-landing'
+);
+create index if not exists leads_created_idx on leads (created_at desc);
+create index if not exists leads_status_idx on leads (status);
+

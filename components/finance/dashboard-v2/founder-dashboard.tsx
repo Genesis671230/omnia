@@ -20,6 +20,7 @@ import { InsightRail } from "./insight-rail";
 import { RevenueArea, GatewayDonut, TopProductsCarousel, CHARTS_CSS } from "./charts";
 import { MoneyDrawer } from "./money-drawer";
 import { PaymentsInsightsPanel } from "./payments-insights-panel";
+import { PaymentsFullDashboard } from "./payments-full-dashboard";
 
 /* ── live pulse (unchanged behavior: poll /api/pulse, toast new orders) ──── */
 
@@ -232,6 +233,8 @@ export function FounderDashboard({ version }: { version: number }) {
       <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} />
 
       <PaymentsInsightsPanel />
+
+      <PaymentsFullDashboard />
 
       <InsightRail days={days} store={store} onViewCampaign={setCampaignId} onViewMoney={setDrawer} />
 

@@ -31,3 +31,6 @@ gstack/
 
 # Isolated implementation worktrees
 /.worktrees/
+
+# RAMZA intro video source — compressed copy lives in public/ramza/
+/rama-intro.mp4

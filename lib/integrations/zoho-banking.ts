@@ -22,6 +22,8 @@
 // ZohoInventory.fullaccess.all and will 401 here — re-authorize with the
 // banking scopes added before expecting any of this to write.
 
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+
 const BOOKS_API_BASE = "https://www.zohoapis.com/books/v3";
 
 export type ZohoBankAccount = {
@@ -230,7 +232,7 @@ async function booksFetch(
 ): Promise<Record<string, unknown>> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
   const qs = new URLSearchParams({ organization_id: orgId, ...(init?.query ?? {}) });
-  const res = await fetch(`${BOOKS_API_BASE}${path}?${qs}`, {
+  const res = await zohoThrottledFetch(`${BOOKS_API_BASE}${path}?${qs}`, {
     ...init,
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,

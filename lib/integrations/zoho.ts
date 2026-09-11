@@ -3,6 +3,7 @@
 import { normalizeRef } from "@/lib/inventory-compare";
 import { NextResponse } from "next/server";
 import "dotenv/config";
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 const ACCOUNTS_BASE = "https://accounts.zoho.com";
 const API_BASE = "https://www.zohoapis.com/books/v3";
 
@@ -162,7 +163,7 @@ async function zohoFetch(
   orgId: string,
   init: RequestInit = {},
 ) {
-  const res = await fetch(url, {
+  const res = await zohoThrottledFetch(url, {
     ...init,
     headers: {
       ...(init.headers ?? {}),
@@ -215,14 +216,20 @@ async function refreshZohoAccessToken(): Promise<string> {
     grant_type: "refresh_token",
   });
 
-  const res = await fetch(`${accountsUrl}/oauth/v2/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+  const res = await zohoThrottledFetch(
+    `${accountsUrl}/oauth/v2/token`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+      cache: "no-store",
     },
-    body,
-    cache: "no-store",
-  });
+    // OAuth refresh is a different host with its own limit and is cached
+    // ~55min — pace it, but don't spend Books/Inventory quota on it.
+    { skipQuota: true, label: "oauth.token" },
+  );
 
   const json = await res.json();
 
@@ -251,7 +258,7 @@ export async function zohoGetPaginated<T>(path: string, listKey: string, accessT
   let page = 1;
   for (;;) {
     const qs = new URLSearchParams({ organization_id: orgId, per_page: "200", page: String(page) });
-    const res = await fetch(`${API_BASE}${path}?${qs.toString()}`, {
+    const res = await zohoThrottledFetch(`${API_BASE}${path}?${qs.toString()}`, {
       headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "X-com-zoho-books-organizationid": orgId },
       cache: "no-store",
     });
@@ -304,7 +311,7 @@ async function findExistingCustomerPayment(
     customer_id: customerId,
   });
 
-  const res = await fetch(
+  const res = await zohoThrottledFetch(
     `${API_BASE}/customerpayments?${qs.toString()}`,
     {
       headers: {
@@ -349,7 +356,7 @@ async function findExistingCustomerPayment(
   for (const payment of payments) {
     if (!payment.payment_id) continue;
 
-    const detailRes = await fetch(
+    const detailRes = await zohoThrottledFetch(
       `${API_BASE}/customerpayments/${payment.payment_id}?organization_id=${orgId}`,
       {
         headers: {
@@ -415,7 +422,7 @@ export async function listCustomerPaymentCustomFields(
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
   const sampleSize = opts?.sampleSize ?? 10;
 
-  const listRes = await fetch(
+  const listRes = await zohoThrottledFetch(
     `https://www.zohoapis.com/books/v3/customerpayments?organization_id=${orgId}&per_page=${sampleSize}`,
     {
       headers: {
@@ -442,7 +449,7 @@ export async function listCustomerPaymentCustomFields(
   const schema = new Map<string, ZohoPaymentCustomFieldMeta>();
 
   for (const paymentId of paymentIds) {
-    const detailRes = await fetch(
+    const detailRes = await zohoThrottledFetch(
       `https://www.zohoapis.com/inventory/v1/customerpayments/${paymentId}?organization_id=${orgId}`,
       {
         headers: {
@@ -544,7 +551,7 @@ export async function findZohoInvoice(
       customer_name_startswith: prefix,
       per_page: "200",
     });
-    const res = await fetch(`${API_BASE}/invoices?${qs.toString()}`, {
+    const res = await zohoThrottledFetch(`${API_BASE}/invoices?${qs.toString()}`, {
       headers: {
         Authorization: `Zoho-oauthtoken ${accessToken}`,
         "X-com-zoho-books-organizationid": orgId,
@@ -627,7 +634,7 @@ if(!invoiceDetail){
   invoice = await findZohoInvoice(input.invoiceReferenceNumber, accessToken, orgId);
   
   
-  const detailRes = await fetch(
+  const detailRes = await zohoThrottledFetch(
     `${API_BASE}/invoices/${invoice.invoice_id}?organization_id=${orgId}`,
     {
       headers: {
@@ -758,7 +765,7 @@ try {
       customerId: invoice.customer_id,
     });
   
-    const updateRes = await fetch(
+    const updateRes = await zohoThrottledFetch(
       `${API_BASE}/customerpayments/${existingPayment.payment_id}?organization_id=${orgId}`,
       {
         method: "PUT",
@@ -801,7 +808,7 @@ try {
     };
   }else{
 console.log(body,"amount balance etc niovice")
-const createRes = await fetch(
+const createRes = await zohoThrottledFetch(
   `${API_BASE}/customerpayments?organization_id=${orgId}`,
   {
     method: "POST",

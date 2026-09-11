@@ -1,18 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, BarChart3, FileSpreadsheet, Flag, Landmark, Loader2, Package } from "lucide-react";
+import { ArrowRight, BarChart3, Download, FileSpreadsheet, Flag, Landmark, Loader2, Package } from "lucide-react";
 import { groupLines, matchesQuery, type GroupMode } from "@/lib/reconciliation/filters";
 import { ReconFilters } from "./recon-filters";
 import { ReconGroupHeader } from "./recon-group";
-import { ReconRow } from "./recon-row";
+import { ReconTable } from "./recon-table";
 import { InsightsTab } from "./insights-tab";
 import { PayoutSummaryBar } from "./payout-summary-bar";
 import { BankTransactionsTab } from "./bank-transactions-tab";
 import type { ReconLine, ReconPayload } from "./types";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
 import { gatewayFilterOptionsFromZohoAccounts, regionForLine } from "@/lib/reconciliation/gateway-filter";
-import { getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
 
 /* The reconciliation surface: filters → tabs → grouped rows, or Insights.
  *
@@ -87,25 +86,35 @@ export function ReconView({
 
   const visible: ReconLine[] = buckets[tab];
 
-  const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
-  const columns = useMemo<ColumnDef<ReconLine>[]>(() => [
-    { id: "date", accessorFn: (r) => r.date ?? "" },
-    { id: "bankAmount", accessorFn: (r) => r.bankAmount },
-    { id: "provider", accessorFn: (r) => r.provider },
-  ], []);
-  const table = useReactTable({
-    data: visible,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
-  // Sorting only reorders the flat ("All credits") view — grouped modes
-  // (by gateway/state/day) already impose their own order via groupLines,
-  // and re-sorting within each group is a separate, later decision.
-  const sortedVisible = groupMode === "none" ? table.getRowModel().rows.map((r) => r.original) : visible;
-  const groups = useMemo(() => groupLines(sortedVisible, groupMode), [sortedVisible, groupMode]);
+  // Each ReconTable sorts its own columns; grouped modes still impose their
+  // group order via groupLines and the table sorts within each group.
+  const groups = useMemo(() => groupLines(visible, groupMode), [visible, groupMode]);
+
+  const [exporting, setExporting] = useState(false);
+  const exportXlsx = async () => {
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams({ format: "xlsx" });
+      if (fromDate) qs.set("from", fromDate);
+      if (toDate) qs.set("to", toDate);
+      const res = await fetch(`/api/reconcile/export?${qs}`);
+      if (!res.ok) throw new Error(`Export failed (HTTP ${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+?)"/)?.[1] ?? "omnia-reconciliation.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const toggleGroup = (key: string) => {
     const next = new Set(collapsed);
@@ -164,22 +173,15 @@ export function ReconView({
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[12px] text-[#8A8175]">
-        <span className="mr-1">Sort:</span>
-        {(["date", "bankAmount", "provider"] as const).map((col) => {
-          const active = sorting[0]?.id === col;
-          return (
-            <button
-              key={col}
-              onClick={() => setSorting([{ id: col, desc: active ? !sorting[0].desc : true }])}
-              className={`rounded-full border px-2.5 py-1 font-medium transition-colors ${
-                active ? "border-[#B08343] bg-[#FBF3E6] text-[#6F5325]" : "border-[#EAE3D6] bg-white hover:border-[#D6CCBA]"
-              }`}
-            >
-              {col === "bankAmount" ? "Amount" : col === "provider" ? "Gateway" : "Date"}
-              {active && (sorting[0].desc ? " ↓" : " ↑")}
-            </button>
-          );
-        })}
+        <span>Click any column header to sort. Click a row for the full bank → payout → orders breakdown and actions.</span>
+        <button
+          onClick={exportXlsx}
+          disabled={exporting || visible.length === 0}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#B08343] bg-[#B08343] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#9a723a] disabled:opacity-60"
+        >
+          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          Export .xlsx
+        </button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-1.5">
@@ -267,18 +269,15 @@ export function ReconView({
                     <ReconGroupHeader group={g} mode={groupMode} open={open} onToggle={() => toggleGroup(g.key)} />
                   )}
                   {open && (
-                    <div className={`space-y-2 ${groupMode !== "none" ? "pl-3" : ""}`}>
-                      {g.lines.map((r) => (
-                        <ReconRow
-                          key={r.id}
-                          r={r}
-                          isFounder={isFounder}
-                          posting={postings[r.id]}
-                          onConfirm={onConfirm}
-                          refresh={refresh}
-                          uploadSlot={uploadSlotFor(r.provider)}
-                        />
-                      ))}
+                    <div className={groupMode !== "none" ? "pl-3" : ""}>
+                      <ReconTable
+                        lines={g.lines}
+                        isFounder={isFounder}
+                        postings={postings}
+                        onConfirm={onConfirm}
+                        refresh={refresh}
+                        uploadSlotFor={uploadSlotFor}
+                      />
                     </div>
                   )}
                 </div>

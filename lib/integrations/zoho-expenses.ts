@@ -1,6 +1,8 @@
 // Zoho Books Expense create — separate from the Bank Transaction API used elsewhere
 // because Bank Transactions don't accept tax fields.
 
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+
 export type ZohoBooksExpense = {
     account_id: string;              // expense category id (e.g. Bank Fees and Charges)
     paid_through_account_id: string; // the bank account id
@@ -28,7 +30,7 @@ export type ZohoBooksExpense = {
     const url = new URL(`${BOOKS_BASE}/expenses`);
     url.searchParams.set("organization_id", organizationId);
   
-    const res = await fetch(url.toString(), {
+    const res = await zohoThrottledFetch(url.toString(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

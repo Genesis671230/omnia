@@ -22,6 +22,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SheetGatewayTable } from "./sheet-gateway-table";
 import { SheetExchangeTable } from "./sheet-exchange-table";
 import { SheetTrendChart } from "./sheet-trend-chart";
+import { SheetMonthlyTable } from "./sheet-monthly-table";
+import { SheetMonthReconciliation } from "./sheet-month-reconciliation";
+import { SheetPayoutBreakdown } from "./sheet-payout-breakdown";
 import { computeGatewayBreakdown, type SheetInsightsResponse, type PeriodStats } from "@/lib/finance/payments-sheet-insights";
 
 async function fetchInsights(spreadsheetId: string): Promise<SheetInsightsResponse> {
@@ -145,7 +148,13 @@ export function SheetInsightsStrip() {
       ) : data ? (
         <>
           {/* ── Trend chart ──────────────────────────────────────────── */}
-          <SheetTrendChart rows={rows} />
+          <SheetTrendChart rows={rows} from={from} to={to} />
+
+          {/* ── Monthly rollup ─────────────────────────────────────── */}
+          <SheetMonthlyTable rows={rows} from={from} to={to} />
+
+          {/* ── Month-close reconciliation statement ────────────────── */}
+          <SheetMonthReconciliation rows={rows} from={from} to={to} />
 
           {/* ── Period cards ────────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
@@ -182,6 +191,9 @@ export function SheetInsightsStrip() {
 
           {/* ── Gateway breakdown table ─────────────────────────────── */}
           <SheetGatewayTable rows={gatewayBreakdown} />
+
+          {/* ── Payouts, split by order month ───────────────────────── */}
+          <SheetPayoutBreakdown rows={rows} from={from} to={to} />
 
           {/* ── Exchanges + SKUs ────────────────────────────────────── */}
           <SheetExchangeTable spreadsheetId={activeId} from={from ?? ""} to={to ?? ""} />

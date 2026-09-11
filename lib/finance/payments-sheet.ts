@@ -50,6 +50,7 @@ import { resolveTabName, readAllValues } from "@/lib/integrations/google-sheets"
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { PaymentSheetMonthsRepository, type PaymentSheetMonth } from "@/lib/repositories/payment-sheet-months.repository";
 import type { PartyInfo, PaymentSheetRow, SheetTabKey } from "@/lib/finance/payments-sheet-insights";
+import { parsePaymentBatchTotal, parsePaymentReceivedNote } from "@/lib/finance/payments-sheet-insights";
 
 export * from "@/lib/finance/payments-sheet-insights";
 
@@ -116,18 +117,10 @@ export function normalizeParty(raw: string | undefined | null): PartyInfo {
   return { raw: original, canonical: null, isSplit: gatewayTokens.length > 1 };
 }
 
-// "Payment Received on 03.08.2026 (25,794.83)" -> "2026-08-03". The parens
-// amount is the whole payout batch's total, not this order's own amount —
-// intentionally discarded here, it's not useful per-row.
-const PAYMENT_NOTE_RE = /(\d{2})\.(\d{2})\.(\d{4})/;
-
-export function parsePaymentReceivedNote(raw: string | undefined | null): string | null {
-  if (!raw) return null;
-  const m = PAYMENT_NOTE_RE.exec(raw);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  return `${yyyy}-${mm}-${dd}`;
-}
+// parsePaymentReceivedNote ("Payment Received on 03.08.2026 (25,794.83)" ->
+// "2026-08-03") now lives in payments-sheet-insights.ts (pure, client-safe,
+// permissive across the hand-typed date formats ops actually uses) and is
+// re-exported below via `export *`.
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const SHEET_DATE_RE = /^(\d{1,2})\.([A-Za-z]{3,9})\.(\d{4})$/;
@@ -270,6 +263,7 @@ async function readTab(key: SheetTabKey, spreadsheetId: string): Promise<Payment
       actualPaymentStatus: (row[idx.status] ?? "").trim(),
       paymentReceivedRaw: receivedRaw,
       paymentReceivedDate: parsePaymentReceivedNote(receivedRaw),
+      paymentBatchTotalAed: parsePaymentBatchTotal(receivedRaw),
       amountAed: idx.amount !== -1 ? parseAmount(row[idx.amount]) : 0,
       cancelledAmount: idx.cancelled !== -1 ? parseAmount(row[idx.cancelled]) : 0,
       isDuplicateFlagged: Boolean((idx.dup1 !== -1 && row[idx.dup1]?.trim()) || (idx.dup2 !== -1 && row[idx.dup2]?.trim())),
@@ -303,12 +297,24 @@ export async function readAllPaymentRows(spreadsheetId?: string): Promise<Paymen
 // visible rather than silently missing from the dashboard; if that proves
 // too strict in practice, switching to Promise.allSettled with a per-month
 // error list is the natural next step, not a silent partial result.
+//
+// Each month's rows are scoped to that month's own key (r.date.slice(0,7))
+// before being combined — without this, a founder duplicating last month's
+// file to start a new month's sheet (a realistic workflow, and exactly how
+// this registry gets populated) would silently double-count every carried-
+// over row in Gross/Net/Fees. Undated rows (date parse failed) are kept
+// rather than dropped, since we can't know which month they belong to.
 export async function readAllPaymentRowsAllMonths(): Promise<{
   months: PaymentSheetMonth[];
   rows: PaymentSheetRow[];
 }> {
   const months = await PaymentSheetMonthsRepository.list();
-  const perMonth = await Promise.all(months.map((m) => readAllPaymentRows(m.spreadsheetId)));
+  const perMonth = await Promise.all(
+    months.map(async (m) => {
+      const rows = await readAllPaymentRows(m.spreadsheetId);
+      return rows.filter((r) => !r.date || r.date.slice(0, 7) === m.monthKey);
+    }),
+  );
   return { months, rows: perMonth.flat() };
 }
 

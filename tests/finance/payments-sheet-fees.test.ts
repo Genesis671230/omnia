@@ -15,6 +15,7 @@ function row(overrides: Partial<PaymentSheetRow>): PaymentSheetRow {
     party: { raw: "telr", canonical: "Telr", isSplit: false }, saleType: "Paid", isExchange: false,
     currency: "KWD", region: "KWD", gatewayLabel: "Telr KWD", actualPaymentStatus: "Payment Received",
     paymentReceivedRaw: "Payment Received on 04.09.2026 (18,903.64)", paymentReceivedDate: "2026-09-04",
+    paymentBatchTotalAed: 18903.64,
     amountAed: 1732.91, cancelledAmount: 0, isDuplicateFlagged: false,
     gatewayGrossAed: null, feeDeductedAed: 0, netAfterFeeAed: null, feePercentRaw: null,
     ...overrides,

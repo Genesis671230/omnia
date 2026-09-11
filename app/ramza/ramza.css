@@ -1,0 +1,309 @@
+/* RAMZA landing — scoped design system. Royal blue, serif display, glass over
+   dimmed media, dark bento panels. Everything under [data-ramza] so it never
+   touches the omnia app. Dark mode follows the visitor's OS. */
+
+[data-ramza] {
+  --paper: #ffffff;
+  --paper-2: #f7f9ff;
+  --field: #eef2ff;
+  --ink: #10163a;
+  --ink-60: #5a6489;
+  --ink-40: #8a92b4;
+
+  --brand: #3a55e6; /* royal blue — primary, matched, posted */
+  --brand-bright: #2f6bff;
+  --brand-strong: #2a3fc0;
+  --brand-ink: #ffffff;
+  --brand-soft: rgba(58, 85, 230, 0.1);
+
+  --residual: #c2851a; /* fees / pending — amber */
+  --stamp: #e0453f; /* overdue */
+  --rule: #e4e8f6;
+  --card: #ffffff;
+
+  /* dark bento panel */
+  --panel: #0f1636;
+  --panel-2: #131b42;
+  --panel-ink: #eef1ff;
+  --panel-ink-60: #a9b1d8;
+  --panel-border: rgba(255, 255, 255, 0.08);
+
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 28px 80px -28px rgba(16, 28, 78, 0.3);
+  --grid-dot: rgba(58, 85, 230, 0.1);
+  --halo-a: rgba(58, 85, 230, 0.18);
+  --halo-b: rgba(96, 150, 255, 0.13);
+
+  /* neutralise the omnia app's global olive outline/ring inside RAMZA */
+  --tw-ring-color: var(--brand);
+  --tw-ring-offset-color: var(--paper);
+
+  color-scheme: light;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-ramza] *,
+[data-ramza] *::before,
+[data-ramza] *::after {
+  outline-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  border-color: var(--rule);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-ramza] {
+    --paper: #070b20;
+    --paper-2: #0a1030;
+    --field: #0c1336;
+    --ink: #eef1ff;
+    --ink-60: #9aa3cc;
+    --ink-40: #6c76a0;
+
+    --brand: #6a83ff;
+    --brand-bright: #7c96ff;
+    --brand-strong: #4a63e8;
+    --brand-ink: #05102e;
+    --brand-soft: rgba(106, 131, 255, 0.16);
+
+    --residual: #e0a231;
+    --stamp: #f0605a;
+    --rule: #202a54;
+    --card: #0c1436;
+
+    --panel: #0b1230;
+    --panel-2: #0f1740;
+    --panel-ink: #eef1ff;
+    --panel-ink-60: #9aa3cc;
+    --panel-border: rgba(255, 255, 255, 0.07);
+
+    --glass-bg: rgba(14, 22, 56, 0.55);
+    --glass-border: rgba(120, 150, 235, 0.18);
+    --glass-shadow: 0 28px 80px -28px rgba(0, 0, 0, 0.65);
+    --grid-dot: rgba(120, 160, 255, 0.1);
+    --halo-a: rgba(70, 110, 255, 0.22);
+    --halo-b: rgba(40, 80, 220, 0.16);
+    color-scheme: dark;
+  }
+}
+
+/* Typography — serif display, two-tone */
+[data-ramza] .r-h1 {
+  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-size: clamp(2.1rem, 3.2vw + 0.6rem, 3.5rem);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+}
+[data-ramza] .r-h2 {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(1.5rem, 2vw + 0.5rem, 2.4rem);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+}
+[data-ramza] .r-dim {
+  color: var(--ink-40);
+}
+[data-ramza] .r-lead {
+  font-size: clamp(1rem, 0.6vw + 0.9rem, 1.15rem);
+  line-height: 1.55;
+}
+[data-ramza] .r-measure {
+  max-width: 60ch;
+}
+[data-ramza] .r-eyebrow {
+  font-size: 0.8125rem;
+  color: var(--ink-60);
+}
+[data-ramza] .r-eyebrow b {
+  color: var(--brand);
+  font-weight: 600;
+}
+[data-ramza] .tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Surfaces */
+[data-ramza] .r-card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+}
+[data-ramza] .r-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-ramza] .r-glass {
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+  }
+}
+[data-ramza] .r-panel {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-border);
+  color: var(--panel-ink);
+  box-shadow: 0 30px 90px -40px rgba(6, 14, 45, 0.55);
+}
+[data-ramza] .r-panel .r-h2,
+[data-ramza] .r-panel h3 {
+  color: var(--panel-ink);
+}
+[data-ramza] .r-panel-dim {
+  color: var(--panel-ink-60);
+}
+[data-ramza] .r-hairline {
+  border-color: var(--rule);
+}
+
+/* Dotted grid + halos + progress */
+[data-ramza] .r-dotgrid {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+[data-ramza] .r-field-bg {
+  background: var(--field);
+}
+[data-ramza] .r-halo {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+[data-ramza] .r-progress {
+  height: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+[data-ramza] .r-progress > i {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+}
+
+/* Buttons */
+[data-ramza] .r-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+[data-ramza] .r-btn-primary {
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: 0 14px 34px -14px color-mix(in srgb, var(--brand) 75%, transparent);
+}
+[data-ramza] .r-btn-primary:hover {
+  background: var(--brand-strong);
+  transform: translateY(-1px);
+}
+[data-ramza] .r-btn-outline {
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+}
+[data-ramza] .r-btn-outline:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+[data-ramza] .r-btn-ghost-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--rule);
+  color: var(--brand);
+}
+
+/* Status pills */
+[data-ramza] .r-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+[data-ramza] .r-pill-matched {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+[data-ramza] .r-pill-unmatched {
+  background: color-mix(in srgb, var(--residual) 18%, transparent);
+  color: color-mix(in srgb, var(--residual) 82%, var(--ink));
+}
+[data-ramza] .r-pill-overdue {
+  background: color-mix(in srgb, var(--stamp) 14%, transparent);
+  color: var(--stamp);
+}
+
+/* Focus — one blue ring, and kill the inherited olive box-shadow ring */
+[data-ramza] a:focus-visible,
+[data-ramza] button:focus-visible,
+[data-ramza] input:focus-visible,
+[data-ramza] select:focus-visible,
+[data-ramza] summary:focus-visible,
+[data-ramza] [tabindex]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+  box-shadow: none !important;
+}
+
+/* Inputs */
+[data-ramza] .r-field {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.875rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+[data-ramza] .r-field:focus {
+  border-color: var(--brand);
+  outline: none;
+}
+[data-ramza] textarea.r-field {
+  height: auto;
+  padding: 0.625rem 0.875rem;
+  line-height: 1.5;
+}
+
+@keyframes r-pulse {
+  from {
+    stroke-dashoffset: 576;
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ramza] * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

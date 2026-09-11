@@ -20,6 +20,7 @@ import { SheetMatchPanel } from "./sheet-match-panel";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
 import type { WorkbenchInvoice, WorkbenchResponse, ZohoInvoiceStatus } from "@/lib/finance/types";
 import { SheetInsightsStrip } from "./sheet-insights-strip";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const AED = new Intl.NumberFormat("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const aed = (n: number) => AED.format(n);
@@ -38,6 +39,11 @@ const STATUS_TONE: Record<string, string> = {
 
 export function InvoicesWorkbench() {
   const [mode, setMode] = useState<"manual" | "sheet">("manual");
+  // Gate the Zoho invoice fetch behind an explicit click — the workbench
+  // pages Zoho's /invoices endpoint, and auto-running it on every mount /
+  // filter change was a steady drain on the 5k/day API budget during
+  // testing. Nothing hits Zoho until the user asks for it.
+  const [armed, setArmed] = useState(false);
 
   // Filters
   const [range, setRange] = useState<DateRange>({ from: subDays(new Date(), 7), to: new Date() });
@@ -50,9 +56,9 @@ export function InvoicesWorkbench() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(PAGE_SIZE);
   // Data + selection
-  const [data, setData] = useState<WorkbenchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // const [data, setData] = useState<WorkbenchResponse | null>(null);
+  // const [loading, setLoading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Publish setup — deposit account list comes from the shared Zoho config
@@ -141,82 +147,215 @@ export function InvoicesWorkbench() {
     setPage(1);
   }, [range.from, range.to, status]);
 
-  const fetchInvoices = async () => {
-    if (!range.from || !range.to) return;
+
+  async function fetchInvoices({
+    from,
+    to,
+    status,
+    page,
+    pageSize,
+  }: {
+    from: Date;
+    to: Date;
+    status: string;
+    page: number;
+    pageSize: number;
+  }): Promise<WorkbenchResponse| any> {
+    const url = new URL("/api/invoices/workbench", window.location.origin);
   
-    setLoading(true);
-    setError(null);
+    url.searchParams.set("from", format(from, "yyyy-MM-dd"));
+    url.searchParams.set("to", format(to, "yyyy-MM-dd"));
+    url.searchParams.set("status", status);
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("pageSize", String(pageSize));
   
     try {
-      const url = new URL("/api/invoices/workbench", window.location.origin);
-  
-      url.searchParams.set("from", format(range.from, "yyyy-MM-dd"));
-      url.searchParams.set("to", format(range.to, "yyyy-MM-dd"));
-      url.searchParams.set("status", status);
-  
-      url.searchParams.set("page", String(page));
-      url.searchParams.set("pageSize", String(pageSize));
-  
+      
       const res = await fetch(url.toString());
-
       const json: WorkbenchResponse = await res.json();
-
-        if (!res.ok) {
-          throw new Error(json.error || `HTTP ${res.status}`);
-        }
-
-        const orderMap = await fetchUnknownGateways(json.invoices);
-
-        const invoices: WorkbenchInvoice[] = json.invoices.map((invoice) => {
-          const orderNumber = invoice.orderNumber?.trim();
-        
-          const order = orderNumber
-            ? orderMap.get(orderNumber)
-            : undefined;
-        
-          if (!order) {
-            return invoice;
-          }
-        
-          return {
-            ...invoice,
-            gateway: order.gateway,
-            gatewaySource: "orders" as const,
-            country: order.country,
-          };
-        });
-        // Recalculate counts using the enriched invoices.
-        const gatewayCounts = invoices.reduce<Record<string, number>>(
-          (counts, invoice) => {
-            const gateway = invoice.gateway || "Unknown";
-        
-            counts[gateway] = (counts[gateway] ?? 0) + 1;
-        
-            return counts;
-          },
-          {},
-        );
-        
-        setData({
-          ...json,
-          invoices,
-          gatewayCounts,
-        });
-        
-        setSelected(new Set());
-  
-      setSelected(new Set());
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
+      console.log("json", json);
+      if (!res.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      
+      return json;
+    } catch (error) {
+      console.error("error", error);
+      return {
+        invoices: [],
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        pageSize: 50,
+        totalCount: 0,
+        gatewayCounts: {},
+      };
     }
+  }
+
+  const fromKey = range.from
+  ? format(range.from, "yyyy-MM-dd")
+  : null;
+
+const toKey = range.to
+  ? format(range.to, "yyyy-MM-dd")
+  : null;
+
+  const invoiceQuery = useQuery({
+    queryKey: [
+      "invoice-workbench",
+      fromKey,
+      toKey,
+      status,
+      page,
+      pageSize,
+    ],
+    queryFn: () =>
+      fetchInvoices({
+        from: range.from ?? subDays(new Date(), 7),
+        to: range.to ?? subDays(new Date(), 1),
+        status,
+        page,
+        pageSize,
+      }),
+    enabled: armed && Boolean(fromKey && toKey),
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    placeholderData: (previousData: WorkbenchResponse | undefined) => previousData,
+  });
+
+  const json = invoiceQuery.data;
+
+const { data: orderMap } = useQuery({
+  queryKey: [
+    "invoice-order-gateways",
+    json?.invoices.map((invoice) => invoice.orderNumber).filter(Boolean).sort(),
+  ],
+  queryFn: () => fetchUnknownGateways(json!.invoices),
+  enabled: Boolean(json?.invoices?.length),
+  staleTime: 5 * 60_000,
+  gcTime: 30 * 60_000,
+});
+
+const data = useMemo(() => {
+  if (!json) return null;
+
+  const invoices: WorkbenchInvoice[] = json?.invoices.map((invoice) => {
+    const orderNumber = invoice.orderNumber?.trim();
+    const order = orderNumber
+      ? orderMap?.get(orderNumber)
+      : undefined;
+
+    if (!order) {
+      return invoice;
+    }
+
+    return {
+      ...invoice,
+      gateway: order.gateway,
+      gatewaySource: "orders" as const,
+      country: order.country,
+    };
+  });
+
+  const gatewayCounts = invoices.reduce<Record<string, number>>(
+    (counts, invoice) => {
+      const gateway = invoice.gateway || "Unknown";
+      counts[gateway] = (counts[gateway] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
+
+  return {
+    ...json,
+    invoices,
+    gatewayCounts,
   };
+}, [json, orderMap]);
+
+
+const loading = invoiceQuery.isLoading;
+const fetching = invoiceQuery.isFetching;
+const error = invoiceQuery.error;
+  // const fetchInvoices = async () => {
+  //   if (!range.from || !range.to) return;
+  
+  //   setLoading(true);
+  //   setError(null);
+  
+  //   try {
+  //     const url = new URL("/api/invoices/workbench", window.location.origin);
+  
+  //     url.searchParams.set("from", format(range.from, "yyyy-MM-dd"));
+  //     url.searchParams.set("to", format(range.to, "yyyy-MM-dd"));
+  //     url.searchParams.set("status", status);
+  
+  //     url.searchParams.set("page", String(page));
+  //     url.searchParams.set("pageSize", String(pageSize));
+  
+  //     const res = await fetch(url.toString());
+
+  //     const json: WorkbenchResponse = await res.json();
+
+  //       if (!res.ok) {
+  //         throw new Error(json.error || `HTTP ${res.status}`);
+  //       }
+
+  //       const orderMap = await fetchUnknownGateways(json.invoices);
+
+  //       const invoices: WorkbenchInvoice[] = json.invoices.map((invoice) => {
+  //         const orderNumber = invoice.orderNumber?.trim();
+        
+  //         const order = orderNumber
+  //           ? orderMap.get(orderNumber)
+  //           : undefined;
+        
+  //         if (!order) {
+  //           return invoice;
+  //         }
+        
+  //         return {
+  //           ...invoice,
+  //           gateway: order.gateway,
+  //           gatewaySource: "orders" as const,
+  //           country: order.country,
+  //         };
+  //       });
+  //       // Recalculate counts using the enriched invoices.
+  //       const gatewayCounts = invoices.reduce<Record<string, number>>(
+  //         (counts, invoice) => {
+  //           const gateway = invoice.gateway || "Unknown";
+        
+  //           counts[gateway] = (counts[gateway] ?? 0) + 1;
+        
+  //           return counts;
+  //         },
+  //         {},
+  //       );
+        
+  //       setData({
+  //         ...json,
+  //         invoices,
+  //         gatewayCounts,
+  //       });
+        
+  //       setSelected(new Set());
+  
+  //     setSelected(new Set());
+  //   } catch (e) {
+  //     setError((e as Error).message);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   useEffect(() => {
-    fetchInvoices();
+    // Only re-pull from Zoho on filter/page changes once the user has
+    // explicitly loaded once — see `armed` above.
+    if (armed) invoiceQuery.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [range.from, range.to, status, page]);
+}, [range.from, range.to, status, page, armed]);
 
   // Client-side filters — instant, no refetch
   const displayed = useMemo(() => {
@@ -262,13 +401,31 @@ export function InvoicesWorkbench() {
     setPublishOpen(true);
   };
 
-  const onPublishDone = (ok: number, failed: number, skipped: number) => {
-    const parts = [`${ok} recorded`];
-    if (failed) parts.push(`${failed} failed`);
-    if (skipped) parts.push(`${skipped} skipped`);
-    (failed > 0 ? toast.warning : toast.success)(parts.join(" · "));
-    fetchInvoices();
-  };
+  // const onPublishDone = (ok: number, failed: number, skipped: number) => {
+  //   const parts = [`${ok} recorded`];
+  //   if (failed) parts.push(`${failed} failed`);
+  //   if (skipped) parts.push(`${skipped} skipped`);
+  //   (failed > 0 ? toast.warning : toast.success)(parts.join(" · "));
+  //   invoiceQuery.refetch();
+  // };
+  const queryClient = useQueryClient();
+
+const onPublishDone = (
+  ok: number,
+  failed: number,
+  skipped: number,
+) => {
+  const parts = [`${ok} recorded`];
+
+  if (failed) parts.push(`${failed} failed`);
+  if (skipped) parts.push(`${skipped} skipped`);
+
+  (failed > 0 ? toast.warning : toast.success)(parts.join(" · "));
+
+  queryClient.invalidateQueries({
+    queryKey: ["invoice-workbench"],
+  });
+};
 
   return (
     <div className="space-y-4">
@@ -293,6 +450,20 @@ export function InvoicesWorkbench() {
       <>
 
       <SheetInsightsStrip/>
+
+      {!armed && !data && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[#D6CCBA] bg-[#FBF8F1] px-4 py-3 text-[12.5px] text-[#6F5325]">
+          <span>Pick a date range and status, then load — invoices are pulled live from Zoho (rate-limited to protect the daily API budget).</span>
+          <Button
+            size="sm"
+            onClick={() => { setArmed(true); invoiceQuery.refetch(); }}
+            className="ml-auto h-9 bg-[#1F1B16] text-white hover:bg-[#332d25]"
+          >
+            <RefreshCw size={13} className="mr-1.5" /> Load invoices from Zoho
+          </Button>
+        </div>
+      )}
+
       {/* ── Filter bar ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#EAE3D6] bg-white p-3 shadow-sm">
         <DateRangePicker range={range} onChange={setRange} />
@@ -336,7 +507,7 @@ export function InvoicesWorkbench() {
         >
           <ArrowLeftRight size={13} className="mr-1.5" />
           Exchanges
-          {data && data.totalPages > 1 && (
+          {data && data.totalPages && data.totalPages > 1 && (
                     <div className="flex items-center justify-between border-t border-[#EAE3D6] bg-[#FBF8F1] px-4 py-3">
                         <div className="text-[12px] text-[#8A8175]">
                         Showing{" "}
@@ -345,7 +516,7 @@ export function InvoicesWorkbench() {
                         </span>
                         {"–"}
                         <span className="font-medium text-[#1F1B16]">
-                            {Math.min(page * pageSize, data.total)}
+                            {Math.min(page * pageSize, data.total || 0)}
                         </span>
                         {" of "}
                         <span className="font-medium text-[#1F1B16]">
@@ -387,11 +558,12 @@ export function InvoicesWorkbench() {
         <Button
           size="sm"
           variant="outline"
-          onClick={fetchInvoices}
-          disabled={loading}
+          onClick={() => { setArmed(true); invoiceQuery.refetch(); }}
+          disabled={fetching}
           className="ml-auto h-9 border-[#D6CCBA]"
         >
-          {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {fetching ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          <span className="ml-1.5 text-[12px]">{armed ? "Refresh" : "Load from Zoho"}</span>
         </Button>
       </div>
 

@@ -4,7 +4,12 @@ import { SESSION_COOKIE } from "@/lib/auth-config";
 import { verifySession } from "@/lib/session";
 
 // Anything not matched by `config.matcher` below is public by default.
-const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm","/api/inventory/warehouse-matrix",];
+const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm","/api/inventory/warehouse-matrix",
+  // Public marketing surface for the commercial accounting product (numio).
+  "/numio", "/api/numio",
+  // Public RAMZA landing page + its lead intake and privacy page.
+  "/ramza", "/api/lead", "/privacy",
+];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

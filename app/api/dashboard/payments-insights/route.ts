@@ -26,7 +26,13 @@ export async function GET() {
     const insights = computeSheetInsights(rows, months.map((m) => m.spreadsheetId).join(","));
     const gatewayBreakdown = computeGatewayBreakdown(rows, null, null);
     const feeRanking = bestWorstGatewayByFeePercent(gatewayBreakdown);
-    return NextResponse.json({ ...insights, gatewayBreakdown, feeRanking, monthsIncluded: months.map((m) => m.label) });
+    return NextResponse.json({
+      ...insights,
+      gatewayBreakdown,
+      feeRanking,
+      monthsIncluded: months.map((m) => m.label),
+      months: months.map((m) => ({ monthKey: m.monthKey, label: m.label, spreadsheetId: m.spreadsheetId })),
+    });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

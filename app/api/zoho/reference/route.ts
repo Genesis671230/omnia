@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
+import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 
 export const maxDuration = 60;
 
@@ -19,7 +20,7 @@ async function fetchTaxes(path: string, token: string, query: Record<string, str
     const url = new URL(`https://www.zohoapis.com/books/v3/settings/taxes`);
     // url.searchParams.set("organization_id", ORG_ID);
     // for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-    const res = await fetch(`https://www.zohoapis.com/books/v3/settings/taxes?organization_id=${ORG_ID}`, {
+    const res = await zohoThrottledFetch(`https://www.zohoapis.com/books/v3/settings/taxes?organization_id=${ORG_ID}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
     const json = await res.json().catch((e) => {
@@ -42,7 +43,7 @@ async function fetchZoho(path: string, token: string, query: Record<string, stri
     const url = new URL(`${BOOKS_BASE}${path}`);
     url.searchParams.set("organization_id", ORG_ID);
     for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-    const res = await fetch(url.toString(), {
+    const res = await zohoThrottledFetch(url.toString(), {
       headers: { Authorization: `Zoho-oauthtoken ${token}` },
     });
     const json = await res.json().catch((e) => {

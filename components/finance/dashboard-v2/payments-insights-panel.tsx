@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle, ArrowLeftRight, Banknote, Clock, Loader2, Percent, RotateCcw, TrendingUp,
+  AlertTriangle, ArrowLeftRight, Banknote, Clock, ExternalLink, Loader2, Percent, RotateCcw, TrendingUp,
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -28,7 +28,12 @@ type PaymentsInsightsResponse = {
   gatewayBreakdown: GatewayRow[];
   feeRanking: { best: { gatewayLabel: string; feePercent: number } | null; worst: { gatewayLabel: string; feePercent: number } | null };
   monthsIncluded: string[];
+  months: { monthKey: string; label: string; spreadsheetId: string }[];
 };
+
+function sheetEditUrl(spreadsheetId: string): string {
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+}
 
 async function fetchPaymentsInsights(): Promise<PaymentsInsightsResponse> {
   const res = await fetch("/api/dashboard/payments-insights");
@@ -174,9 +179,26 @@ export function PaymentsInsightsPanel() {
   const m = data.periods.thisMonth;
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="text-[13px] font-semibold text-[#1F1B16]">This month, across the payments sheet</h3>
-        <span className="text-[11px] text-[#8A8175]">{data.monthsIncluded.join(", ") || "no months registered"}</span>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          {data.months.length === 0 ? (
+            <span className="text-[11px] text-[#8A8175]">no months registered</span>
+          ) : (
+            data.months.map((m) => (
+              <a
+                key={m.monthKey}
+                href={sheetEditUrl(m.spreadsheetId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-[#8A8175] hover:text-[#1F1B16]"
+                title={`Open ${m.label} in Google Sheets`}
+              >
+                {m.label} <ExternalLink size={11} />
+              </a>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Founder's exact six tiles, in the order asked for: Gross, Net,

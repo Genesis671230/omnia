@@ -26,16 +26,20 @@ export async function buildWorkbenchInvoices({
 }): Promise<WorkbenchResponse> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
 
-  // 1. Pull Zoho invoices for the window (25 pages × 200 = 5000 max)
+  // 1. Pull Zoho invoices for the window. perPage 200 is Zoho's max — at
+  //    perPage 20 this was firing 25 API calls to page through what 3 calls
+  //    now cover, a needless drain on the 5k/day budget. maxPages 10 (=2000
+  //    invoices) is a runaway guard; unpaid invoices in a 30-90d window
+  //    never approach it.
   const zohoInvoices = await listZohoInvoicesAll(
     {
       status: status === "all" ? undefined : status,
       dateStart: from,
       dateEnd: to,
-      perPage: 20,
+      perPage: 200,
     },
     orgId,
-    25,
+    10,
   );
 
   // 2. Extract order numbers, build exchange index
