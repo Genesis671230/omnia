@@ -16,6 +16,13 @@
   --brand-ink: #ffffff;
   --brand-soft: rgba(58, 85, 230, 0.1);
 
+  /* --ledger is the "matched / posted / booked" accent. It is the same royal
+     blue as --brand by design (see the note above): a line that reconciles is
+     the brand. Kept as its own name so the reconciliation states read as
+     semantics at the call site rather than as brand decoration. */
+  --ledger: var(--brand);
+  --ledger-ink: var(--brand-ink);
+
   --residual: #c2851a; /* fees / pending — amber */
   --stamp: #e0453f; /* overdue */
   --rule: #e4e8f6;
@@ -67,6 +74,9 @@
     --brand-strong: #4a63e8;
     --brand-ink: #05102e;
     --brand-soft: rgba(106, 131, 255, 0.16);
+
+    --ledger: var(--brand);
+    --ledger-ink: var(--brand-ink);
 
     --residual: #e0a231;
     --stamp: #f0605a;
