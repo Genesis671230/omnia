@@ -11,38 +11,51 @@ import { POSTING_ROWS, POSTING_INTRO } from "@/lib/ramza/copy";
    "suggested" state to a solid "posted" state. Original animation, no video. */
 
 const N = POSTING_ROWS.length;
-const TICK_MS = 480;
-const HOLD_MS = 2400;
+const TICK_MS = 420;
 
 export function PostingStack() {
   const reduce = useReducedMotion();
   const maxTick = N * 2;
-  const [tick, setTick] = useState(reduce ? maxTick : 0);
-  const pausedRef = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const onVis = () => {
-      pausedRef.current = document.hidden;
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
+  /* The sequence runs once, when the panel comes into view, and then holds the
+     posted state. It used to loop back to tick 0 every 2.4s, which meant the
+     panel sat completely empty for a third of its life — including whenever
+     someone happened to scroll to it mid-reset. A ledger that blinks out is
+     worse than no animation. */
+  const [tick, setTick] = useState(reduce ? maxTick : 0);
+  const [started, setStarted] = useState(reduce);
 
   useEffect(() => {
     if (reduce) return;
-    const atEnd = tick >= maxTick;
-    const delay = atEnd ? HOLD_MS : TICK_MS;
-    let id: ReturnType<typeof setTimeout>;
-    const run = () => {
-      if (pausedRef.current) {
-        id = setTimeout(run, 160);
-        return;
-      }
-      setTick(atEnd ? 0 : tick + 1);
+    const el = panelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setStarted(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setStarted(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    // Backstop: if the observer never fires, show the finished state anyway.
+    const watchdog = window.setTimeout(() => setTick(maxTick), 4000);
+    return () => {
+      io.disconnect();
+      window.clearTimeout(watchdog);
     };
-    id = setTimeout(run, delay);
+  }, [reduce, maxTick]);
+
+  useEffect(() => {
+    if (!started || tick >= maxTick) return;
+    const id = setTimeout(() => setTick((t) => t + 1), TICK_MS);
     return () => clearTimeout(id);
-  }, [tick, reduce, maxTick]);
+  }, [started, tick, maxTick]);
 
   return (
     <Section field>
@@ -54,12 +67,12 @@ export function PostingStack() {
           </p>
         </div>
 
-        <div className="r-glass rounded-2xl p-3 sm:p-4 lg:-mt-6" aria-hidden>
-          <div className="mb-2 flex items-center justify-between px-1 text-[11px]" style={{ color: "var(--ink-60)" }}>
+        <div ref={panelRef} className="r-glass r-grain relative rounded-2xl p-3 sm:p-4 lg:-mt-6">
+          <div className="relative z-[1] mb-2 flex items-center justify-between px-1 text-[11px]" style={{ color: "var(--ink-60)" }}>
             <span>Proposed postings</span>
-            <span>March 2026</span>
+            <span className="tnum">March 2026</span>
           </div>
-          <ul className="space-y-1.5">
+          <ul className="relative z-[1] space-y-1.5">
             {POSTING_ROWS.map((row, i) => {
               const arrived = tick >= i * 2 + 1;
               const posted = tick >= i * 2 + 2;
@@ -118,7 +131,7 @@ export function PostingStack() {
             })}
           </ul>
           <div
-            className="mt-2 px-1 text-[11px]"
+            className="relative z-[1] mt-2 px-1 text-[11px]"
             style={{
               color: "var(--ink-60)",
               opacity: tick >= maxTick ? 1 : 0,

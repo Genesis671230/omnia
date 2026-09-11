@@ -24,23 +24,33 @@ export function FoundingPartners() {
         </div>
 
         <Reveal>
-         <div className="r-glass rounded-2xl p-6 sm:p-8">
-          <dl className="grid gap-6 sm:grid-cols-3">
-            {STATS.map((s) => (
-              <div key={s.label}>
-                <dt className="text-xs font-medium" style={{ color: "var(--ink-60)" }}>
-                  {s.label}
-                </dt>
-                <dd
-                  className="tnum mt-1.5 text-2xl font-semibold"
-                  style={{ color: s.value.startsWith("[") ? "var(--ink-60)" : "var(--ink)" }}
+         <div className="r-glass r-grain relative overflow-hidden rounded-2xl p-6 sm:p-8">
+          {/* Stacked rows, not a 3-up grid: the price placeholders are long
+              enough that three columns ran them into each other. Rows also
+              survive any eventual real value without re-breaking. */}
+          <dl className="relative z-[1] divide-y" style={{ borderColor: "var(--rule)" }}>
+            {STATS.map((s) => {
+              const pending = s.value.startsWith("[");
+              return (
+                <div
+                  key={s.label}
+                  className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-4 first:pt-0 last:pb-0"
+                  style={{ borderColor: "var(--rule)" }}
                 >
-                  {s.value}
-                </dd>
-              </div>
-            ))}
+                  <dt className="text-sm font-medium" style={{ color: "var(--ink-60)" }}>
+                    {s.label}
+                  </dt>
+                  <dd
+                    className="tnum text-xl font-semibold sm:text-2xl"
+                    style={{ color: pending ? "var(--ink-40)" : "var(--ink)" }}
+                  >
+                    {s.value}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
-          <p className="mt-6 text-xs" style={{ color: "var(--ink-60)" }}>
+          <p className="relative z-[1] mt-6 text-xs leading-relaxed" style={{ color: "var(--ink-60)" }}>
             One price by transaction volume. VAT on fees and multi-currency included.
           </p>
          </div>
