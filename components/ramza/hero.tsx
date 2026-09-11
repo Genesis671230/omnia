@@ -1,6 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import { HeroReconciliation } from "./hero-reconciliation";
-import { HeroBg } from "./hero-bg";
+import { HeroField } from "./hero-field";
 import { Skyline } from "./skyline";
 import { CtaLink } from "./ui/cta-button";
 import { HERO_SUB, CTA_PRIMARY, CTA_SECONDARY } from "@/lib/ramza/copy";
@@ -8,7 +8,7 @@ import { HERO_SUB, CTA_PRIMARY, CTA_SECONDARY } from "@/lib/ramza/copy";
 export function Hero({ h1, whatsappHref }: { h1: string; whatsappHref: string }) {
   return (
     <section id="top" className="relative flex min-h-[86vh] flex-col justify-center overflow-hidden lg:min-h-[88vh]">
-      <HeroBg />
+      <HeroField />
 
       <div className="relative mx-auto w-full max-w-6xl px-5 pt-14 pb-24 sm:pt-20 sm:pb-32">
         <div className="grid gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-6">
