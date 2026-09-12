@@ -32,7 +32,13 @@ export function RamzaShell({ children }: { children: ReactNode }) {
   return (
     <div
       data-ramza
-      className={`${plex.variable} ${plexArabic.variable} relative min-h-screen`}
+      /* fraunces.variable was missing here. Every .r-h1 and .r-h2 declares
+         font-family: var(--font-fraunces), Georgia, serif — and when the
+         custom property is undefined the whole declaration is invalid at
+         computed-value time, so it fell through to the inherited IBM Plex
+         rather than to the Georgia fallback. The serif display face was
+         loaded and never once rendered. */
+      className={`${plex.variable} ${plexArabic.variable} ${fraunces.variable} relative min-h-screen`}
       style={{ color: "var(--ink)" }}
     >
       <Backdrop />

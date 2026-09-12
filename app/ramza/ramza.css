@@ -16,12 +16,15 @@
   --brand-ink: #ffffff;
   --brand-soft: rgba(58, 85, 230, 0.1);
 
-  /* --ledger is the "matched / posted / booked" accent. It is the same royal
-     blue as --brand by design (see the note above): a line that reconciles is
-     the brand. Kept as its own name so the reconciliation states read as
-     semantics at the call site rather than as brand decoration. */
-  --ledger: var(--brand);
-  --ledger-ink: var(--brand-ink);
+  /* --ledger is the "matched / posted / settled" accent, and it is green on
+     purpose. The page now runs a real three-colour system: royal blue is the
+     brand, green means this line reconciled, amber means it has not yet. When
+     --ledger was also blue, a matched row and a brand button were the same
+     colour and the one state the product exists to produce carried no signal. */
+  --ledger: #12805c;
+  --ledger-bright: #16a06f;
+  --ledger-ink: #ffffff;
+  --ledger-soft: rgba(18, 128, 92, 0.12);
 
   --residual: #c2851a; /* fees / pending — amber */
   --stamp: #e0453f; /* overdue */
@@ -78,8 +81,12 @@
     --brand-ink: #05102e;
     --brand-soft: rgba(106, 131, 255, 0.16);
 
-    --ledger: var(--brand);
-    --ledger-ink: var(--brand-ink);
+    /* Lifted and desaturated for a dark ground: #12805c goes muddy on navy
+       and fails contrast against --panel. */
+    --ledger: #3ecf9a;
+    --ledger-bright: #5fe0b0;
+    --ledger-ink: #04231a;
+    --ledger-soft: rgba(62, 207, 154, 0.16);
 
     --residual: #e0a231;
     --stamp: #f0605a;
@@ -289,6 +296,75 @@
 [data-ramza] .r-stamp-overdue {
   border-color: color-mix(in srgb, var(--stamp) 55%, transparent);
   color: var(--stamp);
+}
+
+/* ── Mesh band ────────────────────────────────────────────────────────────
+   A deep, grainy gradient field: overlapping radial washes in blue and green
+   under a heavy film grain, with soft tonal waves drifting across it. Used for
+   the full-bleed statement bands. The grain is what stops a big gradient
+   looking like a default CSS gradient — it breaks the banding and gives the
+   surface something to be. */
+[data-ramza] .r-mesh {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0a1738;
+  background-image:
+    radial-gradient(120% 90% at 12% 18%, rgba(18, 128, 92, 0.55) 0%, transparent 58%),
+    radial-gradient(100% 80% at 88% 12%, rgba(58, 108, 230, 0.62) 0%, transparent 60%),
+    radial-gradient(130% 110% at 72% 96%, rgba(11, 62, 48, 0.75) 0%, transparent 62%),
+    radial-gradient(90% 70% at 32% 88%, rgba(24, 40, 110, 0.7) 0%, transparent 60%),
+    linear-gradient(155deg, #0d2a4e 0%, #0a1738 46%, #07211c 100%);
+  color: #f2f6ff;
+}
+/* The grain. Two layers: a fine one for tooth, a coarser one for depth. */
+[data-ramza] .r-mesh::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.42;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+[data-ramza] .r-mesh > * {
+  position: relative;
+  z-index: 3;
+}
+[data-ramza] .r-mesh-waves {
+  position: absolute;
+  inset: -12% -6%;
+  z-index: 1;
+  pointer-events: none;
+}
+[data-ramza] .r-mesh h2,
+[data-ramza] .r-mesh h3,
+[data-ramza] .r-mesh p {
+  color: inherit;
+}
+[data-ramza] .r-mesh-dim {
+  color: rgba(226, 235, 255, 0.72);
+}
+/* Pill CTA that reads on the dark field, mirroring the reference band. */
+[data-ramza] .r-btn-on-mesh {
+  background: #ffffff;
+  color: #0a1738;
+  border-radius: 999px;
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.55);
+}
+[data-ramza] .r-btn-on-mesh:hover {
+  background: #eaf1ff;
+  transform: translateY(-1px);
+}
+[data-ramza] .r-btn-mesh-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #f2f6ff;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+[data-ramza] .r-btn-mesh-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* Dotted grid + halos + progress */
