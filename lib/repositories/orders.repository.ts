@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { OrderRow } from "@/lib/normalize/order";
 import { keywordsForLocation } from "@/lib/orders-locations";
-import { dropClobberRiskFields } from "@/lib/orders-clobber-guard";
+import { dropClobberRiskFields, type ExistingOrderState } from "@/lib/orders-clobber-guard";
 
 const ORDER_COLUMNS =
   "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status,shipping_address1, shipping_address2,shipping_state,shipping_postcode,shipping_company,billing_address1,billing_address2,billing_state,billing_postcode,billing_company, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
@@ -121,23 +121,39 @@ export const OrdersRepository = {
   // for orders already shipped through this app's own SMSA pipeline (see
   // dropClobberRiskFields above) — those fields belong to whoever shipped
   // the order, not to whatever the store's raw payload says today.
+  //
+  // And protects financial_status the same way. The WhatsApp store reports
+  // every order as `pending` forever (payment is taken on a Stripe/Tabby/
+  // Tamara link outside Shopify), so this app's gateway confirmers are the
+  // only thing that knows the money arrived. Without this guard the sync
+  // wrote Shopify's stale `pending` straight back over every confirmation
+  // within two minutes, and the confirmer's uid dedup meant it never fired
+  // again — 212 WA orders worth AED 351k sat at `pending` and Gross Sales
+  // read AED 0 for the store.
   async upsertMany(rows: OrderRow[]): Promise<number> {
     if (rows.length === 0) return 0;
 
     const uids = rows.map((r) => r.uid);
-    const shippedUids = new Set<string>();
+    const existingByUid = new Map<string, ExistingOrderState>();
     for (let i = 0; i < uids.length; i += 200) {
       const { data, error } = await supabase
         .from("orders")
-        .select("uid")
-        .in("uid", uids.slice(i, i + 200))
-        .not("awb_number", "is", null)
-        .neq("awb_number", "");
-      if (error) throw new Error(`orders shipped-lookup failed: ${error.message}`);
-      for (const r of data ?? []) shippedUids.add(r.uid as string);
+        .select("uid, awb_number, financial_status, courier, tracking_number, tracking_url")
+        .in("uid", uids.slice(i, i + 200));
+      if (error) throw new Error(`orders clobber-guard lookup failed: ${error.message}`);
+      for (const r of data ?? []) existingByUid.set(r.uid as string, r as ExistingOrderState);
     }
 
-    const syncRows = rows.map((row) => dropClobberRiskFields(row, shippedUids));
+    const syncRows = rows.map((row) => dropClobberRiskFields(row, existingByUid));
+    if (process.env.CLOBBER_DEBUG) {
+      const guarded = syncRows.filter(
+        (r, i) => r.financial_status !== rows[i].financial_status,
+      );
+      console.log(
+        `[clobber-guard] ${rows.length} rows, ${existingByUid.size} known, ${guarded.length} payments preserved:`,
+        guarded.map((r) => r.uid).join(","),
+      );
+    }
 
     // orders.customer_id carries a FK to customers(id) — a customer row must
     // exist before any order referencing it can be written. These are cheap

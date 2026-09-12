@@ -5,6 +5,7 @@
 import { toAed } from "@/lib/fx";
 import { classifyOrderGateway } from "@/lib/gateways";
 import { customerIdentityKey } from "@/lib/customer-identity";
+import { resolveFinancialStatus } from "@/lib/orders/store-payment-policy";
 import type { ShopifyRawOrder, ShopifyStoreCode } from "@/lib/integrations/shopify";
 import { telrRefsFromMeta, type WooRawOrder } from "@/lib/integrations/woo";
 
@@ -103,7 +104,14 @@ export function normalizeShopifyOrder(raw: ShopifyRawOrder, store: ShopifyStoreC
     gateway_raw: gatewayRaw,
     telr_cartid: "",
     telr_tranref: "",
-    financial_status: (raw.displayFinancialStatus || "").toLowerCase(),
+    // Not always the store's own claim — the WhatsApp storefront creates the
+    // order only after payment is taken outside Shopify, so its permanent
+    // "pending" is replaced with the truth. See lib/orders/store-payment-policy.ts.
+    financial_status: resolveFinancialStatus({
+      storeId: store,
+      reportedStatus: raw.displayFinancialStatus,
+      gateway: classifyOrderGateway(gatewayRaw),
+    }),
     fulfillment_status: (raw.displayFulfillmentStatus || "").toLowerCase(),
     city: raw.shippingAddress?.city || "",
     country: raw.shippingAddress?.countryCodeV2 || "",
