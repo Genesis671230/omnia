@@ -16,26 +16,15 @@
 import { supabase } from "@/lib/supabase";
 import { OrdersRepository, type OrderRowRaw } from "@/lib/repositories/orders.repository";
 
-const DUBAI_OFFSET_MINUTES = 4 * 60;
 const PAID_STATUS = "paid";
 
-// Midnight-to-midnight Dubai day, expressed as the UTC bounds order_date is
-// stored/queried in.
-function dubaiDayStartUtcMs(dateIsoDay: string): number {
-  return new Date(`${dateIsoDay}T00:00:00Z`).getTime() - DUBAI_OFFSET_MINUTES * 60_000;
-}
+// Dubai day arithmetic now lives in lib/dubai-day.ts so the gross-sales report
+// shares one implementation of the UTC+4 boundary shift rather than keeping a
+// second copy that could drift. Imported for local use and re-exported because
+// callers and tests already import these names from this module.
+import { dubaiDayBoundsUtc, dubaiRangeBoundsUtc } from "@/lib/dubai-day";
 
-export function dubaiDayBoundsUtc(dateIsoDay: string): { fromUtc: string; toUtc: string } {
-  const startMs = dubaiDayStartUtcMs(dateIsoDay);
-  return { fromUtc: new Date(startMs).toISOString(), toUtc: new Date(startMs + 24 * 60 * 60_000).toISOString() };
-}
-
-// Inclusive of both the fromDay and toDay Dubai calendar days.
-export function dubaiRangeBoundsUtc(fromDay: string, toDay: string): { fromUtc: string; toUtc: string } {
-  const fromMs = dubaiDayStartUtcMs(fromDay);
-  const toMs = dubaiDayStartUtcMs(toDay) + 24 * 60 * 60_000;
-  return { fromUtc: new Date(fromMs).toISOString(), toUtc: new Date(toMs).toISOString() };
-}
+export { dubaiDayBoundsUtc, dubaiRangeBoundsUtc };
 
 export type StoreBreakdown = { store: string; paidOrders: number; revenueAed: number };
 export type StatusBreakdown = { status: string; orders: number };

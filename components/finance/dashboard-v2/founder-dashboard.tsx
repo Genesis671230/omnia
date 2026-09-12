@@ -21,6 +21,7 @@ import { RevenueArea, GatewayDonut, TopProductsCarousel, CHARTS_CSS } from "./ch
 import { MoneyDrawer } from "./money-drawer";
 import { PaymentsInsightsPanel } from "./payments-insights-panel";
 import { PaymentsFullDashboard } from "./payments-full-dashboard";
+import { GrossSalesPanel } from "./gross-sales-panel";
 
 /* ── live pulse (unchanged behavior: poll /api/pulse, toast new orders) ──── */
 
@@ -231,6 +232,10 @@ export function FounderDashboard({ version }: { version: number }) {
       <PulseTicker />
 
       <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} />
+
+      {/* Top line first: what the stores sold, straight from orders, before
+          any of the payout and settlement views below it. */}
+      <GrossSalesPanel />
 
       <PaymentsInsightsPanel />
 
