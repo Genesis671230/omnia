@@ -59,15 +59,21 @@ export function PostingStack() {
 
   return (
     <Section field>
+      {/* min-w-0 on both columns: a grid item defaults to min-width auto, so
+          without it the posting panel refused to shrink below its widest row
+          and pushed the whole section past the viewport on a phone. */}
       <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-        <div>
+        <div className="min-w-0">
           <SectionHeading>Every line gets an account and a date</SectionHeading>
           <p className="r-lead r-measure mt-4" style={{ color: "var(--ink-60)" }}>
             {POSTING_INTRO}
           </p>
         </div>
 
-        <div ref={panelRef} className="r-glass r-grain relative rounded-2xl p-3 sm:p-4 lg:-mt-6">
+        <div
+          ref={panelRef}
+          className="r-glass r-grain relative min-w-0 rounded-2xl p-3 sm:p-4 lg:-mt-6"
+        >
           <div className="relative z-[1] mb-2 flex items-center justify-between px-1 text-[11px]" style={{ color: "var(--ink-60)" }}>
             <span>Proposed postings</span>
             <span className="tnum">March 2026</span>
@@ -79,7 +85,10 @@ export function PostingStack() {
               return (
                 <li
                   key={row.description}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm"
+                  /* Two lines on a phone (description + amount, then account +
+                     date), one line from sm up. The four-across row clipped the
+                     amounts off the right edge at 390px. */
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-lg border px-3 py-2.5 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
                   style={{
                     borderColor: "var(--rule)",
                     background: "var(--paper)",
@@ -88,12 +97,12 @@ export function PostingStack() {
                     transition: "opacity .3s ease, transform .35s cubic-bezier(.2,.7,.3,1)",
                   }}
                 >
-                  <span className="min-w-0 flex-1 truncate" style={{ color: "var(--ink)" }}>
+                  <span className="min-w-0 truncate sm:order-1" style={{ color: "var(--ink)" }}>
                     {row.description}
                   </span>
 
                   <span
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium"
+                    className="col-start-1 row-start-2 inline-flex w-fit items-center gap-1.5 justify-self-start rounded-md border px-2 py-1 text-xs font-medium sm:order-2 sm:col-auto sm:row-auto"
                     style={{
                       borderStyle: posted ? "solid" : "dashed",
                       borderColor: posted ? "var(--ledger)" : "var(--residual)",
@@ -111,14 +120,14 @@ export function PostingStack() {
                   </span>
 
                   <span
-                    className="tnum shrink-0 text-xs"
+                    className="tnum col-start-2 row-start-2 text-right text-xs sm:order-3 sm:col-auto sm:row-auto sm:text-left"
                     style={{ color: "var(--ink-60)", minWidth: 46 }}
                   >
                     {row.date}
                   </span>
 
                   <span
-                    className="tnum shrink-0 text-right text-xs font-medium"
+                    className="tnum col-start-2 row-start-1 whitespace-nowrap text-right text-xs font-medium sm:order-4 sm:col-auto sm:row-auto"
                     style={{
                       color: row.negative ? "var(--stamp)" : "var(--ink)",
                       minWidth: 96,
