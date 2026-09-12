@@ -7,6 +7,7 @@ import {
   type GrossSalesOrder,
 } from "../../lib/orders/gross-sales";
 import { addDubaiDays, dubaiDayKey, dubaiDayRange, dubaiToday } from "../../lib/dubai-day";
+import { earliestDayNeeded } from "../../lib/orders/gross-sales.service";
 
 const ASOF = "2026-03-15";
 
@@ -192,6 +193,136 @@ test("delta is null rather than zero or Infinity when there is nothing to compar
   );
   assert.equal(rep.today.previousGrossAed, 0);
   assert.equal(rep.today.deltaPct, null);
+});
+
+/* ---------- last 30 days, last calendar month, custom range ---------- */
+
+test("last 30 days is inclusive of today and 29 days back, and no further", () => {
+  const orders = [
+    order({ order_date: "2026-03-15T08:00:00Z", gross_aed: 10 }),
+    order({ order_date: "2026-02-14T08:00:00Z", gross_aed: 20 }), // exactly 29 back, inside
+    order({ order_date: "2026-02-13T08:00:00Z", gross_aed: 40 }), // 30 back, outside
+  ];
+  const rep = computeGrossSales(orders, ASOF);
+  assert.equal(rep.last30.fromDay, "2026-02-14");
+  assert.equal(rep.last30.toDay, ASOF);
+  assert.equal(rep.last30.grossAed, 30);
+});
+
+test("last month is the previous calendar month, not a rolling 30 days", () => {
+  const orders = [
+    order({ order_date: "2026-02-01T08:00:00Z", gross_aed: 100 }), // first day of Feb
+    order({ order_date: "2026-02-28T08:00:00Z", gross_aed: 200 }), // last day of Feb
+    order({ order_date: "2026-03-01T08:00:00Z", gross_aed: 400 }), // March, excluded
+    order({ order_date: "2026-01-31T08:00:00Z", gross_aed: 800 }), // January, excluded
+  ];
+  const rep = computeGrossSales(orders, ASOF);
+  assert.equal(rep.lastMonth.fromDay, "2026-02-01");
+  assert.equal(rep.lastMonth.toDay, "2026-02-28");
+  assert.equal(rep.lastMonth.grossAed, 300);
+  assert.equal(rep.lastMonth.label, "February 2026");
+});
+
+test("last month compares against the month before it", () => {
+  const orders = [
+    order({ order_date: "2026-02-10T08:00:00Z", gross_aed: 300 }),
+    order({ order_date: "2026-01-10T08:00:00Z", gross_aed: 200 }),
+  ];
+  const rep = computeGrossSales(orders, ASOF);
+  assert.equal(rep.lastMonth.grossAed, 300);
+  assert.equal(rep.lastMonth.previousGrossAed, 200);
+  assert.equal(rep.lastMonth.deltaPct, 50);
+});
+
+test("last month rolls back across a year boundary", () => {
+  const rep = computeGrossSales([], "2026-01-15");
+  assert.equal(rep.lastMonth.fromDay, "2025-12-01");
+  assert.equal(rep.lastMonth.toDay, "2025-12-31");
+  assert.equal(rep.lastMonth.label, "December 2025");
+});
+
+test("last month handles a leap February", () => {
+  const rep = computeGrossSales([], "2028-03-10");
+  assert.equal(rep.lastMonth.fromDay, "2028-02-01");
+  assert.equal(rep.lastMonth.toDay, "2028-02-29");
+});
+
+test("there is no custom rollup until both dates are supplied", () => {
+  assert.equal(computeGrossSales([], ASOF).custom, null);
+  assert.equal(computeGrossSales([], ASOF, 30, undefined, { fromDay: "2026-03-01" }).custom, null);
+  assert.equal(computeGrossSales([], ASOF, 30, undefined, { toDay: "2026-03-05" }).custom, null);
+  // Inverted range is refused rather than quietly swapped.
+  assert.equal(
+    computeGrossSales([], ASOF, 30, undefined, { fromDay: "2026-03-09", toDay: "2026-03-01" })
+      .custom,
+    null,
+  );
+});
+
+test("a custom range sums only the days inside it, both ends inclusive", () => {
+  const orders = [
+    order({ order_date: "2026-03-01T08:00:00Z", gross_aed: 100 }),
+    order({ order_date: "2026-03-05T08:00:00Z", gross_aed: 200 }),
+    order({ order_date: "2026-03-06T08:00:00Z", gross_aed: 400 }),
+  ];
+  const rep = computeGrossSales(orders, ASOF, 30, undefined, {
+    fromDay: "2026-03-01",
+    toDay: "2026-03-05",
+  });
+  assert.equal(rep.custom?.grossAed, 300);
+  assert.equal(rep.custom?.label, "2026-03-01 to 2026-03-05");
+});
+
+test("a custom range compares against the equally long stretch before it", () => {
+  const orders = [
+    order({ order_date: "2026-03-08T08:00:00Z", gross_aed: 300 }), // in range
+    order({ order_date: "2026-03-03T08:00:00Z", gross_aed: 150 }), // in prior window
+    order({ order_date: "2026-02-28T08:00:00Z", gross_aed: 999 }), // before prior window
+  ];
+  // 06-10 March is 5 days, so the prior window is 01-05 March.
+  const rep = computeGrossSales(orders, ASOF, 30, undefined, {
+    fromDay: "2026-03-06",
+    toDay: "2026-03-10",
+  });
+  assert.equal(rep.custom?.grossAed, 300);
+  assert.equal(rep.custom?.previousGrossAed, 150);
+  assert.equal(rep.custom?.deltaPct, 100);
+});
+
+test("a single-day custom range is labelled as that day and compares to the day before", () => {
+  const orders = [
+    order({ order_date: "2026-03-10T08:00:00Z", gross_aed: 90 }),
+    order({ order_date: "2026-03-09T08:00:00Z", gross_aed: 45 }),
+  ];
+  const rep = computeGrossSales(orders, ASOF, 30, undefined, {
+    fromDay: "2026-03-10",
+    toDay: "2026-03-10",
+  });
+  assert.equal(rep.custom?.label, "2026-03-10");
+  assert.equal(rep.custom?.grossAed, 90);
+  assert.equal(rep.custom?.previousGrossAed, 45);
+});
+
+test("periods lists the five fixed windows in display order", () => {
+  const rep = computeGrossSales([], ASOF);
+  assert.deepEqual(
+    rep.periods.map((p) => p.key),
+    ["today", "yesterday", "last7", "last30", "lastMonth"],
+  );
+  // The custom range is deliberately not in the fixed list.
+  assert.ok(!rep.periods.some((p) => p.key === "custom"));
+});
+
+test("the fetch window reaches back past every comparison window", () => {
+  // Widest fixed comparison is the month before last month.
+  assert.equal(earliestDayNeeded("2026-03-15", 30), "2026-01-01");
+  // A long custom range pushes it back further still.
+  assert.equal(
+    earliestDayNeeded("2026-03-15", 30, { fromDay: "2025-06-01", toDay: "2025-06-30" }),
+    "2025-05-02",
+  );
+  // A long chart window also counts.
+  assert.equal(earliestDayNeeded("2026-03-15", 180), "2025-09-17");
 });
 
 /* ---------- per-store split ---------- */

@@ -22,8 +22,10 @@
 
 import {
   addDubaiDays,
+  dubaiDayCount,
   dubaiDayKey,
   dubaiDayRange,
+  dubaiMonthBounds,
   dubaiToday,
 } from "@/lib/dubai-day";
 
@@ -67,8 +69,16 @@ export type DayBucket = {
   byStore: Record<string, number>;
 };
 
+export type RollupKey =
+  | "today"
+  | "yesterday"
+  | "last7"
+  | "last30"
+  | "lastMonth"
+  | "custom";
+
 export type Rollup = {
-  key: "today" | "yesterday" | "last7" | "prev7";
+  key: RollupKey;
   label: string;
   fromDay: string;
   toDay: string;
@@ -89,6 +99,13 @@ export type GrossSalesReport = {
   today: Rollup;
   yesterday: Rollup;
   last7: Rollup;
+  last30: Rollup;
+  /** The previous whole calendar month, not a rolling 30 days. */
+  lastMonth: Rollup;
+  /** Only present when the caller supplied an explicit from/to range. */
+  custom: Rollup | null;
+  /** Fixed periods in display order, for a panel that just wants to map over them. */
+  periods: Rollup[];
   /** Daily buckets, ascending, one entry per day with no gaps. */
   series: DayBucket[];
   /** Orders the headline deliberately leaves out, over the chart window. */
@@ -216,7 +233,7 @@ export function deltaPercent(current: number, previous: number | null): number |
 }
 
 function makeRollup(
-  key: Rollup["key"],
+  key: RollupKey,
   label: string,
   orders: GrossSalesOrder[],
   fromDay: string,
@@ -251,9 +268,12 @@ export function computeGrossSales(
   asOfDay: string = dubaiToday(),
   days = 30,
   stores: readonly string[] = GROSS_SALES_STORES,
+  range?: { fromDay?: string | null; toDay?: string | null } | null,
 ): GrossSalesReport {
   const yesterday = addDubaiDays(asOfDay, -1);
   const seriesFrom = addDubaiDays(asOfDay, -(Math.max(days, 1) - 1));
+  const prevMonth = dubaiMonthBounds(asOfDay, 1);
+  const monthBefore = dubaiMonthBounds(asOfDay, 2);
 
   // Scoped to the chart window, not to everything the caller happened to
   // fetch. The service pads the query by an extra week so the trailing-7
@@ -286,28 +306,66 @@ export function computeGrossSales(
     }
   }
 
+  const today = makeRollup(
+    "today", "Today", orders,
+    asOfDay, asOfDay,
+    yesterday, yesterday,
+    stores,
+  );
+  const yesterdayRollup = makeRollup(
+    "yesterday", "Yesterday", orders,
+    yesterday, yesterday,
+    addDubaiDays(asOfDay, -2), addDubaiDays(asOfDay, -2),
+    stores,
+  );
+  const last7 = makeRollup(
+    "last7", "Last 7 days", orders,
+    addDubaiDays(asOfDay, -6), asOfDay,
+    addDubaiDays(asOfDay, -13), addDubaiDays(asOfDay, -7),
+    stores,
+  );
+  const last30 = makeRollup(
+    "last30", "Last 30 days", orders,
+    addDubaiDays(asOfDay, -29), asOfDay,
+    addDubaiDays(asOfDay, -59), addDubaiDays(asOfDay, -30),
+    stores,
+  );
+  const lastMonth = makeRollup(
+    "lastMonth", prevMonth.label, orders,
+    prevMonth.fromDay, prevMonth.toDay,
+    monthBefore.fromDay, monthBefore.toDay,
+    stores,
+  );
+
+  // A custom range compares against the equally long stretch immediately
+  // before it, so "1-10 March" is judged against "19-28 February" rather than
+  // against a fixed month that happens to be a different length.
+  let custom: Rollup | null = null;
+  const cFrom = range?.fromDay || null;
+  const cTo = range?.toDay || null;
+  if (cFrom && cTo && cFrom <= cTo) {
+    const span = dubaiDayCount(cFrom, cTo);
+    custom = makeRollup(
+      "custom",
+      span === 1 ? cFrom : `${cFrom} to ${cTo}`,
+      orders,
+      cFrom, cTo,
+      addDubaiDays(cFrom, -span), addDubaiDays(cFrom, -1),
+      stores,
+    );
+  }
+
   return {
     asOfDay,
     stores: [...stores],
     storeLabels: STORE_LABELS,
-    today: makeRollup(
-      "today", "Today", orders,
-      asOfDay, asOfDay,
-      yesterday, yesterday,
-      stores,
-    ),
-    yesterday: makeRollup(
-      "yesterday", "Yesterday", orders,
-      yesterday, yesterday,
-      addDubaiDays(asOfDay, -2), addDubaiDays(asOfDay, -2),
-      stores,
-    ),
-    last7: makeRollup(
-      "last7", "Last 7 days", orders,
-      addDubaiDays(asOfDay, -6), asOfDay,
-      addDubaiDays(asOfDay, -13), addDubaiDays(asOfDay, -7),
-      stores,
-    ),
+    today,
+    yesterday: yesterdayRollup,
+    last7,
+    last30,
+    lastMonth,
+    custom,
+    periods: [today, yesterdayRollup, last7, last30, lastMonth],
     series: buildDailySeries(orders, seriesFrom, asOfDay, stores),
     excluded: {
       ...excluded,

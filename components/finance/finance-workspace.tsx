@@ -660,7 +660,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           ) : showCustomers ? (
             <CustomersPanel />
           ) : showOrders ? (
-            <OrdersLedger />
+            <OrdersLedger fromDate={fromDate} toDate={toDate} />
           ) : view === "settings" ? (
             <div className="space-y-6">
               <ZohoSettingsPanel />

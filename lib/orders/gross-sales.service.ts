@@ -2,7 +2,13 @@
 // aggregation stays pure and unit-testable without a Supabase connection.
 
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
-import { addDubaiDays, dubaiDayBoundsUtc, dubaiToday } from "@/lib/dubai-day";
+import {
+  addDubaiDays,
+  dubaiDayBoundsUtc,
+  dubaiDayCount,
+  dubaiMonthBounds,
+  dubaiToday,
+} from "@/lib/dubai-day";
 import {
   computeGrossSales,
   GROSS_SALES_STORES,
@@ -11,27 +17,58 @@ import {
 } from "./gross-sales";
 
 /**
- * Build the report for the trailing `days` Dubai days ending today.
+ * The oldest Dubai day any rollup in the report needs to see.
  *
- * The fetch window reaches back an extra 7 days beyond the chart window
- * because the trailing-7 rollup compares against the 7 days before it; without
- * the padding that comparison would silently read as zero and every delta
- * badge would be wrong on the widest view.
+ * Every period is shown against the equivalent stretch before it, so the fetch
+ * has to reach back past the earliest comparison window, not just past the
+ * chart. Getting this wrong does not error — it silently reports a previous
+ * window of zero and every delta badge on the widest periods reads as a record
+ * month.
+ */
+export function earliestDayNeeded(
+  asOfDay: string,
+  days: number,
+  range?: { fromDay?: string | null; toDay?: string | null } | null,
+): string {
+  const candidates = [
+    addDubaiDays(asOfDay, -(Math.max(days, 1) - 1)), // chart series
+    addDubaiDays(asOfDay, -13), // previous 7 days
+    addDubaiDays(asOfDay, -59), // previous 30 days
+    dubaiMonthBounds(asOfDay, 2).fromDay, // the month before last month
+  ];
+
+  const cFrom = range?.fromDay || null;
+  const cTo = range?.toDay || null;
+  if (cFrom && cTo && cFrom <= cTo) {
+    candidates.push(addDubaiDays(cFrom, -dubaiDayCount(cFrom, cTo)));
+  }
+
+  return candidates.reduce((a, b) => (a < b ? a : b));
+}
+
+/**
+ * Build the report: today, yesterday, the trailing 7 and 30 days, last
+ * calendar month, an optional explicit range, and a daily series for the
+ * chart, all split across the four stores.
  */
 export async function buildGrossSalesReport({
   days = 30,
   store = null,
+  fromDay = null,
+  toDay = null,
   nowMs = Date.now(),
 }: {
   days?: number;
   store?: string | null;
+  fromDay?: string | null;
+  toDay?: string | null;
   nowMs?: number;
 } = {}): Promise<GrossSalesReport> {
   const asOfDay = dubaiToday(nowMs);
   const window = Math.min(Math.max(days, 1), 180);
-  const earliestDay = addDubaiDays(asOfDay, -(window - 1 + 7));
-  const { fromUtc } = dubaiDayBoundsUtc(earliestDay);
+  const range = { fromDay, toDay };
 
+  const { fromUtc } = dubaiDayBoundsUtc(earliestDayNeeded(asOfDay, window, range));
   const rows = await OrdersRepository.listInWindow({ from: fromUtc, store });
 
   const orders: GrossSalesOrder[] = rows.map((r) => ({
@@ -45,5 +82,5 @@ export async function buildGrossSalesReport({
   // the stacked chart, so narrow the store list to match the filter.
   const stores = store ? [store] : GROSS_SALES_STORES;
 
-  return computeGrossSales(orders, asOfDay, window, stores);
+  return computeGrossSales(orders, asOfDay, window, stores, range);
 }

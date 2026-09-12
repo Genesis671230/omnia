@@ -63,6 +63,35 @@ export function addDubaiDays(dateIsoDay: string, delta: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+/**
+ * First and last day of the calendar month `monthsBack` before the one
+ * containing `dateIsoDay`. 0 is the current month, 1 the previous one.
+ * Built from the year/month parts rather than by subtracting 30 days, so
+ * "last month" is the real month and not a rolling window that drifts.
+ */
+export function dubaiMonthBounds(
+  dateIsoDay: string,
+  monthsBack = 0,
+): { fromDay: string; toDay: string; label: string } {
+  const [y, m] = dateIsoDay.split("-").map(Number);
+  // Date.UTC normalises an out-of-range month, so month 0 rolls to December
+  // of the previous year on its own.
+  const first = new Date(Date.UTC(y, m - 1 - monthsBack, 1));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0));
+  return {
+    fromDay: first.toISOString().slice(0, 10),
+    toDay: last.toISOString().slice(0, 10),
+    label: first.toLocaleString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }),
+  };
+}
+
+/** Whole days from fromDay to toDay inclusive. Never less than 1. */
+export function dubaiDayCount(fromDay: string, toDay: string): number {
+  const ms =
+    new Date(`${toDay}T00:00:00Z`).getTime() - new Date(`${fromDay}T00:00:00Z`).getTime();
+  return Math.max(Math.round(ms / DAY_MS) + 1, 1);
+}
+
 /** Every Dubai calendar day from fromDay to toDay, both inclusive, ascending. */
 export function dubaiDayRange(fromDay: string, toDay: string): string[] {
   const days: string[] = [];

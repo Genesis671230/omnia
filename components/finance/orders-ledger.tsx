@@ -45,6 +45,7 @@ import { useOrderActions, type FinanceStatus, type ZohoState } from "@/lib/hooks
 import { InvoiceModal } from "@/components/finance/invoice-modal";
 import { ShipModal } from "@/components/finance/ship-modal";
 import { FulfillmentSpine } from "./fulfillment-spine";
+import { GrossSalesStrip } from "./gross-sales-strip";
 
 // ── palette (self-contained; independent of workspace --tokens) ──
 const C = {
@@ -500,7 +501,13 @@ const PAGE_SIZE = 50;
 const STORES = ["All", "WA", "UAE", "KSA", "WOO"];
 const WINDOWS = [{ label: "1d", days: 1 },{ label: "7d", days: 7 },{ label: "30d", days: 30 }, { label: "90d", days: 90 }, { label: "1yr", days: 365 }, { label: "All time", days: 0 }];
 
-export function OrdersLedger() {
+export function OrdersLedger({
+  fromDate = "",
+  toDate = "",
+}: {
+  fromDate?: string;
+  toDate?: string;
+} = {}) {
   const [store, setStore] = useState("All");
   const [location, setLocation] = useState("All locations");
   const [q, setQ] = useState("");
@@ -623,7 +630,36 @@ const generateDispatch = useCallback(async () => {
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
         .spin{animation:vspin 1s linear infinite;}@keyframes vspin{to{transform:rotate(360deg)}}
         @media(prefers-reduced-motion:reduce){.spin{animation-duration:.01ms}}
+
+        /* The filter row referenced .filters/.tabs/.tab/.search as "workspace
+           classes", but nothing in the app ever defined them, so the store and
+           window pickers rendered as unstyled text running together
+           ("AllWAUAEKSAWOO") and read as broken rather than clickable. */
+        .filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+        .filters .search{
+          /* Left padding clears the search icon. Setting the shorthand here
+             would out-specify the pl-8 utility on the element and put the
+             placeholder under the magnifier. */
+          min-width:250px;height:36px;padding:0 12px 0 32px;font:inherit;font-size:12.5px;
+          color:${C.ink};background:${C.card};border:1px solid ${C.line};border-radius:10px;outline:none;
+        }
+        .filters .search::placeholder{color:${C.faint}}
+        .filters .search:focus{border-color:#B08343;box-shadow:0 0 0 3px rgba(176,131,67,.12)}
+        .tabs{display:inline-flex;gap:2px;padding:2px;border:1px solid ${C.line};border-radius:10px;background:${C.card}}
+        .tab{
+          min-height:32px;padding:0 11px;font:inherit;font-size:12px;font-weight:600;
+          color:${C.dim};background:transparent;border:none;border-radius:8px;cursor:pointer;
+          transition:background-color .15s,color .15s;white-space:nowrap;
+        }
+        .tab:hover{color:${C.ink};background:rgba(31,27,22,.04)}
+        .tab.on{color:${C.ink};background:${C.paper};box-shadow:0 1px 2px rgba(31,27,22,.08)}
+        .tab:focus-visible{outline:2px solid #B08343;outline-offset:1px}
       `}</style>
+
+      {/* Period gross sales — every order in the window, not the page on
+          screen. Sits above the ribbon because it answers the first question
+          ("what did we sell") before the ribbon's ("where is that money"). */}
+      <GrossSalesStrip store={store} fromDate={fromDate} toDate={toDate} />
 
       {/* liquidity ribbon */}
       <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 24, padding: "26px 30px", marginBottom: 22, boxShadow: "0 1px 3px rgba(28,25,19,.05)" }}>
