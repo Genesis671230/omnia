@@ -27,13 +27,30 @@ import { SheetMonthReconciliation } from "./sheet-month-reconciliation";
 import { SheetPayoutBreakdown } from "./sheet-payout-breakdown";
 import { computeGatewayBreakdown, type SheetInsightsResponse, type PeriodStats } from "@/lib/finance/payments-sheet-insights";
 
-async function fetchInsights(spreadsheetId: string): Promise<SheetInsightsResponse> {
+/* Ops keeps one spreadsheet per month, registered in payment_sheet_months.
+   The API returns every registered month at once (see readPaymentRowsScoped)
+   along with the list of months it read, so the month chips below are driven
+   by what actually loaded rather than by a hardcoded range. */
+type SheetMonth = { monthKey: string; spreadsheetId: string; label: string };
+type InsightsResponse = SheetInsightsResponse & {
+  months?: SheetMonth[];
+  source?: "explicit" | "registry" | "env-default";
+};
+
+async function fetchInsights(spreadsheetId: string): Promise<InsightsResponse> {
   const params = new URLSearchParams();
   if (spreadsheetId) params.set("spreadsheetId", spreadsheetId);
-  const res = await fetch(`/api/invoices/sheet-insights?${params}`);
+  const res = await fetch(`/api/invoices/sheet-insights?${params}`, { cache: "no-store" });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
   return json;
+}
+
+/** Last calendar day of a "YYYY-MM" key, as YYYY-MM-DD. */
+function monthEndIso(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  // Day 0 of the next month is the last day of this one.
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
 
 const PERIOD_LABELS: [keyof SheetInsightsResponse["periods"], string][] = [
@@ -84,7 +101,8 @@ function daysAgoIso(n: number): string {
 export function SheetInsightsStrip() {
   const [urlInput, setUrlInput] = useState("");
   const [activeId, setActiveId] = useState("");
-  const [activePeriod, setActivePeriod] = useState<keyof SheetInsightsResponse["periods"] | "custom">("allTime");
+  const [activePeriod, setActivePeriod] = useState<keyof SheetInsightsResponse["periods"] | "custom" | "month">("allTime");
+  const [activeMonth, setActiveMonth] = useState<string | null>(null);
   const [customFrom, setCustomFrom] = useState(daysAgoIso(30));
   const [customTo, setCustomTo] = useState(todayIso());
   const [gatewayFilter, setGatewayFilter] = useState("all");
@@ -92,6 +110,12 @@ export function SheetInsightsStrip() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["sheet-insights", activeId],
     queryFn: () => fetchInsights(activeId),
+    // One read now covers every registered month, so it costs six Sheets API
+    // calls (two tabs x three months) rather than two. Hold it briefly instead
+    // of re-reading all of them on every remount; the refresh button and the
+    // month chips both still work without waiting this out.
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
   });
 
   const usingCustomSheet = activeId.trim().length > 0;
@@ -100,6 +124,7 @@ export function SheetInsightsStrip() {
   // the gateway table + exchange table both filter — every fixed period
   // maps to Dubai-local day boundaries, matching computeSheetInsights.
   const [from, to] = useMemo((): [string | null, string | null] => {
+    if (activePeriod === "month" && activeMonth) return [`${activeMonth}-01`, monthEndIso(activeMonth)];
     if (activePeriod === "custom") return [customFrom || null, customTo || null];
     if (activePeriod === "allTime") return [null, null];
     const t = todayIso();
@@ -108,9 +133,14 @@ export function SheetInsightsStrip() {
     if (activePeriod === "thisWeek") return [daysAgoIso(7), t];
     if (activePeriod === "thisMonth") return [t.slice(0, 7) + "-01", t];
     return [null, null];
-  }, [activePeriod, customFrom, customTo]);
+  }, [activePeriod, activeMonth, customFrom, customTo]);
 
   const rows = data?.rows ?? [];
+  // Newest month first — the one ops is actually working in.
+  const months = useMemo(
+    () => [...(data?.months ?? [])].sort((a, b) => b.monthKey.localeCompare(a.monthKey)),
+    [data?.months],
+  );
   const gatewayBreakdownAll = useMemo(() => computeGatewayBreakdown(rows, from, to), [rows, from, to]);
   const gatewayOptions = useMemo(() => [...new Set(gatewayBreakdownAll.map((g) => g.gatewayLabel))].sort(), [gatewayBreakdownAll]);
   const gatewayBreakdown = gatewayFilter === "all" ? gatewayBreakdownAll : gatewayBreakdownAll.filter((g) => g.gatewayLabel === gatewayFilter);
@@ -147,6 +177,44 @@ export function SheetInsightsStrip() {
         </div>
       ) : data ? (
         <>
+          {/* ── Month picker ─────────────────────────────────────────
+              Ops keeps one spreadsheet per month. Every registered month is
+              already loaded, so switching between them is instant and never
+              re-hits the Sheets API. */}
+          {months.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-[#DBEAFE] bg-white p-2.5 shadow-sm">
+              <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Month</span>
+              <button
+                onClick={() => { setActivePeriod("allTime"); setActiveMonth(null); }}
+                className={`rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                  activePeriod === "allTime"
+                    ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
+                    : "border-[#BFDBFE] text-[#64748B] hover:text-[#0F172A]"
+                }`}
+              >
+                All months
+              </button>
+              {months.map((m) => (
+                <button
+                  key={m.monthKey}
+                  onClick={() => { setActivePeriod("month"); setActiveMonth(m.monthKey); }}
+                  className={`rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                    activePeriod === "month" && activeMonth === m.monthKey
+                      ? "border-[#2563EB] bg-gradient-to-r from-[#1E3A8A] to-[#1D4ED8] text-white"
+                      : "border-[#BFDBFE] text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+              {usingCustomSheet && (
+                <span className="ml-auto px-1.5 text-[11px] text-[#94A3B8]">
+                  Viewing one pasted sheet — months are hidden
+                </span>
+              )}
+            </div>
+          )}
+
           {/* ── Trend chart ──────────────────────────────────────────── */}
           <SheetTrendChart rows={rows} from={from} to={to} />
 
@@ -199,7 +267,11 @@ export function SheetInsightsStrip() {
           <SheetExchangeTable spreadsheetId={activeId} from={from ?? ""} to={to ?? ""} />
 
           <div className="px-1 text-[10.5px] text-[#94A3B8]">
-            {data.rowCount} rows read · updated {new Date(data.fetchedAt).toLocaleTimeString()}
+            {data.rowCount} rows read
+            {months.length > 0 && ` across ${months.length} ${months.length === 1 ? "month" : "months"} (${months.map((m) => m.label).join(", ")})`}
+            {data.source === "env-default" && " · no months registered, reading the default sheet only"}
+            {" · updated "}
+            {new Date(data.fetchedAt).toLocaleTimeString()}
           </div>
         </>
       ) : null}

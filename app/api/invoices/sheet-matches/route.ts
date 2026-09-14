@@ -14,7 +14,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildWorkbenchInvoices, defaultWorkbenchFrom } from "@/lib/finance/build-workbench-invoices";
-import { readConfirmedPaymentRows, paymentsSheetConfigured, type PaymentSheetRow } from "@/lib/finance/payments-sheet";
+import { readConfirmedPaymentRowsScoped, paymentsSheetConfigured, type PaymentSheetRow } from "@/lib/finance/payments-sheet";
+import { PaymentSheetMonthsRepository } from "@/lib/repositories/payment-sheet-months.repository";
 import { zohoPaymentModeFor } from "@/lib/integrations/zoho";
 import type { SheetInvoiceMatch, SheetMatchFlag, SheetMatchesResponse, UnmatchedSheetRow, WorkbenchInvoice } from "@/lib/finance/types";
 
@@ -26,9 +27,13 @@ export async function GET(req: NextRequest) {
   const from = p.get("from") ?? defaultWorkbenchFrom();
   const to = p.get("to") ?? new Date().toISOString().slice(0, 10);
 
-  if (!paymentsSheetConfigured()) {
+  // Registered months are a valid configuration on their own — the pinned
+  // env sheet is only the fallback, so requiring it here would 503 an install
+  // that has moved to the month registry.
+  const registeredMonths = await PaymentSheetMonthsRepository.list().catch(() => []);
+  if (registeredMonths.length === 0 && !paymentsSheetConfigured()) {
     return NextResponse.json(
-      { error: "Payments sheet not configured — set GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID (and the shared GOOGLE_SERVICE_ACCOUNT_* vars)" },
+      { error: "Payments sheet not configured — register a month, or set GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID (and the shared GOOGLE_SERVICE_ACCOUNT_* vars)" },
       { status: 503 },
     );
   }
@@ -36,7 +41,7 @@ export async function GET(req: NextRequest) {
   try {
     const [workbenchResult, sheetRowsResult] = await Promise.allSettled([
       buildWorkbenchInvoices({ from, to, status: "unpaid" }),
-      readConfirmedPaymentRows(),
+      readConfirmedPaymentRowsScoped(),
     ]);
 
     // The sheet is the primary data source for this route — if that fails
@@ -44,7 +49,7 @@ export async function GET(req: NextRequest) {
     if (sheetRowsResult.status === "rejected") {
       throw sheetRowsResult.reason;
     }
-    const sheetRows = sheetRowsResult.value;
+    const sheetRows = sheetRowsResult.value.rows;
     const sheetRowsSummary = sheetRows.map((r) => ({
       tab: r.tab, rowNumber: r.rowNumber, orderNumber: r.orderNumber!,
       partyRaw: r.party.raw, paymentDate: r.paymentReceivedDate,

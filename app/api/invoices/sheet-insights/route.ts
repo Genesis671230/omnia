@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   computeGatewayBreakdown, computeSheetInsights, extractSpreadsheetId,
-  paymentsSheetConfigured, readAllPaymentRows,
+  paymentsSheetConfigured, readPaymentRowsScoped,
 } from "@/lib/finance/payments-sheet";
 
 export const runtime = "nodejs";
@@ -36,23 +36,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Google Sheets not configured — set GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY" }, { status: 503 });
   }
 
-  let spreadsheetId: string;
+  // No explicit id means "every month ops has registered", not "the one
+  // sheet the env var happens to be pinned to" — see readPaymentRowsScoped.
+  let explicitId: string | null = null;
   if (rawId) {
     const extracted = extractSpreadsheetId(rawId);
     if (!extracted) return NextResponse.json({ error: "Couldn't find a spreadsheet id in that URL" }, { status: 400 });
-    spreadsheetId = extracted;
-  } else {
-    if (!paymentsSheetConfigured()) {
-      return NextResponse.json({ error: "No spreadsheetId given and no default payments sheet configured" }, { status: 503 });
-    }
-    spreadsheetId = process.env.GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID!;
+    explicitId = extracted;
   }
 
   try {
-    const rows = await readAllPaymentRows(spreadsheetId);
+    const { rows, months, spreadsheetId, source } = await readPaymentRowsScoped(explicitId);
+    if (rows.length === 0 && months.length === 0 && !paymentsSheetConfigured()) {
+      return NextResponse.json(
+        { error: "No payments sheet available — register a month under Settings, or set GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID" },
+        { status: 503 },
+      );
+    }
     const insights = computeSheetInsights(rows, spreadsheetId);
     const gatewayBreakdown = computeGatewayBreakdown(rows, from, to);
-    return NextResponse.json({ ...insights, gatewayBreakdown, rows });
+    return NextResponse.json({ ...insights, gatewayBreakdown, rows, months, source });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

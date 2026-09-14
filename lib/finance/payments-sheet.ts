@@ -326,6 +326,92 @@ export async function readConfirmedPaymentRows(spreadsheetId?: string): Promise<
   return rows.filter((r) => r.actualPaymentStatus.toLowerCase() === "payment received");
 }
 
+export type SheetReadSource = "explicit" | "registry" | "env-default";
+
+/**
+ * Which sheet (or sheets) a payments-sheet surface should read.
+ *
+ * Pure so the choice itself is testable — it is the whole bug. The invoices
+ * workbench went straight to the env-pinned id whenever no explicit sheet was
+ * pasted, so with three months registered it still only ever read one.
+ * "env-default" is a last resort for an install with an empty registry, never
+ * a shortcut past a registry that has months in it.
+ */
+export function resolveSheetSource(
+  explicitId: string | null | undefined,
+  registeredMonthCount: number,
+): SheetReadSource {
+  if (explicitId?.trim()) return "explicit";
+  if (registeredMonthCount > 0) return "registry";
+  return "env-default";
+}
+
+export type ScopedSheetRead = {
+  rows: PaymentSheetRow[];
+  /** Every month actually read. Empty when one explicit sheet was requested. */
+  months: PaymentSheetMonth[];
+  /** The single sheet read, or "" when several months were combined. */
+  spreadsheetId: string;
+  source: SheetReadSource;
+};
+
+/**
+ * The read every payments-sheet surface should use.
+ *
+ * Ops keeps ONE spreadsheet per month and registers each in
+ * `payment_sheet_months`. `GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID` is a single
+ * pinned id that only ever names one of them, so anything reading it directly
+ * silently shows that one month forever — which is exactly what the invoices
+ * workbench did. It was pinned to the August sheet, so its chart, its gateway
+ * tables and its "From payments sheet" matcher could not see September's rows
+ * at all, and September's newly added invoices simply never appeared.
+ *
+ * Order of preference:
+ *   1. An explicit id (the "paste a sheet URL" path) — read exactly that sheet.
+ *   2. The month registry — read every registered month.
+ *   3. The env default — a single sheet, for an install with an empty registry.
+ *
+ * The registry path scopes each month's rows to its own month key, so a
+ * September sheet started by duplicating August does not double-count the
+ * carried-over rows. That is not hypothetical: the August sheet already
+ * carries a September-dated row.
+ */
+export async function readPaymentRowsScoped(spreadsheetId?: string | null): Promise<ScopedSheetRead> {
+  const explicit = spreadsheetId?.trim();
+  if (resolveSheetSource(explicit, 0) === "explicit") {
+    return {
+      rows: await readAllPaymentRows(explicit),
+      months: [],
+      spreadsheetId: explicit!,
+      source: "explicit",
+    };
+  }
+
+  const { months, rows } = await readAllPaymentRowsAllMonths();
+  if (resolveSheetSource(null, months.length) === "registry") {
+    return { rows, months, spreadsheetId: "", source: "registry" };
+  }
+
+  // No months registered yet — fall back to the pinned sheet so a fresh
+  // install still shows something rather than an empty page.
+  const id = resolveId();
+  return {
+    rows: await readAllPaymentRows(id),
+    months: [],
+    spreadsheetId: id,
+    source: "env-default",
+  };
+}
+
+/** Confirmed-payment rows across every registered month. See readPaymentRowsScoped. */
+export async function readConfirmedPaymentRowsScoped(spreadsheetId?: string | null): Promise<ScopedSheetRead> {
+  const read = await readPaymentRowsScoped(spreadsheetId);
+  return {
+    ...read,
+    rows: read.rows.filter((r) => r.actualPaymentStatus.toLowerCase() === "payment received"),
+  };
+}
+
 export type ExchangeLineItem = { sku: string; title: string; qty: number; totalAed: number };
 export type ExchangeWithOrder = {
   tab: SheetTabKey;

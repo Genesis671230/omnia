@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   extractSpreadsheetId, joinExchangeLineItems, listExchangeRows,
-  paymentsSheetConfigured, readAllPaymentRows,
+  readPaymentRowsScoped,
 } from "@/lib/finance/payments-sheet";
 
 export const runtime = "nodejs";
@@ -25,20 +25,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Google Sheets not configured" }, { status: 503 });
   }
 
-  let spreadsheetId: string;
+  // Same rule as sheet-insights: no explicit id means every registered
+  // month, not just whichever single sheet the env var is pinned to.
+  let explicitId: string | null = null;
   if (rawId) {
     const extracted = extractSpreadsheetId(rawId);
     if (!extracted) return NextResponse.json({ error: "Couldn't find a spreadsheet id in that URL" }, { status: 400 });
-    spreadsheetId = extracted;
-  } else {
-    if (!paymentsSheetConfigured()) {
-      return NextResponse.json({ error: "No spreadsheetId given and no default payments sheet configured" }, { status: 503 });
-    }
-    spreadsheetId = process.env.GOOGLE_SHEETS_PAYMENTS_SPREADSHEET_ID!;
+    explicitId = extracted;
   }
 
   try {
-    const rows = await readAllPaymentRows(spreadsheetId);
+    const { rows } = await readPaymentRowsScoped(explicitId);
     const exchangeRows = listExchangeRows(rows, from, to);
     const exchanges = await joinExchangeLineItems(exchangeRows);
     return NextResponse.json({ exchanges });
