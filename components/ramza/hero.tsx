@@ -19,9 +19,9 @@ export function Hero({ h1, whatsappHref }: { h1: string; whatsappHref: string })
               style={{ borderColor: "var(--rule)", color: "var(--ink-60)" }}
             >
               <span className="size-1.5 rounded-full" style={{ background: "var(--brand)" }} />
-              Payout reconciliation for UAE &amp; KSA e-commerce
+              Payout reconciliation
             </p>
-            <h1 className="r-h1 mt-5">{h1}</h1>
+            <h4 className="r-h1 mt-0">{h1}</h4>
             <p className="r-lead r-measure mt-5" style={{ color: "var(--ink-60)" }}>
               {HERO_SUB}
             </p>

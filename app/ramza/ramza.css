@@ -586,6 +586,68 @@
   box-shadow: none !important;
 }
 
+/* Range slider — filled track to the thumb, so the value reads at a glance
+   without looking at the number. Both engines need their own pseudo-elements;
+   they cannot be combined into one selector list because an unrecognised
+   pseudo invalidates the whole rule. */
+[data-ramza] .r-range {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+[data-ramza] .r-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--ledger) 0%,
+    var(--ledger) var(--r-range-pct, 50%),
+    var(--rule) var(--r-range-pct, 50%),
+    var(--rule) 100%
+  );
+}
+[data-ramza] .r-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--rule);
+}
+[data-ramza] .r-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ledger);
+}
+[data-ramza] .r-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 2px solid var(--ledger);
+  box-shadow: 0 2px 8px -2px rgba(16, 22, 58, 0.35);
+  transition: transform 0.15s ease;
+}
+[data-ramza] .r-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 2px solid var(--ledger);
+  box-shadow: 0 2px 8px -2px rgba(16, 22, 58, 0.35);
+}
+[data-ramza] .r-range:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+[data-ramza] .r-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 /* Inputs */
 [data-ramza] .r-field {
   width: 100%;

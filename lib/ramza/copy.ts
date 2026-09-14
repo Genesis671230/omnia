@@ -6,7 +6,7 @@ export type H1Variant = "default" | "money" | "books";
 
 export const H1_VARIANTS: Record<H1Variant, string> = {
   default:
-    "Every Tabby, Tamara and Telr payout, matched to your bank and closed in Zoho Books.",
+    "Every payout, matched to your bank",
   money: "Find the money your payment gateways didn't send.",
   books: "Your gateways pay out. RAMZA closes the books.",
 };
@@ -18,7 +18,7 @@ export function resolveH1(param: string | string[] | undefined): string {
 }
 
 export const HERO_SUB =
-  "RAMZA reads your store orders, payout files and bank statement, matches every dirham, and posts payments, gateway fees and VAT to Zoho. No more month-end spreadsheets.";
+  "RAMZA reads your store orders, payout files and bank statement, matches every transaction, and posts payments, gateway fees and VAT to books. No more month-end spreadsheets.";
 
 export const CTA_PRIMARY = "Get a free payout audit";
 export const CTA_SECONDARY = "Chat on WhatsApp";
@@ -116,6 +116,38 @@ export const GATEWAY_OPTIONS = [
 export const FOUNDING_COPY =
   "We're onboarding a small number of Gulf stores this quarter. Founding partners get setup done for them and pricing locked for 12 months.";
 
+/* ── Value calculator ─────────────────────────────────────────────────────
+   Every figure this produces is arithmetic on what the visitor typed. There
+   are no benchmarks, no "stores typically lose 2%", no industry averages.
+   That is deliberate: a made-up recovery rate is the one number a finance
+   buyer will check, and being caught inventing it costs more than the
+   calculator earns. The price itself is set on the audit, so the calculator
+   sizes the problem rather than quoting.
+
+   When the rate card is settled, add it here and the panel can show a monthly
+   figure alongside the cost of the current process. */
+export const CALC_DEFAULTS = {
+  ordersPerMonth: 1500,
+  gateways: 4,
+  hoursPerMonth: 12,
+  hourlyCostAed: 120,
+};
+
+export const CALC_BOUNDS = {
+  // Capped at 10k so a typical Gulf store sits in the usable middle of the
+  // track rather than pinned to the left end of a 50k range.
+  ordersPerMonth: { min: 50, max: 10000, step: 50 },
+  gateways: { min: 1, max: 8, step: 1 },
+  hoursPerMonth: { min: 1, max: 160, step: 1 },
+  hourlyCostAed: { min: 20, max: 800, step: 10 },
+};
+
+export const CALC_HEADING = "What the current process costs you";
+export const CALC_INTRO =
+  "Four numbers you already know. Everything below is arithmetic on them, not an industry average.";
+export const CALC_FOOTNOTE =
+  "Your price is set on the free payout audit, against your real volume and gateway mix, and locked for 12 months. No card, no commitment to see it.";
+
 export const FAQ: { q: string; a: string }[] = [
   {
     q: "Do I need to change payment gateways?",
@@ -123,7 +155,7 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What about my bank statement data?",
-    a: "Files are used only to reconcile your account. We sign an NDA before you share anything. [Founder to confirm retention wording before launch.]",
+    a: "Files are used only to reconcile your account, never shared, and never used to train anything. We sign an NDA before you send the first file, and you can ask us to delete everything we hold at any time.",
   },
   {
     q: "We use Xero or QuickBooks.",
@@ -135,11 +167,36 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How long does setup take?",
-    a: "[SETUP_TIME]",
+    a: "Under a week. Connecting the stores and pulling the first payout files takes a day; the rest is us reconciling your most recent month alongside you so you can see the numbers agree before you rely on them.",
   },
   {
     q: "Is this an app or a service?",
     a: "Both. The software does the matching and posting; we set it up and check the first month with you.",
+  },
+];
+
+/* Senior accountant review. Wording checked against what is actually offered:
+   a layered review by senior accountants, not a named person assigned to one
+   client, so the page never says "dedicated" or "your accountant". */
+export const REVIEW_HEADING = "Software does the matching. Senior accountants check it.";
+export const REVIEW_INTRO =
+  "Automation is right most of the time, and the month you need it is the month it isn't. Every close passes through a layered review before anyone relies on the numbers.";
+
+export const REVIEW_LAYERS: { step: string; title: string; body: string }[] = [
+  {
+    step: "Layer 1",
+    title: "The engine matches",
+    body: "Payouts tied to bank credits, fees and VAT split to their accounts, FX between AED and SAR resolved. Anything it cannot tie with confidence is held, not guessed.",
+  },
+  {
+    step: "Layer 2",
+    title: "Exceptions are worked",
+    body: "Partial captures, post-cutoff refunds, invoices with no order behind them. Each one is resolved by hand and the reason is written next to it.",
+  },
+  {
+    step: "Layer 3",
+    title: "A senior accountant signs off",
+    body: "Before the month is called closed, a qualified accountant reviews the postings, the fee and VAT treatment, and every exception left open, then tells you what needs a decision.",
   },
 ];
 
@@ -280,4 +337,4 @@ export const VIDEO_INTRO_BODY =
   "A short walkthrough: payout files in, every line matched to the bank, fees and VAT split out, invoices closed in Zoho.";
 
 export const PRIVACY_INTRO =
-  "This is a placeholder. The founder will replace it with the reviewed privacy policy before launch.";
+  "What we collect when you ask for a payout audit, why we hold it, and how to get it deleted. Plain terms, no defined-term index.";

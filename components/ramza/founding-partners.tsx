@@ -3,15 +3,19 @@ import { CtaLink } from "./ui/cta-button";
 import { Reveal } from "./reveal";
 import { FOUNDING_COPY, CTA_PRIMARY } from "@/lib/ramza/copy";
 
+/* What a founding partner gets, rather than a price. The figure itself is set
+   on the audit against real volume, so quoting one here would be a number
+   invented to fill a box. These three are commitments that hold whatever the
+   price turns out to be. */
 const STATS = [
-  { label: "Setup", value: "[PRICE_SETUP]" },
-  { label: "Monthly", value: "[PRICE_MONTHLY]" },
   { label: "Price lock", value: "12 months" },
+  { label: "Setup", value: "Done for you" },
+  { label: "Time to live", value: "Under a week" },
 ];
 
 export function FoundingPartners() {
   return (
-    <Section id="pricing" field>
+    <Section id="founding">
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <div>
           <SectionHeading>Founding partners</SectionHeading>

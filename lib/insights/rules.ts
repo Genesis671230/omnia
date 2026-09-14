@@ -305,7 +305,7 @@ export function detectRevenueMomentum(input: RulesInput): InsightFact[] {
         : `Revenue is down ${Math.abs(delta * 100).toFixed(0)}% on the previous ${input.windowDays} days`,
       why: `${aed(input.revenue)} this window vs ${aed(input.previousRevenue)} in the ${input.windowDays} days before.`,
       recommendation: up
-        ? "Find what drove it — the store, product, or campaign behind the jump is where the next dirham goes."
+        ? "Find what drove it — the store, product, or campaign behind the jump."
         : "Check the store split and campaign cards below to see where the drop is coming from before it compounds.",
     },
   }];

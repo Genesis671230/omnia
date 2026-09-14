@@ -33,7 +33,7 @@ export default function OgImage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ fontSize: 52, fontWeight: 600, lineHeight: 1.1, maxWidth: 900 }}>
+          <div style={{ fontSize: 54, fontWeight: 600, lineHeight: 1.1, maxWidth: 900 }}>
             Every Tabby, Tamara and Telr payout, matched to your bank and closed in Zoho Books.
           </div>
           <div

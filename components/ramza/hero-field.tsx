@@ -1,3 +1,5 @@
+"use client";
+
 /* The hero ground.
 
    This replaces the stock clip that used to sit here (public/ramza/hero-bg.mp4
@@ -11,6 +13,9 @@
    a few kilobytes, stays sharp at any density, follows the theme, and has
    nothing to load. */
 
+import { useRef } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+
 const ROWS = 14;
 const ROW_H = 34;
 
@@ -22,6 +27,16 @@ function rand(seed: number): number {
 }
 
 export function HeroField() {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+  // Hero parallax is keyed to the page scroll from the top, not to the element
+  // crossing the viewport, because the hero starts already in view.
+  const { scrollY } = useScroll();
+  const ledgerY = useTransform(scrollY, [0, 900], [0, 130]);
+  const connectorY = useTransform(scrollY, [0, 900], [0, 62]);
+  const dotsY = useTransform(scrollY, [0, 900], [0, 34]);
+  const still = { y: 0 };
+
   const rows = Array.from({ length: ROWS }, (_, i) => {
     const y = 60 + i * ROW_H;
     const matched = rand(i + 3) > 0.32;
@@ -30,9 +45,10 @@ export function HeroField() {
   });
 
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden">
+    <div ref={ref} aria-hidden className="absolute inset-0 overflow-hidden">
       {/* the ledger itself, anchored right so it never fights the headline */}
-      <svg
+      <motion.svg
+        style={reduce ? still : { y: ledgerY }}
         className="absolute inset-y-0 right-0 h-full w-[min(100%,1100px)]"
         viewBox="0 0 1100 560"
         preserveAspectRatio="xMaxYMid slice"
@@ -124,10 +140,11 @@ export function HeroField() {
             </g>
           ))}
         </g>
-      </svg>
+      </motion.svg>
 
       {/* five connectors: order, gateway, payout, bank, books */}
-      <svg
+      <motion.svg
+        style={reduce ? still : { y: connectorY }}
         className="absolute inset-0 h-full w-full"
         viewBox="0 0 1440 800"
         preserveAspectRatio="none"
@@ -155,10 +172,13 @@ export function HeroField() {
             fillOpacity="0.3"
           />
         ))}
-      </svg>
+      </motion.svg>
 
       {/* dot field and grain over the top */}
-      <div className="r-dotgrid absolute inset-0 opacity-[0.55]" />
+      <motion.div
+        style={reduce ? still : { y: dotsY }}
+        className="r-dotgrid absolute inset-[-10%] opacity-[0.55]"
+      />
       <div className="r-grain absolute inset-0" />
 
       {/* readability veil: solid under the copy, open on the right */}

@@ -13,6 +13,8 @@ import { PostingStack } from "@/components/ramza/posting-stack";
 import { AccountantView } from "@/components/ramza/accountant-view";
 import { Copilot } from "@/components/ramza/copilot";
 import { Outcomes } from "@/components/ramza/outcomes";
+import { AccountantReview } from "@/components/ramza/accountant-review";
+import { ValueCalculator } from "@/components/ramza/value-calculator";
 import { Integrations } from "@/components/ramza/integrations";
 import { AuditForm } from "@/components/ramza/audit-form";
 import { FoundingPartners } from "@/components/ramza/founding-partners";
@@ -21,7 +23,10 @@ import { Footer } from "@/components/ramza/footer";
 import { resolveH1, FAQ } from "@/lib/ramza/copy";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://ramza.example"),
+  // ramza.example was a stand-in. Inferred from the contact address the
+  // founder set (hello@ramza.ai); override with NEXT_PUBLIC_RAMZA_ORIGIN if
+  // the live domain differs.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_RAMZA_ORIGIN || "https://ramza.ai"),
   title: "RAMZA — Payout reconciliation for Gulf e-commerce",
   description:
     "RAMZA matches Tabby, Tamara, Telr, Stripe and COD payouts to your bank and closes invoices in Zoho Books automatically. Built for UAE and KSA stores.",
@@ -36,8 +41,8 @@ export const metadata: Metadata = {
 
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
-const EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "hello@ramza.example";
-const LEGAL_LINE = process.env.LEGAL_LINE || "LEGAL_LINE";
+const EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "hello@ramza.ai";
+const LEGAL_LINE = process.env.LEGAL_LINE || "Lexoro Solutions LLC";
 
 function whatsappHref(): string {
   if (!WHATSAPP) return "#audit";
@@ -124,7 +129,9 @@ export default async function RamzaPage({
         <PostingStack />
         <Copilot />
         <Outcomes />
+        <AccountantReview />
         <Integrations />
+        <ValueCalculator />
         <FoundingPartners />
         <Faq />
         <AuditForm />

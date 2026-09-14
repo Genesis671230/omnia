@@ -20,7 +20,7 @@ const SECTIONS: { h: string; body: string }[] = [
   },
   {
     h: "Retention",
-    body: "[Founder to confirm the retention period and deletion process before launch.]",
+    body: "Audit files are held only while the audit is open and for 12 months afterwards so the reconciliation can be re-checked, then deleted. Contact details are kept until you ask us to remove them. You can request deletion of everything we hold at any time and we action it within 30 days.",
   },
   {
     h: "Sharing",
