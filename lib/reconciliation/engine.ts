@@ -616,15 +616,52 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
       settlementRows.map((r) => r.order_uid),
     );
     const existingById = new Map(existing.map((e) => [e.id, e]));
+
+    // An order must never hold two settlement records — that would mean two
+    // publishable Zoho Customer Payments for one sale. But "a record exists
+    // under a different id" has two very different causes:
+    //
+    //  * The other record is LIVE — its bank credit still claims this order.
+    //    A genuine conflict; leave both alone and keep the newer row out.
+    //  * The other record is ORPHANED — its bank credit no longer claims the
+    //    order, because payout assignment moved it to the credit that really
+    //    paid it. Its id embeds the old bank_line_id, so it can never be
+    //    reached again, and while it sits there it blocks the correct record
+    //    from ever being written. 37 of 53 settled credits had no settlement
+    //    record at all for exactly this reason.
+    //
+    // Orphans are superseded: the stale row is deleted and the correct one
+    // written, carrying the evidence forward. A row already published to Zoho
+    // is never touched — a booked payment is history.
+    const liveLineIds = new Set(lines.map((l) => l.id));
     const foreign = new Set<string>();
+    const orphanedIds: string[] = [];
+    const evidenceByUid = new Map<string, (typeof existing)[number]>();
     for (const e of existing) {
       const candidate = settlementRows.find((r) => r.order_uid === e.order_uid);
-      if (candidate && e.id !== candidate.id) foreign.add(e.order_uid);
+      if (!candidate || e.id === candidate.id) continue;
+      const stillLive = liveLineIds.has(e.bank_line_id) && e.bank_line_id !== candidate.bank_line_id
+        ? lines.some((l) => l.id === e.bank_line_id && l.resolvedOrders.includes(candidate.order_number))
+        : false;
+      if (e.zoho_payment_id || stillLive) {
+        foreign.add(e.order_uid);
+      } else {
+        orphanedIds.push(e.id);
+        evidenceByUid.set(e.order_uid, e); // carry the confirmation across
+      }
+    }
+    if (orphanedIds.length > 0) {
+      const removed = await SettlementsRepository.deleteOrphanedByIds(orphanedIds);
+      if (removed > 0) {
+        console.log(`[recon] superseded ${removed} settlement record(s) orphaned by payout reassignment`);
+      }
     }
     const rows = settlementRows
       .filter((r) => !foreign.has(r.order_uid))
       .map((r) => {
-        const prior = existingById.get(r.id);
+        // Either this row's own prior state, or the state of the orphan it
+        // supersedes — a founder's confirmation survives the move.
+        const prior = existingById.get(r.id) ?? evidenceByUid.get(r.order_uid);
         return prior
           ? {
               ...r,

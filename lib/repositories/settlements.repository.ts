@@ -92,6 +92,9 @@ export type ExistingSettlementRecord = Pick<
   | "evidence_document_id"
   | "zoho_payment_id"
   | "zoho_published_at"
+  // Which bank credit this record belongs to. Needed to tell a record that is
+  // still live from one orphaned by a payout reassignment — see persistResults.
+  | "bank_line_id"
 >;
 
 export const SettlementsRepository = {
@@ -157,13 +160,38 @@ export const SettlementsRepository = {
       const { data, error } = await supabase
         .from("settlement_records")
         .select(
-          "id, order_uid, evidence_type, evidence_confirmed, evidence_confirmed_by, evidence_confirmed_at, evidence_document_id, zoho_payment_id, zoho_published_at",
+          "id, order_uid, bank_line_id, evidence_type, evidence_confirmed, evidence_confirmed_by, evidence_confirmed_at, evidence_document_id, zoho_payment_id, zoho_published_at",
         )
         .in("order_uid", orderUids.slice(i, i + 200));
       if (error) throw new Error(`settlement_records existing select failed: ${error.message}`);
       out.push(...(data ?? []));
     }
     return out;
+  },
+
+  /** Drop settlement records that a reassignment has orphaned.
+   *
+   *  A record's id is `${order_uid}_${bank_line_id}`, so when the reconciler
+   *  moves an order to the credit that actually paid it, the old row can never
+   *  be reached again — and while it exists, the "one settlement record per
+   *  order" guard blocks the correct row from being written at all. Callers
+   *  must never pass a record that carries a zoho_payment_id: a booked payment
+   *  is history, not something to relocate. */
+  async deleteOrphanedByIds(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    let removed = 0;
+    for (let i = 0; i < ids.length; i += 200) {
+      const chunk = ids.slice(i, i + 200);
+      const { data, error } = await supabase
+        .from("settlement_records")
+        .delete()
+        .in("id", chunk)
+        .is("zoho_payment_id", null) // belt and braces: never delete a booked row
+        .select("id");
+      if (error) throw new Error(`settlement_records orphan delete failed: ${error.message}`);
+      removed += (data ?? []).length;
+    }
+    return removed;
   },
 
   async markStripeEvidence(settlementIds: string[]): Promise<void> {
