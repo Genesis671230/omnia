@@ -7,8 +7,15 @@ import { exchangeCodeForTokens } from "@/lib/integrations/gmail";
 // credential and belongs in the environment, alongside every other secret here.
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  console.log("url", url.toString());
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
+
+  console.log("code", code);
+  console.log("error", error);
+
+  console.log("process.env.GMAIL_REDIRECT_URI", process.env.GMAIL_REDIRECT_URI);
+  console.log("process.env.GMAIL_CLIENT_SECRET", process.env.GMAIL_CLIENT_SECRET);
 
   if (error) {
     return new NextResponse(page(`Google returned an error: ${escapeHtml(error)}`), {

@@ -1,6 +1,12 @@
 /* Shared client types for the reconciliation surface. Mirrors the engine's
  * ReconLine plus the two fields the API adds on top (posting state). */
 
+import type { ReactNode } from "react";
+
+/** Renders a payout upload control. With a bankLineId the uploaded file is
+ *  attached to that credit; "dropzone" renders the large drag-and-drop area. */
+export type UploadSlotFor = (provider: string, bankLineId?: string, variant?: "button" | "dropzone") => ReactNode;
+
 export type ReconTxn = {
   ref: string;
   netShare: number;
@@ -16,6 +22,12 @@ export type ReconTxn = {
   netOriginal: number | null;
   grossOriginal: number | null;
   feeOriginal: number | null;
+  /** VAT charged on top of feeShare (Tamara). Null when the fee already
+   *  includes VAT (Tabby) or the file doesn't itemise it. */
+  vatShare?: number | null;
+  vatOriginal?: number | null;
+  /** Order this line resolved to (itself, prefix-free, or a manual link). */
+  orderNumber?: string | null;
 };
 
 export type ReconLine = {
@@ -55,7 +67,20 @@ export type ZohoPostingState = {
   result: unknown;
 };
 
+export type UnmatchedPayout = {
+  id: string;
+  provider: string;
+  net: number;
+  currency: string | null;
+  netOriginal: number | null;
+  source: string | null;
+  orders: number;
+  uploadedAt: string | null;
+  pinnedTo: string | null;
+};
+
 export type ReconPayload = {
+  unmatchedPayouts?: UnmatchedPayout[];
   lines: ReconLine[];
   settledOrders: number;
   totalOrders: number;
@@ -122,6 +147,41 @@ export const aed0 = (v: number) =>
 // locale-dependent symbol they may not recognize for SAR/KWD.
 export const fmtOriginal = (v: number, currency: string) =>
   `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} ${currency}`;
+
+/** Payout foots to the bank but some lines match no order: the matched
+ *  orders can be confirmed and booked now; the rest get linked on screen.
+ *  Mirrors isConfirmablePartial() in lib/reconciliation/engine.ts. */
+export const isConfirmablePartial = (l: Pick<ReconLine, "state" | "payout" | "resolvedOrders">) =>
+  l.state === "ORDERS_UNRESOLVED" && !!l.payout && l.resolvedOrders.length > 0;
+
+/** A cross-border credit whose only gap is the slice the remitting bank kept
+ *  between its quoted rate and the AED it credited. Still a Variance on screen,
+ *  but bookable: the remainder goes to Exchange Gain or Loss.
+ *  Mirrors isBankFxVariance() in lib/reconciliation/engine.ts. */
+export const BANK_FX_VARIANCE_LIMIT_PCT = 0.01;
+export const BANK_FX_VARIANCE_CEILING_AED = 500;
+export const bankFxVarianceLimit = (bankAmount: number) =>
+  Math.max(1, Math.min(Math.abs(bankAmount) * BANK_FX_VARIANCE_LIMIT_PCT, BANK_FX_VARIANCE_CEILING_AED));
+
+export const isBankFxVariance = (
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
+) =>
+  l.state === "PAYOUT_VARIANCE" &&
+  !!l.payout &&
+  !!l.payout.currency &&
+  l.payout.currency.toUpperCase() !== "AED" &&
+  l.resolvedOrders.length > 0 &&
+  Math.abs(l.variance) <= bankFxVarianceLimit(l.bankAmount);
+
+/** Settled, a partial that can be confirmed with lines still unmatched, or a
+ *  cross-border credit whose only gap is the bank's own cut. */
+/** Confirming asserts "this credit is right", which means nothing without the
+ *  payout that proves it — the API refuses it outright (NoPayoutToConfirmError).
+ *  The payout check is explicit rather than implied by SETTLED so the button
+ *  can never reappear on a fileless row. */
+export const isConfirmable = (
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
+) => !!l.payout && (l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l));
 
 export const STATE_META = {
   SETTLED: { label: "Settled", tone: "ok" },

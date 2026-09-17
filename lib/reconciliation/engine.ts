@@ -11,7 +11,7 @@
 // An order NEVER claims it settled itself. It waits to be claimed by a
 // bank-confirmed payout. Anything a payout can't explain is an exception.
 
-import { supabase } from "@/lib/supabase";
+import { supabase, selectAllPages } from "@/lib/supabase";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
@@ -91,6 +91,13 @@ export type ReconTransactionShare = {
   netOriginal: number | null;
   grossOriginal: number | null;
   feeOriginal: number | null;
+  // VAT charged on top of feeShare (Tamara), rescaled like the other AED
+  // shares. Null when the file doesn't itemise it — Tabby's fee includes VAT.
+  vatShare?: number | null;
+  vatOriginal?: number | null;
+  // The order this line resolved to — the ref itself, its store-prefix-free
+  // form, or a manual link (payout_ref_links). Null while unresolved.
+  orderNumber?: string | null;
 };
 
 // Parsers convert cross-currency payouts to AED at upload time with the static
@@ -114,6 +121,8 @@ function rescaleShares(
     netOriginal: t.net_original,
     grossOriginal: t.gross_original,
     feeOriginal: t.fee_original,
+    vatShare: t.vat_aed != null && t.vat_aed !== 0 ? +(t.vat_aed * scale).toFixed(2) : null,
+    vatOriginal: t.vat_original != null && t.vat_original !== 0 ? t.vat_original : null,
   }));
   if (shares.length === 0) return shares;
 
@@ -211,13 +220,15 @@ export type ComputeReconInputs = {
   /** Persisted review flags, keyed by bank line id. Optional so existing
    *  fixture tests construct inputs unchanged. */
   reviews?: Map<string, { flag: boolean; note: string }>;
+  /** Manual ref → order links, keyed `${payoutId}|${ref}`. */
+  links?: Map<string, string>;
 };
 
 // Pure: bank → payout → orders matching, no I/O. Split out of
 // runReconciliation() so it can be fixture-tested without a live database —
 // see tests/reconciliation/engine.test.ts.
 export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
-  const { credits, payouts, orders, confirmations, reviews } = inputs;
+  const { credits, payouts, orders, confirmations, reviews, links } = inputs;
   const orderNumbers = new Set(orders.map((o) => o.order_number));
   const claimedPayouts = new Set<string>();
   const lines: ReconLine[] = [];
@@ -228,13 +239,20 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     // a payout explains a credit when provider agrees AND net ≈ bank amount
     // (expectedNetFor prefers the bank's own quoted wire rate over our static
     // FX estimate, so cross-currency payouts still match precisely)
-    const payout = payouts.find(
-      (p) =>
-        !claimedPayouts.has(p.id) &&
-        p.gateway === provider &&
-        Math.abs(expectedNetFor(p, credit).net - credit.amount) <=
-          Math.max(TOLERANCE_AED, credit.amount * 0.02),
-    );
+    // A payout uploaded from this credit's own panel belongs to it, whatever
+    // its totals say — a wrong total shows as Variance on the credit, instead
+    // of the file matching nothing and seeming to disappear. Payouts pinned
+    // to another credit never auto-match here.
+    const payout =
+      payouts.find((p) => !claimedPayouts.has(p.id) && p.bank_line_id === credit.id) ??
+      payouts.find(
+        (p) =>
+          !claimedPayouts.has(p.id) &&
+          !p.bank_line_id &&
+          p.gateway === provider &&
+          Math.abs(expectedNetFor(p, credit).net - credit.amount) <=
+            Math.max(TOLERANCE_AED, credit.amount * 0.02),
+      );
 
     const confirmation = confirmations.get(credit.id);
     const review = reviews?.get(credit.id);
@@ -299,8 +317,11 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     const unresolvedRefs: string[] = [];
     const refundedOrders: string[] = [];
     const qualityIssues: QualityIssue[] = [];
+    const orderByRef = new Map<string, string>();
     for (const ref of payout.order_refs) {
-      const hit = refCandidates(ref).find((c) => orderNumbers.has(c));
+      const linked = links?.get(`${payout.id}|${ref}`);
+      const hit = (linked && orderNumbers.has(linked) ? linked : undefined) ?? refCandidates(ref).find((c) => orderNumbers.has(c));
+      if (hit) orderByRef.set(ref, hit);
       const tx = txByRef.get(ref);
       const isRefund = tx?.is_refund ?? false;
 
@@ -351,7 +372,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       unresolvedRefs,
       refundedOrders,
       qualityIssues,
-      transactions,
+      transactions: transactions.map((t) => ({ ...t, orderNumber: orderByRef.get(t.ref) ?? null })),
       rateDriftAed,
       fxFeeAed,
       state,
@@ -373,25 +394,90 @@ export async function runReconciliation(): Promise<ReconLine[]> {
     OrdersRepository.listAll(),
   ]);
 
-  const { data: existing } = await supabase
-    .from("recon_lines")
-    .select("bank_line_id, confirmed_by, confirmed_at, review_flag, review_note");
+  // Paged: an unpaginated PostgREST select stops at 1000 rows and says nothing,
+  // which would quietly drop confirmations and review flags off older credits.
+  const existing = await selectAllPages<{
+    bank_line_id: string; confirmed_by: string | null; confirmed_at: string | null;
+    review_flag: boolean | null; review_note: string | null;
+  }>(
+    (from, to) =>
+      supabase
+        .from("recon_lines")
+        .select("bank_line_id, confirmed_by, confirmed_at, review_flag, review_note")
+        .range(from, to),
+    "recon_lines select",
+  );
   const confirmations = new Map(
-    (existing ?? [])
+    existing
       .filter((r) => r.confirmed_by)
       .map((r) => [r.bank_line_id, { by: r.confirmed_by, at: r.confirmed_at }]),
   );
   // Only flagged rows are carried — an unflagged row is the default, and
   // materialising one entry per credit would just be noise in the map.
   const reviews = new Map(
-    (existing ?? [])
+    existing
       .filter((r) => r.review_flag)
       .map((r) => [r.bank_line_id, { flag: true, note: r.review_note ?? "" }]),
   );
 
-  const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews });
+  const linkRows = await selectAllPages<{ payout_id: string; order_ref: string; order_number: string }>(
+    (from, to) => supabase.from("payout_ref_links").select("payout_id, order_ref, order_number").range(from, to),
+    "payout_ref_links select",
+  );
+  const links = new Map(linkRows.map((r) => [`${r.payout_id}|${r.order_ref}`, r.order_number]));
+
+  const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews, links });
   await persistResults(lines, orders);
   return lines;
+}
+
+/** The payout foots to the bank, but some of its lines match no order. The
+ *  matched orders can still be confirmed and booked; the rest stay listed
+ *  until someone links them. (ORDERS_UNRESOLVED is only reachable once the
+ *  variance is inside tolerance.) */
+export function isConfirmablePartial(l: Pick<ReconLine, "state" | "payout" | "resolvedOrders">): boolean {
+  return l.state === "ORDERS_UNRESOLVED" && !!l.payout && l.resolvedOrders.length > 0;
+}
+
+/** How much of a cross-border credit the remitting bank may keep before the
+ *  gap stops looking like its own charge. A correspondent/telex fee is a small
+ *  flat cut — AED 47.94 on a 12k SAR wire (credit DSZ26252CHJHFHHK) is 0.39%.
+ *  Anything past 1%, or past AED 500 on a large wire, is something else and a
+ *  person looks at it. */
+export const BANK_FX_VARIANCE_LIMIT_PCT = 0.01;
+export const BANK_FX_VARIANCE_CEILING_AED = 500;
+export const bankFxVarianceLimit = (bankAmount: number) =>
+  Math.max(TOLERANCE_AED, Math.min(Math.abs(bankAmount) * BANK_FX_VARIANCE_LIMIT_PCT, BANK_FX_VARIANCE_CEILING_AED));
+
+/**
+ * A cross-border payout whose orders all matched, where the only thing left
+ * over is the slice the remitting bank kept between its quoted rate and the
+ * AED it actually credited.
+ *
+ * Without this, such a credit sat in PAYOUT_VARIANCE forever: "Confirm
+ * settlement" never appeared, no settlement records were written, and every
+ * invoice on a perfectly good SAR/KWD payout stayed open. The gap is real and
+ * still shows as Variance — it just isn't a reason to refuse the booking.
+ * publishSettlements() leaves each order's figures at the bank's quoted rate
+ * — so its exchange difference is the real invoice-vs-settlement gap — and
+ * books what the bank kept once, to Exchange Gain or Loss (planWireResidual),
+ * which is what empties the clearing account to zero.
+ */
+export function isBankFxVariance(
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
+): boolean {
+  if (l.state !== "PAYOUT_VARIANCE" || !l.payout || l.resolvedOrders.length === 0) return false;
+  const currency = l.payout.currency;
+  if (!currency || currency.toUpperCase() === "AED") return false;
+  return Math.abs(l.variance) <= bankFxVarianceLimit(l.bankAmount);
+}
+
+/** Settled, a partial that can be confirmed with lines still unmatched, or a
+ *  cross-border credit whose only gap is the bank's own cut. */
+export function isConfirmable(
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
+): boolean {
+  return l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l);
 }
 
 async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typeof OrdersRepository.listAll>>) {
@@ -421,7 +507,7 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
 
   // Stamp orders: settled ONLY because a bank-confirmed payout reached them.
   for (const l of lines) {
-    if (l.state === "SETTLED" && l.payout) {
+    if (l.payout && (l.state === "SETTLED" || ((isConfirmablePartial(l) || isBankFxVariance(l)) && l.confirmedBy))) {
       await OrdersRepository.markSettled(l.resolvedOrders, l.payout.id);
     }
   }
@@ -430,7 +516,9 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
   // what a founder points Zoho Books / an accountant at later.
   const orderByNumber = new Map(orders.map((o) => [o.order_number, o]));
   const settlementRows = lines
-    .filter((l) => l.state === "SETTLED")
+    // A bank-FX variance gets its settlement rows too — without them the
+    // booking bar has nothing to publish even once a founder confirms it.
+    .filter((l) => l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l))
     .flatMap((l) =>
       l.resolvedOrders
         .map((num) => orderByNumber.get(num))
@@ -539,7 +627,34 @@ export function summarizeReconLines(lines: ReconLine[]) {
   };
 }
 
+/** Thrown when a credit is confirmed with no payout file behind it. */
+export class NoPayoutToConfirmError extends Error {
+  constructor(bankLineId: string) {
+    super(
+      "This credit has no payout file yet, so there is nothing to confirm against. " +
+        "Upload the settlement report for it first — you can drop the file straight onto the row.",
+    );
+    this.name = "NoPayoutToConfirmError";
+    this.bankLineId = bankLineId;
+  }
+  bankLineId: string;
+}
+
 export async function confirmLine(bankLineId: string, actor: string) {
+  // Confirming asserts "this credit is right", which is meaningless without the
+  // payout that proves it. Four credits were confirmed while still
+  // AWAITING_PAYOUT (payout_id null) and then could not be repaired, because the
+  // upload control used to be hidden on confirmed rows. Refuse at the source.
+  // persistResults() rewrites payout_id on every reconcile, so this column is
+  // the authoritative answer to "does this credit have a file".
+  const { data: line, error: lookupErr } = await supabase
+    .from("recon_lines")
+    .select("payout_id")
+    .eq("bank_line_id", bankLineId)
+    .maybeSingle();
+  if (lookupErr) throw new Error(`confirm precheck failed: ${lookupErr.message}`);
+  if (!line?.payout_id) throw new NoPayoutToConfirmError(bankLineId);
+
   const { error } = await supabase
     .from("recon_lines")
     .update({ confirmed_by: actor, confirmed_at: new Date().toISOString() })

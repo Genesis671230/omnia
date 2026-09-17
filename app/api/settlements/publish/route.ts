@@ -1,118 +1,106 @@
 import { NextResponse } from "next/server";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
-import { ZohoPublishRunsRepository, type ZohoPublishResult } from "@/lib/repositories/zoho-publish-runs.repository";
-import { createZohoCustomerPayment, getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
+import { ZohoPublishRunsRepository } from "@/lib/repositories/zoho-publish-runs.repository";
+import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
+import { runReconciliation } from "@/lib/reconciliation/engine";
+import { publishSettlements } from "@/lib/finance/publish-settlements";
 
+// A 28-order payout is ~150 paced Zoho calls.
+export const maxDuration = 300;
 
+// POST /api/settlements/publish
+//   body: {
+//     bankLineId: string,              — the confirmed bank credit
+//     settlementIds?: string[],        — a subset; omit for every order on it
+//     depositAccountId: string,        — clearing account, e.g. "TABBY AED"
+//     feeAccountId: string,            — e.g. "Payment Gateway Charges"
+//     vatTaxId?: string,               — AED payouts: fee is VAT-inclusive
+//     differenceAccountId?: string,    — Exchange Gain or Loss
+//     referenceNumberOverride?: string,
+//     bookFeesOnExternallyPaid?: boolean — also book fee/FX on invoices
+//                                         already paid by hand in Zoho
+//     dryRun?: boolean,                — reads Zoho, writes nothing
+//   }
+//
+// Per order: payment for the full invoice → fee expense → FX/rounding journal.
+// See lib/finance/publish-settlements.ts.
 export async function POST(request: Request) {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
   const body = await request.json().catch(() => ({}));
-  const settlementIds = Array.isArray(body.settlementIds) ? body.settlementIds.map(String) : [];
-  const bankLineId = typeof body.bankLineId === "string" && body.bankLineId ? body.bankLineId : null;
-  const accountId = typeof body.accountId === "string" && body.accountId ? body.accountId : undefined;
-  const referenceNumberOverride =
-    typeof body.referenceNumberOverride === "string" && body.referenceNumberOverride
-      ? body.referenceNumberOverride
-      : undefined;
-console.log(settlementIds,"this is settlementIds from publish route");
-console.log(bankLineId,"this is bankLineId from publish route");
-console.log(accountId,"this is accountId from publish route");
-if (settlementIds.length === 0 && !bankLineId) {
-  return NextResponse.json({ error: "settlementIds or bankLineId is required" }, { status: 400 });
-}
-// if (settlementIds.length > 0 && bankLineId) {
-//   return NextResponse.json({ error: "pass settlementIds or bankLineId, not both" }, { status: 400 });
-// }
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
-const runId = await ZohoPublishRunsRepository.start();
-const results: (ZohoPublishResult & { outcome?: string })[] = [];
-const writeOffResidualAsFee = body.writeOffResidualAsFee === true;
-try {
-  const settlements = settlementIds.length > 0
-  ? await SettlementsRepository.listByIds(settlementIds)
-  : bankLineId
-    ? await SettlementsRepository.listByBankLineId(bankLineId)
-    : [];
+  const bankLineId = str(body.bankLineId);
+  const settlementIds: string[] = Array.isArray(body.settlementIds) ? body.settlementIds.map(String) : [];
+  const dryRun = body.dryRun === true;
+  const accounts = {
+    depositAccountId: str(body.depositAccountId ?? body.accountId),
+    feeAccountId: str(body.feeAccountId),
+    vatTaxId: str(body.vatTaxId) || null,
+    differenceAccountId: str(body.differenceAccountId) || null,
+  };
 
-if (settlements.length === 0) {
-  return NextResponse.json(
-    { error: "No settlements resolved from settlementIds or bankLineId" },
-    { status: 400 },
-  );
-}
-  const accessToken = await getAccessToken();
+  if (!bankLineId) {
+    return NextResponse.json({ error: "bankLineId is required" }, { status: 400 });
+  }
+  if (!accounts.depositAccountId) {
+    return NextResponse.json({ error: "Pick the Deposit To (clearing) account first." }, { status: 400 });
+  }
 
-    for (const s of settlements) {
-      const attemptId = crypto.randomUUID();
-      // if (s.zoho_payment_id) {
-      //   console.log(s.zoho_payment_id,"this is s.zoho_payment_id from publish route");
-      //   console.log(results,"this is results from publish route");
-      //   results.push({ settlementId: s.id, ok: false, error: "Already published" });
-      //   console.log(results,"this is results from publish route");
-      //   continue;
-      // }
-      // if (!s.evidence_confirmed) {
-      //   console.log(s.evidence_confirmed,"this is s.evidence_confirmed from publish route");
-      //   console.log(results,"this is results from publish route");
-      //   results.push({ settlementId: s.id, ok: false, error: "Not evidence-confirmed" });
-      //   console.log(results,"this is results from publish route");
-      //   continue;
-      // }
+  const line = (await runReconciliation()).find((l) => l.id === bankLineId);
+  if (!line) return NextResponse.json({ error: `No reconciliation line ${bankLineId}` }, { status: 404 });
+  if (!line.confirmedBy) {
+    return NextResponse.json({ error: "Confirm this settlement before recording payments." }, { status: 409 });
+  }
+  if (!line.payout) return NextResponse.json({ error: "This bank credit has no matched payout file." }, { status: 409 });
 
-      // const claimed = await SettlementsRepository.claimForPublish(s.id, attemptId);
-      // if (!claimed) {
-      //   console.log(claimed,"this is claimed from publish route");
-      //   console.log(results,"this is results from publish route");
-      //   results.push({ settlementId: s.id, ok: false, error: "Already published or being published" });
-      //   console.log(results,"this is results from publish route");
-      //   continue;
-      // }
+  // Rows written after the credit was confirmed (e.g. a re-uploaded payout
+  // file) are born unconfirmed; the confirmation covers them too.
+  await SettlementsRepository.confirmEvidenceForBankLine(line.id, line.confirmedBy);
 
-      const useInvoiceBalanceAsAmount = body.useInvoiceBalanceAsAmount === true;
-      try {
-    
-        const { payment_id, outcome } = await createZohoCustomerPayment(
-          {
-            customerName: s.customer_name,
-            invoiceReferenceNumber: s.order_number,
-            amount: s.gross_aed, // ignored when useInvoiceBalanceAsAmount is true
-            gateway: s.gateway,
-            bankReference: s.bank_reference,
-            date: s.settlement_date ?? undefined,
-            accountId,
-            referenceNumberOverride,
-            description: "Settlement for order " + s.order_number,
-            bankCharges: 0,
-            customFields: [],
-            useInvoiceBalanceAsAmount,
-          },
-          accessToken,
-        );
-        await SettlementsRepository.markPublished(s.id, payment_id);
-        results.push({ settlementId: s.id, ok: true, paymentId: payment_id, outcome: outcome });
-      } catch (e) {
-        const message = (e as Error).message;
-        // Anything with an HTTP status in the message is a definite response
-        // from Zoho (accepted or rejected) — safe to release and retry.
-        // A bare network/timeout failure carries no such status, meaning we
-        // genuinely don't know whether Zoho's write landed — leave the claim
-        // in place rather than risk a duplicate on the next auto-retry.
-        const isDefiniteRejection = /HTTP \d{3}|error \d+|No Zoho invoice found|Ambiguous Zoho invoice|exceeds Zoho invoice|no balance field/.test(message);
-        if (isDefiniteRejection) {
-          await SettlementsRepository.releaseClaim(s.id, attemptId);
-          results.push({ settlementId: s.id, ok: false, error: message });
-        } else {
-          results.push({ settlementId: s.id, ok: false, error: message, needsManualReview: true });
-        }
-      }
+  const all = await SettlementsRepository.listByBankLineId(line.id);
+  const wanted = settlementIds.length > 0 ? new Set(settlementIds) : null;
+  const settlements = all.filter((s) => !wanted || wanted.has(s.id));
+  if (settlements.length === 0) {
+    return NextResponse.json(
+      { error: "No settlement records for this credit — run reconciliation again after the payout file upload." },
+      { status: 400 },
+    );
+  }
+
+  const runId = dryRun ? null : await ZohoPublishRunsRepository.start();
+  try {
+    const { results, wire } = await publishSettlements({
+      line,
+      settlements,
+      accounts,
+      referenceOverride: str(body.referenceNumberOverride) || undefined,
+      dryRun,
+      accessToken: await getAccessToken(),
+      bookFeesOnExternallyPaid: body.bookFeesOnExternallyPaid === true,
+    });
+    if (runId) {
+      await ZohoPublishRunsRepository.finish(
+        runId,
+        results.map((r) => ({
+          ...r,
+          error: r.ok ? undefined : r.message,
+          paymentId: r.paymentId ?? undefined,
+          needsManualReview: r.uncertain,
+        })),
+      );
     }
-
-    await ZohoPublishRunsRepository.finish(runId, results);
-    return NextResponse.json({ results: results });
+    return NextResponse.json({
+      dryRun,
+      results,
+      // The bank's own cut on a cross-border wire, booked once for the whole
+      // credit rather than smeared across its orders.
+      wire,
+      settlements: await SettlementsRepository.listByBankLineId(line.id),
+    });
   } catch (e) {
-    await ZohoPublishRunsRepository.finish(runId, results, (e as Error).message);
-    return NextResponse.json({ error: (e as Error).message, results }, { status: 500 });
+    if (runId) await ZohoPublishRunsRepository.finish(runId, [], (e as Error).message).catch(() => {});
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

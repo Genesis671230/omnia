@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { confirmLine, flagLine } from "@/lib/reconciliation/engine";
+import { confirmLine, flagLine, NoPayoutToConfirmError } from "@/lib/reconciliation/engine";
 
 // POST /api/reconcile/confirm — body: { bankLineId, actor? }
 // POST /api/reconcile/flag    — body: { bankLineId, flagged, note? }
@@ -18,11 +18,18 @@ export async function POST(
     // How many orders this confirmation just made publishable to Zoho — the
     // UI reports it back so a bookkeeper sees the consequence of the click
     // rather than having to go hunting in the Settlements panel.
-    const settlementsConfirmed = await confirmLine(bankLineId, actor || "founder");
-    return NextResponse.json({
-      ok: true, action, bankLineId, settlementsConfirmed,
-      updatedAt: new Date().toISOString(),
-    });
+    try {
+      const settlementsConfirmed = await confirmLine(bankLineId, actor || "founder");
+      return NextResponse.json({
+        ok: true, action, bankLineId, settlementsConfirmed,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e instanceof NoPayoutToConfirmError) {
+        return NextResponse.json({ error: e.message, needsPayoutFile: true }, { status: 409 });
+      }
+      throw e;
+    }
   }
 
   if (action === "flag") {

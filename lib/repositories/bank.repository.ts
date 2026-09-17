@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { supabase } from "@/lib/supabase";
+import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedBankLine } from "@/lib/parsers/bank";
 import { dedupeKey, hasStableWireIdentity } from "@/lib/parsers/bank-dedupe";
 
@@ -211,15 +211,25 @@ export const BankRepository = {
     return { new: isNew, heal, unchanged, duplicates };
   },
 
+  // Paged: PostgREST truncates an unpaginated select at 1000 rows without
+  // erroring, and the reconciler treats this as the complete set of credits —
+  // a truncated read would silently drop the oldest credits off the screen.
   async listCredits() {
-    const { data, error } = await supabase
-      .from("bank_lines")
-      .select("id, batch_id, statement_date, description, reference, amount, gateway_guess, confidence, status")
-      .eq("direction", "credit")
-      .order("statement_date", { ascending: false })
-      .order("amount", { ascending: false });
-    if (error) throw new Error(`bank_lines select failed: ${error.message}`);
-    return data ?? [];
+    return selectAllPages<{
+      id: string; batch_id: string | null; statement_date: string; description: string;
+      reference: string | null; amount: number; gateway_guess: string | null;
+      confidence: string | null; status: string | null;
+    }>(
+      (from, to) =>
+        supabase
+          .from("bank_lines")
+          .select("id, batch_id, statement_date, description, reference, amount, gateway_guess, confidence, status")
+          .eq("direction", "credit")
+          .order("statement_date", { ascending: false })
+          .order("amount", { ascending: false })
+          .range(from, to),
+      "bank_lines select",
+    );
   },
 
   async listDebits() {

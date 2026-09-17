@@ -9,7 +9,8 @@ import { ReconTable } from "./recon-table";
 import { InsightsTab } from "./insights-tab";
 import { PayoutSummaryBar } from "./payout-summary-bar";
 import { BankTransactionsTab } from "./bank-transactions-tab";
-import type { ReconLine, ReconPayload } from "./types";
+import type { ReconLine, ReconPayload, UploadSlotFor } from "./types";
+import { UnmatchedPayouts } from "./unmatched-payouts";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
 import { gatewayFilterOptionsFromZohoAccounts, regionForLine } from "@/lib/reconciliation/gateway-filter";
 
@@ -33,7 +34,7 @@ export function ReconView({
   onRange: (from: string, to: string) => void;
   onConfirm: (id: string) => void;
   refresh: () => void;
-  uploadSlotFor: (provider: string) => React.ReactNode;
+  uploadSlotFor: UploadSlotFor;
 }) {
 
 
@@ -136,6 +137,8 @@ export function ReconView({
   return (
     <>
       <PayoutSummaryBar lines={gatewayFiltered} />
+
+      <UnmatchedPayouts payouts={recon?.unmatchedPayouts ?? []} refresh={refresh} />
 
       <ReconFilters
         query={query} onQuery={setQuery}
@@ -277,6 +280,7 @@ export function ReconView({
                         onConfirm={onConfirm}
                         refresh={refresh}
                         uploadSlotFor={uploadSlotFor}
+                        allLines={lines}
                       />
                     </div>
                   )}

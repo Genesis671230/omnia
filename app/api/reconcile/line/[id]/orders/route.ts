@@ -30,6 +30,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         ...line.refundedOrders,
         ...line.unresolvedRefs,
         ...line.transactions.map((t) => t.ref),
+        // manual links point a line at an order whose number differs from the ref
+        ...line.transactions.map((t) => t.orderNumber ?? ""),
       ]),
     ].filter(Boolean);
 

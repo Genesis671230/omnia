@@ -241,3 +241,147 @@ test("computeReconLines: rescale never dumps the whole payout onto one row when 
     "no single row may silently absorb the entire payout total when the underlying data has no real per-order split",
   );
 });
+
+// ── attached payouts, manual links, partial confirmation ────────────────────
+
+const tx = (order_ref: string, net: number, is_refund = false) => ({
+  order_ref, is_refund, quality: null, net_aed: net, gross_aed: net, fee_aed: 0,
+  net_original: null, gross_original: null, fee_original: null,
+});
+
+test("computeReconLines: a payout attached to a credit shows there even when its total is off", () => {
+  const lines = computeReconLines({
+    credits: [
+      { id: "C1", statement_date: "2026-09-08", description: "TAMARA", reference: "FT1", amount: 17783.66, gateway_guess: "Tamara", confidence: "keyword" },
+      { id: "C2", statement_date: "2026-09-08", description: "TAMARA", reference: "FT2", amount: 18376.08, gateway_guess: "Tamara", confidence: "keyword" },
+    ],
+    payouts: [{
+      id: "TAMARA-X", gateway: "Tamara", net_amount: 18376.08, gross_amount: 18376.08, fee_amount: 0,
+      source: "x.xlsx", status: "uploaded", order_refs: ["804517"], original_currency: null, net_original: null,
+      transactions: [tx("804517", 18376.08)], bank_line_id: "C1",
+    }],
+    orders: [{ order_number: "804517" }],
+    confirmations: new Map(),
+  });
+  const c1 = lines.find((l) => l.id === "C1")!;
+  const c2 = lines.find((l) => l.id === "C2")!;
+  assert.equal(c1.payout?.id, "TAMARA-X", "attached payout stays on its credit");
+  assert.equal(c1.state, "PAYOUT_VARIANCE");
+  assert.equal(c2.payout, null, "an attached payout never auto-matches another credit, even an exact one");
+});
+
+test("computeReconLines: a manual link resolves a phone-number line to its order", () => {
+  const base = {
+    credits: [{ id: "C1", statement_date: "2026-09-08", description: "TAMARA", reference: "FT1", amount: 1100, gateway_guess: "Tamara", confidence: "keyword" }],
+    payouts: [{
+      id: "TAMARA-X", gateway: "Tamara", net_amount: 1100, gross_amount: 1100, fee_amount: 0, source: "x", status: "uploaded",
+      order_refs: ["804517", "0655572535"], original_currency: null, net_original: null,
+      transactions: [tx("804517", 800), tx("0655572535", 300)],
+    }],
+    orders: [{ order_number: "804517" }, { order_number: "WA55600" }],
+    confirmations: new Map(),
+  };
+  const [unlinked] = computeReconLines(base);
+  assert.equal(unlinked.state, "ORDERS_UNRESOLVED");
+  assert.deepEqual(unlinked.unresolvedRefs, ["0655572535"]);
+  assert.equal(unlinked.transactions.find((t) => t.ref === "0655572535")?.orderNumber, null);
+
+  const [linked] = computeReconLines({ ...base, links: new Map([["TAMARA-X|0655572535", "WA55600"]]) });
+  assert.equal(linked.state, "SETTLED");
+  assert.deepEqual(linked.resolvedOrders.sort(), ["804517", "WA55600"]);
+  assert.equal(linked.transactions.find((t) => t.ref === "0655572535")?.orderNumber, "WA55600");
+});
+
+test("isConfirmablePartial: payout foots and some orders matched, others not", async () => {
+  const { isConfirmablePartial } = await import("@/lib/reconciliation/engine");
+  const payout = { id: "P", net: 1, source: null, currency: null, fxRate: null, fxSource: null } as const;
+  assert.equal(isConfirmablePartial({ state: "ORDERS_UNRESOLVED", payout, resolvedOrders: ["1"] }), true);
+  assert.equal(isConfirmablePartial({ state: "ORDERS_UNRESOLVED", payout, resolvedOrders: [] }), false);
+  assert.equal(isConfirmablePartial({ state: "PAYOUT_VARIANCE", payout, resolvedOrders: ["1"] }), false);
+});
+
+/* ── The bank's own cut on a cross-border wire ───────────────────────────────
+ * Real credit DSZ26252CHJHFHHK (Tabby SAR, 2026-09-09). The narration quotes
+ * SAR/AED 0.958918, which values the payout's 12,761.00 SAR at AED 12,236.75.
+ * The bank credited AED 12,188.81 — it kept AED 47.94 on the way in. Every
+ * order on the file is matched and the payout itself is not in dispute, so
+ * this must stay confirmable and bookable: the AED 47.94 is an exchange
+ * difference, not evidence that the payout is wrong.
+ */
+const TABBY_SAR_CREDIT = {
+  id: "C-DSZ", statement_date: "2026-09-09",
+  description:
+    "Inward Telex Payment/Sender Info:SA SABB 003-777729-001, TABI COMPANY FOR FINANCING " +
+    "MUSAHAMA/TT CPMP005AEBBI/Rmt Info:BUSINESS RELATED PAYMENT OMNIASTORES KSA BILL " +
+    "07092026GMV/SAR/AED 0.958918/ DSZ26252CHJHFHHK DSZ26252CHJHFHHK",
+  reference: "DSZ26252CHJHFHHK", amount: 12188.81,
+  gateway_guess: "Tabby", confidence: "keyword" as const,
+};
+
+const tabbySarPayout = (netAed: number) => ({
+  id: "TABBY-SAR-1", gateway: "Tabby", net_amount: netAed, gross_amount: netAed + 865.05,
+  fee_amount: 865.05, source: "tabby-sar.xlsx", status: "uploaded",
+  order_refs: ["804734", "805051"],
+  original_currency: "SAR", net_original: 12761.0,
+  transactions: [
+    { order_ref: "804734", net_aed: netAed * 0.6, gross_aed: netAed * 0.64, fee_aed: netAed * 0.04, is_refund: false, quality: "clean" },
+    { order_ref: "805051", net_aed: netAed * 0.4, gross_aed: netAed * 0.43, fee_aed: netAed * 0.03, is_refund: false, quality: "clean" },
+  ],
+});
+
+test("computeReconLines: the bank keeping AED 47.94 on a SAR wire stays confirmable, not a dead-end variance", async () => {
+  const { isBankFxVariance, isConfirmable } = await import("@/lib/reconciliation/engine");
+  const [line] = computeReconLines({
+    credits: [TABBY_SAR_CREDIT],
+    payouts: [tabbySarPayout(12000)],
+    orders: [{ order_number: "804734" }, { order_number: "805051" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.payout!.fxSource, "bank");
+  assert.equal(line.payout!.fxRate, 0.958918);
+  assert.equal(line.payout!.net, 12236.75, "12,761.00 SAR at the bank's own quoted rate");
+  assert.equal(line.variance, -47.94);
+  assert.equal(line.state, "PAYOUT_VARIANCE", "the gap is real and stays visible");
+  assert.equal(isBankFxVariance(line), true, "but it is the bank's cut, so it can be booked");
+  assert.equal(isConfirmable(line), true);
+});
+
+test("isBankFxVariance: only a small cross-border gap with matched orders qualifies", async () => {
+  const { isBankFxVariance } = await import("@/lib/reconciliation/engine");
+  const sar = { id: "P", net: 12236.75, source: null, currency: "SAR", fxRate: 0.958918, fxSource: "bank" as const };
+  const base = { state: "PAYOUT_VARIANCE" as const, payout: sar, resolvedOrders: ["1"], bankAmount: 12188.81, variance: -47.94 };
+
+  assert.equal(isBankFxVariance(base), true);
+  assert.equal(isBankFxVariance({ ...base, resolvedOrders: [] }), false, "nothing matched to book");
+  assert.equal(isBankFxVariance({ ...base, state: "SETTLED" }), false, "already settled, not a variance");
+  assert.equal(
+    isBankFxVariance({ ...base, variance: -900, bankAmount: 11336.75 }),
+    false,
+    "AED 900 on a 12k wire is not a bank charge — a person looks",
+  );
+  assert.equal(
+    isBankFxVariance({
+      ...base,
+      payout: { id: "P", net: 100, source: null, currency: null, fxRate: null, fxSource: null },
+      bankAmount: 98.5, variance: 1.5,
+    }),
+    false,
+    "an AED-native gap is never an exchange difference",
+  );
+});
+
+test("computeReconLines: a cross-border gap too big to be the bank's cut stays a dead stop", async () => {
+  const { isBankFxVariance } = await import("@/lib/reconciliation/engine");
+  // 12,236.75 expected vs 12,000 credited — AED 236.75, inside the 2% window
+  // that lets the payout match the credit at all, but far past a wire charge.
+  const [line] = computeReconLines({
+    credits: [{ ...TABBY_SAR_CREDIT, amount: 12000 }],
+    payouts: [tabbySarPayout(12000)],
+    orders: [{ order_number: "804734" }, { order_number: "805051" }],
+    confirmations: new Map(),
+  });
+
+  assert.equal(line.state, "PAYOUT_VARIANCE");
+  assert.equal(isBankFxVariance(line), false);
+});

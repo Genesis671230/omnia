@@ -31,6 +31,12 @@ export type PayoutTransactionShare = {
   netOriginal?: number;
   grossOriginal?: number;
   feeOriginal?: number;
+  // VAT the gateway charged ON TOP of feeShare, when the file itemises it
+  // (Tamara's "VAT Collected by Tamara": Total Fees × 5%, deducted
+  // separately — gross − fee − VAT = net). Absent for gateways whose fee
+  // already includes VAT (Tabby's Total Deduction).
+  vatShare?: number;
+  vatOriginal?: number;
 };
 
 export type ParsedPayout = {
@@ -50,6 +56,16 @@ export type ParsedPayout = {
   // which can't track the bank's actual daily conversion spread.
   originalCurrency?: string;
   netOriginal?: number;
+  // Which store this report covers, read from the transaction table's own
+  // "Merchant Name"/"Merchant Code" columns — never from the filename, which
+  // arrives decorated with "(1)" or "36". Tabby issues one report per store
+  // but numbers them all alike (statementNo is date+currency only), so these
+  // are what keep two stores' payouts from colliding on one primary key.
+  // See lib/finance/payout-identity.ts.
+  store?: string;
+  merchantCode?: string;
+  /** The raw statement number, before any collision disambiguation. */
+  statementNo?: string;
 };
 
 // ── Stripe: payout RECONCILIATION report (has automatic_payout_id) ───────────
@@ -583,9 +599,15 @@ function sheetRows(buf: Buffer | ArrayBuffer): SheetRows[] {
   );
 }
 
+// Statement exports write negatives accountant-style — Tamara's refund row
+// reads "(592.42)". parseFloat on that is NaN, which used to become 0 and
+// silently drop the refund from the payout net (FT262517PC8K: 18,376.08
+// parsed vs 17,783.66 banked, so the credit could never match its payout).
 const num = (v: string) => {
-  const n = parseFloat(String(v).replace(/[,\s]/g, ""));
-  return Number.isNaN(n) ? 0 : n;
+  const raw = String(v).replace(/[,\s]/g, "");
+  const negative = /^\(.*\)$/.test(raw) || /^-/.test(raw);
+  const n = parseFloat(raw.replace(/[()\-]/g, ""));
+  return Number.isNaN(n) ? 0 : negative ? -n : n;
 };
 
 // find the cell to the right of a label like "Statement ID" / "Statement #"
@@ -623,8 +645,14 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
     const jRefId = header.findIndex((c) => c === "merchant order id");
     const jRef = jRefNumber >= 0 ? jRefNumber : jRefId;
     const jNet = header.findIndex((c) => c.startsWith("total payable"));
-    const jGross = header.findIndex((c) => c === "order amount");
+    const jOrderAmount = header.findIndex((c) => c === "order amount");
+    // The amount this event actually moved: a partial refund of a 672.60
+    // order refunds 592.42, not the whole order amount.
+    const jEventAmount = header.findIndex((c) => c === "event amount");
+    const jGross = jEventAmount >= 0 ? jEventAmount : jOrderAmount;
     const jFees = header.findIndex((c) => c === "total fees");
+    // VAT is charged on top of Total Fees, not inside it.
+    const jVat = header.findIndex((c) => c.startsWith("vat collected") || c === "tamara vat");
     const jCcy = header.findIndex((c) => c === "currency");
     const jTamaraId = header.findIndex((c) => c === "tamara order id");
     // Refund signals, checked in combination because Tamara's real merchant
@@ -654,9 +682,11 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
       const rowGrossAed = jGross >= 0 ? sign * Math.abs(toAed(num(r[jGross]), ccy)) : 0;
       const rowFeeAed = jFees >= 0 ? Math.abs(toAed(num(r[jFees]), ccy)) : 0;
+      const rowVatAed = jVat >= 0 ? Math.abs(toAed(num(r[jVat]), ccy)) : 0;
       const rowNetOriginal = sign * Math.abs(num(r[jNet]));
       const rowGrossOriginal = jGross >= 0 ? sign * Math.abs(num(r[jGross])) : 0;
       const rowFeeOriginal = jFees >= 0 ? Math.abs(num(r[jFees])) : 0;
+      const rowVatOriginal = jVat >= 0 ? Math.abs(num(r[jVat])) : 0;
       netOriginal += rowNetOriginal;
       net += rowNetAed;
       if (jGross >= 0) gross += rowGrossAed;
@@ -678,6 +708,8 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
               netOriginal: +((prior.netOriginal ?? 0) + rowNetOriginal).toFixed(2),
               grossOriginal: +((prior.grossOriginal ?? 0) + rowGrossOriginal).toFixed(2),
               feeOriginal: +((prior.feeOriginal ?? 0) + rowFeeOriginal).toFixed(2),
+              vatShare: +((prior.vatShare ?? 0) + rowVatAed).toFixed(2),
+              vatOriginal: +((prior.vatOriginal ?? 0) + rowVatOriginal).toFixed(2),
             }
           : {
               ref: clean,
@@ -689,6 +721,8 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
               netOriginal: +rowNetOriginal.toFixed(2),
               grossOriginal: +rowGrossOriginal.toFixed(2),
               feeOriginal: +rowFeeOriginal.toFixed(2),
+              vatShare: +rowVatAed.toFixed(2),
+              vatOriginal: +rowVatOriginal.toFixed(2),
             });
       }
     }
@@ -733,10 +767,17 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
     const jFees = header.findIndex((c) => c === "total deduction");
     const jCcy = header.findIndex((c) => c === "currency");
     const jType = header.findIndex((c) => c === "type");
+    // Per-row store identity — "Omniastores UAE"/"AE", "Omniastores UAE
+    // Paylink"/"OSUAEPL". Tabby reuses one statement number across every store
+    // it pays on a date, so this is the only in-file signal that separates them.
+    const jMerchant = header.findIndex((c) => c === "merchant name");
+    const jMerchantCode = header.findIndex((c) => c === "merchant code");
 
     let net = 0, gross = 0, fees = 0, sales = 0, refunds = 0, netOriginal = 0;
     const orderRefs: string[] = [];
     const currencies = new Set<string>();
+    const merchants = new Set<string>();
+    const merchantCodes = new Set<string>();
     const shareByRef = new Map<string, PayoutTransactionShare>();
     for (const r of rows.slice(h + 1)) {
       const ref = String(r[jRef] ?? "").trim();
@@ -746,6 +787,8 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       if (!/\d/.test(String(r[jNet] ?? ""))) continue;
       const ccy = ((jCcy >= 0 && r[jCcy]?.trim()) || "AED").toUpperCase();
       currencies.add(ccy);
+      if (jMerchant >= 0 && r[jMerchant]?.trim()) merchants.add(r[jMerchant].trim());
+      if (jMerchantCode >= 0 && r[jMerchantCode]?.trim()) merchantCodes.add(r[jMerchantCode].trim());
       const isRefund = jType >= 0 && /refund/i.test(String(r[jType] ?? ""));
       const sign = isRefund ? -1 : 1;
       const rowNetAed = sign * Math.abs(toAed(num(r[jNet]), ccy));
@@ -793,8 +836,17 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
 
     const statementId = labelledValue(rows, /^statement\s*#$/i) || filename.replace(/\.[a-z]+$/i, "");
     const originalCurrency = currencies.size === 1 ? [...currencies][0] : undefined;
+    const statementNo = statementId.toUpperCase().startsWith("TABBY") ? statementId : `TABBY-${statementId}`;
+    // A report covering exactly one store names it on every row; a mixed file
+    // (should not happen, but the format does not forbid it) leaves these unset
+    // rather than asserting a store it cannot vouch for.
+    const store = merchants.size === 1 ? [...merchants][0] : undefined;
+    const merchantCode = merchantCodes.size === 1 ? [...merchantCodes][0] : undefined;
     return [{
-      id: statementId.toUpperCase().startsWith("TABBY") ? statementId : `TABBY-${statementId}`,
+      id: statementNo,
+      statementNo,
+      store,
+      merchantCode,
       provider: "Tabby",
       net: +net.toFixed(2),
       gross: +gross.toFixed(2),

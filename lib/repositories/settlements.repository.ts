@@ -34,7 +34,52 @@ export type SettlementRecord = {
   evidence_document_id: string | null;
   zoho_payment_id: string | null;
   zoho_published_at: string | null;
+  // Gateway fee / VAT / FX booking — see lib/finance/settlement-posting.ts.
+  // The three id columns hold a Zoho id, or PENDING:<attempt> mid-write.
+  zoho_claimed_at?: string | null;
+  zoho_invoice_id?: string | null;
+  zoho_fee_expense_id?: string | null;
+  zoho_fx_journal_id?: string | null;
+  fee_aed?: number | null;
+  fee_vat_aed?: number | null;
+  fx_difference_aed?: number | null;
+  zoho_post_error?: string | null;
+  // What Zoho said about the invoice the last time anything read it. Kept so
+  // the proof panel can show the invoice amount and exchange difference
+  // without re-searching Zoho once per order every time it opens.
+  zoho_invoice_number?: string | null;
+  zoho_invoice_status?: string | null;
+  /** The balance still owed when we looked — what the payment closes. */
+  zoho_invoice_balance?: number | null;
+  zoho_invoice_total?: number | null;
+  zoho_invoice_checked_at?: string | null;
 };
+
+export type SettlementPostingColumns = Partial<
+  Pick<
+    SettlementRecord,
+    | "zoho_payment_id"
+    | "zoho_published_at"
+    | "zoho_invoice_id"
+    | "zoho_fee_expense_id"
+    | "zoho_fx_journal_id"
+    | "fee_aed"
+    | "fee_vat_aed"
+    | "fx_difference_aed"
+    | "zoho_post_error"
+    | "zoho_invoice_number"
+    | "zoho_invoice_status"
+    | "zoho_invoice_balance"
+    | "zoho_invoice_total"
+    | "zoho_invoice_checked_at"
+  >
+>;
+
+/** A Zoho id column that doesn't yet point at a real document: empty, or a
+ *  marker left by a claim / an in-flight write. */
+export function isUnsettledZohoId(v: string | null | undefined): boolean {
+  return !v || v.startsWith("CLAIMED:") || v.startsWith("PENDING:");
+}
 
 export type ExistingSettlementRecord = Pick<
   SettlementRecord,
@@ -220,6 +265,81 @@ export const SettlementsRepository = {
       .update({ zoho_payment_id: zohoPaymentId, zoho_published_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw new Error(`settlement_records publish update failed: ${error.message}`);
+  },
+
+  // Short row lease for the fee/VAT/FX booking flow. Unlike claimForPublish
+  // (which parks a marker in zoho_payment_id forever if the process dies),
+  // this expires on its own, so a crashed publish never strands an order —
+  // the per-document PENDING markers are what make the retry safe.
+  async leaseForPosting(id: string, leaseMinutes = 5): Promise<boolean> {
+    const staleBefore = new Date(Date.now() - leaseMinutes * 60_000).toISOString();
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .update({ zoho_claimed_at: new Date().toISOString() })
+      .eq("id", id)
+      .or(`zoho_claimed_at.is.null,zoho_claimed_at.lt.${staleBefore}`)
+      .select("id");
+    if (error) throw new Error(`settlement_records lease failed: ${error.message}`);
+    return (data ?? []).length === 1;
+  },
+
+  async releasePostingLease(id: string): Promise<void> {
+    const { error } = await supabase
+      .from("settlement_records")
+      .update({ zoho_claimed_at: null })
+      .eq("id", id);
+    if (error) throw new Error(`settlement_records lease release failed: ${error.message}`);
+  },
+
+  /** Remember what Zoho said about each order's invoice, so the proof panel
+   *  can render the invoice amount and exchange difference without paying for
+   *  a `customer_name_startswith` search per order every time it opens.
+   *  Matched on order_number within one bank credit; a miss is simply skipped. */
+  async saveInvoiceSnapshots(
+    bankLineId: string,
+    rows: {
+      orderNumber: string;
+      zoho_invoice_number: string | null;
+      zoho_invoice_status: string;
+      zoho_invoice_balance: number;
+      zoho_invoice_total: number | null;
+    }[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const checkedAt = new Date().toISOString();
+    // One round trip each, but in parallel — serially awaiting 14 updates
+    // inside a GET was adding seconds to a request that should be instant.
+    // Never upsert here: these rows carry booking state, and a partial upsert
+    // would null every column this patch omits.
+    await Promise.all(
+      rows.map(async ({ orderNumber, ...cols }) => {
+        const { error } = await supabase
+          .from("settlement_records")
+          .update({ ...cols, zoho_invoice_checked_at: checkedAt })
+          .eq("bank_line_id", bankLineId)
+          .eq("order_number", orderNumber);
+        if (error) throw new Error(`settlement_records invoice snapshot failed: ${error.message}`);
+      }),
+    );
+  },
+
+  async updatePosting(id: string, patch: SettlementPostingColumns): Promise<void> {
+    const { error } = await supabase.from("settlement_records").update(patch).eq("id", id);
+    if (error) throw new Error(`settlement_records posting update failed: ${error.message}`);
+  },
+
+  /** Whether any order on this bank credit already had its gateway fee or FX
+   *  difference booked individually — the payout-level transfer must then
+   *  move only the net, or the fee would be expensed twice. */
+  async hasOrderLevelFeeBooking(bankLineId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("id")
+      .eq("bank_line_id", bankLineId)
+      .or("zoho_fee_expense_id.not.is.null,zoho_fx_journal_id.not.is.null")
+      .limit(1);
+    if (error) throw new Error(`settlement_records fee-booking check failed: ${error.message}`);
+    return (data ?? []).length > 0;
   },
 
   async listByIds(ids: string[]): Promise<SettlementRecord[]> {

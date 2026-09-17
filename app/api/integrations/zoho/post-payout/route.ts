@@ -8,8 +8,9 @@ import {
   postPayoutToZoho,
   type PayoutPostingInput,
 } from "@/lib/integrations/zoho-banking";
-import { runReconciliation } from "@/lib/reconciliation/engine";
+import { isBankFxVariance, isConfirmablePartial, runReconciliation } from "@/lib/reconciliation/engine";
 import { ZohoConfigRepository } from "@/lib/repositories/zoho-config.repository";
+import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 
 export const maxDuration = 120;
 
@@ -60,7 +61,9 @@ export async function POST(request: Request) {
   // Only a settled, human-confirmed credit may reach the books. SETTLED alone
   // means our matching believes it; confirmed means a person checked it. The
   // whole point of the confirmation step is that it gates real money.
-  if (line.state !== "SETTLED") {
+  // A cross-border credit whose only gap is the remitting bank's own cut is
+  // bookable too — the remainder posts to Exchange Gain or Loss.
+  if (line.state !== "SETTLED" && !isConfirmablePartial(line) && !isBankFxVariance(line)) {
     return NextResponse.json(
       { error: `Bank line is ${line.state}, not SETTLED — resolve it before posting to Zoho` },
       { status: 409 },
@@ -83,13 +86,19 @@ export async function POST(request: Request) {
   const grossFromShares = +line.transactions
     .reduce((s, t) => s + t.grossShare, 0)
     .toFixed(2);
-  const grossAed = grossFromShares > 0 ? grossFromShares : line.payout.net;
+  // When the orders on this credit were booked individually from the gateway
+  // proof panel, each order's fee (and FX difference) already left the
+  // clearing account — which now holds exactly what the bank credited. Moving
+  // a fee leg again would expense it twice, so transfer only the bank amount.
+  const feesBookedPerOrder = await SettlementsRepository.hasOrderLevelFeeBooking(bankLineId);
+  const netAed = feesBookedPerOrder ? line.bankAmount : line.payout.net;
+  const grossAed = feesBookedPerOrder ? netAed : grossFromShares > 0 ? grossFromShares : line.payout.net;
 
   const input: PayoutPostingInput = {
     gateway: line.provider,
     bankReference: line.reference || line.id,
     date: (line.date ?? new Date().toISOString()).slice(0, 10),
-    netAed: line.payout.net,
+    netAed,
     grossAed,
     payoutId: line.payout.id,
   };

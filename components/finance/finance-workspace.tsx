@@ -43,6 +43,7 @@ import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-sett
 import { PaymentSheetMonthsPanel } from "@/components/finance/payment-sheet-months-panel";
 import { InvoicesWorkbench } from "@/components/finance/invoices-workbench";
 import { useReconciliation } from "@/lib/hooks/use-reconciliation-query";
+import type { UploadSlotFor } from "@/components/finance/reconciliation/types";
 import { ZohoSettingsProvider } from "@/lib/hooks/use-zoho-settings";
 import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
@@ -100,11 +101,39 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
   extraFields?: Record<string, string>;
   accept: string;
   label: string;
-  onDone: () => void;
-  variant?: "outline" | "ghost";
+  onDone: () => void | Promise<void>;
+  /** "dropzone": a large drag-and-drop area. Every variant accepts drops. */
+  variant?: "outline" | "ghost" | "dropzone";
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  const allowed = accept.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dragging) setDragging(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+      setDragging(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      if (allowed.length && !allowed.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+        toast.error(`${file.name} isn't a ${allowed.join(" / ")} file.`);
+        return;
+      }
+      void upload(file);
+    },
+  };
 
   const upload = async (file?: File) => {
     if (!file) return;
@@ -119,9 +148,9 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
       toast.success(
         json.batchId
           ? `${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new${json.updated ? `, ${json.updated} corrected` : ""})`
-          : `Payout saved: ${json.payouts?.map((p: { id: string }) => p.id).join(", ")}`,
+          : `Payout saved: ${json.payouts?.map((p: { id: string; orderRefs?: string[] }) => `${p.id} · ${p.orderRefs?.length ?? 0} orders`).join(", ")}`,
       );
-      onDone();
+      await onDone();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -130,8 +159,32 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
     }
   };
 
+  if (variant === "dropzone") {
+    return (
+      <div
+        {...dropProps}
+        role="button"
+        tabIndex={0}
+        onClick={() => !busy && input.current?.click()}
+        onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !busy) input.current?.click(); }}
+        className={`flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors ${
+          dragging ? "border-[#B08343] bg-[#FBF3E6]" : "border-[#D6CCBA] bg-[#FBF8F1] hover:border-[#B08343] hover:bg-[#FBF3E6]"
+        } ${busy ? "pointer-events-none opacity-70" : ""}`}
+      >
+        {busy ? <Loader2 size={18} className="animate-spin text-[#B08343]" /> : <Upload size={18} className="text-[#B08343]" />}
+        <span className="text-[13px] font-medium text-[#1F1B16]">
+          {busy ? "Reading the file…" : dragging ? "Drop to upload" : label}
+        </span>
+        <span className="text-[11.5px] text-[#8A8175]">
+          Drag and drop the {allowed.join(" / ")} file here, or click to choose. It&apos;s attached to this credit and its orders list straight away.
+        </span>
+        <input ref={input} type="file" className="hidden" accept={accept} onChange={(e) => upload(e.target.files?.[0])} />
+      </div>
+    );
+  }
+
   return (
-    <>
+    <span {...dropProps} className={`inline-flex rounded-md ${dragging ? "ring-2 ring-[#B08343] ring-offset-1" : ""}`}>
       <Button
         variant={variant}
         size="sm"
@@ -146,7 +199,7 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
         {label}
       </Button>
       <input ref={input} type="file" className="hidden" accept={accept} onChange={(e) => upload(e.target.files?.[0])} />
-    </>
+    </span>
   );
 }
 
@@ -349,7 +402,7 @@ function ReconciliationTabs({
   onRange: (f: string, t: string) => void;
   onConfirm: (id: string) => void;
   refresh: () => void;
-  uploadSlotFor: (provider: string) => React.ReactNode;
+  uploadSlotFor: UploadSlotFor;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -617,7 +670,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
             )} */}
 
           {/* KPIs — always visible on recon context; on Invoices tab too, for continuity */}
-          {showReconContext && view !== "orders" && (
+          {/* {showReconContext && view !== "orders" && (
             <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi
                 label="Bank-confirmed settled"
@@ -644,7 +697,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                 tone={exceptionCount ? "bad" : "muted"}
               />
             </div>
-          )}
+          )} */}
 
           {/* View body */}
           {showDashboard ? (
@@ -676,11 +729,11 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
               onRange={onRange}
               onConfirm={onConfirm}
               refresh={refresh}
-              uploadSlotFor={(provider) => (
+              uploadSlotFor={(provider, bankLineId, variant) => (
                 <UploadButton
-                  variant="ghost"
+                  variant={variant === "dropzone" ? "dropzone" : "ghost"}
                   endpoint="/api/upload/payout"
-                  extraFields={{ provider }}
+                  extraFields={bankLineId ? { provider, bankLineId } : { provider }}
                   accept=".csv,.xls,.xlsx"
                   label={`Upload ${provider} payout file`}
                   onDone={refresh}

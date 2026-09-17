@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GatewayProof } from "./gateway-proof";
 import { ZohoPostDialog } from "./zoho-post-dialog";
-import { aed2, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
+import { aed2, isBankFxVariance, isConfirmable, isConfirmablePartial, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
 
 type StripeProof =
   | { available: true; payoutId: string; net: number; refs: string[]; transactions: ReconTxn[] }
@@ -85,7 +85,8 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
   const [flagged, setFlagged] = useState(r.reviewFlag);
   const [deleting, setDeleting] = useState(false);
 
-  const payoutOk = !!r.payout && Math.abs(r.variance) <= 1;
+  // A gap that is only the remitting bank's own cut still explains the credit.
+  const payoutOk = !!r.payout && (Math.abs(r.variance) <= 1 || isBankFxVariance(r));
   const ordersOk = payoutOk && r.unresolvedRefs.length === 0 && r.resolvedOrders.length > 0;
   const ageDays = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86_400_000) : null;
   const overdue = !r.payout && ageDays !== null && ageDays > 7;
@@ -100,7 +101,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
       .catch(() => setProof({ available: false, reason: "Could not reach Stripe" }));
   }, [isStripe, proof, r.payout]);
 
-  const canPost = r.state === "SETTLED" && !!r.confirmedBy && !!r.payout;
+  const canPost = isConfirmable(r) && !!r.confirmedBy && !!r.payout;
 
   const toggleFlag = async () => {
     setFlagging(true);
@@ -199,22 +200,44 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         </div>
       )}
       {r.state === "PAYOUT_VARIANCE" && r.payout && (
-        <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
-          Bank credited <b>{aed2(r.bankAmount)}</b> but the {r.provider} payout says <b>{aed2(r.payout.net)}</b> — a{" "}
-          {r.variance > 0 ? "surplus" : "shortfall"} of <b>{aed2(Math.abs(r.variance))}</b>. Likely cause:{" "}
-          {r.payout.fxSource === "estimate"
-            ? "the FX estimate used to convert this payout drifted from the bank's actual wire rate"
-            : r.refundedOrders.length > 0
-              ? `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} may not net out the way expected`
-              : "a bank fee, rounding, or a partial settlement not reflected in the payout file"}.
-        </div>
+        isBankFxVariance(r) ? (
+          /* The orders all match and the gap is small enough to be the
+             remitting bank's own cut — a cost to book, not a broken payout. */
+          <div className="mb-3.5 rounded-lg bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#6F5325]">
+            The {r.provider} payout is worth <b>{aed2(r.payout.net)}</b> at the rate the bank itself quoted, but only{" "}
+            <b>{aed2(r.bankAmount)}</b> landed — the bank kept <b>{aed2(Math.abs(r.variance))}</b> on the way in
+            ({((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit), the usual inward-telex
+            charge on a {r.payout.currency} wire. All {r.resolvedOrders.length} order
+            {r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for, so this can be confirmed and booked: each
+            invoice still closes in full, the {r.provider} fee goes to gateway charges, and the{" "}
+            <b>{aed2(Math.abs(r.variance))}</b> is spread across the orders and booked to <b>exchange gain / loss</b>.
+          </div>
+        ) : (
+          <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
+            Bank credited <b>{aed2(r.bankAmount)}</b> but the {r.provider} payout says <b>{aed2(r.payout.net)}</b> — a{" "}
+            {r.variance > 0 ? "surplus" : "shortfall"} of <b>{aed2(Math.abs(r.variance))}</b>. Likely cause:{" "}
+            {r.payout.fxSource === "estimate"
+              ? "the FX estimate used to convert this payout drifted from the bank's actual wire rate"
+              : r.refundedOrders.length > 0
+                ? `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} may not net out the way expected`
+                : "a bank fee, rounding, or a partial settlement not reflected in the payout file"}
+            {r.resolvedOrders.length === 0
+              ? "."
+              : ` — too large (${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit) to book as an exchange difference, so it needs a person before the invoices close.`}
+          </div>
+        )
       )}
       {r.state === "ORDERS_UNRESOLVED" && (
         <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
           {r.unresolvedRefs.length > 0 ? (
-            <>The payout net matches the bank, but order <b>#{r.unresolvedRefs.join(", #")}</b>{" "}
-              {r.unresolvedRefs.length > 1 ? "aren't" : "isn't"} in the synced orders. Run a sync — this credit
-              can&apos;t be called Settled until every order it pays for is accounted for.</>
+            <>The payout net matches the bank, but line{r.unresolvedRefs.length > 1 ? "s" : ""} <b>#{r.unresolvedRefs.join(", #")}</b>{" "}
+              {r.unresolvedRefs.length > 1 ? "don't" : "doesn't"} match an order.
+              {isConfirmablePartial(r) ? (
+                <> You can confirm the {r.resolvedOrders.length} matched order{r.resolvedOrders.length > 1 ? "s" : ""} now and
+                  link the rest to their real orders in the table below (<b>Link order</b>) — linked orders become bookable too.</>
+              ) : (
+                <> Link {r.unresolvedRefs.length > 1 ? "them" : "it"} to the real order in the table below, or run a sync.</>
+              )}</>
           ) : (
             <>The payout net matches the bank, but it carries no chargeable order references — nothing to settle yet.</>
           )}
@@ -233,6 +256,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         <GatewayProof
           r={r}
           live={{ transactions: proof.transactions, net: proof.net, sourceLabel: `live from Stripe · payout ${proof.payoutId}` }}
+          onChanged={refresh}
         />
       )}
       {isStripe && !proof && (
@@ -245,13 +269,37 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           Couldn&apos;t load live Stripe proof: {proof.reason}
         </div>
       )}
-      {!isStripe && r.transactions.length > 0 && r.payout && <GatewayProof r={r} />}
+      {!isStripe && r.transactions.length > 0 && r.payout && <GatewayProof r={r} onChanged={refresh} />}
+
+      {/* Upload — drag-and-drop, attached to this credit. Shown until the
+          credit is confirmed; replacing a file is a re-upload here. */}
+      {!r.confirmedBy && r.state !== "SETTLED" && r.provider !== "Unclassified" && (
+        <div className="mb-3.5">{uploadSlot}</div>
+      )}
 
       {/* Action bar */}
       <div className="flex flex-wrap items-center gap-2">
-        {r.state === "SETTLED" && !r.confirmedBy && (
+        {isConfirmable(r) && !r.confirmedBy && (
           isFounder ? (
-            <ActionButton icon={BadgeCheck} label="Confirm settlement" tone="primary" onClick={() => onConfirm(r.id)} />
+            <ActionButton
+              icon={BadgeCheck}
+              label={
+                isConfirmablePartial(r)
+                  ? `Confirm ${r.resolvedOrders.length} matched order${r.resolvedOrders.length > 1 ? "s" : ""}`
+                  : isBankFxVariance(r)
+                    ? `Confirm and book ${aed2(Math.abs(r.variance))} as exchange difference`
+                    : "Confirm settlement"
+              }
+              tone="primary"
+              onClick={() => onConfirm(r.id)}
+              title={
+                isConfirmablePartial(r)
+                  ? `${r.unresolvedRefs.length} unmatched line(s) stay listed until linked`
+                  : isBankFxVariance(r)
+                    ? `The bank kept ${aed2(Math.abs(r.variance))} of this ${r.payout?.currency ?? ""} wire; it books to exchange gain / loss, invoices still close in full`
+                    : undefined
+              }
+            />
           ) : (
             <ActionButton icon={Lock} label="Founder confirms settlement" tone="locked" disabled />
           )
@@ -272,7 +320,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           </span>
         ) : canPost ? (
           <ActionButton icon={BookCheck} label="Preview & post to Zoho" onClick={() => setShowZoho(true)} />
-        ) : r.state === "SETTLED" ? (
+        ) : isConfirmable(r) ? (
           <ActionButton
             icon={BookCheck}
             label="Post to Zoho"
@@ -296,7 +344,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
             <AlertDialogTrigger asChild>
               <button
                 disabled={deleting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#A6472F] transition-colors hover:border-[#A6472F] hover:bg-[#F9ECE7] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] z-99999999999999999999 font-medium text-[#A6472F] transition-colors hover:border-[#A6472F] hover:bg-[#F9ECE7] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete payout
               </button>
@@ -327,7 +375,6 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           disabled={flagging}
         />
 
-        {r.state !== "SETTLED" && r.provider !== "Unclassified" && uploadSlot}
       </div>
 
       {showZoho && (

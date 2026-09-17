@@ -32,7 +32,7 @@ export function ReconDetailDialog({ line, isFounder, posting, onConfirm, refresh
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="my-auto w-full max-w-3xl rounded-2xl p-6 shadow-2xl"
+        className="my-auto w-full max-w-4xl rounded-2xl p-6 shadow-2xl"
         style={{ background: "#FFFFFF", color: "#1F1B16" }}
       >
         <div className="mb-4 flex items-start justify-between gap-4">

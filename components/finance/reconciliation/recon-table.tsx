@@ -6,7 +6,7 @@
  * Clicking a row opens ReconDetailDialog with the full breakdown + every
  * action. Replaces the old stack of always-expanded ReconRow cards. */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import {
   flexRender, getCoreRowModel, getSortedRowModel, useReactTable,
   type ColumnDef, type SortingState,
@@ -23,7 +23,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { gatewayColor } from "./colors";
 import { ReconDetailDialog } from "./recon-detail-dialog";
-import { aed2, STATE_META, type ReconLine, type ReconPayload } from "./types";
+import { aed2, STATE_META, type ReconLine, type ReconPayload, type UploadSlotFor } from "./types";
 
 const STATE_ICON = {
   SETTLED: Check, PAYOUT_VARIANCE: AlertTriangle, ORDERS_UNRESOLVED: HelpCircle, AWAITING_PAYOUT: Clock,
@@ -86,17 +86,27 @@ function DeletePayoutButton({ line, refresh }: { line: ReconLine; refresh: () =>
 }
 
 export function ReconTable({
-  lines, isFounder, postings, onConfirm, refresh, uploadSlotFor,
+  lines, allLines, isFounder, postings, onConfirm, refresh, uploadSlotFor,
 }: {
   lines: ReconLine[];
+  /** Every loaded credit, so an open modal survives its row moving to another
+   *  tab or group (e.g. Awaiting → Settled right after a payout upload). */
+  allLines?: ReconLine[];
   isFounder: boolean;
   postings: ReconPayload["zohoPostings"];
   onConfirm: (id: string) => void;
   refresh: () => void;
-  uploadSlotFor: (provider: string) => React.ReactNode;
+  uploadSlotFor: UploadSlotFor;
 }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
-  const [openLine, setOpenLine] = useState<ReconLine | null>(null);
+  // Keep only the id: the modal must show the line as it is NOW. Holding the
+  // row object froze it at click time, so after uploading a payout from the
+  // modal the orders didn't appear until the page was reloaded.
+  const [openLineId, setOpenLineId] = useState<string | null>(null);
+  const lastOpen = useRef<ReconLine | null>(null);
+  const liveOpen = openLineId ? (allLines ?? lines).find((l) => l.id === openLineId) ?? null : null;
+  if (liveOpen) lastOpen.current = liveOpen;
+  const openLine = openLineId ? liveOpen ?? lastOpen.current : null;
 
   const columns = useMemo<ColumnDef<ReconLine>[]>(() => [
     {
@@ -190,10 +200,18 @@ export function ReconTable({
         const meta = STATE_META[r.state];
         const Icon = STATE_ICON[r.state];
         const posting = postings[r.id];
+        // Confirmed with no payout file is not a settled row — it was confirmed
+        // on trust before the report existed. Say so, rather than showing a
+        // clean "Confirmed" that implies evidence nobody has seen.
+        const proofMissing = Boolean(r.confirmedBy) && !r.payout;
         return (
           <div className="flex flex-wrap items-center gap-1">
-            <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[meta.tone]}`}>
-              <Icon size={11} />{r.confirmedBy ? "Confirmed" : meta.label}
+            <span
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${proofMissing ? TONE_BG.warn : TONE_BG[meta.tone]}`}
+              title={proofMissing ? "Confirmed without a payout file — upload the settlement report to complete it" : undefined}
+            >
+              <Icon size={11} />
+              {proofMissing ? "Confirmed · proof missing" : r.confirmedBy ? "Confirmed" : meta.label}
             </span>
             {posting && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#FBF3E6] px-2 py-0.5 text-[11px] font-medium text-[#6F5325]" title="Recorded in Zoho">
@@ -226,9 +244,13 @@ export function ReconTable({
                 <Download size={13} />
               </a>
             )}
-            {r.state !== "SETTLED" && r.provider !== "Unclassified" && (
+            {/* Gated on the credit having NO payout file, never on it being
+                unconfirmed. A row confirmed while still AWAITING_PAYOUT has no
+                proof at all, and hiding the uploader there left four credits
+                permanently stuck — confirmed, fileless, and unrepairable. */}
+            {!r.payout && r.provider !== "Unclassified" && (
               <span title="Upload payout file" className="[&_button]:!h-auto [&_button]:!rounded-md [&_button]:!border [&_button]:!border-[#EAE3D6] [&_button]:!bg-white [&_button]:!p-1.5">
-                {uploadSlotFor(r.provider)}
+                {uploadSlotFor(r.provider, r.id)}
               </span>
             )}
             <DeletePayoutButton line={r} refresh={refresh} />
@@ -275,7 +297,7 @@ export function ReconTable({
             {table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
-                onClick={() => setOpenLine(row.original)}
+                onClick={() => setOpenLineId(row.original.id)}
                 className={`cursor-pointer border-b border-[#EAE3D6] transition-colors hover:bg-[#FBF8F1] ${row.original.reviewFlag ? "border-l-2 border-l-[#B08343]" : ""}`}
               >
                 {row.getVisibleCells().map((cell) => (
@@ -296,8 +318,8 @@ export function ReconTable({
           posting={postings[openLine.id]}
           onConfirm={onConfirm}
           refresh={refresh}
-          uploadSlot={uploadSlotFor(openLine.provider)}
-          onClose={() => setOpenLine(null)}
+          uploadSlot={uploadSlotFor(openLine.provider, openLine.id, "dropzone")}
+          onClose={() => setOpenLineId(null)}
         />
       )}
     </>

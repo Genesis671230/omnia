@@ -61,6 +61,26 @@ export async function GET(request: Request) {
         { status: p.status, postedAt: p.posted_at, reference: p.reference_number, result: p.zoho_result },
       ]),
     ),
+    // Uploaded payout files no bank credit claimed. They stay here, visible
+    // and downloadable, until someone deletes them — a file must never look
+    // like it vanished just because its total matched nothing.
+    unmatchedPayouts: (() => {
+      const claimed = new Set(allLines.map((l) => l.payout?.id).filter(Boolean));
+      return payouts
+        .filter((p) => !claimed.has(p.id))
+        .map((p) => ({
+          id: p.id,
+          provider: p.gateway,
+          net: Number(p.net_amount),
+          currency: p.original_currency,
+          netOriginal: p.net_original,
+          source: p.source,
+          orders: p.order_refs.length,
+          uploadedAt: p.uploaded_at ?? null,
+          pinnedTo: p.bank_line_id ?? null,
+        }))
+        .sort((a, b) => String(b.uploadedAt ?? "").localeCompare(String(a.uploadedAt ?? "")));
+    })(),
     documents: {
       bankStatement: credits.length > 0,
       missingPayouts: missingDocs,

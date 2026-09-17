@@ -3,6 +3,7 @@ import type { Gateway } from "@/lib/gateways";
 import { parsePayoutFile, type ParsedPayout } from "@/lib/parsers/payouts";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { FilesRepository } from "@/lib/repositories/files.repository";
+import { supabase } from "@/lib/supabase";
 
 export const maxDuration = 60;
 
@@ -31,7 +32,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 422 });
   }
 
-  const saved = await PayoutsRepository.upsertPayouts(payouts);
+  // A colliding statement number is stored under a disambiguated id (Tabby
+  // reuses one number across every store it pays that day), so everything
+  // downstream must act on the id the row actually claimed, not the parser's.
+  const resolvedIds = await PayoutsRepository.upsertPayoutsWithIds(payouts);
+  const storedId = (p: ParsedPayout) => resolvedIds.get(p.id) ?? p.id;
+  const saved = resolvedIds.size;
+
+  // Uploaded from a bank credit's own panel → attach it to that credit so it
+  // lists there immediately, even if its total doesn't match (shows Variance).
+  const bankLineId = String(form.get("bankLineId") || "");
+  let pinnedTo: string | null = null;
+  if (bankLineId && payouts.length === 1) {
+    const { data: line } = await supabase
+      .from("recon_lines")
+      .select("confirmed_by, payout_id")
+      .eq("bank_line_id", bankLineId)
+      .maybeSingle();
+    // A credit confirmed with no payout file is exactly the case that most
+    // needs a file attached — it was confirmed on trust and has no proof — so
+    // pinning is gated on the credit having no payout, never on it being
+    // unconfirmed. Pinning to a credit that already has its payout would
+    // silently swap the evidence under a settled row, so that stays refused.
+    if (!line?.payout_id) {
+      await PayoutsRepository.pinToBankLine([storedId(payouts[0])], bankLineId);
+      pinnedTo = bankLineId;
+    }
+  }
 
   let fileId: string | null = null;
   try {
@@ -42,7 +69,7 @@ export async function POST(request: Request) {
       mime: file.type || undefined,
       content: buf,
       parseSummary: payouts
-        .map((p) => `${p.id} · net AED ${p.net.toFixed(2)} · ${p.orderRefs.length} orders`)
+        .map((p) => `${storedId(p)} · net AED ${p.net.toFixed(2)} · ${p.orderRefs.length} orders`)
         .join(" | "),
     });
   } catch (e) {
@@ -53,10 +80,16 @@ export async function POST(request: Request) {
   return NextResponse.json({
     saved,
     fileId,
+    pinnedTo,
     payouts: payouts.map((p) => ({
-      id: p.id,
+      id: storedId(p),
       provider: p.provider,
       net: p.net,
+      store: p.store ?? null,
+      // Surfaced so the uploader can see when a report had to take a
+      // disambiguated id because another store already held its statement number.
+      statementNo: p.statementNo ?? p.id,
+      renamed: storedId(p) !== (p.statementNo ?? p.id),
       orderRefs: p.orderRefs,
       notes: p.notes,
     })),

@@ -529,7 +529,7 @@ export function buildCustomerPaymentBody(
     date: input.date ?? new Date().toISOString().slice(0, 10),
     customer_name: input.customerName,
     reference_number: input.referenceNumberOverride || input.bankReference,
-    account_id: input.accountId,
+    account_id: input.accountId||"2330082000000236001",
     ...(input.description ? { description: input.description } : {}),
     ...(input.bankCharges ? { bank_charges: input.bankCharges } : {}),
     ...(input.customFields ? { custom_fields: input.customFields } : {}),
@@ -537,11 +537,16 @@ export function buildCustomerPaymentBody(
   };
 }
 
-export async function findZohoInvoice(
+export type { ZohoInvoiceListRow };
+
+/** Every Zoho invoice whose customer name starts with this order number
+ *  (store prefix stripped as a fallback). Callers that know the expected
+ *  amount can pick among several; findZohoInvoice() below can't. */
+export async function findZohoInvoiceCandidates(
   orderNumber: string,
   accessToken: string,
   orgId: string,
-): Promise<ZohoInvoiceListRow> {
+): Promise<ZohoInvoiceListRow[]> {
   const wanted = orderNumber?.trim();
   if (!wanted) throw new Error("Cannot find Zoho invoice: order number is empty");
 
@@ -596,6 +601,16 @@ export async function findZohoInvoice(
     })),
   });
 
+  return matches;
+}
+
+export async function findZohoInvoice(
+  orderNumber: string,
+  accessToken: string,
+  orgId: string,
+): Promise<ZohoInvoiceListRow> {
+  const wanted = orderNumber?.trim();
+  const matches = await findZohoInvoiceCandidates(orderNumber, accessToken, orgId);
   if (matches.length === 0) throw new Error(`No Zoho invoice found for order ${wanted}`);
   if (matches.length === 1) return matches[0];
 
