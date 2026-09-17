@@ -3,6 +3,7 @@ import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { computeFinanceStatuses } from "@/lib/orders-finance-status";
+import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 import { aggregateCustomers, CANCELLED } from "@/lib/customers/aggregate";
 import { customerIdentityKey } from "@/lib/customer-identity";
 
@@ -38,7 +39,12 @@ export async function GET() {
     AdInsightsRepository.listInsights(from, to),
     PayoutsRepository.listWithRefs(),
   ]);
-  const financeByUid = new Map(computeFinanceStatuses(orders, payouts).map((o) => [o.uid, o]));
+  const settlements = await SettlementsRepository.settlementInfoByOrderUid(
+    orders.map((o) => o.uid).filter(Boolean) as string[],
+  );
+  const financeByUid = new Map(
+    computeFinanceStatuses(orders, payouts, settlements).map((o) => [o.uid, o]),
+  );
 
   const { customers: aggregated, unidentifiedCount } = aggregateCustomers(orders);
 

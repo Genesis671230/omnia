@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { OrdersRepository, parseOrdersQuery } from "@/lib/repositories/orders.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { computeFinanceStatuses } from "@/lib/orders-finance-status";
+import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 
 
 export async function GET(request: Request) {
@@ -28,7 +29,13 @@ export async function GET(request: Request) {
   }
 
   const stripped = rows.map(({ line_items: _li, ...o }) => o);
-  const orders = computeFinanceStatuses(stripped, payouts);
+  // Settlement evidence per order: without it every order reads AWAITING_BANK
+  // however much proof its settlement record carries, and nothing can show as
+  // ready to book.
+  const settlements = await SettlementsRepository.settlementInfoByOrderUid(
+    stripped.map((o) => o.uid).filter(Boolean) as string[],
+  );
+  const orders = computeFinanceStatuses(stripped, payouts, settlements);
 
   return NextResponse.json({ orders, total, page, pageSize: limit, coverage,orderNumbers });
 }

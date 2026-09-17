@@ -520,7 +520,15 @@ export function resolveCustomFields(
   });
 }
 export function buildCustomerPaymentBody(
-  input: ZohoCustomerPaymentInput & { customerId: string; invoiceId: string; amountApplied: number; balance: number },
+  input: ZohoCustomerPaymentInput & {
+    customerId: string;
+    invoiceId: string;
+    /** How much of this payment closes the invoice. Defaults to the whole
+     *  payment — sending it undefined makes Zoho record a payment that applies
+     *  to nothing, leaving the invoice open with the money sitting unapplied. */
+    amountApplied?: number;
+    balance?: number;
+  },
 ): CustomerPaymentBody {
   return {
     customer_id: input.customerId,
@@ -529,11 +537,14 @@ export function buildCustomerPaymentBody(
     date: input.date ?? new Date().toISOString().slice(0, 10),
     customer_name: input.customerName,
     reference_number: input.referenceNumberOverride || input.bankReference,
-    account_id: input.accountId||"2330082000000236001",
+    // No hardcoded fallback: a deposit account is an accounting decision, and
+    // defaulting it silently posted every account-less payment into one fixed
+    // Zoho account. Omitted, Zoho applies the organisation's own default.
+    ...(input.accountId ? { account_id: input.accountId } : {}),
     ...(input.description ? { description: input.description } : {}),
     ...(input.bankCharges ? { bank_charges: input.bankCharges } : {}),
     ...(input.customFields ? { custom_fields: input.customFields } : {}),
-    invoices: [{ invoice_id: input.invoiceId, amount_applied:input.amountApplied }],
+    invoices: [{ invoice_id: input.invoiceId, amount_applied: input.amountApplied ?? input.amount }],
   };
 }
 

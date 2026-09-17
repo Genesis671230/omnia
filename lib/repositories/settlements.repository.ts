@@ -4,6 +4,7 @@
 // later. Written by the reconciliation engine, never by hand.
 
 import { supabase } from "@/lib/supabase";
+import type { OrderSettlementInfo } from "@/lib/orders-finance-status";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 
@@ -167,6 +168,27 @@ export const SettlementsRepository = {
       out.push(...(data ?? []));
     }
     return out;
+  },
+
+  /** Settlement state per order uid, shaped for computeFinanceStatuses.
+   *
+   *  This is what lets an order page say "the gateway confirms it paid this"
+   *  and "this is ready to book in Zoho" — without it every order read as
+   *  AWAITING_BANK no matter how much evidence its settlement record carried. */
+  async settlementInfoByOrderUid(orderUids: string[]): Promise<Map<string, OrderSettlementInfo>> {
+    const rows = await this.listExistingByOrderUids(orderUids);
+    return new Map(
+      rows.map((r) => [
+        r.order_uid,
+        {
+          settlement_id: r.id,
+          evidence_type: r.evidence_type,
+          evidence_confirmed: Boolean(r.evidence_confirmed),
+          zoho_payment_id: r.zoho_payment_id,
+          zoho_published_at: r.zoho_published_at,
+        },
+      ]),
+    );
   },
 
   /** Drop settlement records that a reassignment has orphaned.

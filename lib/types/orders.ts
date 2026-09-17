@@ -43,7 +43,10 @@ export type OrderRow = {
   payout_id: string | null;
   payout_status: string;
   in_payout_file: boolean;
-  finance_status: "SETTLED" | "AWAITING_BANK" | "MISSING_PAYOUT" | "COD_PENDING";
+  // STRIPE_SETTLED: the gateway's own API confirms it paid this order out,
+  // before the bank credit for that payout has been reconciled. Real evidence,
+  // but weaker than SETTLED, which means money actually landed in the bank.
+  finance_status: "SETTLED" | "STRIPE_SETTLED" | "AWAITING_BANK" | "MISSING_PAYOUT" | "COD_PENDING";
 };
 
 // MISSING_PAYOUT reads as "Processing" here deliberately — most rows in this
@@ -54,6 +57,7 @@ export type OrderRow = {
 // settled) via the Settlement tracker in ExpandedOrder.
 export const ORDER_STATUS_META: Record<OrderRow["finance_status"], { label: string; tone: string }> = {
   SETTLED: { label: "Settled", tone: "ok" },
+  STRIPE_SETTLED: { label: "Gateway settled", tone: "info" },
   AWAITING_BANK: { label: "Awaiting bank", tone: "warn" },
   MISSING_PAYOUT: { label: "Processing", tone: "muted" },
   COD_PENDING: { label: "COD pending", tone: "muted" },
