@@ -23,7 +23,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { gatewayColor } from "./colors";
 import { ReconDetailDialog } from "./recon-detail-dialog";
-import { aed2, STATE_META, type ReconLine, type ReconPayload, type UploadSlotFor } from "./types";
+import { aed2, isDownloadableSource, STATE_META, type ReconLine, type ReconPayload, type UploadSlotFor } from "./types";
 
 const STATE_ICON = {
   SETTLED: Check, PAYOUT_VARIANCE: AlertTriangle, ORDERS_UNRESOLVED: HelpCircle, AWAITING_PAYOUT: Clock,
@@ -235,14 +235,25 @@ export function ReconTable({
         const r = row.original;
         return (
           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-            {r.payout?.source && (
+            {/* Only offer the download when there IS a document. A payout
+                synced from a gateway API has source="stripe-api", not a
+                filename, and the link 404'd for every one of them. */}
+            {isDownloadableSource(r.payout?.source) && (
               <a
-                href={`/api/files/by-name?filename=${encodeURIComponent(r.payout.source)}&provider=${encodeURIComponent(r.provider)}`}
-                title="Download payout file"
+                href={`/api/files/by-name?filename=${encodeURIComponent(r.payout!.source!)}&provider=${encodeURIComponent(r.provider)}`}
+                title={`Download ${r.payout!.source}`}
                 className="rounded-md border border-[#EAE3D6] bg-white p-1.5 text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
               >
                 <Download size={13} />
               </a>
+            )}
+            {r.payout && !isDownloadableSource(r.payout.source) && (
+              <span
+                title="Synced from the gateway API — there is no file to download"
+                className="rounded-md border border-dashed border-[#EAE3D6] px-1.5 py-1 text-[10px] text-[#8A8175]"
+              >
+                API
+              </span>
             )}
             {/* Gated on the credit having NO payout file, never on it being
                 unconfirmed. A row confirmed while still AWAITING_PAYOUT has no

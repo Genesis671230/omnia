@@ -175,6 +175,17 @@ export const isBankFxVariance = (
 
 /** Settled, a partial that can be confirmed with lines still unmatched, or a
  *  cross-border credit whose only gap is the bank's own cut. */
+/** Whether a payout's `source` names a real archived file that can be
+ *  downloaded, or is just a provenance marker.
+ *
+ *  Payouts pulled from a gateway API store source="stripe-api" — there is no
+ *  document behind them. The UI used to offer a Download button whenever
+ *  `source` was truthy, which sent the browser to
+ *  /api/files/by-name?filename=stripe-api and returned "no such file exists"
+ *  for all 68 API-synced payouts. */
+export const isDownloadableSource = (source: string | null | undefined): boolean =>
+  !!source && /\.(xlsx|xls|csv|pdf)$/i.test(source);
+
 /** Confirming asserts "this credit is right", which means nothing without the
  *  payout that proves it — the API refuses it outright (NoPayoutToConfirmError).
  *  The payout check is explicit rather than implied by SETTLED so the button

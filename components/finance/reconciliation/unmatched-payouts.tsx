@@ -7,7 +7,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { aed2, fmtOriginal, type UnmatchedPayout } from "./types";
+import { aed2, fmtOriginal, isDownloadableSource, type UnmatchedPayout } from "./types";
 
 /* Payout files that were uploaded but that no bank credit claimed.
  *
@@ -67,11 +67,13 @@ export function UnmatchedPayouts({ payouts, refresh }: { payouts: UnmatchedPayou
                   </span>
                 )}
                 <span className="ml-auto flex items-center gap-1.5">
-                  {p.source && (
+                  {/* No link for API-synced payouts (source="stripe-api"):
+                      there is no document, and the link 404'd. */}
+                  {isDownloadableSource(p.source) && (
                     <a
-                      href={`/api/files/by-name?filename=${encodeURIComponent(p.source)}&provider=${encodeURIComponent(p.provider)}`}
+                      href={`/api/files/by-name?filename=${encodeURIComponent(p.source!)}&provider=${encodeURIComponent(p.provider)}`}
                       className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] text-[#1F1B16] hover:border-[#B08343]"
-                      title={p.source}
+                      title={p.source!}
                     >
                       <Download size={12} /> File
                     </a>

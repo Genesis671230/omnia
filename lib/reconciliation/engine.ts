@@ -224,6 +224,63 @@ export type ComputeReconInputs = {
   links?: Map<string, string>;
 };
 
+/** Decide which unpinned payout explains which credit, best match first.
+ *
+ *  Candidate selection accepts anything within max(1 AED, 2% of the credit),
+ *  which is wide enough that several same-gateway payouts can be eligible for
+ *  the same credit. Taking the FIRST eligible one meant an earlier credit could
+ *  grab a payout that belonged to a later credit; the later credit then took
+ *  the leftover, and BOTH sat in PAYOUT_VARIANCE forever, neither closable.
+ *  All 18 Stripe credits stuck in variance had an exact match available, most
+ *  of them swapped pairwise with their neighbour.
+ *
+ *  Every (credit, payout) pair inside the window is scored by absolute
+ *  difference and assigned smallest-difference-first, so exact matches always
+ *  win and no payout is claimed twice. Ties break on credit id then payout id,
+ *  which keeps the result independent of input order.
+ *
+ *  Pinned payouts are deliberately NOT considered here: pinning is a human
+ *  decision made by uploading a file from a credit's own panel, and it
+ *  outranks amount proximity in the caller.
+ */
+function assignPayoutsToCredits(
+  credits: ComputeReconInputs["credits"],
+  payouts: PayoutWithRefs[],
+): Map<string, PayoutWithRefs> {
+  const pinnedCredits = new Set(payouts.filter((p) => p.bank_line_id).map((p) => p.bank_line_id!));
+  const open = payouts.filter((p) => !p.bank_line_id);
+
+  const pairs: { creditId: string; payout: PayoutWithRefs; diff: number }[] = [];
+  for (const credit of credits) {
+    // A credit that already has its own pinned payout is spoken for.
+    if (pinnedCredits.has(credit.id)) continue;
+    const provider = credit.gateway_guess || "Unclassified";
+    const window = Math.max(TOLERANCE_AED, Number(credit.amount) * 0.02);
+    for (const p of open) {
+      if (p.gateway !== provider) continue;
+      const diff = Math.abs(expectedNetFor(p, credit).net - Number(credit.amount));
+      if (diff <= window) pairs.push({ creditId: credit.id, payout: p, diff });
+    }
+  }
+
+  pairs.sort(
+    (a, b) =>
+      a.diff - b.diff ||
+      a.creditId.localeCompare(b.creditId) ||
+      a.payout.id.localeCompare(b.payout.id),
+  );
+
+  const byCredit = new Map<string, PayoutWithRefs>();
+  const taken = new Set<string>();
+  for (const { creditId, payout, diff } of pairs) {
+    void diff;
+    if (byCredit.has(creditId) || taken.has(payout.id)) continue;
+    byCredit.set(creditId, payout);
+    taken.add(payout.id);
+  }
+  return byCredit;
+}
+
 // Pure: bank → payout → orders matching, no I/O. Split out of
 // runReconciliation() so it can be fixture-tested without a live database —
 // see tests/reconciliation/engine.test.ts.
@@ -232,6 +289,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
   const orderNumbers = new Set(orders.map((o) => o.order_number));
   const claimedPayouts = new Set<string>();
   const lines: ReconLine[] = [];
+  const assignment = assignPayoutsToCredits(credits, payouts);
 
   for (const credit of credits) {
     const provider = credit.gateway_guess || "Unclassified";
@@ -245,14 +303,9 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     // to another credit never auto-match here.
     const payout =
       payouts.find((p) => !claimedPayouts.has(p.id) && p.bank_line_id === credit.id) ??
-      payouts.find(
-        (p) =>
-          !claimedPayouts.has(p.id) &&
-          !p.bank_line_id &&
-          p.gateway === provider &&
-          Math.abs(expectedNetFor(p, credit).net - credit.amount) <=
-            Math.max(TOLERANCE_AED, credit.amount * 0.02),
-      );
+      (assignment.get(credit.id) && !claimedPayouts.has(assignment.get(credit.id)!.id)
+        ? assignment.get(credit.id)
+        : undefined);
 
     const confirmation = confirmations.get(credit.id);
     const review = reviews?.get(credit.id);

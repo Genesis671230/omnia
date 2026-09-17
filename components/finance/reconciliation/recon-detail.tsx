@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GatewayProof } from "./gateway-proof";
 import { ZohoPostDialog } from "./zoho-post-dialog";
-import { aed2, isBankFxVariance, isConfirmable, isConfirmablePartial, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
+import { aed2, isBankFxVariance, isConfirmable, isConfirmablePartial, isDownloadableSource, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
 
 type StripeProof =
   | { available: true; payoutId: string; net: number; refs: string[]; transactions: ReconTxn[] }
@@ -160,7 +160,18 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         <ChainLink
           icon={Package}
           label={ordersOk ? `${r.resolvedOrders.length} orders` : r.unresolvedRefs.length ? `${r.unresolvedRefs.length} missing` : "—"}
-          sub={r.unresolvedRefs.length ? `#${r.unresolvedRefs.join(", ")} not found` : ordersOk ? `#${r.resolvedOrders.join(", ")}` : "awaiting payout"}
+          // "awaiting payout" is only true when there IS no payout. With a
+          // payout present and no orders, the honest label names that instead
+          // of blaming a file that is sitting right there.
+          sub={
+            r.unresolvedRefs.length
+              ? `#${r.unresolvedRefs.join(", ")} not found`
+              : ordersOk
+                ? `#${r.resolvedOrders.join(", ")}`
+                : r.payout
+                  ? "payout carries no order refs"
+                  : "awaiting payout"
+          }
           status={ordersOk ? "resolved" : r.unresolvedRefs.length ? "broken" : "pending"}
         />
       </div>
@@ -330,14 +341,21 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           />
         ) : null}
 
-        {r.payout?.source && (
+        {/* A payout synced from a gateway API carries source="stripe-api", not
+            a filename — offering "Payout file" there sent every click to
+            "no such file exists". Say where it came from instead. */}
+        {isDownloadableSource(r.payout?.source) ? (
           <a
-            href={`/api/files/by-name?filename=${encodeURIComponent(r.payout.source)}&provider=${encodeURIComponent(r.provider)}`}
+            href={`/api/files/by-name?filename=${encodeURIComponent(r.payout!.source!)}&provider=${encodeURIComponent(r.provider)}`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
           >
             <Download size={14} /> Payout file
           </a>
-        )}
+        ) : r.payout ? (
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#D6CCBA] px-3 py-2 text-[12.5px] text-[#8A8175]">
+            Synced from the {r.provider} API — no file
+          </span>
+        ) : null}
 
         {r.payout && !r.confirmedBy && (
           <AlertDialog>
