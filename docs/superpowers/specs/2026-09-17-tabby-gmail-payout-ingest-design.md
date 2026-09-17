@@ -101,22 +101,54 @@ since the change affects all 238 lines, not just Tabby.
 ### 4. Payout ID collisions
 
 Tabby's statement number is date+currency only (`Tabby20260914AED`) and carries no
-store token, while Tabby issues **one report per store**. On 2026-09-14 two TABBY
-LLC AED credits arrived — 14477.55 (matched) and 34695.28 (stuck, no file). When
-the second report is ingested it parses to the same `payouts.id` primary key and
-the upsert silently overwrites the first. Manual one-at-a-time uploading has
-masked this; automation pulling every store's report triggers it immediately.
+store token, while Tabby issues **one report per store**. The `payouts.id`
+primary key is that statement number, so every same-date same-currency report
+overwrites its predecessor.
 
-Resolution, chosen for backward compatibility over elegance:
+This is not hypothetical. Scanning the settlement reports in `~/Downloads`
+against `parsePayoutFile()` found **13 distinct payouts collapsing onto 5 primary
+keys**:
 
-- Add a nullable `store` column to `payouts`, populated from the attachment
-  filename or the email body's `Store name`.
+| Statement # | Distinct payouts | Nets |
+|---|---|---|
+| `Tabby20260706AED` | 3 | 8126.21 / 12199.51 / 57486.65 |
+| `Tabby20260907AED` | 2 | 41080.84 / 36243.51 |
+| `Tabby20260907SAR` | 2 | 12505.79 / 13836.94 |
+| `Tabby20260914AED` | 3 | 34695.28 / 14477.55 / 13589.71 |
+| `Tabby20260914SAR` | 3 | 9876.21 / 3190.91 / 55964.48 |
+
+The file the founder was about to upload — `2026-09-14 AED settlement report
+Omniastores UAE (1).xlsx`, net **34695.28**, the exact amount of one of the four
+stuck credits — parses to `Tabby20260914AED`, the key already held by the
+Omniastores UAE Paylink payout of 14477.55. Uploading it today destroys a
+correctly matched payout.
+
+**Store name alone is an insufficient discriminator.** Under `Tabby20260914AED`
+two files share merchant code `OSUAEPL` with different nets (14477.55 and
+13589.71), so identity needs a content component.
+
+Payout identity becomes, in order of increasing specificity:
+
+```
+<statement #>[-<merchant code slug>][-<content hash>]
+```
+
+- The merchant segment is added only when a different merchant already holds the
+  statement number. `Merchant Name` and `Merchant Code` are **columns inside the
+  transaction table** (`Omniastores UAE` / `AE`, `Omniastores UAE Paylink` /
+  `OSUAEPL`), so they are read from data, never from a filename decorated with
+  `(1)` or `36`.
+- The content hash — first 6 hex of a SHA-1 over the sorted order-ref list — is
+  added only when the statement+merchant pair still collides with a *different*
+  set of orders. It is deterministic, so re-ingesting an identical file yields
+  the identical ID and upserts harmlessly; idempotency is preserved.
 - **Existing payout IDs are never rewritten.** `payouts.id` is referenced by
   `payout_transactions`, `payout_ref_links`, `recon_lines` and settlements; a PK
-  migration across live reconciled data is the riskiest available fix.
-- On upsert, when an incoming report carries a statement number that already
-  exists **with a different store**, the new row is written as
-  `Tabby20260914AED-UAE-PAYLINK` (statement + store slug) instead of clobbering.
+  migration across live reconciled data is the riskiest available fix. The first
+  file to claim a statement number keeps the bare ID.
+
+A one-off reconciliation script reports which historical payouts were lost to
+this collision so they can be re-uploaded deliberately; it changes no existing row.
 
 ### 5. Gmail ingest subsystem
 
@@ -193,7 +225,9 @@ The row highlights on drag-over and rejects non-spreadsheet MIME types.
 ## Schema changes
 
 - `payouts.entity` (text, nullable)
-- `payouts.store` (text, nullable)
+- `payouts.store` (text, nullable) — merchant name
+- `payouts.merchant_code` (text, nullable) — `AE`, `OSUAEPL`, `ORPL`, `SA`, `ksa`
+- `payouts.statement_no` (text, nullable) — the raw statement number before disambiguation
 - `bank_lines.entity` (text, nullable)
 - `payout_email_ingests` (new table)
 
