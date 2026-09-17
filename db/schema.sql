@@ -181,6 +181,10 @@ alter table payout_transactions add column if not exists quality text;
 alter table payout_transactions add column if not exists gross_original numeric;
 alter table payout_transactions add column if not exists fee_original   numeric;
 alter table payout_transactions add column if not exists net_original   numeric;
+-- VAT a gateway charges on top of its fee, when the statement itemises it
+-- (Tamara "VAT Collected by Tamara"); null/0 where the fee already includes VAT.
+alter table payout_transactions add column if not exists vat_aed        numeric;
+alter table payout_transactions add column if not exists vat_original   numeric;
 
 -- recon_lines: refund refs (matched to an order but reversing money, not
 -- settling it) and quality-flagged transactions, surfaced separately from
@@ -289,6 +293,20 @@ alter table settlement_records add column if not exists evidence_document_id uui
 alter table settlement_records add column if not exists zoho_payment_id text;
 alter table settlement_records add column if not exists zoho_published_at timestamptz;
 create index if not exists settlement_records_evidence_idx on settlement_records (evidence_confirmed, zoho_payment_id);
+
+-- Gateway fee / VAT / FX booking (lib/finance/settlement-posting.ts). Each
+-- order posts up to three Zoho documents; each id column holds either the
+-- Zoho id or a PENDING:<attempt> marker while the write is in flight, so a
+-- retry after a timeout checks Zoho first instead of posting twice.
+-- zoho_claimed_at is a short row lease against two concurrent publishes.
+alter table settlement_records add column if not exists zoho_claimed_at timestamptz;
+alter table settlement_records add column if not exists zoho_invoice_id text;
+alter table settlement_records add column if not exists zoho_fee_expense_id text;
+alter table settlement_records add column if not exists zoho_fx_journal_id text;
+alter table settlement_records add column if not exists fee_aed numeric;
+alter table settlement_records add column if not exists fee_vat_aed numeric;
+alter table settlement_records add column if not exists fx_difference_aed numeric;
+alter table settlement_records add column if not exists zoho_post_error text;
 
 -- one uploaded statement can evidence many orders (e.g. one Tabby payout
 -- file covering 40 settled orders) — parent row + join table, not a single
@@ -643,3 +661,108 @@ create table if not exists leads (
 create index if not exists leads_created_idx on leads (created_at desc);
 create index if not exists leads_status_idx on leads (status);
 
+
+-- A payout file uploaded from a specific bank credit's panel is pinned to that
+-- credit: it always shows there (as Variance if the totals disagree) instead
+-- of silently matching nothing and seeming to vanish. Null = auto-match.
+alter table payouts add column if not exists bank_line_id text;
+alter table payouts add column if not exists uploaded_at timestamptz default now();
+
+-- Manual links for payout lines whose reference isn't an order number (e.g.
+-- Tamara payment links carrying a phone number, "0655572535"). Keyed by the
+-- payout + the ref as it appears in the file.
+create table if not exists payout_ref_links (
+  payout_id     text not null,
+  order_ref     text not null,
+  order_number  text not null,
+  tenant_id     text not null default 'omnia',
+  linked_by     text not null default 'founder',
+  linked_at     timestamptz not null default now(),
+  primary key (payout_id, order_ref)
+);
+
+-- Refunds netted out of a gateway payout, booked in Zoho as a credit note
+-- against the order + a refund of it paid from the gateway clearing account.
+-- Id columns hold the Zoho id or PENDING:<attempt> mid-write (same retry
+-- discipline as settlement_records).
+create table if not exists refund_postings (
+  id                  text primary key,          -- payout_id|order_number
+  tenant_id           text not null default 'omnia',
+  bank_line_id        text not null,
+  payout_id           text not null,
+  order_number        text not null,
+  amount_aed          numeric not null,
+  zoho_invoice_id     text,
+  zoho_creditnote_id  text,
+  creditnote_reused   boolean not null default false,
+  zoho_refund_id      text,
+  error               text,
+  claimed_at          timestamptz,
+  posted_at           timestamptz,
+  created_at          timestamptz not null default now()
+);
+create index if not exists refund_postings_line_idx on refund_postings (bank_line_id);
+
+-- ── Zoho invoice snapshot on the settlement row ────────────────────────────
+-- The proof panel used to re-ask Zoho for every order's invoice each time it
+-- opened: 1-2 `invoices?customer_name_startswith=` searches PER ORDER (each
+-- pulling up to 200 rows), serialised through the throttle, against a ~4,900
+-- call/day budget. A 14-order payout burned ~28 calls just to render, and the
+-- exchange difference couldn't be shown until they all came back.
+--
+-- Booking already reads the invoice from Zoho; these columns keep what it saw,
+-- so the panel renders the invoice amount and FX difference from the database
+-- instantly and only calls Zoho for orders it has never looked up (or when the
+-- founder explicitly refreshes).
+alter table settlement_records add column if not exists zoho_invoice_number     text;
+alter table settlement_records add column if not exists zoho_invoice_status     text;
+-- What the invoice still owed when we looked: the amount the payment closes.
+alter table settlement_records add column if not exists zoho_invoice_balance    numeric(14,2);
+alter table settlement_records add column if not exists zoho_invoice_total      numeric(14,2);
+alter table settlement_records add column if not exists zoho_invoice_checked_at timestamptz;
+
+-- ── Payout store identity: one statement number, several stores ────────────
+-- Tabby numbers a settlement statement by date and currency only
+-- ("Tabby20260914AED") but issues one report PER STORE, and payouts.id is that
+-- statement number. Every same-date same-currency report therefore overwrote
+-- its predecessor. Measured against the real files: 13 distinct payouts
+-- collapsed onto 5 primary keys, losing AED 41,080.84 (Omniastores UAE, behind
+-- the 2026-09-07 credit) and SAR 12,505.79 (Omniastores KSA, behind the
+-- 2026-09-09 AED 12,188.81 credit) among others.
+--
+-- These columns record where a payout actually came from, read from the
+-- transaction table's own Merchant Name / Merchant Code columns rather than
+-- from a filename decorated with "(1)" or "36". lib/finance/payout-identity.ts
+-- uses them to give a colliding report its own id instead of clobbering.
+-- Existing ids are never rewritten: payouts.id is referenced by
+-- payout_transactions, payout_ref_links, recon_lines and settlement_records.
+alter table payouts add column if not exists store         text;
+alter table payouts add column if not exists merchant_code text;
+alter table payouts add column if not exists statement_no  text;
+create index if not exists payouts_statement_no_idx on payouts (statement_no);
+
+-- ── Gmail payout-report ingestion audit ────────────────────────────────────
+-- Gateways email a settlement report on every payout; lib/finance/
+-- payout-email-ingest.ts pulls them in so credits stop waiting on somebody
+-- noticing the mail. One row per Gmail message examined.
+--
+-- message_id is UNIQUE and is the idempotency key: re-polling the same mailbox
+-- must never re-ingest a report. Failures and skips are recorded too — a
+-- message that matched but yielded nothing parseable is exactly what needs to
+-- be visible rather than silently dropped.
+create table if not exists payout_email_ingests (
+  id              uuid primary key,
+  tenant_id       text not null,
+  message_id      text not null unique,
+  mailbox         text not null,
+  sender          text,
+  subject         text,
+  received_at     timestamptz,
+  provider        text,
+  attachment_name text,
+  payout_id       text,
+  status          text not null,   -- ingested | skipped | failed
+  error           text,
+  created_at      timestamptz default now()
+);
+create index if not exists payout_email_ingests_status_idx on payout_email_ingests (status, created_at desc);

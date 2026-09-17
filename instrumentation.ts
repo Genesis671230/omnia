@@ -1,8 +1,8 @@
 // Next.js server-boot hook (stable since Next 15) — starts the persistent
 // payout-verification, ad-platform-sync, Zoho/inventory-sync, order-sync,
 // gateway payment-confirmation (Stripe + Telr), CFO digest, group-summary,
-// and Telegram-listener schedulers exactly once when the Node server
-// process comes up. Not invoked in the edge runtime or during build.
+// Telegram-listener and Gmail payout-ingest schedulers exactly once when the
+// Node server process comes up. Not invoked in the edge runtime or during build.
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startPayoutSyncScheduler } = await import("@/lib/scheduler/payout-sync-scheduler");
@@ -28,5 +28,8 @@ export async function register() {
 
     const { startTelegramListeners } = await import("@/lib/scheduler/telegram-listener-scheduler");
     startTelegramListeners();
+
+    const { startPayoutEmailScheduler } = await import("@/lib/scheduler/payout-email-scheduler");
+    startPayoutEmailScheduler();
   }
 }
