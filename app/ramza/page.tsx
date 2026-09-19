@@ -21,28 +21,19 @@ import { FoundingPartners } from "@/components/ramza/founding-partners";
 import { Faq } from "@/components/ramza/faq";
 import { Footer } from "@/components/ramza/footer";
 import { resolveH1, FAQ } from "@/lib/ramza/copy";
+import { landingMetadata, landingJsonLd, faqNode } from "@/lib/ramza/seo";
+import { RAMZA_EMAIL, RAMZA_LEGAL_LINE } from "@/lib/ramza/site";
 
-export const metadata: Metadata = {
-  // ramza.example was a stand-in. Inferred from the contact address the
-  // founder set (hello@ramza.ai); override with NEXT_PUBLIC_RAMZA_ORIGIN if
-  // the live domain differs.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_RAMZA_ORIGIN || "https://ramza.ai"),
-  title: "RAMZA — Payout reconciliation for Gulf e-commerce",
-  description:
-    "RAMZA matches Tabby, Tamara, Telr, Stripe and COD payouts to your bank and closes invoices in Zoho Books automatically. Built for UAE and KSA stores.",
-  openGraph: {
-    title: "RAMZA — Payout reconciliation for Gulf e-commerce",
-    description:
-      "RAMZA matches Tabby, Tamara, Telr, Stripe and COD payouts to your bank and closes invoices in Zoho Books automatically.",
-    type: "website",
-  },
-  robots: { index: true, follow: true },
-};
+/* Title, canonical, OG and Twitter all come from lib/ramza/seo so the landing
+   page and every /ramza/* content page stay consistent. Two things that module
+   fixes and this block did not: the root layout's "%s · Omnia Finance OS"
+   template was silently appended to the title here, and the ?h= headline
+   variants were each separately indexable with no canonical pointing home. */
+export const metadata: Metadata = landingMetadata();
 
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
-const EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "hello@ramza.ai";
-const LEGAL_LINE = process.env.LEGAL_LINE || "Lexoro Solutions LLC";
+
 
 function whatsappHref(): string {
   if (!WHATSAPP) return "#audit";
@@ -59,25 +50,11 @@ export default async function RamzaPage({
   const h1 = resolveH1(sp.h);
   const wa = whatsappHref();
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        name: "RAMZA",
-        description:
-          "Payout reconciliation for Gulf e-commerce. Matches gateway payouts to the bank and closes invoices in Zoho Books.",
-      },
-      {
-        "@type": "FAQPage",
-        mainEntity: FAQ.map((f) => ({
-          "@type": "Question",
-          name: f.q,
-          acceptedAnswer: { "@type": "Answer", text: f.a },
-        })),
-      },
-    ],
-  };
+  /* Organization + WebSite + SoftwareApplication from the shared graph, with
+     this page's FAQ appended. The nodes cross-reference by @id rather than
+     repeating the org details in every node. */
+  const base = landingJsonLd();
+  const jsonLd = { ...base, "@graph": [...base["@graph"], faqNode(FAQ)] };
 
   return (
     <RamzaShell>
@@ -136,7 +113,7 @@ export default async function RamzaPage({
         <Faq />
         <AuditForm />
       </main>
-      <Footer whatsappHref={wa} email={EMAIL} legalLine={LEGAL_LINE} />
+      <Footer whatsappHref={wa} email={RAMZA_EMAIL} legalLine={RAMZA_LEGAL_LINE} />
     </RamzaShell>
   );
 }

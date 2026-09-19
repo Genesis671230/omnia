@@ -8,7 +8,12 @@ const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm","/api/i
   // Public marketing surface for the commercial accounting product (numio).
   "/numio", "/api/numio",
   // Public RAMZA landing page + its lead intake and privacy page.
+  // "/ramza" also covers every /ramza/* content page via the startsWith check.
   "/ramza", "/api/lead", "/privacy",
+  // Crawler files. These MUST be listed: config.matcher below only exempts
+  // _next assets and image extensions, so without an entry here both get the
+  // session check and 302 to /login — invisible to every search engine.
+  "/robots.txt", "/sitemap.xml",
 ];
 
 export async function middleware(req: NextRequest) {

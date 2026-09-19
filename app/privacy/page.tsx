@@ -4,7 +4,8 @@ import { Wordmark } from "@/components/ramza/wordmark";
 import { PRIVACY_INTRO } from "@/lib/ramza/copy";
 
 export const metadata: Metadata = {
-  title: "Privacy — RAMZA",
+  /* absolute, or the root layout appends "· Omnia Finance OS" to a RAMZA page. */
+  title: { absolute: "Privacy — RAMZA" },
   description: "How RAMZA handles the files and data you share for a payout audit.",
   robots: { index: false, follow: true },
 };
