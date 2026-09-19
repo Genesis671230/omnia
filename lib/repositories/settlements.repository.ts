@@ -18,7 +18,12 @@ export type SettlementRecord = {
   order_date: string | null;
   settlement_date: string | null;
   gateway: string;
+  /** The unit of gross_aed. Always AED — not what the customer was charged. */
   currency: string;
+  /** What the customer was actually charged in (SAR, QAR, AED...). Decides
+   *  whether an invoice-vs-gateway gap is an exchange difference; see
+   *  isFxOrder() in lib/finance/settlement-posting.ts. */
+  order_currency?: string | null;
   gross_aed: number;
   bank_line_id: string;
   payout_id: string | null;

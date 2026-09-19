@@ -308,6 +308,21 @@ alter table settlement_records add column if not exists fee_vat_aed numeric;
 alter table settlement_records add column if not exists fx_difference_aed numeric;
 alter table settlement_records add column if not exists zoho_post_error text;
 
+-- The currency the customer was actually charged in, which is NOT the
+-- settlement's `currency` column above (that one describes gross_aed and is
+-- always AED). An AED-denominated Telr or Stripe payout routinely carries SAR
+-- and QAR orders, and the gateway converts those at its own rate — Telr
+-- settles SAR at 0.95900 where the rate table says 0.98. Without this column
+-- the posting path cannot tell that gap apart from a genuine mismatch, and
+-- holds the order for review forever. See lib/finance/settlement-posting.ts.
+alter table settlement_records add column if not exists order_currency text;
+update settlement_records s
+   set order_currency = o.currency
+  from orders o
+ where o.uid = s.order_uid
+   and s.order_currency is null
+   and o.currency is not null;
+
 -- one uploaded statement can evidence many orders (e.g. one Tabby payout
 -- file covering 40 settled orders) — parent row + join table, not a single
 -- FK on settlement_records.

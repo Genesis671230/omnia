@@ -222,7 +222,12 @@ async function checkInvoice(
   ref: string,
   accessToken: string,
   orgId: string,
-  hint: { expectedAmount: number; crossBorder: boolean; preferredInvoiceId: string | null },
+  hint: {
+    expectedAmount: number;
+    crossBorder: boolean;
+    orderCurrency: string | null;
+    preferredInvoiceId: string | null;
+  },
 ): Promise<InvoiceStatus> {
   let candidates;
   try {
@@ -309,7 +314,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // no invoice to close.
     const bookedInvoice = new Map<string, string>();
     const snapshots = new Map<string, InvoiceStatus>();
+    // A SAR order on an AED payout is priced at two different rates, so its
+    // invoice sits a couple of percent off the gateway's figure. The picker
+    // needs to know that or it refuses to choose between two live invoices.
+    const orderCurrencies = new Map<string, string | null>();
     for (const s of await SettlementsRepository.listByBankLineId(id)) {
+      orderCurrencies.set(s.order_number, s.order_currency ?? null);
+      orderCurrencies.set(bareRef(s.order_number), s.order_currency ?? null);
       if (s.zoho_invoice_id) {
         bookedInvoice.set(s.order_number, s.zoho_invoice_id);
         bookedInvoice.set(bareRef(s.order_number), s.zoho_invoice_id);
@@ -339,6 +350,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const status = await checkInvoice(lookup, accessToken, orgId, {
         expectedAmount: (tx?.grossShare ?? 0) * bankScale,
         crossBorder,
+        orderCurrency: orderCurrencies.get(lookup) ?? orderCurrencies.get(bareRef(lookup)) ?? null,
         preferredInvoiceId: bookedInvoice.get(lookup) ?? bookedInvoice.get(bareRef(lookup)) ?? null,
       });
       return [ref, lookup, status] as const;

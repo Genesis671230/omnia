@@ -947,7 +947,11 @@ export function GatewayProof({ r, live, onChanged }: {
     const p = planOrderPosting({
       invoiceBalance: balance ?? t.grossShare * bankScale,
       grossAed: t.grossShare, feeAed: t.feeShare, feeVatAed: t.vatShare, netAed: t.netShare,
-      bankScale, crossBorder, feeVatInclusive: !!vatTaxId,
+      // A SAR order on an AED payout is an exchange difference, not a
+      // mismatch. Without this the preview shows "needs review" on rows the
+      // server would book, which is how the Telr payout looked wrong.
+      bankScale, crossBorder, orderCurrency: s?.order_currency ?? null,
+      feeVatInclusive: !!vatTaxId,
     });
     return { ...p, paymentAmount: balance, difference: balance == null ? null : p.difference };
   };

@@ -587,6 +587,10 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
           settlement_date: l.date,
           gateway: l.provider,
           currency: "AED",
+          // What the customer paid in, which is often not AED even on an AED
+          // payout. The posting path needs it to tell a rate difference apart
+          // from a mismatch — see isFxOrder() in lib/finance/settlement-posting.
+          order_currency: o.currency || "AED",
           gross_aed: Number(o.gross_aed || 0),
           bank_line_id: l.id,
           payout_id: l.payout?.id ?? null,

@@ -93,6 +93,10 @@ export function buildStripeSettlementRows(opts: {
       settlement_date: arrivalDate,
       gateway: "Stripe",
       currency: "AED",
+      // Stripe's AED payouts carry foreign-currency charges the same way
+      // Telr's do, and those are where the exchange gains and losses come
+      // from — see isFxOrder() in lib/finance/settlement-posting.
+      order_currency: order.currency || "AED",
       gross_aed: Number(order.gross_aed || 0),
       bank_line_id: `STRIPE-API:${payoutId.replace(/^STRIPE-/, "")}`,
       payout_id: payoutId,

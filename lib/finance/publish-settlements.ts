@@ -34,6 +34,7 @@ import {
   planWireResidual,
   wireResidualReference,
   isCrossBorderCurrency,
+  isFxOrder,
   pickInvoiceForOrder,
   planOrderPosting,
   postingReferences,
@@ -184,6 +185,11 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
   const { line, accounts, dryRun, accessToken } = opts;
   const base = { settlementId: s.id, orderNumber: s.order_number };
   const crossBorder = isCrossBorderCurrency(line.payout?.currency);
+  // The payout's currency and the order's are different questions: an AED
+  // Telr payout carries SAR orders the gateway converted at its own rate.
+  // crossBorder still drives VAT and bankScale; this drives the difference.
+  const orderCurrency = s.order_currency ?? null;
+  const fxOrder = isFxOrder({ crossBorder, orderCurrency });
   const gateway = s.gateway || line.provider;
   const date = (s.settlement_date ?? line.date ?? new Date().toISOString()).slice(0, 10);
   const baseReference = (opts.referenceOverride || s.bank_reference || line.reference || line.id).trim();
@@ -231,6 +237,7 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
       orderNumber: s.order_number,
       expectedAmount: tx.grossShare * bankScale,
       crossBorder,
+      orderCurrency,
       preferredInvoiceId: s.zoho_invoice_id,
     });
     if (!picked.invoice) {
@@ -270,7 +277,7 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     const freshPlan = (invoiceAmount: number) =>
       planOrderPosting({
         invoiceBalance: invoiceAmount, grossAed: tx.grossShare, feeAed: tx.feeShare, feeVatAed: tx.vatShare, netAed: tx.netShare,
-        bankScale, crossBorder, feeVatInclusive: !!accounts.vatTaxId,
+        bankScale, crossBorder, orderCurrency, feeVatInclusive: !!accounts.vatTaxId,
       });
     const storedPlan = (): OrderPostingPlan => {
       const fee = Number(s.fee_aed);
@@ -279,7 +286,7 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
       return {
         paymentAmount: total, fee, feeVat: vat, feeExVat: +(fee - vat).toFixed(2),
         netReceived: +(tx.netShare * bankScale).toFixed(2), difference,
-        differenceKind: Math.abs(difference) < ROUNDING_TOLERANCE_AED ? "none" : crossBorder ? "fx" : "rounding",
+        differenceKind: Math.abs(difference) < ROUNDING_TOLERANCE_AED ? "none" : fxOrder ? "fx" : "rounding",
         review: null,
       };
     };
