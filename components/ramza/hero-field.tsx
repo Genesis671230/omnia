@@ -112,8 +112,15 @@ export function HeroField() {
                 width={48 + Math.round(rand(r.i + 5) * 34)}
                 height="5"
                 rx="2.5"
+                /* Texture, not data. At 0.30/0.42 these bars sat at reading
+                   contrast in the same green and amber the real UI uses for
+                   matched and pending, so the eye tried to parse the backdrop
+                   as a ledger, failed, and read the hero as a half-loaded
+                   screen. Low enough now to suggest rows resolving without
+                   competing with the product frame that carries the actual
+                   numbers. */
                 fill={r.matched ? "var(--ledger)" : "var(--residual)"}
-                opacity={r.matched ? 0.3 : 0.42}
+                opacity={r.matched ? 0.1 : 0.13}
               />
               <circle
                 cx="1050"
@@ -122,7 +129,7 @@ export function HeroField() {
                 fill={r.matched ? "var(--ledger)" : "none"}
                 stroke={r.matched ? "none" : "var(--residual)"}
                 strokeWidth="1.6"
-                opacity="0.75"
+                opacity="0.16"
               />
               {/* filler ticks in the middle columns */}
               {[800, 900].map((x, k) => (
@@ -150,7 +157,9 @@ export function HeroField() {
         preserveAspectRatio="none"
         fill="none"
       >
-        <g stroke="var(--brand)" strokeOpacity="0.26" strokeWidth="1.4" fill="none">
+        {/* The connector paths are the loudest brand-blue on the page and they
+            run behind the headline. Structural, so they sit back. */}
+        <g stroke="var(--brand)" strokeOpacity="0.1" strokeWidth="1.4" fill="none">
           <path d="M-40 640 C 320 640, 380 470, 700 470 S 1120 300, 1500 300" />
           <path d="M-40 720 C 300 720, 420 560, 760 560 S 1160 420, 1500 420" />
           <path d="M-40 560 C 360 560, 400 380, 720 380 S 1140 190, 1500 190" />
@@ -169,7 +178,7 @@ export function HeroField() {
             cy={cy}
             r="3"
             fill="var(--brand)"
-            fillOpacity="0.3"
+            fillOpacity="0.12"
           />
         ))}
       </motion.svg>
@@ -177,7 +186,7 @@ export function HeroField() {
       {/* dot field and grain over the top */}
       <motion.div
         style={reduce ? still : { y: dotsY }}
-        className="r-dotgrid absolute inset-[-10%] opacity-[0.55]"
+        className="r-dotgrid absolute inset-[-10%] opacity-[0.3]"
       />
       <div className="r-grain absolute inset-0" />
 
