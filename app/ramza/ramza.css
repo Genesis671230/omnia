@@ -3,8 +3,20 @@
    touches the omnia app. Dark mode follows the visitor's OS. */
 
 [data-ramza] {
-  --paper: #ffffff;
-  --paper-2: #f7f9ff;
+  /* Two planes, not one.
+
+     --paper and --card were both #ffffff, so the hero's copy card and the
+     product frame beside it sat on a ground the same colour as themselves.
+     Nothing was figure, nothing was ground, and every surface floated at the
+     same depth held apart only by shadow — which is what made a page full of
+     real content read as a wireframe.
+
+     The ground is now a warm off-white and cards stay pure white. Warm rather
+     than the blue-white --paper-2 already here, because blue-tinted white
+     under a royal-blue brand is the default SaaS ground; warm reads as paper,
+     which is the metaphor the hero field is drawing anyway. */
+  --paper: #faf9f6;
+  --paper-2: #f4f4f0;
   --field: #eef2ff;
   --ink: #10163a;
   --ink-60: #5a6489;
@@ -38,8 +50,8 @@
   --panel-ink-60: #a9b1d8;
   --panel-border: rgba(255, 255, 255, 0.08);
 
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.92);
   --glass-shadow: 0 28px 80px -28px rgba(16, 28, 78, 0.3);
   --grid-dot: rgba(58, 85, 230, 0.1);
   --halo-a: rgba(58, 85, 230, 0.18);
