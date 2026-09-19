@@ -853,8 +853,13 @@
   cursor: pointer;
   overflow: hidden;
 }
+/* A pale brand wash behind the label looked like a default hover state rather
+   than a chosen one. A rule down the leading edge says "you are here" with no
+   tinted slab, and keeps the blue structural instead of decorative. */
 [data-ramza] .r-wt-step[data-state="active"] {
-  background: var(--brand-soft);
+  background: transparent;
+  box-shadow: inset 2px 0 0 0 var(--brand);
+  border-radius: 0.25rem;
   color: var(--ink);
   font-weight: 600;
 }
@@ -928,10 +933,25 @@
   --chip-bg: var(--ledger-soft);
   --chip-fg: var(--ledger);
 }
+/* Posted is where nearly every chip ends up, and a solid fill turned the last
+   stage into eighteen identical dark-green slabs in two ragged rows — noise
+   where the point is "it is done, and one line needs you". Posted now reads as
+   matched plus a filled marker, so the progression is still legible and the
+   one flagged chip is the only thing with real weight on it. */
 [data-ramza] .r-wt-chip[data-state="posted"] {
-  --chip-bd: var(--ledger);
-  --chip-bg: var(--ledger);
-  --chip-fg: var(--ledger-ink);
+  --chip-bd: color-mix(in srgb, var(--ledger) 42%, transparent);
+  --chip-bg: var(--ledger-soft);
+  --chip-fg: color-mix(in srgb, var(--ledger) 88%, var(--ink));
+  font-weight: 600;
+}
+[data-ramza] .r-wt-chip[data-state="posted"]::before {
+  content: "";
+  width: 0.3125rem;
+  height: 0.3125rem;
+  margin-right: 0.375rem;
+  border-radius: 999px;
+  background: var(--ledger);
+  flex: none;
 }
 [data-ramza] .r-wt-chip[data-state="flagged"] {
   --chip-bd: color-mix(in srgb, var(--residual) 45%, transparent);
