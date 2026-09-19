@@ -261,6 +261,39 @@ create table if not exists zoho_sync_runs (
 );
 create index if not exists zoho_sync_runs_started_idx on zoho_sync_runs (started_at desc);
 
+-- Incremental sync bookkeeping. Re-pulling the whole catalogue every cycle
+-- cost 278 Zoho calls (11k items + 44k sales orders at 200/page) roughly 10
+-- times a day — about 3,000 of the org's ~5,000 daily requests, spent
+-- re-reading rows that had not changed. Both /items and /salesorders honour
+-- last_modified_time (verified against the live API), so a normal cycle now
+-- pages only the delta.
+--   sync_mode  'incremental' | 'full'
+--   watermark  the point this run is complete up to; the next incremental
+--              run asks Zoho for everything modified after it.
+-- A modified-since query cannot report a row that no longer exists, so a
+-- deletion or a void would never reach the mirror. That is what the nightly
+-- full pass is for — see ZOHO_FULL_SYNC_MAX_AGE_HOURS.
+alter table zoho_sync_runs add column if not exists sync_mode text not null default 'full';
+alter table zoho_sync_runs add column if not exists watermark timestamptz;
+create index if not exists zoho_sync_runs_full_idx
+  on zoho_sync_runs (started_at desc) where sync_mode = 'full';
+
+-- Seed the watermark from the last clean run so the switch to incremental
+-- doesn't open with a 278-call full pass. Safe because every run before this
+-- migration WAS a full pull: the mirror is already complete as of that run's
+-- start, which is exactly what the watermark is supposed to mean. Without it
+-- the first cycle after deploy asks for the whole catalogue, which on a day
+-- that is already at 4,900/5,000 simply fails.
+update zoho_sync_runs
+   set watermark = started_at
+ where id = (
+   select id from zoho_sync_runs
+    where error is null and watermark is null
+    order by started_at desc
+    limit 1
+ )
+   and not exists (select 1 from zoho_sync_runs where watermark is not null);
+
 -- ad_insights: purchase-funnel stages. The founder's "actual money leads"
 -- means this funnel — the Meta accounts run no lead-gen campaigns at all
 -- (objectives are only OUTCOME_AWARENESS / LINK_CLICKS / OUTCOME_SALES).
@@ -591,9 +624,27 @@ create table if not exists zoho_api_usage (
   updated_at    timestamptz not null default now()
 );
 
+-- Per-endpoint attribution. zoho_api_usage says the day's budget is gone;
+-- this says who spent it. The throttle has always accepted a `label` and only
+-- ever printed it in a 429 warning, so answering "where did 5,000 calls go?"
+-- meant reading every call site by hand. One row per label per day, written
+-- in the same statement that reserves the unit, so it cannot drift from the
+-- total it explains.
+create table if not exists zoho_api_usage_labels (
+  usage_date    date not null default current_date,
+  label         text not null default 'unlabelled',
+  request_count integer not null default 0,
+  updated_at    timestamptz not null default now(),
+  primary key (usage_date, label)
+);
+
 -- Atomically reserve one unit of today's Zoho budget. Returns allowed=false
 -- (and does not consume) once request_count would exceed p_limit.
-create or replace function zoho_consume_quota(p_limit integer)
+-- Dropped and recreated rather than replaced: p_label is new, and leaving the
+-- old single-argument version in place would make a one-argument call
+-- ambiguous against this one's default.
+drop function if exists zoho_consume_quota(integer);
+create or replace function zoho_consume_quota(p_limit integer, p_label text default 'unlabelled')
 returns table(allowed boolean, used integer)
 language plpgsql
 as $$
@@ -613,6 +664,14 @@ begin
       where zoho_api_usage.usage_date = current_date;
     return query select false, v_count - 1;
   end if;
+
+  -- Only count what was actually granted, so the per-label rows always sum
+  -- to the day's total rather than to the attempts.
+  insert into zoho_api_usage_labels (usage_date, label, request_count, updated_at)
+  values (current_date, coalesce(nullif(p_label, ''), 'unlabelled'), 1, now())
+  on conflict (usage_date, label)
+  do update set request_count = zoho_api_usage_labels.request_count + 1,
+                updated_at = now();
 
   return query select true, v_count;
 end;

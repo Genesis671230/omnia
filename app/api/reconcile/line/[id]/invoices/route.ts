@@ -271,8 +271,15 @@ async function mapWithConcurrency<T, R>(items: T[], mapper: (item: T) => Promise
 
 const bareRef = (r: string) => r.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+/** How long a stored invoice snapshot is served before Zoho is asked again.
+ *  A Zoho invoice changes when someone books against it or edits it in Zoho;
+ *  neither happens on the timescale of a founder reopening a panel. */
+const SNAPSHOT_TTL_MINUTES = Number(process.env.ZOHO_INVOICE_SNAPSHOT_TTL_MINUTES || 30);
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // ?refresh=1 is the founder saying "I changed something in Zoho, look again".
+  const forceRefresh = new URL(req.url).searchParams.get("refresh") === "1";
   try {
     const line = (await runReconciliation()).find((l) => l.id === id);
     if (!line) return NextResponse.json({ error: `No reconciliation line ${id}` }, { status: 404 });
@@ -318,6 +325,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // invoice sits a couple of percent off the gateway's figure. The picker
     // needs to know that or it refuses to choose between two live invoices.
     const orderCurrencies = new Map<string, string | null>();
+    // Orders whose stored snapshot is still inside the TTL. Each one of these
+    // is a Zoho invoice search NOT made: an 18-order payout used to cost 18-36
+    // requests every single time the panel mounted, with no reuse at all.
+    const fresh = new Set<string>();
     for (const s of await SettlementsRepository.listByBankLineId(id)) {
       orderCurrencies.set(s.order_number, s.order_currency ?? null);
       orderCurrencies.set(bareRef(s.order_number), s.order_currency ?? null);
@@ -326,6 +337,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         bookedInvoice.set(bareRef(s.order_number), s.zoho_invoice_id);
       }
       if (!s.zoho_invoice_checked_at || s.zoho_invoice_balance == null || !s.zoho_invoice_id) continue;
+      const ageMinutes = (Date.now() - new Date(s.zoho_invoice_checked_at).getTime()) / 60_000;
+      if (ageMinutes < SNAPSHOT_TTL_MINUTES) {
+        fresh.add(s.order_number);
+        fresh.add(bareRef(s.order_number));
+      }
       const snap: InvoiceStatus = {
         status: (s.zoho_invoice_status || "unpaid") as ZohoInvoiceStatus,
         invoiceId: s.zoho_invoice_id,
@@ -343,7 +359,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const orgId = process.env.ZOHO_ORGANIZATION_ID!;
 
     // The throttle serialises Zoho calls anyway; concurrency only overlaps the waits.
-    const looked = await mapWithConcurrency(refs, async (ref) => {
+    const stale = refs.filter((ref) => {
+      if (forceRefresh) return true;
+      const tx = line.transactions.find((t) => t.ref === ref || bareRef(t.ref) === bareRef(ref));
+      const lookup = tx?.orderNumber ?? ref;
+      return !(fresh.has(lookup) || fresh.has(bareRef(lookup)));
+    });
+
+    const looked = await mapWithConcurrency(stale, async (ref) => {
       const tx = line.transactions.find((t) => t.ref === ref || bareRef(t.ref) === bareRef(ref));
       // A manually linked line looks its invoice up by the order it points at.
       const lookup = tx?.orderNumber ?? ref;
@@ -358,6 +381,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const statuses: Record<string, InvoiceStatus> = {};
     let fellBack = 0;
+    let served = 0;
+    // Refs we deliberately did not ask Zoho about answer from their snapshot.
+    for (const ref of refs) {
+      const tx = line.transactions.find((t) => t.ref === ref || bareRef(t.ref) === bareRef(ref));
+      const lookup = tx?.orderNumber ?? ref;
+      if (stale.includes(ref)) continue;
+      const snap = snapshots.get(lookup) ?? snapshots.get(bareRef(lookup));
+      if (snap) { statuses[ref] = snap; served += 1; }
+    }
     for (const [ref, lookup, status] of looked) {
       if (status.status === "not_found") {
         // Zoho didn't answer, or the invoice genuinely isn't there. A stored
@@ -387,8 +419,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       bankLineId: id,
       statuses,
       fetched: looked.length,
+      // Two different things, deliberately not summed: `cached` means Zoho
+      // would not answer and the row is showing stale figures (a problem the
+      // founder should see), while `snapshot` means the stored figure was
+      // still inside its TTL so no call was needed (working as intended).
       cached: fellBack,
+      snapshot: served,
       unchecked: 0,
+      ttlMinutes: SNAPSHOT_TTL_MINUTES,
     });
   } catch (e) {
     console.error(`invoice-status GET failed for line ${id}:`, e);

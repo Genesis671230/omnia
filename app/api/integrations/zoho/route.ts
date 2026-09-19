@@ -26,9 +26,19 @@ export async function GET() {
 // POST /api/integrations/zoho — pull Zoho items/orders and live Shopify/Woo
 // stock on demand. Also used by the scheduler internally via
 // syncZohoAndInventory directly.
-export async function POST() {
-  const sourceResults = await syncZohoAndInventory();
-  await ZohoSyncRunsRepository.record({ trigger: "manual", sourceResults });
+export async function POST(req: Request) {
+  // A hand-triggered sync is usually someone checking that a specific change
+  // landed, so it stays incremental by default and costs a page or two.
+  // ?full=1 forces the whole catalogue when the mirror looks genuinely wrong.
+  const full = new URL(req.url).searchParams.get("full") === "1";
+  const window = full
+    ? { mode: "full" as const, sinceIso: null }
+    : await ZohoSyncRunsRepository.nextSyncWindow();
+
+  const { results: sourceResults, zohoWatermark } = await syncZohoAndInventory({ sinceIso: window.sinceIso });
+  await ZohoSyncRunsRepository.record({
+    trigger: "manual", sourceResults, mode: window.mode, watermark: zohoWatermark,
+  });
 
   if (sourceResults.length === 0) {
     return NextResponse.json({

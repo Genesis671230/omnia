@@ -252,16 +252,37 @@ async function refreshZohoAccessToken(): Promise<string> {
   return json.access_token;
 }
 
-export async function zohoGetPaginated<T>(path: string, listKey: string, accessToken: string): Promise<T[]> {
+/**
+ * Pages a Zoho list endpoint.
+ *
+ * `sinceIso` is the difference between a cheap cycle and an expensive one.
+ * Without it this pulls the entire history every time: 44,253 sales orders
+ * and 11,085 items at 200 rows a page is 278 requests, and at one cycle
+ * every 135 minutes that was ~3,000 of the org's ~5,000 daily requests spent
+ * re-reading rows nobody had touched. Both /items and /salesorders honour
+ * last_modified_time (verified against the live API: a future timestamp
+ * returns zero rows with has_more_page false, so the filter is applied rather
+ * than ignored).
+ *
+ * Callers must still run a periodic full pass — a modified-since query cannot
+ * report a row that has been deleted. See syncZohoAndInventory().
+ */
+export async function zohoGetPaginated<T>(
+  path: string,
+  listKey: string,
+  accessToken: string,
+  opts: { sinceIso?: string | null; label?: string } = {},
+): Promise<T[]> {
   const orgId = process.env.ZOHO_ORGANIZATION_ID!;
   const out: T[] = [];
   let page = 1;
   for (;;) {
     const qs = new URLSearchParams({ organization_id: orgId, per_page: "200", page: String(page) });
+    if (opts.sinceIso) qs.set("last_modified_time", toZohoTimestamp(opts.sinceIso));
     const res = await zohoThrottledFetch(`${API_BASE}${path}?${qs.toString()}`, {
       headers: { Authorization: `Zoho-oauthtoken ${accessToken}`, "X-com-zoho-books-organizationid": orgId },
       cache: "no-store",
-    });
+    }, { label: opts.label ?? `paginated${path}` });
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Zoho API HTTP ${res.status} (${path}): ${body.slice(0, 300)}`);
@@ -277,13 +298,21 @@ export async function zohoGetPaginated<T>(path: string, listKey: string, accessT
 }
 
   
-export async function fetchZohoItems(): Promise<ZohoItem[]> {
-  const accessToken = await getAccessToken();
-  return zohoGetPaginated<ZohoItem>("/items", "items", accessToken);
+/** Zoho wants `yyyy-MM-ddTHH:mm:ss±HHmm`, not the `Z` that toISOString emits. */
+export function toZohoTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) throw new Error(`Invalid timestamp for Zoho: ${iso}`);
+  return `${d.toISOString().slice(0, 19)}+0000`;
 }
-export async function fetchZohoSalesOrders(): Promise<ZohoSalesOrder[]> {
+
+/** Omit `sinceIso` for the whole catalogue; pass it for just the changes. */
+export async function fetchZohoItems(sinceIso?: string | null): Promise<ZohoItem[]> {
   const accessToken = await getAccessToken();
-  return zohoGetPaginated<ZohoSalesOrder>("/salesorders", "salesorders", accessToken);
+  return zohoGetPaginated<ZohoItem>("/items", "items", accessToken, { sinceIso, label: "items.list" });
+}
+export async function fetchZohoSalesOrders(sinceIso?: string | null): Promise<ZohoSalesOrder[]> {
+  const accessToken = await getAccessToken();
+  return zohoGetPaginated<ZohoSalesOrder>("/salesorders", "salesorders", accessToken, { sinceIso, label: "salesorders.list" });
 }
 
 

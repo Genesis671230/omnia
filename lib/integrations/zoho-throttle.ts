@@ -21,7 +21,7 @@
 import { supabase } from "@/lib/supabase";
 
 const MIN_GAP_MS = Number(process.env.ZOHO_MIN_GAP_MS ?? 150);
-const DAILY_BUDGET = Number(process.env.ZOHO_DAILY_BUDGET ?? 4500);
+const DAILY_BUDGET = Number(process.env.ZOHO_DAILY_BUDGET ?? 7000);
 const MAX_429_RETRIES = Number(process.env.ZOHO_MAX_429_RETRIES ?? 3);
 
 export class ZohoQuotaExceededError extends Error {
@@ -51,10 +51,16 @@ let lastCallAt = 0;
 // or throws ZohoQuotaExceededError when the budget is spent. If the DB call
 // itself fails we log and allow the request — a monitoring blip must not
 // wedge invoicing.
-async function reserveDailyQuota(): Promise<number> {
+async function reserveDailyQuota(label: string): Promise<number> {
   try {
+    // The label rides along on the same RPC that reserves the unit, so the
+    // per-endpoint counters always sum to the day's total. Before this, the
+    // label existed but was only ever printed in a 429 warning — which meant
+    // "where did 5,000 calls go?" could only be answered by reading every
+    // call site by hand.
     const { data, error } = await supabase.rpc("zoho_consume_quota", {
       p_limit: DAILY_BUDGET,
+      p_label: label,
     });
     if (error) {
       console.error("[zoho-throttle] quota rpc failed, allowing call:", error.message);
@@ -89,7 +95,7 @@ export async function zohoThrottledFetch(
     if (gap > 0) await sleep(gap);
 
     if (!opts.skipQuota) {
-      const used = await reserveDailyQuota();
+      const used = await reserveDailyQuota(opts.label ?? "unlabelled");
       if (used >= 0 && used % 250 === 0) {
         console.warn(`[zoho-throttle] ${used}/${DAILY_BUDGET} Zoho calls used today`);
       }
@@ -129,5 +135,23 @@ export async function zohoQuotaStatus(): Promise<{ used: number; budget: number 
     return { used: Number(data?.request_count ?? 0), budget: DAILY_BUDGET };
   } catch {
     return null;
+  }
+}
+
+/** Today's spend broken down by call site, biggest first — the view that
+ *  turns "the budget is gone" into "this endpoint spent it". Never throws. */
+export async function zohoQuotaByLabel(
+  date = new Date().toISOString().slice(0, 10),
+): Promise<{ label: string; count: number }[]> {
+  try {
+    const { data, error } = await supabase
+      .from("zoho_api_usage_labels")
+      .select("label, request_count")
+      .eq("usage_date", date)
+      .order("request_count", { ascending: false });
+    if (error) return [];
+    return (data ?? []).map((r) => ({ label: String(r.label), count: Number(r.request_count) }));
+  } catch {
+    return [];
   }
 }

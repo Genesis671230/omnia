@@ -31,7 +31,7 @@ async function runSyncCycle(trigger: "scheduler" | "manual") {
 export function startPayoutSyncScheduler() {
   if (g.__payoutSyncTimer) return; // already running
 
-  const minutes = Math.max(parseInt(process.env.PAYOUT_SYNC_INTERVAL_MINUTES || "", 130) || DEFAULT_INTERVAL_MINUTES, 130);
+  const minutes = Math.max(parseInt(process.env.PAYOUT_SYNC_INTERVAL_MINUTES || "", 10) || DEFAULT_INTERVAL_MINUTES, 30);
   const intervalMs = minutes * 60 * 1000;
 
   const tick = () => { void runSyncCycle("scheduler"); };
