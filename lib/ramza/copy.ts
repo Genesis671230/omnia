@@ -332,9 +332,92 @@ export const OUTCOMES: {
   },
 ];
 
-export const VIDEO_INTRO_HEADING = "See a month close in under a minute";
-export const VIDEO_INTRO_BODY =
-  "A short walkthrough: payout files in, every line matched to the bank, fees and VAT split out, invoices closed in Zoho.";
+/* --- the walkthrough -----------------------------------------------------
+   This heading used to sit above public/ramza/intro.mp4, a 47-second stock
+   clip. A visitor pressed play at the highest-intent moment on the page and
+   got stock footage of an office, which is a worse outcome than having no
+   walkthrough at all: the section made a specific promise and then broke it.
+
+   The promise is kept literally instead. Three stages carry the argument —
+   what the 4th of the month costs today, what RAMZA does to it, what is left
+   afterwards — and the figures reconcile across all three: 18 payouts, of
+   which 16 match, 1 carries an FX variance and 1 is still in transit. */
+
+export const WALKTHROUGH_HEADING = "See a month close in under a minute";
+export const WALKTHROUGH_BODY =
+  "Not a demo reel. The same month, three times: before RAMZA, while it runs, and after the books are closed.";
+
+export type WalkthroughStage = {
+  key: "pain" | "solution" | "value";
+  /* Rail label — when this moment happens, not what it is. */
+  rail: string;
+  headline: string;
+  body: string;
+  /* The one number that changes between stages. */
+  metric: string;
+  metricNote: string;
+};
+
+export const WALKTHROUGH_STAGES: WalkthroughStage[] = [
+  {
+    key: "pain",
+    rail: "The 4th of the month",
+    headline: "Eighteen payouts. Nothing ties out.",
+    body:
+      "Five gateways paid you net of their fees, so not one deposit equals an invoice. The bank shows eighteen credits and no way to tell which orders they settle. Somebody opens a spreadsheet.",
+    metric: "18 unexplained",
+    metricNote: "AED 1,571,770.40 sitting in the bank, unattributed",
+  },
+  {
+    key: "solution",
+    rail: "RAMZA runs",
+    headline: "Every payout, matched to the credit that paid it.",
+    body:
+      "Orders, payout files and the bank statement are lined up together. Gateway fees and the VAT on those fees are split out. SAR and KWD payouts are matched at the rate the bank actually used, not a static table.",
+    metric: "16 matched",
+    metricNote: "1 FX variance flagged for review, 1 payout still in transit",
+  },
+  {
+    key: "value",
+    rail: "The same afternoon",
+    headline: "Books closed. Two days back.",
+    body:
+      "Invoices flip to Paid in Zoho. Fees land in bank charges, VAT on fees in input VAT. The single variance is on screen with its reason attached, instead of buried in a tab nobody reopens.",
+    metric: "AED 1,486,220.40",
+    metricNote: "matched to the bank and posted — one line left to review",
+  },
+];
+
+export const WALKTHROUGH_CTA_NOTE =
+  "We will run this against one real month of your own payouts, free, before you decide anything.";
+
+/* Eighteen payouts, in the order they hit the statement. `settlesAt` is the
+   stage at which the chip turns over: 1 for the sixteen RAMZA matches, 2 for
+   the FX variance that needs a human, and null for the payout the bank has
+   not credited yet. Counts here must agree with the metrics above. */
+export const WALKTHROUGH_PAYOUTS: {
+  gateway: string;
+  settlesAt: 1 | 2 | null;
+}[] = [
+  { gateway: "Tabby", settlesAt: 1 },
+  { gateway: "Tamara", settlesAt: 1 },
+  { gateway: "Stripe", settlesAt: 1 },
+  { gateway: "Telr", settlesAt: 1 },
+  { gateway: "COD", settlesAt: 1 },
+  { gateway: "Tabby", settlesAt: 1 },
+  { gateway: "Telr SAR", settlesAt: 2 },
+  { gateway: "Tamara", settlesAt: 1 },
+  { gateway: "Stripe", settlesAt: 1 },
+  { gateway: "COD", settlesAt: 1 },
+  { gateway: "Tabby", settlesAt: 1 },
+  { gateway: "Checkout", settlesAt: 1 },
+  { gateway: "Tamara", settlesAt: 1 },
+  { gateway: "Stripe", settlesAt: 1 },
+  { gateway: "Tabby", settlesAt: 1 },
+  { gateway: "COD", settlesAt: 1 },
+  { gateway: "Telr", settlesAt: 1 },
+  { gateway: "Tamara", settlesAt: null },
+];
 
 export const PRIVACY_INTRO =
   "What we collect when you ask for a payout audit, why we hold it, and how to get it deleted. Plain terms, no defined-term index.";

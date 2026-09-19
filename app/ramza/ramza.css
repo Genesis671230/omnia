@@ -804,3 +804,211 @@
   background: color-mix(in srgb, var(--residual) 24%, transparent);
   color: color-mix(in srgb, var(--residual) 55%, #ffffff);
 }
+
+/* --- walkthrough ---------------------------------------------------------
+   Replaces the stock-video card. The chips carry the argument: neutral while
+   nothing ties out, tinted green as RAMZA matches, solid once posted, amber
+   for the one line a human still has to look at. */
+
+[data-ramza] .r-wt {
+  display: grid;
+  gap: 1.5rem;
+}
+@media (min-width: 900px) {
+  [data-ramza] .r-wt {
+    grid-template-columns: 15rem 1fr;
+    gap: 2.5rem;
+    align-items: start;
+  }
+}
+
+[data-ramza] .r-wt-rail {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Horizontal on phones so the rail never eats a third of the screen. */
+}
+[data-ramza] .r-wt-rail::-webkit-scrollbar { display: none; }
+@media (min-width: 900px) {
+  [data-ramza] .r-wt-rail {
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow: visible;
+    position: sticky;
+    top: 6rem;
+  }
+}
+
+[data-ramza] .r-wt-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.6875rem 0.875rem;
+  border-radius: 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-40);
+  background: transparent;
+  transition: background 220ms ease-out, color 220ms ease-out;
+  cursor: pointer;
+  overflow: hidden;
+}
+[data-ramza] .r-wt-step[data-state="active"] {
+  background: var(--brand-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+[data-ramza] .r-wt-step[data-state="done"] { color: var(--ink-60); }
+[data-ramza] .r-wt-step:hover { color: var(--ink); }
+
+[data-ramza] .r-wt-step-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex: none;
+  background: var(--rule);
+  transition: background 220ms ease-out;
+}
+[data-ramza] .r-wt-step[data-state="active"] .r-wt-step-dot { background: var(--brand); }
+[data-ramza] .r-wt-step[data-state="done"] .r-wt-step-dot { background: var(--ledger); }
+
+[data-ramza] .r-wt-step-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  transform-origin: left;
+  background: var(--brand);
+  animation: r-wt-fill linear forwards;
+}
+@keyframes r-wt-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+[data-ramza] .r-wt-panel {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  box-shadow: var(--glass-shadow);
+}
+@media (min-width: 640px) {
+  [data-ramza] .r-wt-panel { padding: 1.75rem; }
+}
+
+[data-ramza] .r-wt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+[data-ramza] .r-wt-chip {
+  --chip-bd: var(--rule);
+  --chip-bg: transparent;
+  /* --ink-60, not --ink-40: the latter is ~3.1:1 on paper, under the 4.5:1
+     AA floor at 11px, and the unmatched stage is the one making the argument. */
+  --chip-fg: var(--ink-60);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5625rem;
+  border: 1px solid var(--chip-bd);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border-radius: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: background 420ms ease-out, color 420ms ease-out,
+    border-color 420ms ease-out;
+}
+[data-ramza] .r-wt-chip[data-state="matched"] {
+  --chip-bd: color-mix(in srgb, var(--ledger) 35%, transparent);
+  --chip-bg: var(--ledger-soft);
+  --chip-fg: var(--ledger);
+}
+[data-ramza] .r-wt-chip[data-state="posted"] {
+  --chip-bd: var(--ledger);
+  --chip-bg: var(--ledger);
+  --chip-fg: var(--ledger-ink);
+}
+[data-ramza] .r-wt-chip[data-state="flagged"] {
+  --chip-bd: color-mix(in srgb, var(--residual) 45%, transparent);
+  --chip-bg: color-mix(in srgb, var(--residual) 14%, transparent);
+  --chip-fg: color-mix(in srgb, var(--residual) 85%, var(--ink));
+}
+[data-ramza] .r-wt-chip[data-state="transit"] {
+  --chip-bd: var(--ink-40);
+  border-style: dashed;
+}
+
+[data-ramza] .r-wt-readout {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 720px) {
+  [data-ramza] .r-wt-readout {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+}
+[data-ramza] .r-wt-metric {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem);
+  line-height: 1.1;
+  color: var(--ink);
+}
+[data-ramza] .r-wt-metric-note {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--ink-40);
+}
+
+[data-ramza] .r-wt-headline {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+[data-ramza] .r-wt-body {
+  margin-top: 0.5rem;
+  max-width: 54ch;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--ink-60);
+}
+
+[data-ramza] .r-wt-cta {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+@media (min-width: 900px) {
+  [data-ramza] .r-wt-cta {
+    margin-left: 17.5rem; /* aligns under the panel, not the rail */
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+  }
+}
+[data-ramza] .r-wt-cta-note {
+  font-size: 0.8125rem;
+  max-width: 36ch;
+  color: var(--ink-40);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ramza] .r-wt-chip { transition: none; }
+  [data-ramza] .r-wt-step-progress { animation: none; }
+}

@@ -7,7 +7,7 @@ import { Hero } from "@/components/ramza/hero";
 import { PainStrip } from "@/components/ramza/pain-strip";
 import { ContrastLine } from "@/components/ramza/contrast-line";
 import { HowItWorks } from "@/components/ramza/how-it-works";
-import { VideoIntro } from "@/components/ramza/video-intro";
+import { Walkthrough } from "@/components/ramza/walkthrough";
 import { Orchestrator } from "@/components/ramza/orchestrator";
 import { PostingStack } from "@/components/ramza/posting-stack";
 import { AccountantView } from "@/components/ramza/accountant-view";
@@ -100,7 +100,7 @@ export default async function RamzaPage({
         <Hero h1={h1} whatsappHref={wa} />
         <PainStrip />
         <ContrastLine />
-        <VideoIntro />
+        <Walkthrough whatsappHref={wa} />
         <HowItWorks />
         <Orchestrator />
         <ProductFrame />
