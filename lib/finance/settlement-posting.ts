@@ -50,6 +50,30 @@ export function isCrossBorderCurrency(currency: string | null | undefined): bool
 }
 
 /**
+ * Whether this order's invoice and the gateway's figure for it were converted
+ * at two different rates — the only question that decides whether a gap
+ * between them is an exchange difference or a disagreement.
+ *
+ * Two separate things used to ride on `crossBorder` alone, and conflating them
+ * is what held every foreign-currency order on an AED payout for review:
+ *
+ *   payout currency  — drives VAT reclaim and bankScale. No UAE input VAT is
+ *                      reclaimable on a SAR/KWD settlement.
+ *   ORDER currency   — drives this. An AED-denominated Telr or Stripe payout
+ *                      still carries SAR and QAR orders, and the gateway
+ *                      converts those at its own rate on its own date (Telr
+ *                      settles SAR at 0.95900 where the rate table says 0.98).
+ *                      That gap is an exchange difference, never a mismatch,
+ *                      however the payout itself was denominated.
+ */
+export function isFxOrder(opts: {
+  crossBorder: boolean;
+  orderCurrency?: string | null;
+}): boolean {
+  return opts.crossBorder || isCrossBorderCurrency(opts.orderCurrency);
+}
+
+/**
  * The factor that turns the payout file's AED figures into what the bank
  * actually credited — used ONLY when the per-order shares are still at our
  * static FX estimate, because then the rate itself is what's wrong and
@@ -110,7 +134,12 @@ export type OrderPostingInput = {
   feeVatAed?: number | null;
   /** From bankScaleFor(). */
   bankScale: number;
+  /** Whether the PAYOUT is non-AED. Drives VAT reclaim and bankScale only. */
   crossBorder: boolean;
+  /** The currency the customer was actually charged in, when it isn't the
+   *  payout's. An AED payout full of SAR orders is the common case; see
+   *  isFxOrder(). Absent/AED means the invoice and the gateway used one rate. */
+  orderCurrency?: string | null;
   /** Whether the fee carries UAE VAT (a tax was chosen for an AED payout). */
   feeVatInclusive: boolean;
   vatRatePct?: number;
@@ -163,7 +192,9 @@ export function planOrderPosting(input: OrderPostingInput): OrderPostingPlan {
   }
   if (Math.abs(difference) < ROUNDING_TOLERANCE_AED) return plan;
 
-  if (input.crossBorder) {
+  // Note this asks isFxOrder, not input.crossBorder: the VAT split above is
+  // keyed to the payout, this is keyed to the order.
+  if (isFxOrder({ crossBorder: input.crossBorder, orderCurrency: input.orderCurrency })) {
     if (Math.abs(difference) > paymentAmount * FX_DIFFERENCE_LIMIT_PCT) {
       plan.review =
         `Exchange difference of AED ${Math.abs(difference).toFixed(2)} is over ` +
@@ -359,7 +390,16 @@ export type InvoiceCandidate = {
  */
 export function pickInvoiceForOrder(
   candidates: InvoiceCandidate[],
-  opts: { orderNumber: string; expectedAmount: number; crossBorder: boolean; preferredInvoiceId?: string | null },
+  opts: {
+    orderNumber: string;
+    expectedAmount: number;
+    crossBorder: boolean;
+    /** See isFxOrder() — a SAR order on an AED payout needs the FX tolerance
+     *  here too, or two live invoices and a 2% rate gap end in "none matches
+     *  the gateway amount". */
+    orderCurrency?: string | null;
+    preferredInvoiceId?: string | null;
+  },
 ): { invoice: InvoiceCandidate; error?: undefined } | { invoice?: undefined; error: string } {
   const live = candidates.filter((c) => !["void", "draft"].includes(String(c.status).toLowerCase()));
   if (live.length === 0) {
@@ -370,7 +410,9 @@ export function pickInvoiceForOrder(
   if (live.length === 1) return { invoice: live[0] };
 
   const expected = Math.abs(opts.expectedAmount);
-  const tolerance = opts.crossBorder ? Math.max(AED_DIFFERENCE_LIMIT_AED, expected * FX_DIFFERENCE_LIMIT_PCT) : aedDifferenceLimit(expected);
+  const tolerance = isFxOrder(opts)
+    ? Math.max(AED_DIFFERENCE_LIMIT_AED, expected * FX_DIFFERENCE_LIMIT_PCT)
+    : aedDifferenceLimit(expected);
   const gap = (c: InvoiceCandidate) => Math.abs(Number(c.total) - expected);
   const isOpen = (c: InvoiceCandidate) => Number(c.balance) > ROUNDING_TOLERANCE_AED;
 

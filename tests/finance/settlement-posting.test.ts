@@ -409,3 +409,91 @@ test("buildResidualJournalBody: a loss debits exchange gain/loss and credits cle
   assert.equal(gain.line_items[0].account_id, "TABBY_AED", "a gain lands in clearing");
   assert.equal(gain.line_items[0].amount, 13.25);
 });
+
+test("planOrderPosting: a foreign-currency order inside an AED payout is FX, not a mismatch", () => {
+  // Real Telr payout TELR-5650390 (AED-denominated, 18 orders). Order 804938
+  // was placed in SAR 827.22. Zoho invoiced it at our 0.98 rate (AED 810.70);
+  // Telr converted the same charge at its own 0.95900 (AED 793.30) and took
+  // its 3.9% international-card fee. The 17.40 gap is that rate difference,
+  // and it used to block on the AED branch's max(AED 1, 0.25%) tolerance.
+  const plan = planOrderPosting({
+    invoiceBalance: 810.7, grossAed: 793.3, feeAed: 31.04, netAed: 762.26,
+    bankScale: 1, crossBorder: false, orderCurrency: "SAR", feeVatInclusive: true,
+  });
+  assert.equal(plan.review, null, "a rate difference is not a reason for a human to look");
+  assert.equal(plan.differenceKind, "fx");
+  assert.equal(plan.difference, 17.4);
+  // The payout is AED, so UAE input VAT on the fee is still reclaimable —
+  // the order's currency must not switch that off.
+  assert.equal(plan.feeVat, 1.48);
+  assert.equal(plan.feeExVat, 29.56);
+  // Clearing empties to exactly what Telr paid.
+  assert.equal(+(plan.paymentAmount - plan.fee - plan.difference).toFixed(2), plan.netReceived);
+});
+
+test("planOrderPosting: QAR order converted 1:1 books its FX difference too", () => {
+  // Order 805020: QAR 1680.50 with no QAR entry in the rate table, so it was
+  // invoiced 1:1. Telr settled it at 0.98470 → AED 1654.79.
+  const plan = planOrderPosting({
+    invoiceBalance: 1680.5, grossAed: 1654.79, feeAed: 63.61, netAed: 1591.18,
+    bankScale: 1, crossBorder: false, orderCurrency: "QAR", feeVatInclusive: true,
+  });
+  assert.equal(plan.review, null);
+  assert.equal(plan.differenceKind, "fx");
+  assert.equal(plan.difference, 25.71);
+  assert.equal(+(plan.paymentAmount - plan.fee - plan.difference).toFixed(2), plan.netReceived);
+});
+
+test("planOrderPosting: a Stripe exchange GAIN on a foreign order reverses the journal legs", () => {
+  // Same class as the Telr loss, opposite sign: the gateway's rate beat ours,
+  // so more landed than the invoice expected. buildResidualJournalBody swaps
+  // the debit and credit legs off that sign.
+  const plan = planOrderPosting({
+    invoiceBalance: 500, grossAed: 515, feeAed: 15, netAed: 500,
+    bankScale: 1, crossBorder: false, orderCurrency: "SAR", feeVatInclusive: false,
+  });
+  assert.equal(plan.differenceKind, "fx");
+  assert.equal(plan.difference, -15);
+  const journal = buildDifferenceJournalBody({
+    plan, accounts: ACCOUNTS, date: "2026-09-08", reference: "REF/805099/FX", description: "exchange gain",
+  });
+  assert.equal(journal.line_items[0].account_id, ACCOUNTS.depositAccountId, "a gain debits clearing");
+  assert.equal(journal.line_items[1].account_id, ACCOUNTS.differenceAccountId);
+  assert.equal(journal.line_items[0].amount, 15);
+});
+
+test("planOrderPosting: an AED order in an AED payout still holds a real gap for review", () => {
+  // The guard must survive the fix — only foreign-currency orders are exempt.
+  const plan = planOrderPosting({
+    invoiceBalance: 130, grossAed: 100, feeAed: 5, netAed: 95,
+    bankScale: 1, crossBorder: false, orderCurrency: "AED", feeVatInclusive: true,
+  });
+  assert.match(plan.review ?? "", /doesn't match/);
+});
+
+test("planOrderPosting: a foreign-currency gap beyond 15% is still held for review", () => {
+  const plan = planOrderPosting({
+    invoiceBalance: 1000, grossAed: 700, feeAed: 20, netAed: 680,
+    bankScale: 1, crossBorder: false, orderCurrency: "SAR", feeVatInclusive: true,
+  });
+  assert.match(plan.review ?? "", /Exchange difference/);
+});
+
+test("pickInvoiceForOrder: a foreign-currency order gets the FX tolerance", () => {
+  // Two live invoices, and the gateway's AED figure is 2.1% off the right one
+  // because it converted SAR at its own rate. The AED tolerance (0.25%) would
+  // reject both; the FX tolerance picks the near one.
+  const candidates = [
+    { invoice_id: "A", invoice_number: "INV-1", status: "overdue", total: 810.7, balance: 810.7, customer_id: "C1" },
+    { invoice_id: "B", invoice_number: "INV-2", status: "overdue", total: 2400, balance: 2400, customer_id: "C1" },
+  ];
+  const picked = pickInvoiceForOrder(candidates, {
+    orderNumber: "804938", expectedAmount: 793.3, crossBorder: false, orderCurrency: "SAR",
+  });
+  assert.equal(picked.invoice?.invoice_id, "A");
+
+  const aed = pickInvoiceForOrder(candidates, {
+    orderNumber: "804938", expectedAmount: 793.3, crossBorder: false, orderCurrency: "AED",
+  });
+  assert.ok(aed.error, "an AED order with the same gap still refuses to guess");
+});
