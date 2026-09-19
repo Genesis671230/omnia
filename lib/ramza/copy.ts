@@ -338,3 +338,93 @@ export const VIDEO_INTRO_BODY =
 
 export const PRIVACY_INTRO =
   "What we collect when you ask for a payout audit, why we hold it, and how to get it deleted. Plain terms, no defined-term index.";
+
+/* --- the product frame ---------------------------------------------------
+   Copy and synthetic rows for components/ramza/product-frame.tsx, the one
+   section that shows the application interface rather than its accounting
+   output. Figures are invented but internally consistent: bank credit minus
+   payout net equals the variance on every row, and the totals in the tiles
+   foot to the rows below them. A finance buyer checks that arithmetic, and a
+   frame that does not add up is worse than no frame. */
+
+export const PRODUCT_FRAME = {
+  heading: "The month, on one screen",
+  body:
+    "Every gateway payout lined up against the bank credit that paid it. Matched rows settle green. A variance is the gap RAMZA is still chasing, not a number you have to go find.",
+  disclaimer: "Illustrative figures. Five gateways, one bank account, one month.",
+  windowTitle: "Reconciliation",
+  period: "March 2026",
+  footer: "18 payouts · 1,204 orders · AED 1,486,220.40 matched to the bank",
+};
+
+export const PRODUCT_TILES: { label: string; value: string; note?: string }[] = [
+  { label: "Matched (AED)", value: "1,486,220.40", note: "16 of 18 payouts" },
+  { label: "Awaiting bank", value: "84,310.00", note: "1 payout in transit" },
+  { label: "Gateway fees", value: "41,905.62", note: "incl. VAT on fees" },
+  { label: "Open variance", value: "1,240.00", note: "1 payout to review" },
+];
+
+export const PRODUCT_ROWS: {
+  date: string;
+  gateway: string;
+  ref: string;
+  bank: string;
+  net: string;
+  variance: string;
+  status: string;
+  matched: boolean;
+}[] = [
+  {
+    date: "28 Mar",
+    gateway: "Tabby",
+    ref: "TBY-0318994",
+    bank: "312,480.20",
+    net: "312,480.20",
+    variance: "0.00",
+    status: "Matched",
+    matched: true,
+  },
+  {
+    date: "27 Mar",
+    gateway: "Tamara",
+    ref: "TMR-772140",
+    bank: "268,905.00",
+    net: "268,905.00",
+    variance: "0.00",
+    status: "Matched",
+    matched: true,
+  },
+  {
+    /* The SAR row is the one that earns its place: a KWD/SAR payout lands in
+       AED at the bank's own wire rate, not the static FX table, and that gap
+       is the single most common reason a Gulf payout is left unreconciled. */
+    date: "26 Mar",
+    gateway: "Telr (SAR)",
+    ref: "TLR-2240871",
+    bank: "195,332.40",
+    net: "194,092.40",
+    variance: "1,240.00",
+    status: "FX variance",
+    matched: false,
+  },
+  {
+    date: "25 Mar",
+    gateway: "Stripe",
+    ref: "po_1Qx8mLB",
+    bank: "148,770.60",
+    net: "148,770.60",
+    variance: "0.00",
+    status: "Matched",
+    matched: true,
+  },
+  {
+    date: "24 Mar",
+    gateway: "COD, Aramex",
+    ref: "ARX-CO-44182",
+    bank: "96,214.00",
+    net: "96,214.00",
+    variance: "0.00",
+    status: "Matched",
+    matched: true,
+  },
+];

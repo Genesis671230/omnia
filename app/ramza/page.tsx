@@ -11,6 +11,7 @@ import { VideoIntro } from "@/components/ramza/video-intro";
 import { Orchestrator } from "@/components/ramza/orchestrator";
 import { PostingStack } from "@/components/ramza/posting-stack";
 import { AccountantView } from "@/components/ramza/accountant-view";
+import { ProductFrame } from "@/components/ramza/product-frame";
 import { Copilot } from "@/components/ramza/copilot";
 import { Outcomes } from "@/components/ramza/outcomes";
 import { AccountantReview } from "@/components/ramza/accountant-review";
@@ -102,6 +103,7 @@ export default async function RamzaPage({
         <VideoIntro />
         <HowItWorks />
         <Orchestrator />
+        <ProductFrame />
         <AccountantView />
         <PostingStack />
         <Copilot />

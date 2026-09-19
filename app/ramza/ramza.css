@@ -561,8 +561,13 @@
   font-weight: 600;
 }
 [data-ramza] .r-pill-matched {
-  background: var(--brand-soft);
-  color: var(--brand);
+  /* --ledger, not --brand. The token block at the top of this file introduced
+     green precisely so a reconciled row would not wear the same colour as a
+     brand button; this rule was still painting it brand blue, which put the
+     one state the product exists to produce back into the brand palette.
+     Affects the hero animation's matched rows and "Paid" pill too. */
+  background: var(--ledger-soft);
+  color: var(--ledger);
 }
 [data-ramza] .r-pill-unmatched {
   background: color-mix(in srgb, var(--residual) 18%, transparent);
@@ -689,4 +694,113 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* --- product frame -------------------------------------------------------
+   The application window in section "The month, on one screen". Dark bento
+   panel so the interface reads as a distinct surface from the page around it,
+   the same way the real app does against its chrome. */
+
+[data-ramza] .r-nums {
+  font-variant-numeric: tabular-nums;
+  /* Columns of money that do not align are the fastest way to look unserious
+     to the exact person this page is selling to. */
+}
+
+[data-ramza] .r-appframe {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: var(--glass-shadow);
+}
+
+[data-ramza] .r-appframe-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+[data-ramza] .r-appframe-dots {
+  display: inline-flex;
+  gap: 0.3125rem;
+  flex: none;
+}
+[data-ramza] .r-appframe-dots i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--panel-border);
+}
+
+[data-ramza] .r-appframe-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--panel-ink);
+}
+
+[data-ramza] .r-appframe-period {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--panel-ink-60);
+}
+
+[data-ramza] .r-appframe-body {
+  padding: 1rem;
+}
+@media (min-width: 640px) {
+  [data-ramza] .r-appframe-body { padding: 1.25rem; }
+}
+
+[data-ramza] .r-appframe-table table { font-size: 0.8125rem; }
+
+[data-ramza] .r-appframe-table th {
+  padding: 0.5rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--panel-ink-60);
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+[data-ramza] .r-appframe-table td {
+  padding: 0.6875rem 0.625rem;
+  color: var(--panel-ink);
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+[data-ramza] .r-appframe-table tr:last-child td { border-bottom: 0; }
+
+[data-ramza] .r-appframe-cards li {
+  background: var(--panel-2);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+}
+
+[data-ramza] .r-appframe-foot {
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--panel-border);
+  font-size: 0.75rem;
+  color: var(--panel-ink-60);
+}
+
+/* Pills sitting on the dark panel resolve their own contrast: in light mode
+   --ledger (#12805c) and --residual (#c2851a) are tuned for a white page and
+   go muddy on #0f1636, so the panel restates them against its own ground
+   rather than inheriting the page's. */
+[data-ramza] .r-appframe .r-pill-matched {
+  background: color-mix(in srgb, var(--ledger-bright) 22%, transparent);
+  color: color-mix(in srgb, var(--ledger-bright) 62%, #ffffff);
+}
+[data-ramza] .r-appframe .r-pill-unmatched {
+  background: color-mix(in srgb, var(--residual) 24%, transparent);
+  color: color-mix(in srgb, var(--residual) 55%, #ffffff);
 }
