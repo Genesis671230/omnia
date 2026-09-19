@@ -298,23 +298,24 @@
   color: var(--stamp);
 }
 
-/* ── Mesh band ────────────────────────────────────────────────────────────
-   A deep, grainy gradient field: overlapping radial washes in blue and green
-   under a heavy film grain, with soft tonal waves drifting across it. Used for
-   the full-bleed statement bands. The grain is what stops a big gradient
-   looking like a default CSS gradient — it breaks the banding and gives the
-   surface something to be. */
+/* ── Statement band ───────────────────────────────────────────────────────
+   One flat ink panel, grain on top, nothing else.
+
+   This used to be five overlapping radial washes in blue and green under
+   three drifting wave blobs. Two problems. The green wash meeting the navy
+   produced a muddy olive mid-tone with visible banding, and a mesh gradient
+   with wavy blobs is the single most dated treatment on a 2026 fintech page —
+   Trullion, Ledge and Numeric all ship zero gradients. It read as a Figma
+   preset, which made the most important line on the page look cheap.
+
+   Flat is not the same as plain: the grain gives the surface tooth, and a
+   statement in white serif on deep ink is a stronger frame for one sentence
+   than any amount of colour. */
 [data-ramza] .r-mesh {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   background-color: #0a1738;
-  background-image:
-    radial-gradient(120% 90% at 12% 18%, rgba(18, 128, 92, 0.55) 0%, transparent 58%),
-    radial-gradient(100% 80% at 88% 12%, rgba(58, 108, 230, 0.62) 0%, transparent 60%),
-    radial-gradient(130% 110% at 72% 96%, rgba(11, 62, 48, 0.75) 0%, transparent 62%),
-    radial-gradient(90% 70% at 32% 88%, rgba(24, 40, 110, 0.7) 0%, transparent 60%),
-    linear-gradient(155deg, #0d2a4e 0%, #0a1738 46%, #07211c 100%);
   color: #f2f6ff;
 }
 /* The grain. Two layers: a fine one for tooth, a coarser one for depth. */
@@ -324,19 +325,13 @@
   inset: -50%;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.42;
+  opacity: 0.28;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
   mix-blend-mode: overlay;
 }
 [data-ramza] .r-mesh > * {
   position: relative;
   z-index: 3;
-}
-[data-ramza] .r-mesh-waves {
-  position: absolute;
-  inset: -12% -6%;
-  z-index: 1;
-  pointer-events: none;
 }
 [data-ramza] .r-mesh h2,
 [data-ramza] .r-mesh h3,
