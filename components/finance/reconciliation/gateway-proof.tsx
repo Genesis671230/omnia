@@ -1399,8 +1399,8 @@ export function GatewayProof({ r, live, onChanged }: {
             )}
           </div>
           <ul className="mt-1.5 space-y-1">
-            {attention.map(({ t, st }) => (
-              <li key={t.ref} className="flex items-start gap-2 leading-snug">
+            {attention.map(({ t, st },i) => (
+              <li key={i} className="flex items-start gap-2 leading-snug">
                 {postableSet.has(t.ref) ? (
                   <Checkbox className="mt-0.5" checked={selected.has(t.ref)} onCheckedChange={() => toggleSelect(t.ref)} disabled={!!busy} />
                 ) : (
