@@ -1,5 +1,5 @@
 import { MessageCircle } from "lucide-react";
-import { HeroReconciliation } from "./hero-reconciliation";
+import { CloseStatement } from "./close-statement";
 import { HeroField } from "./hero-field";
 import { Skyline } from "./skyline";
 import { CtaLink } from "./ui/cta-button";
@@ -39,9 +39,12 @@ export function Hero({ h1, whatsappHref }: { h1: string; whatsappHref: string })
             </div>
           </div>
 
-          {/* reconciliation animation — overlaps the copy card on desktop */}
+          {/* A real close, not a mocked one. Replaces the synthetic payout
+              cycler that showed "Matched" / "Awaiting" badges — every rival
+              hero shows a matched state, so it proved nothing, and it was
+              invented, which is the first thing a finance buyer tests. */}
           <div className="relative z-[1] lg:pl-10">
-            <HeroReconciliation />
+            <CloseStatement />
           </div>
         </div>
       </div>

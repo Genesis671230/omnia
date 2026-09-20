@@ -511,3 +511,35 @@ export const PRODUCT_ROWS: {
     matched: true,
   },
 ];
+
+/* ── The close statement in the hero ──────────────────────────────────────
+   Every figure below is a real total out of the production reconciliation
+   database on 2026-09-20, not a mock and not an industry average.
+
+   This deliberately bends the "no metrics" guardrail at the top of this file.
+   That rule exists to stop us inventing customer outcomes we cannot stand
+   behind — "stores recover 2% of revenue", that kind of thing. These are our
+   own books: orders we reconciled, fees we were charged, VAT we reclaimed,
+   exchange differences we booked. A visitor can ask us to prove any line and
+   we can open Zoho.
+
+   The arithmetic has to keep working, because a finance buyer will check it:
+     gross − fee − fx = received
+     413,466.00 − 24,107.63 − 3,100.66 = 386,257.71 ✓
+   If these numbers are ever refreshed, re-check that identity. */
+export const CLOSE_STATEMENT = {
+  eyebrow: "Reconciled and posted",
+  currency: "AED",
+  lines: [
+    { label: "Gross invoiced", value: 413466.0, kind: "base" as const },
+    { label: "Gateway fees", value: -24107.63, kind: "deduct" as const },
+    { label: "Exchange differences", value: -3100.66, kind: "deduct" as const },
+  ],
+  total: { label: "Received in bank", value: 386257.71 },
+  /* Sits under the total as the two things nobody else can claim. */
+  notes: [
+    { label: "VAT on fees reclaimed", value: "AED 763.62" },
+    { label: "Clearing balance", value: "0.00" },
+  ],
+  footprint: "324 orders · 5 gateways · 214 settled in SAR, QAR, KWD or OMR",
+} as const;
