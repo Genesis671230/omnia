@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { MessageCircle, Mail } from "lucide-react";
+import { ALL_PAGES, pageUrl } from "@/lib/ramza/pages";
 import { Wordmark } from "./wordmark";
 import { BrandMark, type BrandKey } from "./brand-marks";
 import { Skyline } from "./skyline";
@@ -109,6 +111,32 @@ export function Footer({
             </a>
           </nav>
         </div>
+
+        {/* Every content page, from the registry.
+            A footer link is the one inbound link every page on the site gives
+            every other page, and until now these twelve had none at all — they
+            rendered, they were in the sitemap, and nothing linked to them. */}
+        <nav aria-label="All pages" className="mt-12 border-t r-hairline pt-8">
+          <h2
+            className="text-xs font-semibold uppercase tracking-[0.14em]"
+            style={{ color: "var(--ink-40)" }}
+          >
+            All pages
+          </h2>
+          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3 lg:grid-cols-4">
+            {ALL_PAGES.map((p) => (
+              <li key={p.path}>
+                <Link
+                  href={pageUrl(p)}
+                  className="inline-flex min-h-9 items-center text-[0.875rem] transition-colors hover:text-[var(--brand)]"
+                  style={{ color: "var(--ink-60)" }}
+                >
+                  {p.crumb}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         {/* the stack, one last time */}
         <div className="mt-12 border-t r-hairline pt-8">

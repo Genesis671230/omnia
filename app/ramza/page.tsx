@@ -19,6 +19,7 @@ import { ValueCalculator } from "@/components/ramza/value-calculator";
 import { Integrations } from "@/components/ramza/integrations";
 import { AuditForm } from "@/components/ramza/audit-form";
 import { FoundingPartners } from "@/components/ramza/founding-partners";
+import { Library } from "@/components/ramza/library";
 import { Faq } from "@/components/ramza/faq";
 import { Footer } from "@/components/ramza/footer";
 import { resolveH1, FAQ } from "@/lib/ramza/copy";
@@ -112,6 +113,7 @@ export default async function RamzaPage({
         <Integrations />
         <ValueCalculator />
         <FoundingPartners />
+        <Library />
         <Faq />
         <AuditForm />
       </main>
