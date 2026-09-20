@@ -78,10 +78,59 @@ async function reserveDailyQuota(label: string): Promise<number> {
   }
 }
 
+/**
+ * A label for a call that did not supply one, derived from what it is actually
+ * asking Zoho for.
+ *
+ * Hand-labelling 21 call sites was the obvious move and the wrong one: the
+ * generic wrappers (zohoFetch, books(), booksFetch) each serve a dozen
+ * endpoints, so a per-site label would have lumped them together, and the next
+ * call site added would arrive unlabelled again. Deriving from the URL means
+ * attribution cannot drift out of date, and "unlabelled" stops existing.
+ *
+ *   GET  /books/v3/invoices?...              → books.invoices.list
+ *   GET  /books/v3/invoices/90300123/        → books.invoices.get
+ *   POST /books/v3/customerpayments          → books.customerpayments.create
+ *   PUT  /inventory/v1/items/551/            → inventory.items.update
+ */
+export function deriveZohoLabel(input: string | URL, init?: RequestInit): string {
+  let path: string;
+  try {
+    path = new URL(String(input)).pathname;
+  } catch {
+    return "unparsed";
+  }
+
+  const parts = path.split("/").filter(Boolean);
+  // Drop the API family's version segment: books/v3/... → books/...
+  const api = parts.shift() ?? "zoho";
+  if (parts[0] && /^v\d+$/i.test(parts[0])) parts.shift();
+
+  const resource = parts.shift() ?? "root";
+  // Anything after the resource that looks like an id means "one of these".
+  const rest = parts.filter((p) => p.length > 0);
+  const byId = rest.some((p) => /^\d{5,}$/.test(p) || /^[0-9a-f-]{16,}$/i.test(p));
+
+  const method = (init?.method ?? "GET").toUpperCase();
+  const verb =
+    method === "POST" ? "create"
+    : method === "PUT" ? "update"
+    : method === "DELETE" ? "delete"
+    : byId ? "get"
+    : "list";
+
+  // Sub-resource (…/invoices/123/payments) is worth keeping; ids are not.
+  const sub = rest.filter((p) => !/^\d{5,}$/.test(p) && !/^[0-9a-f-]{16,}$/i.test(p));
+  const tail = sub.length ? `.${sub.join(".")}` : "";
+
+  return `${api}.${resource}${tail}.${verb}`.slice(0, 120);
+}
+
 export type ZohoFetchOpts = {
   /** Skip the daily-budget counter (OAuth refresh, health checks). Pacing still applies. */
   skipQuota?: boolean;
-  /** Label for logs, e.g. "invoices.list". */
+  /** Overrides the URL-derived label. Only worth setting when one endpoint
+   *  serves two purposes worth telling apart in the usage table. */
   label?: string;
 };
 
@@ -95,7 +144,7 @@ export async function zohoThrottledFetch(
     if (gap > 0) await sleep(gap);
 
     if (!opts.skipQuota) {
-      const used = await reserveDailyQuota(opts.label ?? "unlabelled");
+      const used = await reserveDailyQuota(opts.label ?? deriveZohoLabel(input, init));
       if (used >= 0 && used % 250 === 0) {
         console.warn(`[zoho-throttle] ${used}/${DAILY_BUDGET} Zoho calls used today`);
       }

@@ -691,6 +691,8 @@ export function GatewayProof({ r, live, onChanged }: {
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [invoiceMeta, setInvoiceMeta] = useState<{ fetched: number; cached: number } | null>(null);
   const [refreshingInvoices, setRefreshingInvoices] = useState(false);
+  /** Invoice status has been read from Zoho at least once in this panel. */
+  const [invoicesChecked, setInvoicesChecked] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const [options, setOptions] = useState<PostingOptions | null>(null);
@@ -782,15 +784,6 @@ export function GatewayProof({ r, live, onChanged }: {
       })
       .catch((e) => alive && setSetupError(`Couldn't load settlement records: ${(e as Error).message}`));
 
-    const invoicesP = fetch(`/api/reconcile/line/${encodeURIComponent(r.id)}/invoices`)
-      .then((x) => x.json())
-      .then((d: { statuses?: Record<string, InvoiceStatus>; fetched?: number; cached?: number }) => {
-        if (!alive) return;
-        setInvoiceByRef(d.statuses ?? {});
-        setInvoiceMeta({ fetched: d.fetched ?? 0, cached: d.cached ?? 0 });
-      })
-      .catch(() => {});
-
     const optionsP = fetch("/api/settlements/posting-options")
       .then(async (x) => {
         const d = await x.json();
@@ -811,12 +804,23 @@ export function GatewayProof({ r, live, onChanged }: {
       })
       .catch((e) => alive && setOptionsError((e as Error).message));
 
-    Promise.allSettled([settlementsP, invoicesP, optionsP]).finally(() => alive && setLoadingSetup(false));
+    // Invoice status is NOT fetched here. It is one customer_name_startswith
+    // search per order against a ~5,000/day org cap — an 18-order payout cost
+    // 18-36 Zoho requests every single time this panel mounted, including
+    // every time someone navigated back to it. It is a button now.
+    //
+    // Deliberately a trigger rather than a cache: a manager can reopen a paid
+    // invoice in Zoho, so a stored status can be wrong in a way that matters.
+    // Not asking is safe; answering from a stale snapshot is not.
+    Promise.allSettled([settlementsP, optionsP]).finally(() => alive && setLoadingSetup(false));
     return () => { alive = false; };
   }, [r.id, r.confirmedBy, r.provider, currency, crossBorder, prefsKey, matchedKey]);
 
   const orderByNumber = new Map((orders?.orders ?? []).map((o) => [o.order_number, o]));
   useEffect(() => { setOrders(null); }, [matchedKey]);
+  // A different set of matched orders means the statuses on screen answer a
+  // question nobody asked. Clear rather than show them against new rows.
+  useEffect(() => { setInvoiceByRef({}); setInvoiceMeta(null); setInvoicesChecked(false); }, [matchedKey]);
   const missingSet = new Set(orders?.missing ?? []);
 
   const settlementFor = useMemo(() => {
@@ -1088,7 +1092,8 @@ export function GatewayProof({ r, live, onChanged }: {
       if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
       setInvoiceByRef(d.statuses ?? {});
       setInvoiceMeta({ fetched: d.fetched ?? 0, cached: 0 });
-      toast.success(`Re-read ${d.fetched ?? 0} invoice${d.fetched === 1 ? "" : "s"} from Zoho.`);
+      setInvoicesChecked(true);
+      toast.success(`Read ${d.fetched ?? 0} invoice${d.fetched === 1 ? "" : "s"} from Zoho.`);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -1321,12 +1326,14 @@ export function GatewayProof({ r, live, onChanged }: {
                   title={
                     invoiceMeta?.cached
                       ? `${invoiceMeta.cached} invoice(s) couldn't be read from Zoho and are showing their last known figures. Try again.`
-                      : "Read every invoice from Zoho again — use this after changing an invoice in Zoho"
+                      : invoicesChecked
+                        ? "Read every invoice from Zoho again — use this after changing an invoice in Zoho"
+                        : "Reads each order's invoice status live from Zoho. One search per order against a ~5,000/day cap, so it runs when you ask rather than every time this panel opens."
                   }
                   className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] font-medium text-[#6F5325] hover:border-[#B08343] disabled:opacity-50"
                 >
                   {refreshingInvoices ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-                  Re-check invoices
+                  {invoicesChecked ? "Re-check invoices" : "Check invoices in Zoho"}
                   {invoiceMeta && invoiceMeta.cached > 0 && (
                     <span className="text-[#A6472F]">({invoiceMeta.cached} not live)</span>
                   )}
