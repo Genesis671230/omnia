@@ -34,6 +34,17 @@ export async function middleware(req: NextRequest) {
   }
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {
+    // An API call is made by fetch(), which follows the redirect and hands the
+    // caller the /login PAGE. Every `.json()` in the app then dies on
+    // `Unexpected token '<', "<!DOCTYPE "...` — a parser error standing in for
+    // "your session expired", which reads to the user as broken data rather
+    // than a sign-in prompt. Answer machines with a machine-readable 401.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Session expired — sign in again.", sessionExpired: true },
+        { status: 401 },
+      );
+    }
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     // preserve where they were headed so we can bounce them back post-login

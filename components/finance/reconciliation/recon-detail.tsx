@@ -215,13 +215,19 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           /* The orders all match and the gap is small enough to be the
              remitting bank's own cut — a cost to book, not a broken payout. */
           <div className="mb-3.5 rounded-lg bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#6F5325]">
-            The {r.provider} payout is worth <b>{aed2(r.payout.net)}</b> at the rate the bank itself quoted, but only{" "}
+            The {r.provider} payout is worth{" "}
+            <b>{aed2(r.payout.net)}</b>
+            {(r.payout.currency ?? "AED").toUpperCase() === "AED" ? "" : " at the rate the bank itself quoted"}, but only{" "}
             <b>{aed2(r.bankAmount)}</b> landed — the bank kept <b>{aed2(Math.abs(r.variance))}</b> on the way in
-            ({((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit), the usual inward-telex
-            charge on a {r.payout.currency} wire. All {r.resolvedOrders.length} order
+            ({((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit
+            {(r.payout.currency ?? "AED").toUpperCase() === "AED"
+              ? ", within the 1% a bank charge can be"
+              : `, the usual inward-telex charge on a ${r.payout.currency} wire`}
+            ). All {r.resolvedOrders.length} order
             {r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for, so this can be confirmed and booked: each
-            invoice still closes in full, the {r.provider} fee goes to gateway charges, and the{" "}
-            <b>{aed2(Math.abs(r.variance))}</b> is spread across the orders and booked to <b>exchange gain / loss</b>.
+            invoice still closes in full at its own amount, the {r.provider} fee goes to gateway charges, and the{" "}
+            <b>{aed2(Math.abs(r.variance))}</b> books once to <b>exchange gain / loss</b> — it is never spread across
+            the orders, so no invoice&apos;s own exchange difference moves.
           </div>
         ) : (
           <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
@@ -307,7 +313,9 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
                 isConfirmablePartial(r)
                   ? `${r.unresolvedRefs.length} unmatched line(s) stay listed until linked`
                   : isBankFxVariance(r)
-                    ? `The bank kept ${aed2(Math.abs(r.variance))} of this ${r.payout?.currency ?? ""} wire; it books to exchange gain / loss, invoices still close in full`
+                    ? `The bank kept ${aed2(Math.abs(r.variance))} of this ${
+                        (r.payout?.currency ?? "AED").toUpperCase() === "AED" ? "credit" : `${r.payout?.currency} wire`
+                      }; it books once to exchange gain / loss, and every invoice still closes in full at its own amount`
                     : undefined
               }
             />

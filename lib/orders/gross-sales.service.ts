@@ -76,6 +76,7 @@ export async function buildGrossSalesReport({
     order_date: r.order_date,
     gross_aed: r.gross_aed,
     financial_status: r.financial_status,
+    gateway: r.gateway,
   }));
 
   // Filtering to one store would leave the other three as permanent zeros in

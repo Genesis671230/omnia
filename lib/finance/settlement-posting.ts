@@ -101,13 +101,23 @@ export function bankScaleFor(opts: {
 }
 
 /**
- * What the remitting bank kept between quoting a rate and crediting the money:
- * the payout's AED value at the bank's own rate, less the AED that landed.
- * Positive = a loss (the usual inward-telex charge); negative = the bank paid
- * out more than its quoted rate implied.
+ * What the bank kept between what the payout was worth and what it credited:
+ * the payout's AED net, less the AED that landed. Positive = a loss (the usual
+ * inward-telex charge); negative = more landed than the payout implied.
  *
- * Only meaningful when the shares were NOT rescaled — if bankScaleFor() already
- * spread the gap across the orders, booking it again would double-count it.
+ * Books exactly when bankScaleFor() returned 1, i.e. when the gap was NOT
+ * already spread across the orders — booking it twice would double-count it.
+ * That is the single rule; it holds for both shapes:
+ *
+ *   cross-border, shares at the bank's quoted rate — the leftover is the flat
+ *     wire charge, and it belongs to the payout, not to any one order.
+ *   AED-native — never rescaled at all, because a variance on an AED payout is
+ *     not an exchange rate. The gap is still a real cost the bank took, and it
+ *     books once here rather than holding every invoice on the payout open.
+ *
+ * Cross-border payouts still at our static FX estimate are the one case that
+ * does NOT book: there bankScaleFor() rescales the shares, so the gap is
+ * already inside the per-order figures.
  */
 export function planWireResidual(opts: {
   crossBorder: boolean;
@@ -115,9 +125,9 @@ export function planWireResidual(opts: {
   payoutNet: number;
   sharesAtBankRate: boolean;
 }): { amount: number; needed: boolean } {
-  if (!opts.crossBorder || !opts.sharesAtBankRate || !opts.payoutNet || !opts.bankAmount) {
-    return { amount: 0, needed: false };
-  }
+  if (!opts.payoutNet || !opts.bankAmount) return { amount: 0, needed: false };
+  // The shares were rescaled to the bank credit, so the gap is already in them.
+  if (opts.crossBorder && !opts.sharesAtBankRate) return { amount: 0, needed: false };
   const amount = round2(opts.payoutNet - opts.bankAmount);
   return { amount, needed: Math.abs(amount) >= ROUNDING_TOLERANCE_AED };
 }

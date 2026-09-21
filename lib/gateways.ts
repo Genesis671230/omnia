@@ -24,7 +24,9 @@ export function classifyOrderGateway(raw: string): Gateway {
   if (t.includes("TELR")) return "Telr";
   if (t.includes("CHECKOUT")) return "Checkout";
   if (t.includes("TABBY")) return "Tabby";
-  if (t.includes("TAMARA")) return "Tamara";
+  // The WhatsApp store's method is spelled "Pay By Tammara" — without this it
+  // read as Unclassified and its orders never matched a Tamara payout.
+  if (t.includes("TAMARA") || t.includes("TAMMARA")) return "Tamara";
   if (t.includes("SHOPIFY")) return "Shopify Payments";
   if (t.includes("COD") || t.includes("CASH ON DELIVERY")) return "COD";
   return "Unclassified";

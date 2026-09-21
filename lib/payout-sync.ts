@@ -8,6 +8,8 @@ import { stripeConfigured, listRecentPayouts, payoutOrderRefs } from "@/lib/inte
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { persistStripeApiSettlements, type PaidStripePayout } from "@/lib/reconciliation/stripe-settlements";
 import type { ParsedPayout } from "@/lib/parsers/payouts";
+import { getShopifyStores } from "@/lib/integrations/shopify";
+import { fetchStoreShopifyPayouts } from "@/lib/integrations/shopify-payments";
 
 export type GatewaySyncResult = { provider: string; fetched: number; saved: number; settled?: number; error?: string };
 
@@ -88,6 +90,22 @@ export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]
       results.push({ provider: "Stripe", fetched: parsed.length, saved, settled });
     } catch (e) {
       results.push({ provider: "Stripe", fetched: 0, saved: 0, error: (e as Error).message });
+    }
+  }
+
+  // Shopify Payments — one account per Shopify store (UAE in AED, KSA in SAR).
+  // Each store is its own result row so a missing API scope on one store is
+  // reported by name instead of hiding the other store's payouts.
+  const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  for (const store of getShopifyStores()) {
+    const provider = `Shopify Payments ${store.code}`;
+    try {
+      const r = await fetchStoreShopifyPayouts(store, sinceIso);
+      if (r.skipped === "no_account") continue; // store doesn't use Shopify Payments
+      const saved = await PayoutsRepository.upsertPayouts(r.payouts);
+      results.push({ provider, fetched: r.payouts.length, saved });
+    } catch (e) {
+      results.push({ provider, fetched: 0, saved: 0, error: (e as Error).message });
     }
   }
 

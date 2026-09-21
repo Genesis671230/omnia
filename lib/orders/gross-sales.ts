@@ -2,11 +2,13 @@
 // number, split by store and bucketed on the Dubai calendar.
 //
 // WHAT COUNTS
-// Gross Sales here is PAID orders only (financial_status === "paid"), matching
-// lib/reports/cfo-digest.ts. Pending, failed, expired, cancelled, refunded and
-// voided orders are real order attempts but not money in the door, and mixing
-// them into a revenue figure is exactly the discrepancy that showed up against
-// the manual dispatch sheet's "32 paid / 37 total" count.
+// Orders that pass isCountedSale (lib/orders/sale-rule.ts) — the founder's
+// reference definition: paid / partially paid, WooCommerce on-hold, pending
+// Cash on Delivery on the Shopify stores, and anything on the prepaid WhatsApp
+// store. Failed, abandoned-pending, cancelled, refunded and voided orders are
+// real order attempts but not sales, and mixing them in is exactly the
+// discrepancy that showed up against the manual dispatch sheet's
+// "32 paid / 37 total" count.
 //
 // Rather than silently drop the rest, every report carries an `excluded` block
 // with the unpaid and cancelled counts and their value, so the founder can see
@@ -28,6 +30,7 @@ import {
   dubaiMonthBounds,
   dubaiToday,
 } from "@/lib/dubai-day";
+import { isCountedSale, isReversedOrder } from "./sale-rule";
 
 /** The four storefronts. Order is display order, widest first. */
 export const GROSS_SALES_STORES = ["UAE", "KSA", "WA", "WOO"] as const;
@@ -51,6 +54,8 @@ export type GrossSalesOrder = {
   order_date: string | null;
   gross_aed: number | null;
   financial_status: string | null;
+  /** Needed to count pending Cash on Delivery orders. */
+  gateway?: string | null;
 };
 
 export type StoreAmount = {
@@ -126,11 +131,11 @@ function money(n: number): number {
 }
 
 function isPaid(o: GrossSalesOrder): boolean {
-  return (o.financial_status || "").toLowerCase() === PAID_STATUS;
+  return isCountedSale(o);
 }
 
 function isCancelled(o: GrossSalesOrder): boolean {
-  return CANCELLED_STATUSES.has((o.financial_status || "").toLowerCase());
+  return isReversedOrder(o);
 }
 
 function emptyByStore(stores: readonly string[]): Record<string, number> {

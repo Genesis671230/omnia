@@ -3,7 +3,7 @@
 
 import { supabase } from "../supabase";
 
-export type ShopifyStoreCode = "WA" | "UAE" | "KSA";
+export type ShopifyStoreCode = "WA" | "UAE" | "KSA" | "MAIN";
 
 export type ShopifyStoreConfig = {
   code: ShopifyStoreCode;
@@ -27,6 +27,11 @@ export function getShopifyStores(): ShopifyStoreConfig[] {
       code: "KSA",
       url: process.env.SHOPIFY_KSA_URL,
       token: process.env.SHOPIFY_KSA_TOKEN,
+    },
+    {
+      code: "MAIN",
+      url: process.env.SHOPIFY_MAIN_URL,
+      token: process.env.SHOPIFY_MAIN_TOKEN,
     },
   ];
   return defs

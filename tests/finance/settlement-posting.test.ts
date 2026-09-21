@@ -374,9 +374,24 @@ test("planWireResidual: the bank's cut is one charge on the wire, booked once", 
   // Already folded into every order by the rescale — booking it again would
   // double-count it.
   assert.equal(planWireResidual({ ...TABBY_SAR_WIRE, sharesAtBankRate: false }).needed, false);
-  // An AED payout has no wire conversion at all.
+  // An AED payout is never rescaled, so its gap was never folded into the
+  // orders and it books once here. It is what the bank kept, not a rate — the
+  // journal narration says "settlement difference", not "wire charge". Before
+  // this, the gap was silently dropped and every invoice on an AED payout with
+  // a variance stayed open with no way to close it.
   assert.equal(
     planWireResidual({ crossBorder: false, bankAmount: 100, payoutNet: 101, sharesAtBankRate: true }).needed,
+    true,
+  );
+  // The Telr credit that prompted this: AED 28,151.66 net, AED 28,100.21 in.
+  const telr = planWireResidual({
+    crossBorder: false, bankAmount: 28100.21, payoutNet: 28151.66, sharesAtBankRate: false,
+  });
+  assert.equal(telr.amount, 51.45, "the shortfall books as one exchange difference");
+  assert.equal(telr.needed, true);
+  // Sub-cent noise on an AED payout is still not a journal.
+  assert.equal(
+    planWireResidual({ crossBorder: false, bankAmount: 28100.21, payoutNet: 28100.21, sharesAtBankRate: false }).needed,
     false,
   );
   // Bank credited more than the quoted rate implies: a gain.

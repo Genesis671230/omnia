@@ -59,7 +59,10 @@ type RowStatus =
   | { kind: "review"; title?: string }
   | { kind: "failed"; title?: string }
   | { kind: "busy"; title?: string }
-  | { kind: "no_invoice"; title?: string };
+  | { kind: "no_invoice"; title?: string }
+  /** The settlement records could not be read. Says nothing about the order —
+   *  deliberately distinct from `no_settlement`, which is a claim about data. */
+  | { kind: "load_failed"; title?: string };
 
 const PILL: Record<RowStatus["kind"], { cls: string; text: string }> = {
   booked:        { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "booked" },
@@ -76,6 +79,7 @@ const PILL: Record<RowStatus["kind"], { cls: string; text: string }> = {
   failed:        { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
   busy:          { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "in progress" },
   no_invoice:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },
+  load_failed:   { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "couldn't check" },
 };
 
 const bare = (ref: string) => ref.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
@@ -671,6 +675,37 @@ function AccountSelect({ label, hint, value, onChange, options, placeholder, all
   );
 }
 
+/** fetch + parse, but fail with a sentence a bookkeeper can act on.
+ *
+ *  Calling `.json()` on whatever comes back turns every transport failure into
+ *  `Unexpected token '<', "<!DOCTYPE "...` — the login page, a 404, or a server
+ *  error page being parsed as data. That message says nothing about what went
+ *  wrong, and the empty state it leaves behind is indistinguishable from real
+ *  data, which is how a confirmed payout ends up claiming its orders have no
+ *  settlement records. Read the status first, and say what actually happened. */
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  const body = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    // HTML back from a JSON endpoint: the session died (middleware answers
+    // /api/* with 401 JSON now, so this is a proxy/CDN interstitial), the
+    // route is missing, or the server crashed before it could answer.
+    throw new Error(
+      res.status === 401 || res.status === 403
+        ? "Your session expired. Sign in again and reopen this payout."
+        : `The server returned ${res.status || "no"} ${res.statusText || "response"} instead of data. Nothing was changed — retry, and if it repeats the server needs a restart.`,
+    );
+  }
+  if (!res.ok) {
+    const err = (parsed as { error?: string }).error;
+    throw new Error(err || `Request failed (HTTP ${res.status}).`);
+  }
+  return parsed as T;
+}
+
 /* ── The proof panel ────────────────────────────────────────────────────── */
 
 export function GatewayProof({ r, live, onChanged }: {
@@ -687,6 +722,10 @@ export function GatewayProof({ r, live, onChanged }: {
 
   const [invoiceByRef, setInvoiceByRef] = useState<Record<string, InvoiceStatus>>({});
   const [settlements, setSettlements] = useState<SettlementRecord[] | null>(null);
+  /** The settlements request failed. Distinct from `settlements === []`, which
+   *  is a real answer. Without this the panel reports a dead request as
+   *  "no settlement record" against orders that are settled and booked. */
+  const [settlementsFailed, setSettlementsFailed] = useState(false);
   const [claimedElsewhere, setClaimedElsewhere] = useState<Record<string, { payoutId: string | null; gateway: string; published: boolean }>>({});
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [invoiceMeta, setInvoiceMeta] = useState<{ fetched: number; cached: number } | null>(null);
@@ -756,13 +795,18 @@ export function GatewayProof({ r, live, onChanged }: {
   useEffect(() => {
     if (!openRow || orders || loadingOrders) return;
     setLoadingOrders(true);
-    fetch(`/api/reconcile/line/${encodeURIComponent(r.id)}/orders`)
-      .then((x) => x.json())
-      .then((d: OrdersResponse & { error?: string }) => {
+    getJson<OrdersResponse & { error?: string }>(`/api/reconcile/line/${encodeURIComponent(r.id)}/orders`)
+      .then((d) => {
         if (d.error) throw new Error(d.error);
         setOrders(d);
       })
-      .catch(() => setOrders({ orders: [], missing: txns.map((t) => t.ref) }))
+      // A failed request is not evidence that every order is missing. Marking
+      // them all `missing` here is what put "not found" next to orders that
+      // are sitting in the database, so report the failure instead.
+      .catch((e) => {
+        setOrders({ orders: [], missing: [] });
+        setSetupError(`Couldn't load the orders on this payout: ${(e as Error).message}`);
+      })
       .finally(() => setLoadingOrders(false));
   }, [openRow, orders, loadingOrders, r.id, txns]);
 
@@ -774,15 +818,24 @@ export function GatewayProof({ r, live, onChanged }: {
     let alive = true;
     setLoadingSetup(true);
     setSetupError(null);
+    setSettlementsFailed(false);
 
-    const settlementsP = fetch(`/api/reconcile/line/${encodeURIComponent(r.id)}/settlements`)
-      .then((x) => x.json())
-      .then((d: { settlements?: SettlementRecord[]; claimedElsewhere?: Record<string, { payoutId: string | null; gateway: string; published: boolean }> }) => {
+    const settlementsP = getJson<{ settlements?: SettlementRecord[]; claimedElsewhere?: Record<string, { payoutId: string | null; gateway: string; published: boolean }> }>(
+      `/api/reconcile/line/${encodeURIComponent(r.id)}/settlements`,
+    )
+      .then((d) => {
         if (!alive) return;
         setSettlements(d.settlements ?? []);
         setClaimedElsewhere(d.claimedElsewhere ?? {});
       })
-      .catch((e) => alive && setSetupError(`Couldn't load settlement records: ${(e as Error).message}`));
+      // Leave `settlements` null on failure. Null means "we don't know yet";
+      // [] means "we asked and there are none". statusFor() relies on the
+      // difference, so never collapse one into the other here.
+      .catch((e) => {
+        if (!alive) return;
+        setSettlementsFailed(true);
+        setSetupError(`Couldn't load settlement records: ${(e as Error).message}`);
+      });
 
     const optionsP = fetch("/api/settlements/posting-options")
       .then(async (x) => {
@@ -858,6 +911,17 @@ export function GatewayProof({ r, live, onChanged }: {
       return { kind, title: res.message };
     }
     if (!s && !t.isRefund) {
+      // We never read the records, so we know nothing about this order. Saying
+      // "no settlement record" here would be inventing a finance fact out of a
+      // network error — the row stays honest and the banner carries the reason.
+      // Only applies once the credit is confirmed: before that the records
+      // genuinely don't exist yet, and `no_settlement` is the true answer.
+      if (r.confirmedBy && (settlementsFailed || settlements === null)) {
+        return {
+          kind: "load_failed",
+          title: "Couldn't read this payout's settlement records, so this order's status is unknown. Nothing has changed — retry above.",
+        };
+      }
       const elsewhere = t.orderNumber ? claimedElsewhere[t.orderNumber] : undefined;
       if (elsewhere) {
         return {
@@ -1347,7 +1411,16 @@ export function GatewayProof({ r, live, onChanged }: {
                 </label>
 
                 <div className="ml-auto flex items-center gap-2">
-                  {postableRefs.length === 0 ? (
+                  {/* "Nothing left to book" and "we couldn't read what's
+                      booked" both leave postableRefs empty, and only one of
+                      them is good news. Never show the all-clear on a failed
+                      read — it is the sentence that would stop someone
+                      checking a payout that was never actually booked. */}
+                  {settlementsFailed || settlements === null ? (
+                    <span className="inline-flex items-center gap-1.5 text-[12px] text-[#A6472F]">
+                      Settlement records couldn&apos;t be read — booking status unknown.
+                    </span>
+                  ) : postableRefs.length === 0 ? (
                     <span className="inline-flex items-center gap-1.5 text-[12px] text-[#4B7A54]">
                       <CheckCircle2 size={13} /> Every order on this payout is booked.
                     </span>

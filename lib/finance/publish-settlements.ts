@@ -147,14 +147,18 @@ async function publishWireResidual(opts: PublishOptions): Promise<WirePublishRes
   if (!accounts.differenceAccountId) {
     return {
       amount: residual.amount, status: "review", ok: false, reference,
-      message: `The bank kept AED ${Math.abs(residual.amount).toFixed(2)} on this ${line.payout?.currency} wire — pick the Exchange Gain or Loss account so it can be booked.`,
+      message: `The bank kept AED ${Math.abs(residual.amount).toFixed(2)} on this ${line.provider} credit — pick the Exchange Gain or Loss account so it can be booked.`,
     };
   }
 
   const date = (line.date ?? new Date().toISOString()).slice(0, 10);
+  // An AED payout has no quoted rate to cite, so don't claim one — the journal
+  // narration is what an accountant reads to tell a wire charge from an
+  // exchange movement.
+  const crossBorder = isCrossBorderCurrency(line.payout?.currency);
   const description =
-    `${line.provider} ${line.payout?.currency ?? ""} wire charge · ` +
-    `payout ${line.payout?.net.toFixed(2)} at the bank's quoted rate, ` +
+    `${line.provider} ${crossBorder ? `${line.payout?.currency} wire charge` : "settlement difference"} · ` +
+    `payout ${line.payout?.net.toFixed(2)}${crossBorder ? " at the bank's quoted rate" : ""}, ` +
     `AED ${line.bankAmount.toFixed(2)} credited · ` +
     `${residual.amount > 0 ? "loss" : "gain"} AED ${Math.abs(residual.amount).toFixed(2)}`;
 

@@ -1,8 +1,11 @@
 "use client";
 
 /* Gross Sales from store orders — the top-line "what did we sell" panel.
-   Today, yesterday and the trailing 7 days as headline tiles, plus a daily
-   bar chart stacked by store.
+   Today, yesterday and the trailing 7 days as headline tiles, then a month
+   picker driving a daily bar chart stacked by store and a day list. Every day
+   opens a drawer with the orders behind its amount, each traced to its payout
+   file line (fee, net) and bank credit, with the reason when money isn't in
+   yet (/api/orders/sales-ledger).
 
    This is deliberately its own panel rather than another cut of the revenue
    area chart above it: that one is fed by the dashboard payload, this one
@@ -10,12 +13,13 @@
    the number cannot move when a gateway settles late. Paid orders only, with
    the excluded orders stated underneath rather than quietly dropped. */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight, FileX, ChevronRight as Go } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { STORE_COLOR, aed, compact, shortDate } from "./types";
+import { DaySalesDrawer, STATUS_META, type LedgerDay, type LedgerStatus } from "./day-sales-drawer";
 
 type StoreAmount = { store: string; label: string; grossAed: number; orders: number };
 type Rollup = {
@@ -49,7 +53,39 @@ type Report = {
   };
 };
 
-const WINDOWS = [14, 30, 90];
+type Ledger = {
+  month: string;
+  label: string;
+  fromDay: string;
+  toDay: string;
+  stores: string[];
+  totals: {
+    grossAed: number;
+    orders: number;
+    feeAed: number;
+    receivedAed: number;
+    receivedGrossAed: number;
+    statusCounts: Record<LedgerStatus, { orders: number; grossAed: number }>;
+  };
+  missingPayoutFiles: { gateway: string; orders: number; grossAed: number; days: string[] }[];
+  excludedOrders: number;
+  days: LedgerDay[];
+  payoutSyncErrors: { provider: string; error: string; at: string | null }[];
+};
+
+const STATUS_KEYS = Object.keys(STATUS_META) as LedgerStatus[];
+
+/** Current Dubai month, YYYY-MM. */
+function dubaiMonth(offsetMonths = 0): string {
+  const now = new Date(Date.now() + 4 * 3600_000);
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1));
+  return d.toISOString().slice(0, 7);
+}
+function monthLabel(m: string): string {
+  return new Date(`${m}-01T00:00:00Z`).toLocaleString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+/** The last 18 months, newest first — enough to reach back past a year-end close. */
+const MONTH_OPTIONS = Array.from({ length: 18 }, (_, i) => dubaiMonth(-i));
 
 /* The order sync writes new orders into Supabase every 2 minutes
    (lib/scheduler/order-sync-scheduler.ts). Polling a little faster than that
@@ -68,7 +104,11 @@ function agoLabel(ms: number): string {
 }
 
 export function GrossSalesPanel() {
-  const [days, setDays] = useState(30);
+  const [month, setMonth] = useState(() => dubaiMonth());
+  const [ledger, setLedger] = useState<Ledger | null>(null);
+  const [ledgerLoading, setLedgerLoading] = useState(true);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [data, setData] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,14 +117,38 @@ export function GrossSalesPanel() {
   // honest between fetches instead of freezing at "just now".
   const [, setTick] = useState(0);
   // Read by the interval and the focus listener so neither has to be torn down
-  // and rebuilt every time `days` changes.
-  const daysRef = useRef(days);
-  daysRef.current = days;
+  // and rebuilt every time the month changes.
+  const monthRef = useRef(month);
+  monthRef.current = month;
+
+  // The ledger traces every order to its payout file and bank credit, so it is
+  // the heavier read. Polled only while the current month is on screen — a
+  // closed month only changes when someone uploads a file, and the refresh
+  // button covers that.
+  const loadLedger = useCallback(async (silent = false) => {
+    const m = monthRef.current;
+    if (!silent) setLedgerLoading(true);
+    try {
+      const res = await fetch(`/api/orders/sales-ledger?month=${m}`, { cache: "no-store" });
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) throw new Error(`Unexpected response (${res.status}) — session may have expired`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+      if (monthRef.current !== m) return; // a newer month was picked mid-flight
+      setLedger(json as Ledger);
+      setLedgerError(null);
+    } catch (e) {
+      if (monthRef.current === m) setLedgerError((e as Error).message);
+    } finally {
+      if (!silent && monthRef.current === m) setLedgerLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    if (!silent || monthRef.current === dubaiMonth()) void loadLedger(silent);
     try {
-      const res = await fetch(`/api/orders/gross-sales?days=${daysRef.current}`, { cache: "no-store" });
+      const res = await fetch(`/api/orders/gross-sales?days=30`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
       setData(json as Report);
@@ -99,10 +163,19 @@ export function GrossSalesPanel() {
     }
   }, []);
 
-  // Refetch when the window changes, and on first mount.
+  // Tiles on first mount; the ledger again whenever the month changes.
   useEffect(() => {
     void load();
-  }, [days, load]);
+  }, [load]);
+  useEffect(() => {
+    setOpenDay(null);
+    void loadLedger();
+  }, [month, loadLedger]);
+
+  const openLedgerDay = useMemo(
+    () => (openDay && ledger ? ledger.days.find((d) => d.day === openDay) ?? null : null),
+    [openDay, ledger],
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -162,9 +235,11 @@ export function GrossSalesPanel() {
   if (!data) return null;
 
   const rollups = [data.today, data.yesterday, data.last7];
-  const chartRows = data.series.map((d) => ({ day: d.day, ...d.byStore }));
-  const excludedCount =
-    data.excluded.unpaidOrders + data.excluded.cancelledOrders;
+  const chartRows = (ledger?.days ?? []).map((d) => ({ day: d.day, ...d.byStore }));
+  const chartStores = ledger?.stores ?? data.stores;
+  const monthIdx = MONTH_OPTIONS.indexOf(month);
+  const salesDays = (ledger?.days ?? []).filter((d) => d.orders > 0).slice().reverse();
+  const t = ledger?.totals;
 
   return (
     <section className="dv2-panel gs-panel" style={{ opacity: loading ? 0.65 : 1 }}>
@@ -173,7 +248,7 @@ export function GrossSalesPanel() {
       <header className="dv2-panel-head gs-head">
         <div>
           <h2>Gross Sales</h2>
-          <span>store orders only · paid · all four stores · Dubai time</span>
+          <span>store orders · paid, prepaid WhatsApp and COD · all four stores · Dubai time</span>
         </div>
         <div className="gs-controls">
           <button
@@ -188,18 +263,28 @@ export function GrossSalesPanel() {
             <b>{updatedAt ? agoLabel(Date.now() - updatedAt) : "…"}</b>
             <RefreshCw size={11} className={loading ? "dv2-spin" : ""} />
           </button>
-          <div className="gs-windows" role="group" aria-label="Chart window">
-            {WINDOWS.map((w) => (
-              <button
-                key={w}
-                type="button"
-                aria-pressed={days === w}
-                className={days === w ? "on" : ""}
-                onClick={() => setDays(w)}
-              >
-                {w}d
-              </button>
-            ))}
+          <div className="gs-month" role="group" aria-label="Month">
+            <button
+              type="button"
+              aria-label="Previous month"
+              disabled={monthIdx === MONTH_OPTIONS.length - 1}
+              onClick={() => setMonth(MONTH_OPTIONS[Math.min(monthIdx + 1, MONTH_OPTIONS.length - 1)])}
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <select value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Select month">
+              {MONTH_OPTIONS.map((m) => (
+                <option key={m} value={m}>{monthLabel(m)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              aria-label="Next month"
+              disabled={monthIdx <= 0}
+              onClick={() => setMonth(MONTH_OPTIONS[Math.max(monthIdx - 1, 0)])}
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       </header>
@@ -210,7 +295,7 @@ export function GrossSalesPanel() {
             <h3>{r.key === "today" ? "Today so far" : r.label}</h3>
             <p className="gs-amount">{aed(r.grossAed)}</p>
             <p className="gs-sub">
-              {r.orders.toLocaleString()} paid {r.orders === 1 ? "order" : "orders"}
+              {r.orders.toLocaleString()} {r.orders === 1 ? "order" : "orders"}
             </p>
             <Delta rollup={r} />
             <ul className="gs-stores">
@@ -226,17 +311,96 @@ export function GrossSalesPanel() {
         ))}
       </div>
 
-      <div className="gs-chart">
+      <div className="gs-month-head">
+        <h3>{monthLabel(month)}</h3>
+        {ledgerLoading && <Loader2 size={13} className="dv2-spin" />}
+        <span>click a day to see its orders, fees and bank credits</span>
+      </div>
+
+      {ledgerError && !ledger && (
+        <div className="gs-error">
+          <p>Could not load {monthLabel(month)}. {ledgerError}</p>
+          <button type="button" onClick={() => void loadLedger()}><RefreshCw size={12} /> Try again</button>
+        </div>
+      )}
+
+      {t && (
+        <div className="gs-msum" style={{ opacity: ledgerLoading ? 0.6 : 1 }}>
+          <div><span>Gross sales</span><b>{aed(t.grossAed)}</b><em>{t.orders.toLocaleString()} orders</em></div>
+          <div><span>Received in bank</span><b>{aed(t.receivedAed)}</b><em>net of fees · {t.statusCounts.received.orders} orders</em></div>
+          <div><span>Gateway fees</span><b>{aed(t.feeAed)}</b><em>{t.grossAed > 0 ? `${((t.feeAed / t.grossAed) * 100).toFixed(1)}% of gross` : "—"}</em></div>
+          <div><span>Not in bank yet</span><b>{aed(Math.max(t.grossAed - t.receivedGrossAed, 0))}</b><em>gross, see reasons below</em></div>
+        </div>
+      )}
+
+      {t && t.orders > 0 && (
+        <div className="gs-statusbar" aria-label="Where this month's sales are in the money chain">
+          {STATUS_KEYS.filter((k) => t.statusCounts[k].grossAed > 0).map((k) => (
+            <i
+              key={k}
+              title={`${STATUS_META[k].label}: ${t.statusCounts[k].orders} orders · ${aed(t.statusCounts[k].grossAed)}`}
+              style={{ flexGrow: t.statusCounts[k].grossAed, background: STATUS_META[k].color }}
+            />
+          ))}
+        </div>
+      )}
+      {t && t.orders > 0 && (
+        <div className="gs-statuslegend">
+          {STATUS_KEYS.filter((k) => t.statusCounts[k].orders > 0).map((k) => (
+            <span key={k}><i style={{ background: STATUS_META[k].color }} />{STATUS_META[k].label} · {t.statusCounts[k].orders} · {aed(t.statusCounts[k].grossAed)}</span>
+          ))}
+        </div>
+      )}
+
+      {ledger && ledger.missingPayoutFiles.length > 0 && (
+        <div className="gs-missing" role="status">
+          <FileX size={14} />
+          <div>
+            <b>Payout file not uploaded yet</b>
+            {ledger.missingPayoutFiles.map((m) => (
+              <p key={m.gateway}>
+                {m.gateway}: {m.orders} {m.orders === 1 ? "order" : "orders"} · {aed(m.grossAed)} across {m.days.length}{" "}
+                {m.days.length === 1 ? "day" : "days"} ({shortDate(m.days[0])}
+                {m.days.length > 1 ? ` – ${shortDate(m.days[m.days.length - 1])}` : ""})
+              </p>
+            ))}
+          </div>
+          <a href="/reconciliation">Upload in Reconciliation</a>
+        </div>
+      )}
+
+      {ledger && ledger.payoutSyncErrors.length > 0 && (
+        <div className="gs-missing gs-syncerr" role="status">
+          <FileX size={14} />
+          <div>
+            <b>Automatic payout sync is blocked</b>
+            {ledger.payoutSyncErrors.map((e) => (
+              <p key={e.provider}>{e.error}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="gs-chart" style={{ opacity: ledgerLoading ? 0.6 : 1 }}>
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={chartRows} margin={{ left: -8, right: 8, top: 8, bottom: 0 }}>
+          <BarChart
+            data={chartRows}
+            margin={{ left: -8, right: 8, top: 8, bottom: 0 }}
+            onClick={(st) => {
+              const day = st?.activeLabel as string | undefined;
+              if (day && ledger?.days.some((d) => d.day === day && d.orders > 0)) setOpenDay(day);
+            }}
+            style={{ cursor: "pointer" }}
+          >
             <CartesianGrid vertical={false} stroke="rgba(255,255,255,.10)" />
             <XAxis
               dataKey="day"
-              tickFormatter={shortDate}
+              tickFormatter={(d: string) => String(Number(d.slice(8, 10)))}
               tick={{ fontSize: 10, fill: "#9db4d8" }}
               axisLine={false}
               tickLine={false}
-              minTickGap={22}
+              interval={0}
+              minTickGap={0}
             />
             <YAxis
               tickFormatter={(v) => compact(Number(v))}
@@ -245,7 +409,7 @@ export function GrossSalesPanel() {
               tickLine={false}
               width={46}
             />
-            <Tooltip content={<GrossTip />} cursor={{ fill: "rgba(147,197,253,.10)" }} />
+            <Tooltip content={<GrossTip ledger={ledger} />} cursor={{ fill: "rgba(147,197,253,.10)" }} />
             <Legend
               verticalAlign="bottom"
               height={28}
@@ -253,43 +417,69 @@ export function GrossSalesPanel() {
               iconSize={8}
               formatter={(v) => <span className="gs-legend-label">{v}</span>}
             />
-            {data.stores.map((s, i) => (
+            {chartStores.map((s, i) => (
               <Bar
                 key={s}
                 dataKey={s}
                 stackId="gross"
                 name={s}
                 fill={STORE_COLOR[s] ?? "#94a3b8"}
-                radius={i === data.stores.length - 1 ? [3, 3, 0, 0] : undefined}
-                maxBarSize={34}
+                radius={i === chartStores.length - 1 ? [3, 3, 0, 0] : undefined}
+                maxBarSize={26}
               />
             ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
 
+      {ledger && (
+        <div className="gs-days">
+          <div className="gs-days-head">
+            <span>Day</span><span>Orders</span><span className="r">Gross</span><span className="r">Fees</span><span className="r">Received</span><span>Status</span>
+          </div>
+          {salesDays.length === 0 && <p className="gs-days-empty">No sales in {monthLabel(month)}.</p>}
+          {salesDays.map((d) => {
+            const head = d.headline === "empty" ? null : STATUS_META[d.headline];
+            return (
+              <button key={d.day} type="button" className="gs-day" onClick={() => setOpenDay(d.day)}>
+                <span className="gs-day-date">{new Date(`${d.day}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</span>
+                <span className="gs-day-n">{d.orders}</span>
+                <b className="r">{aed(d.grossAed)}</b>
+                <span className="r gs-day-fee">{aed(d.feeAed)}</span>
+                <span className="r gs-day-recv">{d.receivedAed > 0 ? aed(d.receivedAed) : "—"}</span>
+                <span className="gs-day-why">
+                  <span className="gs-day-bar">
+                    {STATUS_KEYS.filter((k) => d.statusCounts[k].grossAed > 0).map((k) => (
+                      <i key={k} style={{ flexGrow: d.statusCounts[k].grossAed, background: STATUS_META[k].color }} />
+                    ))}
+                  </span>
+                  <span className="gs-day-reason" style={{ color: head && d.headline !== "received" ? "#e8eefc" : "#9db4d8" }}>{d.reason}</span>
+                </span>
+                <Go size={13} className="gs-day-go" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <footer className="gs-foot">
         <p>
-          Gross Sales counts paid orders at their full order value, before
+          Gross Sales counts sales at their full order value, before
           gateway fees, refunds and VAT. It is the top line, not the payout.
         </p>
-        {excludedCount > 0 && (
+        {ledger && ledger.excludedOrders > 0 && (
           <p className="gs-excluded">
-            Not counted over these {data.series.length} days:{" "}
-            <b>{data.excluded.unpaidOrders.toLocaleString()}</b> unpaid or
-            pending ({aed(data.excluded.unpaidGrossAed)}) and{" "}
-            <b>{data.excluded.cancelledOrders.toLocaleString()}</b> cancelled,
-            refunded or voided ({aed(data.excluded.cancelledGrossAed)}).
-            {data.excluded.undatedOrders > 0 && (
-              <>
-                {" "}
-                <b>{data.excluded.undatedOrders.toLocaleString()}</b> have no
-                order date and cannot be placed on a day.
-              </>
-            )}
+            Not counted in {monthLabel(month)}: <b>{ledger.excludedOrders.toLocaleString()}</b> failed,
+            unpaid, zero-value, cancelled or refunded {ledger.excludedOrders === 1 ? "order" : "orders"}.
           </p>
         )}
+        <p className="gs-excluded">
+          Fees come from the payout file where it states them per order, are split from the file total where it
+          only states a total, and are estimated at the gateway&apos;s rate where no file is uploaded yet.
+        </p>
       </footer>
+
+      <DaySalesDrawer day={openLedgerDay} onClose={() => setOpenDay(null)} />
     </section>
   );
 }
@@ -332,11 +522,14 @@ function GrossTip({
   active,
   payload,
   label,
+  ledger,
 }: {
   active?: boolean;
   payload?: { name: string; value: number; color?: string }[];
   label?: string;
+  ledger?: Ledger | null;
 }) {
+  const day = label ? ledger?.days.find((d) => d.day === label) : undefined;
   if (!active || !payload?.length) return null;
   const rows = payload.filter((p) => Number(p.value) > 0);
   const total = payload.reduce((a, p) => a + Number(p.value || 0), 0);
@@ -352,7 +545,14 @@ function GrossTip({
       <div className="dv2-tip-row gs-tip-total">
         Total: <b>{aed(total)}</b>
       </div>
-      {rows.length === 0 && <div className="dv2-tip-row">No paid orders</div>}
+      {day && day.orders > 0 && (
+        <>
+          <div className="dv2-tip-row">{day.orders} {day.orders === 1 ? "order" : "orders"} · fees {aed(day.feeAed)}</div>
+          <div className="dv2-tip-row gs-tip-why">{day.reason}</div>
+          <div className="dv2-tip-row gs-tip-cta">Click to open the orders</div>
+        </>
+      )}
+      {rows.length === 0 && <div className="dv2-tip-row">No sales</div>}
     </div>
   );
 }
@@ -409,6 +609,64 @@ export const GROSS_SALES_CSS = `
 .gs-live-dot.stale { background: #fbbf24; animation: none; }
 @keyframes gsbeat { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,.5); } 70% { box-shadow: 0 0 0 6px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
 @media (prefers-reduced-motion: reduce) { .gs-live-dot { animation: none; } }
+
+.gs-month { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 9px; background: rgba(255,255,255,.07); }
+.gs-month button { display: grid; place-items: center; width: 32px; min-height: 32px; border: 0; border-radius: 7px; background: transparent; color: #c7d7f5; cursor: pointer; }
+.gs-month button:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.gs-month button:disabled { opacity: .35; cursor: default; }
+.gs-month select { min-height: 32px; border: 0; border-radius: 7px; padding: 0 8px; background: rgba(255,255,255,.94); color: #131c38; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+.gs-month-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; }
+.gs-month-head h3 { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 16px; color: #f4f7ff; }
+.gs-month-head span { font-size: 11.5px; color: #8ba4cc; }
+
+.gs-msum { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); transition: opacity .15s; }
+@media (min-width: 820px) { .gs-msum { grid-template-columns: repeat(4, 1fr); } }
+.gs-msum div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); }
+.gs-msum span { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #9db4d8; }
+.gs-msum b { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; color: #fff; }
+.gs-msum em { font-style: normal; font-size: 11px; color: #8ba4cc; }
+
+.gs-statusbar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: rgba(255,255,255,.06); }
+.gs-statusbar i { display: block; min-width: 3px; }
+.gs-statuslegend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11px; color: #c7d7f5; margin-top: -8px; }
+.gs-statuslegend span { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.gs-statuslegend i { width: 8px; height: 8px; border-radius: 999px; }
+
+.gs-missing { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(251,113,133,.35); background: rgba(251,113,133,.09); color: #fecdd3; font-size: 12px; }
+.gs-missing > svg { flex: none; margin-top: 2px; color: #fb7185; }
+.gs-missing div { flex: 1; min-width: 0; }
+.gs-missing b { color: #ffe4e6; font-weight: 650; }
+.gs-missing p { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.gs-missing a { flex: none; align-self: center; color: #ffe4e6; font-weight: 600; font-size: 11.5px; text-decoration: underline; text-underline-offset: 2px; }
+
+.gs-syncerr { border-color: rgba(251,191,36,.4); background: rgba(251,191,36,.09); color: #fde68a; }
+.gs-syncerr > svg { color: #fbbf24; }
+.gs-syncerr b { color: #fef3c7; }
+.gs-days { display: flex; flex-direction: column; gap: 4px; }
+.gs-days-head, .gs-day { display: grid; grid-template-columns: 96px 50px 96px 80px 96px minmax(0, 1fr) 16px; gap: 10px; align-items: center; }
+.gs-days-head { padding: 0 12px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #7d93b8; }
+.gs-days .r { text-align: right; }
+.gs-days-empty { margin: 4px 0; font-size: 12.5px; color: #9db4d8; }
+.gs-day { width: 100%; min-height: 40px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.035); color: #e8eefc; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.gs-day:hover, .gs-day:focus-visible { background: rgba(255,255,255,.09); border-color: rgba(147,197,253,.45); outline: none; }
+.gs-day b { font-weight: 650; font-variant-numeric: tabular-nums; color: #fff; }
+.gs-day-date { color: #c7d7f5; font-weight: 600; }
+.gs-day-n, .gs-day-fee, .gs-day-recv { font-variant-numeric: tabular-nums; color: #9db4d8; }
+.gs-day-recv { color: #6ee7b7; }
+.gs-day-why { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gs-day-bar { display: flex; height: 5px; border-radius: 999px; overflow: hidden; gap: 1px; background: rgba(255,255,255,.06); }
+.gs-day-bar i { display: block; min-width: 2px; }
+.gs-day-reason { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-day-go { color: #7d93b8; }
+@media (max-width: 760px) {
+  .gs-days-head { display: none; }
+  .gs-day { grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .gs-day-n, .gs-day-fee, .gs-day-recv, .gs-day-go { display: none; }
+  .gs-day-why { grid-column: 1 / -1; }
+}
+.gs-tip-why { max-width: 260px; white-space: normal; color: #fde68a; }
+.gs-tip-cta { color: #93c5fd; font-size: 10.5px; }
 
 .gs-windows { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgba(255,255,255,.07); }
 .gs-windows button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: 12px; font-weight: 600; color: #9db4d8; cursor: pointer; }

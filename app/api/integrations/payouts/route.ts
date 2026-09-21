@@ -3,6 +3,8 @@ import { telrConfigured } from "@/lib/integrations/telr";
 import { stripeConfigured } from "@/lib/integrations/stripe";
 import { syncGatewayPayouts } from "@/lib/payout-sync";
 import { SyncRunsRepository } from "@/lib/repositories/sync-runs.repository";
+import { runReconciliation, summarizeReconLines } from "@/lib/reconciliation/engine";
+import { getShopifyStores } from "@/lib/integrations/shopify";
 
 export const maxDuration = 60;
 
@@ -11,7 +13,12 @@ export const maxDuration = 60;
 // automatic) so the UI can show founders when payouts were last verified.
 export async function GET() {
   const lastRun = await SyncRunsRepository.getLatest();
-  return NextResponse.json({ telr: telrConfigured(), stripe: stripeConfigured(), lastRun });
+  return NextResponse.json({
+    telr: telrConfigured(),
+    stripe: stripeConfigured(),
+    shopifyPayments: getShopifyStores().map((s) => s.code),
+    lastRun,
+  });
 }
 
 // POST /api/integrations/payouts — pull payouts directly from configured
@@ -20,7 +27,19 @@ export async function GET() {
 export async function POST(request: Request) {
   const { days = 30 } = await request.json().catch(() => ({}));
   const results = await syncGatewayPayouts(days);
-  await SyncRunsRepository.record({ trigger: "manual", gatewayResults: results });
+
+  // Re-match straight away so a freshly pulled payout lands on its bank credit
+  // (and its orders read "received") now, not at the next scheduler cycle.
+  let reconSummary: ReturnType<typeof summarizeReconLines> | undefined;
+  let reconError: string | undefined;
+  if (results.some((r) => r.saved > 0)) {
+    try {
+      reconSummary = summarizeReconLines(await runReconciliation());
+    } catch (e) {
+      reconError = (e as Error).message;
+    }
+  }
+  await SyncRunsRepository.record({ trigger: "manual", gatewayResults: results, reconSummary, error: reconError });
 
   if (results.length === 0) {
     return NextResponse.json({
@@ -29,5 +48,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ results });
+  return NextResponse.json({ results, reconSummary, reconError });
 }

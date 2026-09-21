@@ -380,12 +380,12 @@ export const OrdersRepository = {
   // aggregation that needs every row in range, not one page of it. Still
   // pages past Supabase's 1000-row cap internally like listAll(), just only
   // within the window instead of across all history.
-  async listInWindow({ from, store }: { from: string; store?: string | null }) {
+  async listInWindow({ from, to, store }: { from: string; to?: string; store?: string | null }) {
     const PAGE = 1000;
     const rows: OrderRowRaw[] = [];
     for (let offset = 0; ; offset += PAGE) {
       let query = supabase.from("orders").select(ORDER_COLUMNS);
-      query = applyOrdersFilters(query, { from, store });
+      query = applyOrdersFilters(query, { from, to, store });
       const { data, error } = await query
         .order("order_date", { ascending: false })
         .range(offset, offset + PAGE - 1);

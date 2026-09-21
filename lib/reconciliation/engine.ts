@@ -520,8 +520,13 @@ export function isBankFxVariance(
   l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
 ): boolean {
   if (l.state !== "PAYOUT_VARIANCE" || !l.payout || l.resolvedOrders.length === 0) return false;
-  const currency = l.payout.currency;
-  if (!currency || currency.toUpperCase() === "AED") return false;
+  // Currency is deliberately NOT a condition. An AED Telr payout that credits
+  // AED 28,100.21 against a net of AED 28,151.66 is the same shape of problem:
+  // every order matched, and what is left is the bank's own cut. Excluding AED
+  // hid "Confirm settlement" on those credits and held every invoice on them
+  // open, while the banner blamed the SIZE of a gap that was 0.18% — well
+  // inside the limit. The limit below is what keeps a genuinely broken payout
+  // (a missing order, a partial settlement) in front of a person.
   return Math.abs(l.variance) <= bankFxVarianceLimit(l.bankAmount);
 }
 

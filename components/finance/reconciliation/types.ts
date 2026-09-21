@@ -163,13 +163,13 @@ export const BANK_FX_VARIANCE_CEILING_AED = 500;
 export const bankFxVarianceLimit = (bankAmount: number) =>
   Math.max(1, Math.min(Math.abs(bankAmount) * BANK_FX_VARIANCE_LIMIT_PCT, BANK_FX_VARIANCE_CEILING_AED));
 
+/** Currency is deliberately not a condition — an AED payout's small gap is the
+ *  bank's cut too. See isBankFxVariance() in lib/reconciliation/engine.ts. */
 export const isBankFxVariance = (
   l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
 ) =>
   l.state === "PAYOUT_VARIANCE" &&
   !!l.payout &&
-  !!l.payout.currency &&
-  l.payout.currency.toUpperCase() !== "AED" &&
   l.resolvedOrders.length > 0 &&
   Math.abs(l.variance) <= bankFxVarianceLimit(l.bankAmount);
 

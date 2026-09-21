@@ -128,7 +128,7 @@ test("a paid order with no date is excluded from the totals, not counted as toda
   assert.equal(rep.excluded.undatedOrders, 1);
 });
 
-test("a null gross_aed is treated as zero, not NaN", () => {
+test("a null or zero total is not a sale (reference rule: total > 0), and never NaN", () => {
   const rep = computeGrossSales(
     [
       order({ order_date: "2026-03-15T08:00:00Z", gross_aed: null }),
@@ -137,7 +137,7 @@ test("a null gross_aed is treated as zero, not NaN", () => {
     ASOF,
   );
   assert.equal(rep.today.grossAed, 250);
-  assert.equal(rep.today.orders, 2);
+  assert.equal(rep.today.orders, 1);
 });
 
 /* ---------- rollups ---------- */

@@ -367,8 +367,24 @@ test("isBankFxVariance: only a small cross-border gap with matched orders qualif
       bankAmount: 98.5, variance: 1.5,
     }),
     false,
-    "an AED-native gap is never an exchange difference",
+    "AED 1.50 on a 98.50 credit is 1.5% — past the limit, whatever the currency",
   );
+
+  // An AED payout is judged by the same limit, not excluded for being AED.
+  // Excluding it hid "Confirm settlement" on Telr credits and held every
+  // invoice on them open, while the banner blamed the size of a 0.18% gap.
+  const telr = {
+    state: "PAYOUT_VARIANCE" as const,
+    payout: { id: "TELR-1", net: 28151.66, source: null, currency: "AED", fxRate: null, fxSource: null },
+    resolvedOrders: ["1"], bankAmount: 28100.21, variance: -51.45,
+  };
+  assert.equal(isBankFxVariance(telr), true, "AED 51.45 on 28.1k is 0.18% — the bank's cut, bookable");
+  assert.equal(
+    isBankFxVariance({ ...telr, variance: -900, bankAmount: 27251.66 }),
+    false,
+    "AED 900 is past the limit on an AED payout too — a person looks",
+  );
+  assert.equal(isBankFxVariance({ ...telr, resolvedOrders: [] }), false, "nothing matched to book");
 });
 
 test("computeReconLines: a cross-border gap too big to be the bank's cut stays a dead stop", async () => {
