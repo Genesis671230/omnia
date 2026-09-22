@@ -29,6 +29,7 @@ export type LedgerStatus =
   | "received" // bank credit confirmed for the payout carrying this order
   | "in_review" // bank credit matched, but the totals disagree / need confirming
   | "awaiting_bank" // payout file uploaded, no bank credit matched to it yet
+  | "awaiting_payout" // gateway charged it (fee + net known live), payout not issued yet
   | "no_payout_file" // no uploaded payout file mentions this order
   | "cod"; // cash on delivery — no gateway payout will ever exist
 
@@ -45,6 +46,10 @@ export type LedgerOrderInput = {
   financial_status: string | null;
   payout_id: string | null;
   payout_status: string | null;
+  /** For the export: the order exactly as the store recorded it. */
+  currency?: string | null;
+  gross_original?: number | null;
+  gateway_raw?: string | null;
 };
 
 export type LedgerPayoutInput = {
@@ -62,7 +67,28 @@ export type LedgerPayoutInput = {
     net_aed: number;
     gross_aed: number;
     fee_aed: number;
+    vat_aed?: number | null;
+    gross_original?: number | null;
+    fee_original?: number | null;
+    net_original?: number | null;
   }[];
+  original_currency?: string | null;
+  net_original?: number | null;
+};
+
+/** A gateway charge not yet in any payout — pulled live from the gateway
+ *  (Shopify Payments balance transactions). Carries the real fee and net. */
+export type LedgerPendingChargeInput = {
+  order_ref: string;
+  gateway: string;
+  gross_aed: number;
+  fee_aed: number;
+  net_aed: number;
+  currency: string;
+  gross_original: number | null;
+  fee_original: number | null;
+  net_original: number | null;
+  transaction_date: string | null;
 };
 
 export type LedgerReconInput = {
@@ -92,8 +118,31 @@ export type LedgerOrder = {
   feeAed: number;
   receivedAed: number;
   feeBasis: FeeBasis;
+  /** VAT the gateway charged on its fee, when the payout file itemises it. */
+  vatAed: number | null;
+  /** What this order nets in its payout (gross − fee − VAT), whether or not
+   *  the bank has received it yet. Measured/allocated from the file, else estimated. */
+  payoutNetAed: number;
   status: LedgerStatus;
   reason: string;
+  /** The order as the store recorded it. */
+  currency: string;
+  grossOriginal: number | null;
+  paymentMethod: string;
+  financialStatus: string;
+  /** This order's own line in the payout file, verbatim — null when the file
+   *  has no per-order breakdown or no file covers the order. */
+  payoutLine: {
+    grossAed: number;
+    feeAed: number;
+    vatAed: number | null;
+    netAed: number;
+    currency: string;
+    grossOriginal: number | null;
+    feeOriginal: number | null;
+    netOriginal: number | null;
+    isRefund: boolean;
+  } | null;
   /** A payout line matched this order number but covers far less than the
    *  order (e.g. a AED 70 Stripe top-up on a AED 2,382 Tamara order). The sale
    *  itself is still unpaid-out; this is shown so nobody reads it as settled. */
@@ -105,6 +154,14 @@ export type LedgerOrder = {
     uploadedAt: string | null;
     netAed: number;
     feeAed: number | null;
+    grossAed: number | null;
+    /** Lines in the whole payout file, and what their nets add up to — lets
+     *  anyone check the payout total foots without opening the file. */
+    lineCount: number;
+    linesNetAed: number;
+    /** Set when the payout settled in another currency (SAR/KWD statements). */
+    currency: string;
+    netOriginal: number | null;
   } | null;
   bank: {
     id: string;
@@ -156,7 +213,7 @@ export type SalesLedger = {
   days: LedgerDay[];
 };
 
-const STATUS_ORDER: LedgerStatus[] = ["no_payout_file", "in_review", "awaiting_bank", "received", "cod"];
+const STATUS_ORDER: LedgerStatus[] = ["no_payout_file", "in_review", "awaiting_payout", "awaiting_bank", "received", "cod"];
 
 const money = (n: number) => +n.toFixed(2);
 
@@ -165,6 +222,7 @@ function emptyCounts(): LedgerStatusCounts {
     received: { orders: 0, grossAed: 0 },
     in_review: { orders: 0, grossAed: 0 },
     awaiting_bank: { orders: 0, grossAed: 0 },
+    awaiting_payout: { orders: 0, grossAed: 0 },
     no_payout_file: { orders: 0, grossAed: 0 },
     cod: { orders: 0, grossAed: 0 },
   };
@@ -229,23 +287,29 @@ function feeFor(
   order: LedgerOrderInput,
   gross: number,
   hit: PayoutHit | null,
-): { fee: number; received: number; basis: FeeBasis } {
+): { fee: number; received: number; basis: FeeBasis; vat: number | null } {
   if (hit) {
     const { tx, payout } = hit;
     // A real per-order share: the parser computed it, so it is the fact.
     if (tx.fee_aed > 0 || tx.net_aed > 0) {
-      return { fee: money(tx.fee_aed), received: money(tx.net_aed || gross - tx.fee_aed), basis: "measured" };
+      const vat = tx.vat_aed != null ? money(Number(tx.vat_aed)) : null;
+      return {
+        fee: money(tx.fee_aed),
+        received: money(tx.net_aed || gross - tx.fee_aed - (vat ?? 0)),
+        basis: "measured",
+        vat,
+      };
     }
     // The file states a total fee only — split it by this order's weight.
     const pGross = Number(payout.gross_amount || 0);
     const pFee = Number(payout.fee_amount || 0);
     if (pFee > 0 && pGross > 0) {
       const share = gross / pGross;
-      return { fee: money(pFee * share), received: money(Number(payout.net_amount) * share), basis: "allocated" };
+      return { fee: money(pFee * share), received: money(Number(payout.net_amount) * share), basis: "allocated", vat: null };
     }
   }
   const { fee } = estimatedFeeFor(order.gateway, gross);
-  return { fee, received: money(gross - fee), basis: "estimated" };
+  return { fee, received: money(gross - fee), basis: "estimated", vat: null };
 }
 
 function orderReason(
@@ -260,6 +324,8 @@ function orderReason(
       return "Cash on delivery — collected by the courier, no gateway payout";
     case "no_payout_file":
       return `${gw} payout file not uploaded yet`;
+    case "awaiting_payout":
+      return `Charged via ${gw} — fee known, payout not issued yet`;
     case "awaiting_bank":
       return `In ${gw} payout file${hit?.payout.source ? ` (${hit.payout.source})` : ""} — bank credit not received or not matched yet`;
     case "in_review":
@@ -283,6 +349,9 @@ function dayReason(counts: LedgerStatusCounts, orders: LedgerOrder[]): string {
   }
   if (counts.awaiting_bank.orders > 0) {
     parts.push(`${counts.awaiting_bank.orders} in a payout file, bank credit not matched yet`);
+  }
+  if (counts.awaiting_payout.orders > 0) {
+    parts.push(`${counts.awaiting_payout.orders} charged, payout not issued yet`);
   }
   if (counts.in_review.orders > 0) {
     parts.push(`${counts.in_review.orders} matched to the bank but need confirming`);
@@ -312,6 +381,7 @@ export function computeSalesLedger({
   links = new Map(),
   recon = [],
   bank = [],
+  pending = [],
   stores = [...GROSS_SALES_STORES],
 }: {
   month: string;
@@ -320,6 +390,7 @@ export function computeSalesLedger({
   links?: Map<string, string>;
   recon?: LedgerReconInput[];
   bank?: LedgerBankInput[];
+  pending?: LedgerPendingChargeInput[];
   stores?: string[];
 }): SalesLedger {
   const { fromDay, toDay, label } = monthBounds(month);
@@ -333,6 +404,8 @@ export function computeSalesLedger({
     if (!prev || r.match_status === "SETTLED" || r.confirmed_by) reconByPayout.set(r.payout_id, r);
   }
   const bankById = new Map(bank.map((b) => [b.id, b]));
+  const pendingByOrder = new Map<string, LedgerPendingChargeInput>();
+  for (const c of pending) for (const k of refCandidates(c.order_ref)) if (!pendingByOrder.has(k)) pendingByOrder.set(k, c);
 
   const dayMap = new Map<string, LedgerDay>();
   for (const day of dubaiDayRange(fromDay, toDay)) {
@@ -397,7 +470,23 @@ export function computeSalesLedger({
     else if (hit) status = "awaiting_bank";
     else status = "no_payout_file";
 
-    const fee = status === "cod" ? { fee: 0, received: 0, basis: "estimated" as FeeBasis } : feeFor(o, gross, hit);
+    // No payout covers it yet, but the gateway already charged it: the live
+    // charge carries the real fee and net, so nothing here is an estimate.
+    const charge = !hit && status === "no_payout_file" ? pendingByOrder.get(o.order_number) ?? null : null;
+    if (charge) status = "awaiting_payout";
+
+    const fee = status === "cod"
+      ? { fee: 0, received: 0, basis: "estimated" as FeeBasis, vat: null }
+      : charge
+        ? { fee: money(charge.fee_aed), received: money(charge.net_aed), basis: "measured" as FeeBasis, vat: null }
+        : feeFor(o, gross, hit);
+    const measuredTx = hit && (hit.tx.fee_aed > 0 || hit.tx.net_aed > 0)
+      ? { ...hit.tx, currency: (hit.payout.original_currency || "AED").toUpperCase() }
+      : charge
+        ? { order_ref: charge.order_ref, is_refund: false, quality: null, gross_aed: charge.gross_aed, fee_aed: charge.fee_aed,
+            net_aed: charge.net_aed, vat_aed: null, gross_original: charge.gross_original, fee_original: charge.fee_original,
+            net_original: charge.net_original, currency: charge.currency.toUpperCase() }
+        : null;
 
     const line: LedgerOrder = {
       uid: o.uid,
@@ -410,6 +499,25 @@ export function computeSalesLedger({
       feeAed: fee.fee,
       receivedAed: status === "received" ? fee.received : 0,
       feeBasis: fee.basis,
+      vatAed: fee.vat,
+      payoutNetAed: status === "cod" ? 0 : fee.received,
+      currency: (o.currency || "AED").toUpperCase(),
+      grossOriginal: o.gross_original != null ? money(Number(o.gross_original)) : null,
+      paymentMethod: o.gateway_raw || o.gateway,
+      financialStatus: o.financial_status || "",
+      payoutLine: measuredTx
+        ? {
+            grossAed: money(Number(measuredTx.gross_aed)),
+            feeAed: money(Number(measuredTx.fee_aed)),
+            vatAed: measuredTx.vat_aed != null ? money(Number(measuredTx.vat_aed)) : null,
+            netAed: money(Number(measuredTx.net_aed)),
+            currency: measuredTx.currency,
+            grossOriginal: measuredTx.gross_original != null ? money(Number(measuredTx.gross_original)) : null,
+            feeOriginal: measuredTx.fee_original != null ? money(Number(measuredTx.fee_original)) : null,
+            netOriginal: measuredTx.net_original != null ? money(Number(measuredTx.net_original)) : null,
+            isRefund: measuredTx.is_refund,
+          }
+        : null,
       status,
       reason:
         orderReason(status, o, hit, bankInfo) +
@@ -427,6 +535,11 @@ export function computeSalesLedger({
             uploadedAt: hit.payout.uploaded_at ?? null,
             netAed: money(Number(hit.payout.net_amount || 0)),
             feeAed: hit.payout.fee_amount != null ? money(Number(hit.payout.fee_amount)) : null,
+            grossAed: hit.payout.gross_amount != null ? money(Number(hit.payout.gross_amount)) : null,
+            lineCount: hit.payout.transactions.length,
+            linesNetAed: money(hit.payout.transactions.reduce((a, t) => a + Number(t.net_aed || 0), 0)),
+            currency: (hit.payout.original_currency || "AED").toUpperCase(),
+            netOriginal: hit.payout.net_original != null ? money(Number(hit.payout.net_original)) : null,
           }
         : null,
       bank: bankInfo,

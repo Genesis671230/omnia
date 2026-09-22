@@ -66,3 +66,25 @@ test("a SAR (KSA) payout keeps its original currency for the bank's wire rate", 
   assert.equal(p.transactions![0].ref, "SA3761");
   assert.equal(p.transactions![0].netOriginal, 1000);
 });
+
+test("pending charges keep only unpaid-out, non-test CHARGE rows with an order", async () => {
+  const { toPendingChargeRows } = await import("@/lib/integrations/shopify-payments");
+  const base = {
+    type: "CHARGE", test: false, transactionDate: "2026-09-22T05:15:09Z",
+    amount: { amount: "891.0", currencyCode: "AED" }, fee: m("24.44"), net: m("866.56"),
+    associatedOrder: { id: "gid://shopify/Order/1", name: "#OS3777" },
+    associatedPayout: { id: null, status: "PENDING" },
+  };
+  const rows = toPendingChargeRows("MAIN", [
+    { id: "a", ...base },
+    { id: "b", ...base, associatedPayout: { id: "gid://shopify/ShopifyPaymentsPayout/9", status: "PAID" } },
+    { id: "c", ...base, test: true },
+    { id: "d", ...base, type: "REFUND" },
+    { id: "e", ...base, associatedOrder: null },
+  ] as ShopifyBalanceTxNode[]);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(
+    { ref: rows[0].order_ref, g: rows[0].gross_aed, f: rows[0].fee_aed, n: rows[0].net_aed, s: rows[0].store },
+    { ref: "OS3777", g: 891, f: 24.44, n: 866.56, s: "MAIN" },
+  );
+});

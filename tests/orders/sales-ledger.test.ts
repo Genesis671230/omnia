@@ -153,3 +153,27 @@ test("prefers the payout from the order's own gateway, and trims bank timestamps
   assert.equal(o.bank?.date, "2026-09-15");
   assert.equal(o.reason, "Received in bank on 2026-09-15");
 });
+
+test("a live gateway charge with no payout yet shows its real fee as awaiting payout", () => {
+  const l = computeSalesLedger({
+    month: "2026-09",
+    orders: [
+      order({ order_number: "OS3695", store_id: "MAIN", gateway: "Shopify Payments", gross_aed: 7987.77 }),
+      order({ order_number: "OS3696", store_id: "MAIN", gateway: "Shopify Payments", gross_aed: 500 }),
+    ],
+    payouts: [],
+    pending: [{
+      order_ref: "OS3695", gateway: "Shopify Payments", gross_aed: 7987.78, fee_aed: 375.02, net_aed: 7612.76,
+      currency: "AED", gross_original: 7987.78, fee_original: 375.02, net_original: 7612.76, transaction_date: "2026-09-10T08:01:00Z",
+    }],
+  });
+  const list = l.days.flatMap((d) => d.orderList);
+  const charged = list.find((o) => o.orderNumber === "OS3695")!;
+  assert.equal(charged.status, "awaiting_payout");
+  assert.equal(charged.feeAed, 375.02);
+  assert.equal(charged.payoutNetAed, 7612.76);
+  assert.equal(charged.feeBasis, "measured");
+  assert.equal(charged.receivedAed, 0); // not in the bank yet
+  assert.equal(charged.payoutLine?.feeAed, 375.02);
+  assert.equal(list.find((o) => o.orderNumber === "OS3696")!.status, "no_payout_file");
+});

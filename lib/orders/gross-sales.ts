@@ -33,7 +33,7 @@ import {
 import { isCountedSale, isReversedOrder } from "./sale-rule";
 
 /** The four storefronts. Order is display order, widest first. */
-export const GROSS_SALES_STORES = ["UAE", "KSA", "WA", "WOO"] as const;
+export const GROSS_SALES_STORES = ["UAE", "KSA", "WA", "WOO", "MAIN"] as const;
 export type StoreId = (typeof GROSS_SALES_STORES)[number];
 
 export const STORE_LABELS: Record<string, string> = {
@@ -41,6 +41,7 @@ export const STORE_LABELS: Record<string, string> = {
   KSA: "Shopify KSA",
   WA: "Shopify WhatsApp",
   WOO: "WooCommerce",
+  MAIN: "Shopify Main",
 };
 
 export const PAID_STATUS = "paid";

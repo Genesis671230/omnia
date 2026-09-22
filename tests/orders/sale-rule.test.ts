@@ -20,7 +20,8 @@ test("matches the founder's reference rule store by store", () => {
   assert.equal(isCountedSale(o("UAE", "partially_paid", "Tabby")), true);
   assert.equal(isCountedSale(o("KSA", "pending", "COD")), true);
   assert.equal(isCountedSale(o("KSA", "pending", "Tabby")), false);
-  assert.equal(isCountedSale(o("KSA", "partially_refunded", "Shopify Payments")), false);
+  // partially refunded is still a sale (SA3910: paid, part refunded later)
+  assert.equal(isCountedSale(o("KSA", "partially_refunded", "Checkout")), true);
   // Shopify WA: pending on any method is a prepaid sale
   assert.equal(isCountedSale(o("WA", "pending", "Stripe")), true);
   assert.equal(isCountedSale(o("WA", "pending", "COD")), true);

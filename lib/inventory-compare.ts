@@ -102,7 +102,7 @@ const MISMATCH_PCT = 0.10;
 // route's storeIds[] column order. Known stores first in a sensible reading
 // order; any unexpected store_id falls to the end alphabetically rather than
 // being dropped.
-const STORE_ORDER = ["UAE", "KSA", "WA", "WOO"];
+const STORE_ORDER = ["UAE", "KSA", "WA", "WOO", "MAIN"];
 export function orderStoreIds(ids: Iterable<string>): string[] {
   const seen = [...new Set(ids)];
   return seen.sort((a, b) => {

@@ -395,7 +395,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CampaignDrawer, CampaignScatter } from "./CampaignDrawer";
 
-const STORES = ["ALL", "WOO", "KSA", "UAE"];
+const STORES = ["ALL", "WOO", "KSA", "UAE", "MAIN","WA"];
 const PLATFORM_LABEL: Record<string, string> = { meta: "Meta", google: "Google", tiktok: "TikTok", snap: "Snapchat" };
 const PLATFORM_COLOR: Record<string, string> = { meta: "#1877F2", google: "#4285F4", tiktok: "#00C4C4", snap: "#E4C000" };
 

@@ -16,7 +16,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const STORES = ["ALL", "WOO", "KSA", "UAE", "WA"];
+const STORES = ["ALL", "WOO", "KSA", "UAE", "MAIN","WA"];
 
 type StoreMargin = {
   store: string; revenue: number; orderCount: number; adSpend: number;

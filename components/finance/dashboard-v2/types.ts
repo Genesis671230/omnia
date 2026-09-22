@@ -68,7 +68,7 @@ export type InsightsPayload = {
 export type MoneyDrawerKind = "revenue" | "cash" | "awaiting" | "cod" | null;
 
 export const STORE_COLOR: Record<string, string> = {
-  WA: "#38bdf8", UAE: "#34d399", KSA: "#fbbf24", WOO: "#a78bfa",
+  WA: "#38bdf8", UAE: "#34d399", KSA: "#fbbf24", WOO: "#a78bfa", MAIN: "#fb923c",
 };
 export const GATEWAY_COLOR: Record<string, string> = {
   Stripe: "#818cf8", Telr: "#34d399", Checkout: "#fbbf24", Tabby: "#4ade80",

@@ -278,3 +278,109 @@ export async function fetchStoreShopifyPayouts(
   }
   return { store: store.code, payouts, paid };
 }
+
+// ─── Charges not yet in a payout ───────────────────────────────────────────
+// A new store (Shopify Main) can go days with zero payouts while every sale is
+// already charged. Each pending balance transaction still carries the exact
+// fee and net for its order, so they are pulled too — newest first, stopping
+// at `sinceIso` — and stored apart from payouts (see gateway_pending_charges).
+
+const PENDING_TX_QUERY = /* GraphQL */ `
+  query ShopifyPaymentsPendingCharges($first: Int!, $after: String) {
+    shopifyPaymentsAccount {
+      balanceTransactions(first: $first, after: $after, reverse: true) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          type
+          test
+          transactionDate
+          amount { amount currencyCode }
+          fee { amount }
+          net { amount }
+          associatedOrder { id name }
+          associatedPayout { id status }
+        }
+      }
+    }
+  }
+`;
+
+export type PendingChargeRow = {
+  id: string;
+  store: string;
+  gateway: "Shopify Payments";
+  order_ref: string;
+  order_gid: string | null;
+  type: string;
+  transaction_date: string;
+  currency: string;
+  gross_original: number;
+  fee_original: number;
+  net_original: number;
+  gross_aed: number;
+  fee_aed: number;
+  net_aed: number;
+  payout_status: string | null;
+};
+
+/** Balance transactions → pending-charge rows. Pure. Keeps only live charges
+ *  for an order that no payout has claimed yet. */
+export function toPendingChargeRows(storeCode: string, txs: ShopifyBalanceTxNode[]): PendingChargeRow[] {
+  const out: PendingChargeRow[] = [];
+  for (const t of txs) {
+    if (t.test || t.associatedPayout?.id) continue; // test, or already in a payout
+    if (t.type.toUpperCase() !== "CHARGE") continue;
+    const ref = t.associatedOrder?.name?.replace(/^#/, "");
+    if (!ref) continue;
+    const currency = t.amount.currencyCode || "AED";
+    const aed = (n: number) => (currency === "AED" ? r2(n) : toAed(n, currency));
+    const g = num(t.amount), f = num(t.fee), n = num(t.net);
+    out.push({
+      id: t.id,
+      store: storeCode,
+      gateway: "Shopify Payments",
+      order_ref: ref,
+      order_gid: t.associatedOrder?.id ?? null,
+      type: t.type,
+      transaction_date: t.transactionDate,
+      currency,
+      gross_original: r2(g),
+      fee_original: r2(f),
+      net_original: r2(n),
+      gross_aed: aed(g),
+      fee_aed: aed(f),
+      net_aed: aed(n),
+      payout_status: t.associatedPayout?.status ?? null,
+    });
+  }
+  return out;
+}
+
+/** Every not-yet-paid-out charge since `sinceIso`. Null = no Shopify Payments account. */
+export async function fetchStorePendingCharges(
+  store: ShopifyStoreConfig,
+  sinceIso: string,
+): Promise<PendingChargeRow[] | null> {
+  const txs: ShopifyBalanceTxNode[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    let json: any;
+    try {
+      json = await graphqlRequest(store, PENDING_TX_QUERY, { first: 100, after });
+    } catch (e) {
+      rethrowAccess(e, store);
+    }
+    const account = json.data?.shopifyPaymentsAccount;
+    if (!account) return null;
+    const conn = account.balanceTransactions;
+    let reachedCutoff = false;
+    for (const t of conn.nodes as ShopifyBalanceTxNode[]) {
+      if (t.transactionDate < sinceIso) { reachedCutoff = true; break; }
+      txs.push(t);
+    }
+    if (reachedCutoff || !conn.pageInfo.hasNextPage) break;
+    after = conn.pageInfo.endCursor;
+  }
+  return toPendingChargeRows(store.code, txs);
+}

@@ -498,7 +498,7 @@ function Ribbon({ buckets, total, active, onPick }: {
 }
 
 const PAGE_SIZE = 50;
-const STORES = ["All", "WA", "UAE", "KSA", "WOO"];
+const STORES = ["All", "WA", "UAE", "KSA", "WOO", "MAIN"];
 const WINDOWS = [{ label: "1d", days: 1 },{ label: "7d", days: 7 },{ label: "30d", days: 30 }, { label: "90d", days: 90 }, { label: "1yr", days: 365 }, { label: "All time", days: 0 }];
 
 export function OrdersLedger({

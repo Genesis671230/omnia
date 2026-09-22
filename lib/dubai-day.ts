@@ -46,10 +46,26 @@ export function dubaiRangeBoundsUtc(
  * so callers have to decide what an order with no date means.
  */
 export function dubaiDayKey(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const ms = new Date(iso).getTime();
-  if (Number.isNaN(ms)) return null;
+  const ms = utcMs(iso);
+  if (ms === null) return null;
   return new Date(ms + offsetMs()).toISOString().slice(0, 10);
+}
+
+/**
+ * Epoch ms of a stored UTC timestamp. orders.order_date is a `timestamp`
+ * without time zone, so Supabase returns it with no offset
+ * ("2026-08-31T22:19:31"), and `new Date()` would read that as the *host's*
+ * local time. On a machine set to Dubai time that skips the +4h shift, so
+ * every order placed between midnight and 04:00 Dubai time landed on the
+ * previous day. An offset-less value is therefore always read as UTC.
+ */
+export function utcMs(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const s = String(iso).trim();
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(s);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const ms = new Date(hasZone || isDateOnly ? s : `${s.replace(" ", "T")}Z`).getTime();
+  return Number.isNaN(ms) ? null : ms;
 }
 
 /** Today's Dubai calendar day. `nowMs` is injectable so tests are not clock-dependent. */

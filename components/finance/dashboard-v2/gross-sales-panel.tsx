@@ -14,12 +14,13 @@
    the excluded orders stated underneath rather than quietly dropped. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight, FileX, ChevronRight as Go } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight, FileX, ChevronRight as Go, Download } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { STORE_COLOR, aed, compact, shortDate } from "./types";
-import { DaySalesDrawer, STATUS_META, type LedgerDay, type LedgerStatus } from "./day-sales-drawer";
+import { DaySalesDrawer, STATUS_META, downloadSalesXlsx, type LedgerDay, type LedgerStatus } from "./day-sales-drawer";
+import { toast } from "sonner";
 
 type StoreAmount = { store: string; label: string; grossAed: number; orders: number };
 type Rollup = {
@@ -109,6 +110,7 @@ export function GrossSalesPanel() {
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const [exportingMonth, setExportingMonth] = useState(false);
   const [data, setData] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -315,6 +317,19 @@ export function GrossSalesPanel() {
         <h3>{monthLabel(month)}</h3>
         {ledgerLoading && <Loader2 size={13} className="dv2-spin" />}
         <span>click a day to see its orders, fees and bank credits</span>
+        <button
+          type="button"
+          className="gs-export"
+          disabled={exportingMonth || !ledger || ledger.totals.orders === 0}
+          onClick={async () => {
+            setExportingMonth(true);
+            try { await downloadSalesXlsx({ month }); }
+            catch (e) { toast.error((e as Error).message); }
+            finally { setExportingMonth(false); }
+          }}
+        >
+          {exportingMonth ? <Loader2 size={12} className="dv2-spin" /> : <Download size={12} />} Export month .xlsx
+        </button>
       </div>
 
       {ledgerError && !ledger && (
@@ -619,6 +634,9 @@ export const GROSS_SALES_CSS = `
 .gs-month-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; }
 .gs-month-head h3 { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 16px; color: #f4f7ff; }
 .gs-month-head span { font-size: 11.5px; color: #8ba4cc; }
+.gs-export { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #e8eefc; font-size: 12px; font-weight: 600; cursor: pointer; }
+.gs-export:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.gs-export:disabled { opacity: .45; cursor: default; }
 
 .gs-msum { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); transition: opacity .15s; }
 @media (min-width: 820px) { .gs-msum { grid-template-columns: repeat(4, 1fr); } }

@@ -4,6 +4,7 @@ import { parsePayoutFile, type ParsedPayout } from "@/lib/parsers/payouts";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { FilesRepository } from "@/lib/repositories/files.repository";
 import { supabase } from "@/lib/supabase";
+import { assignShopifyStores } from "@/lib/finance/shopify-payout-store";
 
 export const maxDuration = 60;
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const file = form.get("file");
   const providerRaw = String(form.get("provider") || "");
-  const provider = (["Stripe", "Telr", "Checkout", "Tabby", "Tamara"].includes(providerRaw)
+  const provider = (["Stripe", "Telr", "Checkout", "Tabby", "Tamara", "Shopify Payments"].includes(providerRaw)
     ? providerRaw
     : undefined) as Gateway | undefined;
 
@@ -28,6 +29,9 @@ export async function POST(request: Request) {
   let payouts: ParsedPayout[];
   try {
     payouts = parsePayoutFile(buf, file.name, provider);
+    // A Shopify Payments export doesn't say which store it's from; the order
+    // numbers in it do. Optional `store` form field overrides.
+    payouts = await assignShopifyStores(payouts, String(form.get("store") || "").toUpperCase() || null);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 422 });
   }

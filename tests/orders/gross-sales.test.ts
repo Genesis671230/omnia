@@ -327,19 +327,21 @@ test("the fetch window reaches back past every comparison window", () => {
 
 /* ---------- per-store split ---------- */
 
-test("all four stores are split out and sum to the total", () => {
+test("all five stores (incl. Shopify Main) are split out and sum to the total", () => {
   const orders = [
     order({ order_date: "2026-03-15T08:00:00Z", store_id: "UAE", gross_aed: 100 }),
     order({ order_date: "2026-03-15T08:00:00Z", store_id: "KSA", gross_aed: 200 }),
     order({ order_date: "2026-03-15T08:00:00Z", store_id: "WA", gross_aed: 300 }),
     order({ order_date: "2026-03-15T08:00:00Z", store_id: "WOO", gross_aed: 400 }),
+    order({ order_date: "2026-03-15T08:00:00Z", store_id: "MAIN", gross_aed: 50 }),
   ];
   const rep = computeGrossSales(orders, ASOF);
 
-  assert.equal(rep.today.grossAed, 1000);
+  assert.equal(rep.today.grossAed, 1050);
   const sum = rep.today.byStore.reduce((a, s) => a + s.grossAed, 0);
   assert.equal(sum, rep.today.grossAed);
-  assert.equal(rep.today.byStore.length, 4);
+  assert.equal(rep.today.byStore.length, 5);
+  assert.equal(rep.today.byStore.find((x) => x.store === "MAIN")?.label, "Shopify Main");
   // Sorted biggest first.
   assert.equal(rep.today.byStore[0].store, "WOO");
   assert.equal(rep.today.byStore[0].label, "WooCommerce");
@@ -350,7 +352,7 @@ test("a store with no sales still appears, at zero, so the rail never reflows", 
     [order({ order_date: "2026-03-15T08:00:00Z", store_id: "UAE", gross_aed: 100 })],
     ASOF,
   );
-  assert.equal(rep.today.byStore.length, 4);
+  assert.equal(rep.today.byStore.length, 5);
   const ksa = rep.today.byStore.find((s) => s.store === "KSA");
   assert.equal(ksa?.grossAed, 0);
   assert.equal(ksa?.orders, 0);

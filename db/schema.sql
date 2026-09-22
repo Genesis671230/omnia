@@ -840,3 +840,39 @@ create table if not exists payout_email_ingests (
   created_at      timestamptz default now()
 );
 create index if not exists payout_email_ingests_status_idx on payout_email_ingests (status, created_at desc);
+
+-- Shopify Main (omniastores.com) — the WooCommerce storefront migrated to
+-- Shopify in Sept 2026 (last Woo order 2026-09-17). orders.store_id has a
+-- foreign key to stores, so without this row every MAIN order upsert failed
+-- with orders_store_id_fkey and the store synced zero orders.
+insert into stores (id, store_id, platform, domain, currency, timezone)
+select gen_random_uuid(), 'MAIN', 'shopify', 'omnia-store-main.myshopify.com', 'AED', 'Asia/Dubai'
+where not exists (select 1 from stores where store_id = 'MAIN');
+
+-- Gateway charges not yet paid out — Shopify Payments balance transactions
+-- whose associatedPayout is still PENDING. Each carries the real fee and net
+-- for one order, so the sales ledger shows measured fees the moment a sale is
+-- charged instead of waiting for the payout. Deliberately NOT in `payouts`:
+-- the reconciler must never try to match a not-yet-issued payout to a bank
+-- credit. Rows are replaced per store on every sync; a charge leaves this
+-- table once Shopify groups it into a payout (it then lives in payout_transactions).
+create table if not exists gateway_pending_charges (
+  id               text primary key,          -- ShopifyPaymentsBalanceTransaction gid
+  store            text not null,             -- MAIN | UAE | KSA
+  gateway          text not null,             -- "Shopify Payments"
+  order_ref        text not null,             -- order name without '#', e.g. OS3777
+  order_gid        text,
+  type             text not null,             -- CHARGE | REFUND | ...
+  transaction_date timestamptz,
+  currency         text not null,
+  gross_original   numeric not null,
+  fee_original     numeric not null,
+  net_original     numeric not null,
+  gross_aed        numeric not null,
+  fee_aed          numeric not null,
+  net_aed          numeric not null,
+  payout_status    text,
+  synced_at        timestamptz default now()
+);
+create index if not exists gateway_pending_charges_order_idx on gateway_pending_charges (order_ref);
+create index if not exists gateway_pending_charges_store_idx on gateway_pending_charges (store);

@@ -16,7 +16,7 @@ import { stripeConfigured } from "@/lib/integrations/stripe";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
 import { buildFinancialReport } from "@/lib/reports/cfo-digest";
 
-const STORES = ["ALL", "WA", "UAE", "KSA", "WOO"];
+const STORES = ["ALL", "WA", "UAE", "KSA", "WOO", "MAIN"];
 const cancelled = new Set(["voided", "refunded", "cancelled"]);
 
 function windowFilter(days: number, store: string) {

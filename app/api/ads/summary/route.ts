@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 
-const STORES = ["WOO", "KSA", "UAE"];
+const STORES = ["WOO", "KSA", "UAE", "MAIN","WA"];
 const cancelled = new Set(["voided", "refunded", "cancelled"]);
 
 // GET /api/ads/summary?days=30&store=ALL — per-store ad spend/conversions

@@ -4,7 +4,7 @@ import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { AdInsightsRepository } from "@/lib/repositories/ad-insights.repository";
 import { computeStoreMargins } from "@/lib/contribution-margin";
 
-const STORES = ["WOO", "KSA", "UAE", "WA"];
+const STORES = ["WOO", "KSA", "UAE", "MAIN","WA"];
 
 // GET /api/finance/margin?days=30&store=ALL — per-store contribution margin:
 // revenue − ad spend − gateway fees (measured where the payout parser gave a

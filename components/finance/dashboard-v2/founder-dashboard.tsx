@@ -220,7 +220,7 @@ export function FounderDashboard({ version }: { version: number }) {
     return <div className="dv2-loading"><style>{DASH_CSS}</style><Loader2 size={18} className="dv2-spin" /> Building your view…</div>;
   }
 
-  const trendStores = ["WA", "UAE", "KSA", "WOO"].filter((s) =>
+  const trendStores = ["WA", "UAE", "KSA", "WOO", "MAIN"].filter((s) =>
     data.trend.some((t) => (t.byStore[s] || 0) > 0),
   );
 

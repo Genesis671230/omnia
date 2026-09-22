@@ -9,9 +9,15 @@ import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { persistStripeApiSettlements, type PaidStripePayout } from "@/lib/reconciliation/stripe-settlements";
 import type { ParsedPayout } from "@/lib/parsers/payouts";
 import { getShopifyStores } from "@/lib/integrations/shopify";
-import { fetchStoreShopifyPayouts } from "@/lib/integrations/shopify-payments";
+import { fetchStorePendingCharges, fetchStoreShopifyPayouts } from "@/lib/integrations/shopify-payments";
+import { PendingChargesRepository } from "@/lib/repositories/pending-charges.repository";
 
-export type GatewaySyncResult = { provider: string; fetched: number; saved: number; settled?: number; error?: string };
+export type GatewaySyncResult = {
+  provider: string; fetched: number; saved: number; settled?: number;
+  /** Charges the gateway made that no payout covers yet (Shopify Payments). */
+  pending?: number;
+  error?: string;
+};
 
 export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]> {
   const toDate = new Date().toISOString().slice(0, 10);
@@ -93,21 +99,41 @@ export async function syncGatewayPayouts(days = 30): Promise<GatewaySyncResult[]
     }
   }
 
-  // Shopify Payments — one account per Shopify store (UAE in AED, KSA in SAR).
-  // Each store is its own result row so a missing API scope on one store is
-  // reported by name instead of hiding the other store's payouts.
-  const sinceIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  results.push(...(await syncShopifyPayments(days)));
+
+  return results;
+}
+
+/** Charges stay pending for a few days before Shopify issues the payout; look
+ *  back far enough that a whole month's pending fees are always present. */
+const PENDING_LOOKBACK_DAYS = 45;
+
+/**
+ * Shopify Payments, every store: issued payouts (with per-order fee/net) go
+ * into `payouts` for the reconciler; charges not yet in a payout go into
+ * gateway_pending_charges so the sales ledger shows their real fee at once.
+ * One result row per store, so a missing API scope on one store is reported
+ * by name without hiding the others. `saved` counts payouts only — that is
+ * what tells the caller the reconciler has new work.
+ */
+export async function syncShopifyPayments(days = 30): Promise<GatewaySyncResult[]> {
+  const results: GatewaySyncResult[] = [];
+  const payoutSince = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const pendingSince = new Date(Date.now() - Math.max(days, PENDING_LOOKBACK_DAYS) * 24 * 60 * 60 * 1000).toISOString();
   for (const store of getShopifyStores()) {
     const provider = `Shopify Payments ${store.code}`;
     try {
-      const r = await fetchStoreShopifyPayouts(store, sinceIso);
+      const r = await fetchStoreShopifyPayouts(store, payoutSince);
       if (r.skipped === "no_account") continue; // store doesn't use Shopify Payments
       const saved = await PayoutsRepository.upsertPayouts(r.payouts);
-      results.push({ provider, fetched: r.payouts.length, saved });
+      // An order a payout now covers is no longer pending.
+      await PendingChargesRepository.removeOrderRefs(store.code, r.payouts.flatMap((p) => p.orderRefs));
+      const pending = (await fetchStorePendingCharges(store, pendingSince)) ?? [];
+      const pendingSaved = await PendingChargesRepository.replaceForStore(store.code, pendingSince, pending);
+      results.push({ provider, fetched: r.payouts.length, saved, pending: pendingSaved });
     } catch (e) {
       results.push({ provider, fetched: 0, saved: 0, error: (e as Error).message });
     }
   }
-
   return results;
 }

@@ -42,7 +42,10 @@ export async function syncAllStores(windowDays = DEFAULT_WINDOW_DAYS): Promise<S
     );
   }
 
-  if (wooConfigured()) {
+  // omniastores.com moved from WooCommerce to Shopify Main in Sept 2026 (last
+  // Woo order 2026-09-17); the Woo REST API now answers 404 from Shopify's
+  // theme. WOO_ORDER_SYNC=off stops polling it. Historical WOO orders stay.
+  if (wooConfigured() && (process.env.WOO_ORDER_SYNC || "").toLowerCase() !== "off") {
     jobs.push(
       (async () => {
         try {

@@ -23,7 +23,7 @@ import { customerIdentityKey } from "@/lib/customer-identity";
 //     — it's a budget-accountability context number, same caveat as the Meta
 //     ROAS split (docs/superpowers/specs/2026-07-17-meta-ads-correctness-design.md).
 
-const AD_STORES = ["WOO", "KSA", "UAE"]; // WA has no ad spend tracked
+const AD_STORES = ["WOO", "KSA", "UAE", "MAIN","WA"]; // WA has no ad spend tracked
 
 const monthKey = (iso: string) => iso.slice(0, 7); // "YYYY-MM"
 

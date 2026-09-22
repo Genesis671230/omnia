@@ -20,7 +20,7 @@ type FileMeta = {
   uploaded_at: string;
 };
 
-const PROVIDERS = ["Telr", "Tamara", "Tabby", "Stripe", "Checkout"];
+const PROVIDERS = ["Telr", "Tamara", "Tabby", "Stripe", "Checkout", "Shopify Payments"];
 
 const fmtBytes = (n: number | null) => {
   if (!n) return "—";

@@ -8,6 +8,7 @@ import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { dubaiRangeBoundsUtc } from "@/lib/dubai-day";
 import { SyncRunsRepository } from "@/lib/repositories/sync-runs.repository";
+import { PendingChargesRepository } from "@/lib/repositories/pending-charges.repository";
 import {
   computeSalesLedger,
   ledgerMonthBounds,
@@ -27,7 +28,7 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
   const { fromDay, toDay } = ledgerMonthBounds(month);
   const { fromUtc, toUtc } = dubaiRangeBoundsUtc(fromDay, toDay);
 
-  const [orderRows, payouts, recon, linkRows, lastSync] = await Promise.all([
+  const [orderRows, payouts, recon, linkRows, lastSync, pending] = await Promise.all([
     OrdersRepository.listInWindow({ from: fromUtc, to: toUtc }),
     PayoutsRepository.listWithRefs(),
     selectAllPages<LedgerReconInput>(
@@ -44,6 +45,8 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
       "payout_ref_links select",
     ),
     SyncRunsRepository.getLatest().catch(() => null),
+    // A charge can land a few days after the order; look back one extra week.
+    PendingChargesRepository.listSince(new Date(Date.parse(fromUtc) - 7 * 86_400_000).toISOString()).catch(() => []),
   ]);
 
   // `to` is inclusive (lte); the pure layer drops the boundary instant by day key.
@@ -58,6 +61,9 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
       financial_status: r.financial_status,
       payout_id: r.payout_id ?? null,
       payout_status: r.payout_status ?? null,
+      currency: r.currency ?? null,
+      gross_original: r.gross_original ?? null,
+      gateway_raw: r.gateway_raw ?? null,
     }));
 
   const bankIds = [...new Set(recon.map((r) => r.bank_line_id))];
@@ -75,6 +81,7 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
     month,
     orders,
     payouts,
+    pending,
     links: new Map(linkRows.map((l) => [`${l.payout_id}|${l.order_ref}`, l.order_number])),
     recon,
     bank,

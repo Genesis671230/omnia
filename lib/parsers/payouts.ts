@@ -862,6 +862,104 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
   throw new Error("Tabby settlement report: table (Order Number / Transferred amount) not found.");
 }
 
+// ── Shopify Payments: admin "payment transactions" export (.csv) ─────────────
+// Settings → Payments → View payouts → Export transactions. One row per
+// balance transaction (charge / refund / adjustment / dispute …):
+//   Transaction Date,Type,Order,Card Brand,…,Payout Status,Payout Date,
+//   Payout ID,Available On,Amount,Fee,Net,Checkout,…,Currency,…
+// Amount/Fee/Net are in the settlement Currency — the same numbers the
+// Payouts API returns, and "Payout ID" is the API's legacyResourceId, so an
+// uploaded file and a later API pull land on the same payout row. The export
+// never names the store; the upload route assigns it (assignShopifyStores).
+export const SHOPIFY_UNKNOWN_STORE = "UNKNOWN";
+
+export function isShopifyPaymentsExport(head: string): boolean {
+  const h = head.toUpperCase();
+  return h.includes("PAYOUT ID") && h.includes("CARD BRAND") && h.includes("AVAILABLE ON");
+}
+
+export function shopifyPayoutKey(store: string, payoutId: string): string {
+  return `SHOPIFY-${store}-${payoutId}`;
+}
+
+export function parseShopifyPaymentsCsv(text: string, filename: string, store = SHOPIFY_UNKNOWN_STORE): ParsedPayout[] {
+  const records = toRecords(parseCsv(text));
+  if (records.length === 0) throw new Error("Empty Shopify Payments export");
+  const cols = Object.keys(records[0]);
+  const col = (name: string) => cols.find((c) => c.trim().toLowerCase() === name);
+  const cPayout = col("payout id"), cType = col("type"), cOrder = col("order");
+  const cAmount = col("amount"), cFee = col("fee"), cNet = col("net"), cCur = col("currency");
+  const cStatus = col("payout status"), cPayDate = col("payout date");
+  if (!cPayout || !cNet || !cAmount) {
+    throw new Error("Shopify Payments export is missing Payout ID / Amount / Net columns.");
+  }
+  const num = (v: string | undefined) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
+
+  type Acc = { net: number; gross: number; fees: number; refs: string[]; currency: string; status: string;
+    payDate: string; charges: number; refunds: number; other: number; rows: { ref: string; g: number; f: number; n: number; refund: boolean }[] };
+  const byPayout = new Map<string, Acc>();
+  let unpaid = 0;
+  for (const r of records) {
+    const pid = String(r[cPayout] || "").trim();
+    if (!pid) { unpaid++; continue; } // not yet assigned to a payout — nothing reached the bank
+    const p = byPayout.get(pid) ?? { net: 0, gross: 0, fees: 0, refs: [], currency: "", status: "", payDate: "", charges: 0, refunds: 0, other: 0, rows: [] };
+    const g = num(r[cAmount]), f = num(r[cFee!]), n = num(r[cNet]);
+    p.net += n; p.gross += g; p.fees += f;
+    p.currency ||= String((cCur && r[cCur]) || "AED").trim().toUpperCase();
+    p.status ||= String((cStatus && r[cStatus]) || "").trim();
+    p.payDate ||= String((cPayDate && r[cPayDate]) || "").trim();
+    const type = String((cType && r[cType]) || "").toLowerCase();
+    const refund = type.includes("refund");
+    if (refund) p.refunds++; else if (type === "charge") p.charges++; else p.other++;
+    const ref = String((cOrder && r[cOrder]) || "").trim().replace(/^#/, "");
+    if (ref) {
+      if (!p.refs.includes(ref)) p.refs.push(ref);
+      p.rows.push({ ref, g, f, n, refund });
+    }
+    byPayout.set(pid, p);
+  }
+  if (byPayout.size === 0) {
+    throw new Error(`Shopify Payments export has no rows with a Payout ID (${unpaid} not yet paid out).`);
+  }
+
+  return [...byPayout.entries()].map(([pid, p]) => {
+    const aed = (v: number) => (p.currency === "AED" ? +v.toFixed(2) : toAed(v, p.currency));
+    return {
+      id: shopifyPayoutKey(store, pid),
+      statementNo: shopifyPayoutKey(store, pid),
+      provider: "Shopify Payments" as Gateway,
+      net: aed(p.net),
+      gross: aed(p.gross),
+      fees: aed(Math.abs(p.fees)),
+      orderRefs: p.refs,
+      store: store === SHOPIFY_UNKNOWN_STORE ? undefined : `Shopify ${store}`,
+      source: filename,
+      notes:
+        `Shopify Payments payout ${pid}${p.payDate ? ` · paid out ${p.payDate}` : ""}${p.status ? ` · ${p.status}` : ""} · ` +
+        `${p.charges} charges, ${p.refunds} refunds${p.other ? `, ${p.other} other` : ""}` +
+        (unpaid ? ` · ${unpaid} rows not yet in a payout were skipped` : ""),
+      transactions: p.rows.map((t) => ({
+        ref: t.ref,
+        isRefund: t.refund,
+        quality: (t.refund ? "refund" : "clean") as StripeQuality,
+        grossShare: aed(t.g),
+        feeShare: aed(t.f),
+        netShare: aed(t.n),
+        grossOriginal: +t.g.toFixed(2),
+        feeOriginal: +t.f.toFixed(2),
+        netOriginal: +t.n.toFixed(2),
+      })),
+      ...(p.currency !== "AED" ? { originalCurrency: p.currency, netOriginal: +p.net.toFixed(2) } : {}),
+    };
+  });
+}
+
+/** Re-key Shopify payouts parsed without a store onto the store they belong to. */
+export function withShopifyStore(p: ParsedPayout, store: string): ParsedPayout {
+  const pid = p.id.replace(/^SHOPIFY-[^-]+-/, "");
+  return { ...p, id: shopifyPayoutKey(store, pid), statementNo: shopifyPayoutKey(store, pid), store: `Shopify ${store}` };
+}
+
 // ── universal entry point: detect the format, then parse ─────────────────────
 // Accepts .xls / .xlsx / .csv from any of the five providers; the optional
 // hint only matters when detection is ambiguous (generic CSVs).
@@ -873,6 +971,12 @@ export function parsePayoutFile(
   const buffer = buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
   const name = filename.toLowerCase();
   const isSheet = /\.(xls|xlsx)$/.test(name);
+
+  // First: its header shares words with Stripe ("Payout ID") and its rows can
+  // carry any card/wallet name, so the content sniffs below could misfire.
+  if (!isSheet && isShopifyPaymentsExport(buffer.toString("utf8", 0, 2000))) {
+    return parseShopifyPaymentsCsv(buffer.toString("utf8"), filename);
+  }
 
   let sniff = "";
   try {

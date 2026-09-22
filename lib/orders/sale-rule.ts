@@ -6,7 +6,7 @@
 //   every store      total > 0, and not refunded / cancelled / voided
 //   WooCommerce      anything the store hasn't marked pending or failed
 //                    (processing / completed are stored as "paid"; on-hold counts)
-//   Shopify UAE/KSA  paid or partially paid, or pending Cash on Delivery
+//   Shopify UAE/KSA  paid, partially paid or partially refunded, or pending COD
 //   Shopify WA       paid or partially paid, or pending on any payment method —
 //                    staff take the money on a Stripe / Tabby / Tamara /
 //                    Checkout link (or COD) BEFORE creating the order, so
@@ -17,7 +17,10 @@
 // They are still COD in every view downstream: the ledger shows them as
 // "cash on delivery", never as money received from a gateway.
 //
-// partially_refunded is left out, as the reference leaves it out.
+// partially_refunded counts: the customer paid and kept the order, part of the
+// money went back later. Shopify rewrites a paid order's status when that
+// happens, so leaving it out made real sales (e.g. SA3910) vanish from the
+// day they were placed. The refund belongs to the day it was issued.
 
 export type SaleRuleOrder = {
   store_id: string;
@@ -27,8 +30,8 @@ export type SaleRuleOrder = {
 };
 
 const REVERSED = new Set(["refunded", "cancelled", "voided"]);
-const SHOPIFY_PAID = new Set(["paid", "partially_paid"]);
-const WOO_COUNTED = new Set(["paid", "on-hold", "processing", "completed"]);
+const SHOPIFY_PAID = new Set(["paid", "partially_paid", "partially_refunded"]);
+const WOO_COUNTED = new Set(["paid", "on-hold", "processing", "completed", "partially_refunded"]);
 
 const isCod = (g: string | null | undefined) => (g || "").trim().toUpperCase() === "COD";
 

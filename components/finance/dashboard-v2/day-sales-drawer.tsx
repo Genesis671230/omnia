@@ -10,11 +10,13 @@
    invoice/ship modals before. */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight } from "lucide-react";
+import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight, Download, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import { STORE_COLOR, GATEWAY_COLOR, aed2 } from "./types";
 
-export type LedgerStatus = "received" | "in_review" | "awaiting_bank" | "no_payout_file" | "cod";
+export type LedgerStatus = "received" | "in_review" | "awaiting_bank" | "awaiting_payout" | "no_payout_file" | "cod";
 
 export type LedgerOrder = {
   uid: string;
@@ -29,8 +31,18 @@ export type LedgerOrder = {
   feeBasis: "measured" | "allocated" | "estimated";
   status: LedgerStatus;
   reason: string;
+  vatAed: number | null;
+  payoutNetAed: number;
+  currency: string;
+  grossOriginal: number | null;
+  paymentMethod: string;
+  financialStatus: string;
+  payoutLine: {
+    grossAed: number; feeAed: number; vatAed: number | null; netAed: number;
+    currency: string; grossOriginal: number | null; feeOriginal: number | null; netOriginal: number | null; isRefund: boolean;
+  } | null;
   partial: { gateway: string; grossAed: number; payoutId: string } | null;
-  payout: { id: string; gateway: string; source: string | null; uploadedAt: string | null; netAed: number; feeAed: number | null } | null;
+  payout: { id: string; gateway: string; source: string | null; uploadedAt: string | null; netAed: number; feeAed: number | null; grossAed: number | null; lineCount: number; linesNetAed: number; currency: string; netOriginal: number | null } | null;
   bank: { id: string; date: string | null; amountAed: number; reference: string; state: string; confirmed: boolean } | null;
 };
 
@@ -52,6 +64,7 @@ export const STATUS_META: Record<LedgerStatus, { label: string; tone: string; ic
   received: { label: "Received in bank", tone: "ok", icon: BadgeCheck, color: "#34d399" },
   in_review: { label: "Needs confirming", tone: "warn", icon: AlertTriangle, color: "#fbbf24" },
   awaiting_bank: { label: "Awaiting bank credit", tone: "info", icon: Clock, color: "#60a5fa" },
+  awaiting_payout: { label: "Charged · payout pending", tone: "info", icon: Clock, color: "#22d3ee" },
   no_payout_file: { label: "Payout file not uploaded", tone: "bad", icon: FileX, color: "#fb7185" },
   cod: { label: "Cash on delivery", tone: "muted", icon: Wallet, color: "#c084fc" },
 };
@@ -63,8 +76,40 @@ const longDate = (day: string) =>
 const time = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dubai" });
 
+/** Download the sales ledger as .xlsx — one day, or the whole month. */
+export async function downloadSalesXlsx(q: { day?: string; month?: string }): Promise<void> {
+  const qs = new URLSearchParams(q.day ? { day: q.day } : { month: q.month ?? "" });
+  const res = await fetch(`/api/orders/sales-ledger/export?${qs}`, { cache: "no-store" });
+  const ct = res.headers.get("content-type") || "";
+  if (!res.ok || !ct.includes("spreadsheetml")) {
+    const msg = ct.includes("json") ? (await res.json()).error : `HTTP ${res.status}`;
+    throw new Error(`Export failed: ${msg || "session may have expired"}`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+?)"/)?.[1] ?? "omnia-sales.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClose: () => void }) {
+  const [exporting, setExporting] = useState(false);
   if (typeof document === "undefined") return null;
+
+  const exportDay = async () => {
+    if (!day) return;
+    setExporting(true);
+    try {
+      await downloadSalesXlsx({ day: day.day });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -88,7 +133,12 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
                 <h2>{longDate(day.day)}</h2>
                 <p>{day.orders} {day.orders === 1 ? "order" : "orders"} · {day.reason}</p>
               </div>
-              <button className="dsd-x" onClick={onClose} aria-label="Close"><X size={16} /></button>
+              <div className="dsd-actions">
+                <button className="dsd-export" onClick={exportDay} disabled={exporting || day.orders === 0}>
+                  {exporting ? <Loader2 size={13} className="dsd-spin" /> : <Download size={13} />} Export .xlsx
+                </button>
+                <button className="dsd-x" onClick={onClose} aria-label="Close"><X size={16} /></button>
+              </div>
             </header>
 
             <div className="dsd-sum">
@@ -130,14 +180,18 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
                         {o.status === "cod" ? (
                           <span className="dsd-v">No gateway fee</span>
                         ) : (
-                          <span className="dsd-v">Fee {aed2(o.feeAed)} <em>{BASIS_LABEL[o.feeBasis]}</em></span>
+                          <span className="dsd-v">
+                            Fee {aed2(o.feeAed)}{o.vatAed ? ` + VAT ${aed2(o.vatAed)}` : ""} <em>{o.status === "awaiting_payout" ? "live from gateway" : BASIS_LABEL[o.feeBasis]}</em>
+                          </span>
                         )}
                       </div>
                       <ArrowRight size={12} className="dsd-arrow" />
                       <div className="dsd-step">
                         <span className="dsd-label"><FileText size={11} />Payout file</span>
                         {o.payout ? (
-                          <span className="dsd-v" title={o.payout.id}>{o.payout.source || o.payout.id}</span>
+                          <span className="dsd-v" title={`${o.payout.id} · ${o.payout.source ?? ""}`}>
+                            Net {aed2(o.payoutNetAed)} <em>{o.payout.source || o.payout.id}</em>
+                          </span>
                         ) : (
                           <span className="dsd-v dsd-miss">
                             {o.status === "cod" ? "n/a" : "Not uploaded yet"}
@@ -187,6 +241,12 @@ const DRAWER_CSS = `
   .dsd-drawer h2 { font-family: Georgia, serif; font-weight: 500; font-size: 22px; margin: 6px 0 4px; }
   .dsd-drawer header p { margin: 0; font-size: 12.5px; color: #6F6457; line-height: 1.5; }
   .dsd-x { border: 1px solid #EAE3D6; background: #fff; border-radius: 10px; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; color: #1F1B16; flex: none; }
+  .dsd-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+  .dsd-export { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid #EAE3D6; background: #fff; border-radius: 10px; font-size: 12.5px; font-weight: 600; color: #6d28d9; cursor: pointer; }
+  .dsd-export:hover:not(:disabled) { border-color: #c4b5fd; }
+  .dsd-export:disabled { opacity: .5; cursor: default; }
+  .dsd-spin { animation: dsdspin 1s linear infinite; }
+  @keyframes dsdspin { to { transform: rotate(360deg); } }
   .dsd-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
   .dsd-sum div { background: #fff; border: 1px solid #EAE3D6; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
   .dsd-sum span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: #8A8175; font-weight: 600; }
@@ -221,7 +281,13 @@ const DRAWER_CSS = `
   .dsd-more:hover { text-decoration: underline; }
   @media (max-width: 620px) {
     .dsd-drawer { padding: 18px 16px 32px; }
-    .dsd-sum { grid-template-columns: repeat(2, 1fr); }
+    .dsd-actions { display: flex; gap: 8px; align-items: center; flex: none; }
+  .dsd-export { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid #EAE3D6; background: #fff; border-radius: 10px; font-size: 12.5px; font-weight: 600; color: #6d28d9; cursor: pointer; }
+  .dsd-export:hover:not(:disabled) { border-color: #c4b5fd; }
+  .dsd-export:disabled { opacity: .5; cursor: default; }
+  .dsd-spin { animation: dsdspin 1s linear infinite; }
+  @keyframes dsdspin { to { transform: rotate(360deg); } }
+  .dsd-sum { grid-template-columns: repeat(2, 1fr); }
     .dsd-chain { grid-template-columns: 1fr; }
     .dsd-arrow { display: none; }
     .dsd-time { display: none; }
