@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { createBooksExpense, type ZohoBooksExpense } from "@/lib/integrations/zoho-expenses";
 import { createBankTransaction, type ZohoPosting } from "@/lib/integrations/zoho-banking";
-import { ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 import type { GroupType, TaxTreatment, UAEEmirate } from "@/lib/reconciliation/group-classifier";
 
 export const maxDuration = 120;
@@ -100,11 +100,17 @@ export async function POST(request: Request) {
 
   const token = dryRun ? "" : await getAccessToken();
   const results: Result[] = [];
+  // Double-entry guard: the last Refresh found these booked in Zoho already.
+  const inZoho = await BankLineZohoStatusRepository.inZohoIds(groups.map((g) => g.mainBankLineId));
 
   for (const group of groups) {
     try {
       const err = validate(group);
       if (err) { results.push({ groupKey: group.groupKey, status: "failed", error: err }); continue; }
+      if (inZoho.has(group.mainBankLineId)) {
+        results.push({ groupKey: group.groupKey, status: "failed", error: "Already in Zoho — not posted again. Refresh if it was deleted in Zoho." });
+        continue;
+      }
 
       // Idempotent per main line. Fee lines have their own posting rows written by /bank-charges/post.
       const existing = await ZohoBankTxnRepository.getPosting(group.mainBankLineId);

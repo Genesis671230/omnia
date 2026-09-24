@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { defaultBankLineNote } from "@/lib/reconciliation/bank-line-description";
+import type { LineZohoState } from "@/lib/reconciliation/bank-line-zoho-status";
+import { PostingStatusBadge, type PostingStatus } from "./posting-status-badge";
 import { BankLineNoteEditor } from "./bank-line-note";
 import { gatewayColor } from "./colors";
 import { aed2 } from "./types";
@@ -23,7 +25,7 @@ export type BankTxnLine = {
   payout?: { id: string; gateway: string; orders: string[] } | null;
 };
 
-export type BankTxnPostingState = { status: string; zohoTransactionId: string | null; error: string; postedAt: string } | undefined;
+export type BankTxnPostingState = LineZohoState | undefined;
 
 export function BankTxnRow({
   line, posting, selected, onToggleSelect, onDescriptionSaved,
@@ -39,12 +41,6 @@ export function BankTxnRow({
     direction: line.direction, amount: line.amount, date: line.date, narration: line.description,
     reference: line.reference, entity: line.gatewayGuess, kind: line.kind, payout: line.payout ?? null,
   });
-
-  const statusTone =
-    posting?.status === "posted" ? "bg-[#F0F5EF] text-[#4B7A54]" :
-    posting?.status === "failed" ? "bg-[#F9ECE7] text-[#A6472F]" :
-    "bg-[#F3EFE7] text-[#8A8175]";
-  const statusLabel = posting?.status === "posted" ? "Posted ✓" : posting?.status === "failed" ? "Failed" : "Not posted";
 
   return (
     <div className="rounded-xl border border-[#EAE3D6] bg-white">
@@ -68,7 +64,7 @@ export function BankTxnRow({
           )}
           {line.kind && <span className="text-[11px] capitalize text-[#8A8175]">{line.kind}</span>}
           <span className="w-28 flex-shrink-0 text-right text-[13px] font-medium text-[#1F1B16]">{aed2(line.amount)}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusTone}`}>{statusLabel}</span>
+          <PostingStatusBadge status={(posting?.status ?? "not_posted") as PostingStatus} zoho={posting?.zoho} error={posting?.error} />
           <ChevronDown size={14} className={`text-[#8A8175] transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
       </div>

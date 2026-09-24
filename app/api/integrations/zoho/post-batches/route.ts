@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { createBankTransaction, findBankTransactionByReference, type ZohoPosting } from "@/lib/integrations/zoho-banking";
-import { ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 import type { PostingBatch } from "@/lib/reconciliation/posting-batch-builder";
 
 export const maxDuration = 120;
@@ -54,6 +54,14 @@ export async function POST(request: Request) {
   const accessToken = dryRun ? "" : await getAccessToken();
   const results: BatchResult[] = [];
 
+  // Double-entry guard — see post-bank-lines: a batch holding any line the
+  // last Refresh found booked in Zoho is refused whole.
+  const inZoho = new Set(
+    (await BankLineZohoStatusRepository.list(batches.flatMap((b) => b.items.map((i) => i.bankLineId))))
+      .filter((r) => r.state === "in_zoho")
+      .map((r) => r.bank_line_id),
+  );
+
   for (const batch of batches) {
     const bankLineIds = batch.items.map((i) => i.bankLineId);
     try {
@@ -64,6 +72,15 @@ export async function POST(request: Request) {
       }
 
       const posting = buildPostingFromBatch(batch);
+
+      const booked = bankLineIds.filter((id) => inZoho.has(id));
+      if (booked.length) {
+        results.push({
+          batchId: batch.id, status: "failed", bankLineIds,
+          error: `${booked.length} of ${bankLineIds.length} line(s) already in Zoho — not posted again. Deselect them or Refresh.`,
+        });
+        continue;
+      }
 
       if (dryRun) {
         results.push({ batchId: batch.id, status: "posted", bankLineIds });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isInZoho } from "@/lib/reconciliation/bank-line-zoho-status";
 import { Loader2, RefreshCw, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { BankTxnLine, BankTxnPostingState } from "@/components/finance/reconciliation/bank-txn-row";
@@ -92,7 +93,7 @@ export function GroupClassificationPanel({
   // resurrect them.
   const groups = useMemo(() => {
     if (!ctx) return [];
-    return groupBankLines(lines.filter(l => postings[l.id]?.status !== "posted"));
+    return groupBankLines(lines.filter(l => !isInZoho(postings[l.id]?.status)));
   }, [lines, postings, ctx]);
 
   // Seed classifications for newly seen groups; drop them for groups that vanished.

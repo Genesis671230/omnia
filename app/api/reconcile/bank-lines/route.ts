@@ -57,8 +57,8 @@
 
 import { NextResponse } from "next/server";
 import { BankRepository } from "@/lib/repositories/bank.repository";
-import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
-import { listZohoBankTransactions } from "@/lib/integrations/zoho-books-banking";
+import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { mergeLineZohoStatus } from "@/lib/reconciliation/bank-line-zoho-status";
 import { supabase } from "@/lib/supabase";
 
 /** The payout reconciliation matched to each credit — a DB read, no Zoho call —
@@ -81,47 +81,35 @@ async function reconPayouts(ids: string[]) {
 
 export const maxDuration = 60;
 
-const norm = (s?: string | null) => (s ?? "").trim().toUpperCase();
-
+// GET /api/reconcile/bank-lines?from=&to=
+//
+// Never calls Zoho. The Zoho status column comes from bank_line_zoho_status,
+// which only the Refresh button (POST ./zoho-status) writes — so an edit made
+// in Zoho shows up here on the next Refresh, and opening the tab costs no
+// API quota.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from") || undefined;
   const to = searchParams.get("to") || undefined;
-  const accountId = searchParams.get("accountId") || undefined;
   try {
     const lines = await BankRepository.listAll({ from, to });
-    
-    const postingsByLine: Record<string, { status: string; zohoTransactionId: string | null; zohoStatus?: string }> = {};
+    const ids = lines.map((l) => l.id);
+    const [ledger, postings, payoutByLine] = await Promise.all([
+      BankLineZohoStatusRepository.list(ids),
+      ZohoBankTxnRepository.listPostingsFor(ids),
+      reconPayouts(ids).catch(() => new Map()),
+    ]);
+    const ledgerById = new Map(ledger.map((r) => [r.bank_line_id, r]));
+    const postingById = new Map(postings.map((p) => [p.bank_line_id, p]));
 
-    // dateStart/dateEnd are required by listZohoBankTransactions — an
-    // unbounded Zoho fetch here would page through the org's entire
-    // transaction history on every load. accountId stays optional (Zoho
-    // returns transactions across every account when it's omitted); no
-    // reason to 400 the whole tab just because the account map isn't
-    // configured yet.
-    // Zoho status is a nice-to-have on this tab; the bank lines are not. If
-    // Zoho fails (daily API budget spent, token expired, Zoho down) the lines
-    // still load and the tab says why the status column is blank — before,
-    // one Zoho error emptied the whole tab.
-    let zohoError: string | null = null;
-    if (zohoConfigured() && from && to) {
-      try {
-        const accessToken = await getAccessToken();
-        // same window as `lines` — no mismatch possible
-        const zohoTxns = await listZohoBankTransactions({ accountId, dateStart: from, dateEnd: to }, accessToken);
-        const byReference = new Map(zohoTxns.filter((t) => t.reference_number).map((t) => [norm(t.reference_number), t]));
-
-        for (const l of lines) {
-          const match = byReference.get(norm(l.reference));
-          postingsByLine[l.id] = match
-            ? { status: "verified", zohoTransactionId: match.transaction_id, zohoStatus: match.status }
-            : { status: "missing_in_zoho", zohoTransactionId: null };
-        }
-      } catch (e) {
-        zohoError = (e as Error).message;
-      }
+    const postingsByLine: Record<string, ReturnType<typeof mergeLineZohoStatus>> = {};
+    let checkedAt: string | null = null;
+    for (const l of lines) {
+      const led = ledgerById.get(l.id);
+      if (led && (!checkedAt || Date.parse(led.checked_at) > Date.parse(checkedAt))) checkedAt = led.checked_at;
+      const merged = mergeLineZohoStatus(led, postingById.get(l.id));
+      if (merged) postingsByLine[l.id] = merged;
     }
-    const payoutByLine = await reconPayouts(lines.map((l) => l.id)).catch(() => new Map());
 
     return NextResponse.json({
       lines: lines.map((l) => ({
@@ -139,7 +127,8 @@ export async function GET(request: Request) {
         payout: payoutByLine.get(l.id) ?? null,
       })),
       postings: postingsByLine,
-      zohoError,
+      zohoCheckedAt: checkedAt,
+      zohoError: null,
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

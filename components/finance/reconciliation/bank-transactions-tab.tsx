@@ -1,7 +1,8 @@
 "use client";
 import { GroupClassificationPanel } from "@/components/reconciliation/group-panel";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+import { isInZoho } from "@/lib/reconciliation/bank-line-zoho-status";
 import { toast } from "sonner";
 import { matchesBankTxnQuery, matchesPostStatus, type PostStatusFilter } from "@/lib/reconciliation/bank-line-filters";
 import { BankTxnFilters, type Direction, type PostStatusFilterValue } from "./bank-txn-filters";
@@ -54,18 +55,30 @@ const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
 
 
-const syncWithZoho = async () => {
+// The only Zoho call this tab makes. Page loads read the stored status;
+// this re-reads the Zoho ledger for the visible range (≈1 API call per 200
+// Zoho transactions) so edits made in Zoho show up — nothing else polls.
+const syncWithZoho = async (force = false) => {
+  if (!fromDate || !toDate) { toast.error("Pick a From and To date first"); return; }
   setSyncing(true);
   try {
-    const params = new URLSearchParams();
-    if (settings.bankAccountId) params.set("accountId", "2330082000000236001");
-    if (fromDate) params.set("from", fromDate);
-    if (toDate) params.set("to", toDate);
-    const res = await fetch(`/api/integrations/zoho/sync-bank-transactions?${params}`);
+    const res = await fetch("/api/reconcile/bank-lines/zoho-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: fromDate, to: toDate, accountId: settings.bankAccountId ? "2330082000000236001" : undefined, force }),
+    });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-    toast.success(`Synced: ${json.verified} verified${json.missing ? `, ${json.missing} missing in Zoho` : ""}`);
-    setLastSyncedAt(json.syncedAt);
+    if (json.cached) {
+      toast.message("Checked Zoho under 30s ago — showing that result. Wait a moment to refresh again.");
+    } else {
+      toast.success(
+        `Zoho checked: ${json.inZoho} in Zoho, ${json.notFound} not in Zoho` +
+        `${json.amountDiffers ? `, ${json.amountDiffers} amount differs` : ""}` +
+        `${json.uncategorized ? `, ${json.uncategorized} unbooked in feed` : ""}` +
+        ` · ${json.zohoCalls} API call${json.zohoCalls === 1 ? "" : "s"}${json.quota ? ` (${json.quota.used}/${json.quota.budget} today)` : ""}`,
+      );
+    }
     await load();
   } catch (e) {
     toast.error((e as Error).message);
@@ -91,6 +104,7 @@ const syncWithZoho = async () => {
       setLines(r.lines);
       setPostings(r.postings);
       setZohoError(r.zohoError ?? null);
+      setLastSyncedAt(r.zohoCheckedAt ?? null);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -107,7 +121,7 @@ const syncWithZoho = async () => {
   const visible = useMemo(
     () => lines
       .filter((l) => direction === "all" || l.direction === direction)
-      .filter((l) => matchesBankTxnQuery(l, query))
+      .filter((l) => matchesBankTxnQuery(l, query, postings[l.id]))
       .filter((l) => matchesPostStatus(l.id, postings, postStatus as PostStatusFilter)),
     [lines, direction, query, postings, postStatus],
   );
@@ -166,14 +180,21 @@ const syncWithZoho = async () => {
     return map;
   }, [lines, settings, defaultFromAccountId, defaultToAccountId]);
 
+  // Lines already in Zoho never reach the post dialog — the server refuses
+  // them too, this just keeps them out of the review list.
   const selectedDrafts = useMemo(
-    () => Array.from(selected).map((id) => draftsByLineId.get(id)).filter((d): d is DraftPosting => Boolean(d)),
-    [selected, draftsByLineId],
+    () => Array.from(selected)
+      .filter((id) => postings[id]?.status !== "verified")
+      .map((id) => draftsByLineId.get(id)).filter((d): d is DraftPosting => Boolean(d)),
+    [selected, draftsByLineId, postings],
   );
+  const selectedInZoho = Array.from(selected).filter((id) => postings[id]?.status === "verified").length;
 
   const readyIds = useMemo(
-    () => visible.filter((l) => draftsByLineId.get(l.id)?.confidence === "ready").map((l) => l.id),
-    [visible, draftsByLineId],
+    () => visible
+      .filter((l) => draftsByLineId.get(l.id)?.confidence === "ready" && !isInZoho(postings[l.id]?.status))
+      .map((l) => l.id),
+    [visible, draftsByLineId, postings],
   );
   const allReadySelected = readyIds.length > 0 && readyIds.every((id) => selected.has(id));
   const toggleSelectAllReady = () => setSelected(allReadySelected ? new Set() : new Set(readyIds));
@@ -185,13 +206,19 @@ const deSelectAll = ()=>setSelected(new Set())
         postStatus={postStatus} onPostStatus={setPostStatus} fromDate={fromDate} toDate={toDate}
         onRange={onRange} resultCount={visible.length} totalCount={lines.length} />
 
-<button onClick={syncWithZoho} disabled={syncing}
-  className="rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16] disabled:opacity-50">
-  {syncing ? "Syncing…" : "Sync with Zoho"}
-</button>
-
-
-{lastSyncedAt && <span className="text-[11px] text-[#8A8175]">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
+<div className="mb-3 flex flex-wrap items-center gap-3">
+  <button onClick={() => syncWithZoho()} disabled={syncing}
+    title="Re-read the Zoho Books ledger for this date range. Page loads never call Zoho."
+    className="inline-flex items-center gap-1.5 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16] disabled:opacity-50">
+    <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
+    {syncing ? "Checking Zoho…" : "Refresh Zoho status"}
+  </button>
+  <span className="text-[11px] text-[#8A8175]">
+    {lastSyncedAt
+      ? `Zoho status as of ${new Date(lastSyncedAt).toLocaleString()} — edits made in Zoho show after the next refresh`
+      : "Zoho status not checked for this range yet — press Refresh"}
+  </span>
+</div>
 {zohoError && (
   <div className="my-2 rounded-lg border border-[#E8C9BE] bg-[#F9ECE7] px-3 py-2 text-[12.5px] text-[#A6472F]">
     Bank lines loaded, but Zoho could not be checked, so the Zoho status column is blank: {zohoError}
@@ -201,7 +228,6 @@ const deSelectAll = ()=>setSelected(new Set())
   lines={lines}
   postings={postings}
   onPosted={load}
-  syncWithZoho={syncWithZoho}
 />
 <BankChargesPanel lines={lines} postings={postings}  onPosted={load} />
 
@@ -261,10 +287,14 @@ const deSelectAll = ()=>setSelected(new Set())
      
       {selected.size > 0 && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[#D6CCBA] bg-white px-5 py-3 shadow-lg">
-          <span className="text-[13px] text-[#1F1B16]">{selected.size} selected</span>
-          <button onClick={() => setDialogOpen(true)} className="rounded-full bg-[#B08343] px-4 py-1.5 text-[13px] font-medium text-white">
-            Post to Zoho
+          <span className="text-[13px] text-[#1F1B16]">
+            {selected.size} selected{selectedInZoho ? ` · ${selectedInZoho} already in Zoho, skipped` : ""}
+          </span>
+          <button onClick={() => setDialogOpen(true)} disabled={selectedDrafts.length === 0}
+            className="rounded-full bg-[#B08343] px-4 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">
+            Post {selectedDrafts.length} to Zoho
           </button>
+          <button onClick={deSelectAll} className="text-[12px] text-[#8A8175] underline">Clear</button>
         </div>
       )}
 

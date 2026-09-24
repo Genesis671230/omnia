@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isInZoho } from "@/lib/reconciliation/bank-line-zoho-status";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -106,7 +107,7 @@ export function BankChargesPanel({
   // and lifts SWIFT-style standalones). But its settings block is passed empty —
   // we ignore its "ready/needs mapping" output entirely. The bar is the source of truth.
   const drafts = useMemo(() => {
-    const active = lines.filter((l) => postings[l.id]?.status !== "posted");
+    const active = lines.filter((l) => !isInZoho(postings[l.id]?.status));
     const raw = detectBankChargeDrafts(active, {
       bankAccountId: "",
       bankChargesAccountId: "",

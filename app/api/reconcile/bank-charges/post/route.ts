@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { createBooksExpense, type ZohoBooksExpense } from "@/lib/integrations/zoho-expenses";
-import { ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 
 export const maxDuration = 120;
 
@@ -48,11 +48,17 @@ export async function POST(request: Request) {
 
   const accessToken = dryRun ? "" : await getAccessToken();
   const results: Result[] = [];
+  // Double-entry guard: the last Refresh found these booked in Zoho already.
+  const inZoho = await BankLineZohoStatusRepository.inZohoIds(drafts.flatMap((d) => d.bankLineIds ?? []));
 
   for (const draft of drafts) {
     try {
       const err = validate(draft);
       if (err) { results.push({ bankLineIds: draft.bankLineIds, status: "failed", error: err }); continue; }
+      if (draft.bankLineIds.some((id) => inZoho.has(id))) {
+        results.push({ bankLineIds: draft.bankLineIds, status: "failed", error: "Already in Zoho — not posted again. Refresh if it was deleted in Zoho." });
+        continue;
+      }
 
       // Idempotency: if we've already posted the first line, skip the whole draft.
       // (All sibling lines are marked together on first success, so checking one is enough.)

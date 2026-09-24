@@ -1,9 +1,10 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
+import type { PostStatusFilter } from "@/lib/reconciliation/bank-line-filters";
 
 export type Direction = "all" | "credit" | "debit";
-export type PostStatusFilterValue = "all" | "posted" | "not_posted" | "failed";
+export type PostStatusFilterValue = PostStatusFilter;
 
 export function BankTxnFilters({
   query, onQuery, direction, onDirection, postStatus, onPostStatus,
@@ -22,9 +23,15 @@ export function BankTxnFilters({
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search narration, reference, amount…"
-          className="w-full rounded-lg border border-[#EAE3D6] bg-white py-2 pl-8 pr-3 text-[13px] text-[#1F1B16] outline-none focus:border-[#B08343]"
+          placeholder="Search narration, ref, amount, date, Zoho account…"
+          className="w-full rounded-lg border border-[#EAE3D6] bg-white py-2 pl-8 pr-8 text-[13px] text-[#1F1B16] outline-none focus:border-[#B08343]"
         />
+        {query && (
+          <button onClick={() => onQuery("")} title="Clear search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#8A8175] hover:text-[#1F1B16]">
+            <X size={13} />
+          </button>
+        )}
       </div>
       <select
         value={direction}
@@ -41,9 +48,11 @@ export function BankTxnFilters({
         className="rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[13px] text-[#1F1B16]"
       >
         <option value="all">Any Zoho status</option>
-        <option value="not_posted">Not posted</option>
-        <option value="posted">Posted</option>
-        <option value="failed">Failed</option>
+        <option value="in_zoho">In Zoho</option>
+        <option value="not_in_zoho">Not in Zoho</option>
+        <option value="needs_review">Amount differs / unbooked</option>
+        <option value="failed">Post failed</option>
+        <option value="not_checked">Not checked yet</option>
       </select>
       <label className="inline-flex items-center gap-1.5 text-[12px] text-[#8A8175]">
         From

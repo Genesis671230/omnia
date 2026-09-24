@@ -296,12 +296,18 @@ export async function fetchZohoChartOfAccounts(accessToken: string): Promise<Zoh
 export async function findBankTransactionByReference(
   referenceNumber: string,
   accessToken: string,
+  /** Also require this amount. Bank refs are shared (a transfer, its charge
+   *  and the VAT on the charge all carry FT…), so for statement lines a
+   *  reference hit alone is not proof the SAME money is already booked. */
+  amount?: number,
 ): Promise<{ transaction_id: string; amount: number } | null> {
   const json = await booksFetch("/banktransactions", accessToken, {
     query: { reference_number: referenceNumber },
   });
   const rows = (json.banktransactions ?? []) as { transaction_id: string; amount: number; reference_number?: string }[];
-  const exact = rows.find((r) => r.reference_number === referenceNumber);
+  const exact = rows.find(
+    (r) => r.reference_number === referenceNumber && (amount == null || Math.abs(Number(r.amount) - amount) < 0.005),
+  );
   return exact ? { transaction_id: exact.transaction_id, amount: exact.amount } : null;
 }
 

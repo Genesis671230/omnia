@@ -537,6 +537,29 @@ create table if not exists zoho_bank_txn_postings (
   posted_at            timestamptz not null default now()
 );
 create unique index if not exists zoho_bank_txn_postings_line_idx on zoho_bank_txn_postings (bank_line_id);
+alter table zoho_bank_txn_postings add column if not exists zoho_status text not null default '';
+alter table zoho_bank_txn_postings add column if not exists verified_at timestamptz;
+
+-- bank_line_zoho_status: what the Zoho Books LEDGER says about each bank line,
+-- as of the last time someone pressed Refresh on the Bank Transactions tab.
+-- Separate from zoho_bank_txn_postings (what THIS app posted): most lines are
+-- booked by the accountant directly in Zoho, and the tab must show those as
+-- done too, or they get posted a second time. Written only by the refresh
+-- endpoint, so page loads never spend Zoho API quota.
+create table if not exists bank_line_zoho_status (
+  bank_line_id          text primary key,
+  tenant_id             text not null default 'omnia',
+  state                 text not null,             -- in_zoho | uncategorized | amount_differs | not_found
+  match_kind            text,                      -- exact | combined | posted_by_app
+  zoho_transaction_ids  jsonb not null default '[]',
+  zoho_reference        text,
+  zoho_amount           numeric,
+  zoho_type             text,
+  zoho_account          text,
+  zoho_status           text,
+  zoho_date             date,
+  checked_at            timestamptz not null default now()
+);
 
 -- Extends the existing single-row account-mapping config with the fields
 -- this feature needs: one income account for all credits, one expense

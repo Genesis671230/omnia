@@ -7,7 +7,7 @@ import {
   findBankTransactionByReference,
   type ZohoPosting,
 } from "@/lib/integrations/zoho-banking";
-import { ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 
 export const maxDuration = 120;
 
@@ -104,6 +104,14 @@ export async function POST(request: Request) {
   const accessToken = dryRun ? "" : await getAccessToken();
   const results: LineResult[] = [];
 
+  // Double-entry guard: lines the last Refresh found in the Zoho ledger
+  // (booked by the accountant, or combined into one charge+VAT entry) are
+  // refused here, whatever the client sent.
+  const ledger = new Map(
+    (await BankLineZohoStatusRepository.list(drafts.map((d: DraftPosting) => d.bankLineId).filter(Boolean)))
+      .map((r) => [r.bank_line_id, r]),
+  );
+
   for (const raw of drafts) {
     try {
       const draft = raw as DraftPosting;
@@ -119,6 +127,16 @@ export async function POST(request: Request) {
       }
 
       const posting = buildPostingFromDraft(draft);
+
+      const booked = ledger.get(draft.bankLineId);
+      if (booked?.state === "in_zoho") {
+        results.push({
+          bankLineId: draft.bankLineId,
+          status: "failed",
+          error: `Already in Zoho as "${booked.zoho_reference}" (AED ${Number(booked.zoho_amount).toFixed(2)}${booked.zoho_account ? `, ${booked.zoho_account}` : ""}) — not posted again. Refresh if it was deleted in Zoho.`,
+        });
+        continue;
+      }
 
       if (dryRun) {
         results.push({
@@ -139,7 +157,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const existing = await findBankTransactionByReference(posting.referenceNumber, accessToken);
+      const existing = await findBankTransactionByReference(posting.referenceNumber, accessToken, posting.amount);
       const zohoTransactionId = existing
         ? existing.transaction_id
         : (await createBankTransaction(posting, accessToken)).transaction_id;

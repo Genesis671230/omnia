@@ -82,7 +82,9 @@ export function BankTxnTable({
               <Fragment key={l.id}>
               <tr className="border-t border-[#EAE3D6] hover:bg-[#FBF8F1]">
                 <td className="px-3 py-2">
-                  <input type="checkbox" checked={selected.has(l.id)} onChange={() => onToggleSelect(l.id)} />
+                  <input type="checkbox" checked={selected.has(l.id)} onChange={() => onToggleSelect(l.id)}
+                    disabled={status === "verified" && !selected.has(l.id)}
+                    title={status === "verified" ? "Already in Zoho — nothing to post" : undefined} />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-[#1F1B16]">{l.date}</td>
                 <td className="max-w-md px-3 py-2">
@@ -96,12 +98,12 @@ export function BankTxnTable({
                     <span className={`truncate ${l.zohoDescription ? "font-medium" : "italic"}`}>{note || "Add a description"}</span>
                   </button>
                 </td>
-                <td className="px-3 py-2 text-[#8A8175]">{l.reference || "—"}</td>
+                <td className="px-3 py-2 font-mono text-[12px] text-[#8A8175]">{l.reference || "—"}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-[#1F1B16]">{aed2(l.amount)}</td>
                 <td className="px-3 py-2 capitalize text-[#8A8175]">{l.direction}</td>
                 <td className="px-3 py-2 text-[#8A8175]">{draft?.intent.entity ?? l.gatewayGuess ?? "—"}</td>
                 <td className="px-3 py-2">
-                  <PostingStatusBadge status={status} zohoStatus={(posting as any)?.zohoStatus} />
+                  <PostingStatusBadge status={status} zoho={posting?.zoho} error={posting?.error} />
                 </td>
               </tr>
               {editing === l.id && (
