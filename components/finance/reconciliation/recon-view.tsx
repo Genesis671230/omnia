@@ -70,12 +70,14 @@ export function ReconView({
 
   const buckets = useMemo(() => ({
     all: searched,
-    settled: searched.filter((l) => l.state === "SETTLED"),
+    // A variance a founder force-booked is closed: it belongs with the
+    // settled credits, not in Exceptions (unless someone flagged it).
+    settled: searched.filter((l) => l.state === "SETTLED" || (!!l.forceBook && !!l.confirmedBy)),
     awaiting: searched.filter((l) => l.state === "AWAITING_PAYOUT"),
     // A flagged row belongs in Exceptions even when its math foots — that is
     // the entire point of letting a person raise a flag.
     exceptions: searched.filter(
-      (l) => l.state === "PAYOUT_VARIANCE" || l.state === "ORDERS_UNRESOLVED" || l.reviewFlag,
+      (l) => ((l.state === "PAYOUT_VARIANCE" || l.state === "ORDERS_UNRESOLVED") && !(l.forceBook && l.confirmedBy)) || l.reviewFlag,
     ),
     flagged: searched.filter((l) => l.reviewFlag),
     // Not used to render rows (BankTransactionsTab fetches its own data), but

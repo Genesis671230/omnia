@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle, ArrowRight, BadgeCheck, BookCheck, Check, Clock, Copy, Download,
-  FileSpreadsheet, Flag, HelpCircle, Landmark, Loader2, Lock, Package, Trash2,
+  FileSpreadsheet, Flag, Gavel, HelpCircle, Landmark, Loader2, Lock, Package, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GatewayProof } from "./gateway-proof";
 import { ZohoPostDialog } from "./zoho-post-dialog";
-import { aed2, isBankFxVariance, isConfirmable, isConfirmablePartial, isDownloadableSource, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
+import { ForceBookPanel } from "./force-book-panel";
+import { aed2, canForceBook, isBankFxVariance, isConfirmable, isConfirmablePartial, isDownloadableSource, isForceBooked, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
 
 type StripeProof =
   | { available: true; payoutId: string; net: number; refs: string[]; transactions: ReconTxn[] }
@@ -84,9 +85,11 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
   const [flagging, setFlagging] = useState(false);
   const [flagged, setFlagged] = useState(r.reviewFlag);
   const [deleting, setDeleting] = useState(false);
+  const [forcing, setForcing] = useState(false);
 
-  // A gap that is only the remitting bank's own cut still explains the credit.
-  const payoutOk = !!r.payout && (Math.abs(r.variance) <= 1 || isBankFxVariance(r));
+  // A gap that is only the remitting bank's own cut still explains the credit,
+  // and so does one a founder chose to book anyway.
+  const payoutOk = !!r.payout && (Math.abs(r.variance) <= 1 || isBankFxVariance(r) || isForceBooked(r));
   const ordersOk = payoutOk && r.unresolvedRefs.length === 0 && r.resolvedOrders.length > 0;
   const ageDays = r.date ? Math.floor((Date.now() - new Date(r.date).getTime()) / 86_400_000) : null;
   const overdue = !r.payout && ageDays !== null && ageDays > 7;
@@ -210,7 +213,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           {r.confirmedBy ? " Confirmed by the founder." : " Ready for founder confirmation."}
         </div>
       )}
-      {r.state === "PAYOUT_VARIANCE" && r.payout && (
+      {r.state === "PAYOUT_VARIANCE" && r.payout && !r.forceBook && (
         isBankFxVariance(r) ? (
           /* The orders all match and the gap is small enough to be the
              remitting bank's own cut — a cost to book, not a broken payout. */
@@ -240,9 +243,38 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
                 : "a bank fee, rounding, or a partial settlement not reflected in the payout file"}
             {r.resolvedOrders.length === 0
               ? "."
-              : ` — too large (${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit) to book as an exchange difference, so it needs a person before the invoices close.`}
+              : isForceBooked(r)
+                ? "."
+                : ` — too large (${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit) to book as an exchange difference, so it needs a person before the invoices close.`}
+            {canForceBook(r) && isFounder && !forcing && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setForcing(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#A6472F] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#A6472F] hover:bg-[#F9ECE7]"
+                >
+                  <Gavel size={13} /> Force book the {r.resolvedOrders.length} invoice{r.resolvedOrders.length === 1 ? "" : "s"} anyway
+                </button>
+              </div>
+            )}
+            {r.resolvedOrders.length === 0 && isFounder && (
+              <div className="mt-1.5 text-[12px]">No order on this payout matched yet, so there is no invoice to force book. Link the orders first.</div>
+            )}
           </div>
         )
+      )}
+      {forcing && canForceBook(r) && (
+        <ForceBookPanel r={r} onCancel={() => setForcing(false)} onDone={() => { setForcing(false); refresh(); }} />
+      )}
+      {r.forceBook && (
+        <div className="mb-3.5 rounded-lg border border-[#D6CCBA] bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#6F5325]">
+          <b className="inline-flex items-center gap-1"><Gavel size={13} /> Force-booked</b> by {r.forceBook.by}
+          {r.forceBook.at ? ` on ${r.forceBook.at.slice(0, 10)}` : ""}. Bank credited <b>{aed2(r.bankAmount)}</b> against a{" "}
+          {r.provider} payout of <b>{aed2(r.payout?.net ?? 0)}</b>. Every invoice closes in full; the{" "}
+          <b>{aed2(Math.abs(r.variance))}</b> {r.variance < 0 ? "shortfall" : "surplus"} books once to{" "}
+          <b>{r.forceBook.accountName || "the chosen account"}</b>. Any order that didn&apos;t post can be retried from the
+          booking bar below.
+          <div className="mt-1 text-[12px] text-[#8A8175]">Why: {r.forceBook.note}</div>
+        </div>
       )}
       {r.state === "ORDERS_UNRESOLVED" && (
         <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">

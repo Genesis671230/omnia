@@ -8,6 +8,7 @@ import { BankTxnFilters, type Direction, type PostStatusFilterValue } from "./ba
 import { BankTxnRow, type BankTxnLine, type BankTxnPostingState } from "./bank-txn-row";
 import { BankTxnPostDialog } from "./bank-txn-post-dialog";
 import { resolveDraftPosting, normalizeAccountMap, type DraftPosting } from "@/lib/reconciliation/mapping-resolver";
+import { defaultBankLineNote, zohoDescriptionFor } from "@/lib/reconciliation/bank-line-description";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
 import { AccountCombobox } from "./account-combobox";
 import { BankTxnTable } from "./bank-txn-table";
@@ -34,6 +35,7 @@ const chargeSettings: BankChargeSettings = {
   const [lines, setLines] = useState<BankTxnLine[]>([]);
   const [postings, setPostings] = useState<Record<string, BankTxnPostingState>>({});
   const [loading, setLoading] = useState(true);
+  const [zohoError, setZohoError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [direction, setDirection] = useState<Direction>("all");
   const [postStatus, setPostStatus] = useState<PostStatusFilterValue>("all");
@@ -88,6 +90,7 @@ const syncWithZoho = async () => {
       if (r.error) throw new Error(r.error);
       setLines(r.lines);
       setPostings(r.postings);
+      setZohoError(r.zohoError ?? null);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -122,16 +125,24 @@ const syncWithZoho = async () => {
   const draftsByLineId = useMemo(() => {
     const map = new Map<string, DraftPosting>();
     for (const line of lines) {
+      // Classify on the bank's own narration, never on the note a person
+      // added — the note can say anything and must not move a line's gateway.
       let draft = resolveDraftPosting(
         {
           id: line.id,
           date: line.date ?? null,
-          narration: line.zohoDescription || line.description,
+          narration: line.description,
           reference: line.reference ?? null,
           amount: line.direction === "debit" ? -Math.abs(line.amount) : Math.abs(line.amount),
         },
         settings,
       );
+      const defaultNote = defaultBankLineNote({
+        direction: line.direction, amount: line.amount, date: line.date, narration: line.description,
+        reference: line.reference, entity: draft.intent.entity ?? line.gatewayGuess, kind: draft.intent.kind, payout: line.payout ?? null,
+      });
+      const note = line.zohoDescription || defaultNote;
+      draft = { ...draft, bankNarration: line.description, note, defaultNote, description: zohoDescriptionFor(note, line.description) };
 
       // Fill gaps with the sticky default — never overwrite a real gateway match.
       const usedFromDefault = !draft.fromAccountId && Boolean(defaultFromAccountId);
@@ -181,6 +192,11 @@ const deSelectAll = ()=>setSelected(new Set())
 
 
 {lastSyncedAt && <span className="text-[11px] text-[#8A8175]">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
+{zohoError && (
+  <div className="my-2 rounded-lg border border-[#E8C9BE] bg-[#F9ECE7] px-3 py-2 text-[12.5px] text-[#A6472F]">
+    Bank lines loaded, but Zoho could not be checked, so the Zoho status column is blank: {zohoError}
+  </div>
+)}
 <GroupClassificationPanel
   lines={lines}
   postings={postings}
@@ -239,6 +255,7 @@ const deSelectAll = ()=>setSelected(new Set())
               draftsByLineId={draftsByLineId}
               selected={selected}
               onToggleSelect={toggleSelect}
+              onDescriptionSaved={onDescriptionSaved}
             />
       )}
      
@@ -258,6 +275,7 @@ const deSelectAll = ()=>setSelected(new Set())
           accounts={zohoAccounts}
           onClose={() => setDialogOpen(false)}
           onPosted={() => { setSelected(new Set()); load(); }}
+          onDescriptionSaved={onDescriptionSaved}
         />
       )}
     </>

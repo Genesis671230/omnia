@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { confirmLine, flagLine, NoPayoutToConfirmError } from "@/lib/reconciliation/engine";
+import { confirmLine, flagLine, forceBookLine, NoPayoutToConfirmError, NotForceBookableError } from "@/lib/reconciliation/engine";
 
 // POST /api/reconcile/confirm — body: { bankLineId, actor? }
 // POST /api/reconcile/flag    — body: { bankLineId, flagged, note? }
+// POST /api/reconcile/force-book — body: { bankLineId, note, accountId, accountName?, actor? }
+//   Books a variance too large to pass as the bank's cut: the orders close in
+//   full and the gap books once to accountId. See forceBookLine().
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ action: string }> },
@@ -29,6 +32,27 @@ export async function POST(
         return NextResponse.json({ error: e.message, needsPayoutFile: true }, { status: 409 });
       }
       throw e;
+    }
+  }
+
+  if (action === "force-book") {
+    const { bankLineId, note, accountId, accountName, actor } = body;
+    if (!bankLineId) return NextResponse.json({ error: "bankLineId required" }, { status: 400 });
+    try {
+      const settlementsConfirmed = await forceBookLine({
+        bankLineId: String(bankLineId),
+        actor: String(actor || "founder"),
+        note: typeof note === "string" ? note : "",
+        accountId: typeof accountId === "string" ? accountId : "",
+        accountName: typeof accountName === "string" ? accountName : "",
+      });
+      return NextResponse.json({ ok: true, action, bankLineId, settlementsConfirmed, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      if (e instanceof NotForceBookableError) return NextResponse.json({ error: e.message }, { status: 409 });
+      if (e instanceof NoPayoutToConfirmError) {
+        return NextResponse.json({ error: e.message, needsPayoutFile: true }, { status: 409 });
+      }
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
     }
   }
 

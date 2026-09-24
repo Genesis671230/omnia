@@ -131,6 +131,8 @@ import type { DraftPosting, ZohoTransactionType } from "@/lib/reconciliation/map
 import { guessAccountId } from "@/lib/reconciliation/mapping-resolver";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
 import { AccountCombobox } from "./account-combobox";
+import { zohoDescriptionFor } from "@/lib/reconciliation/bank-line-description";
+import { saveBankLineNote } from "./bank-line-note";
 import { aed2 } from "./types";
 
 type ZohoAccount = { account_id: string; account_name: string; account_type: string };
@@ -153,13 +155,14 @@ function withAutoMatch(drafts: DraftPosting[], accounts: ZohoAccount[]): DraftPo
 }
 
 export function BankTxnPostDialog({
-  drafts, settings, accounts, onClose, onPosted,
+  drafts, settings, accounts, onClose, onPosted, onDescriptionSaved,
 }: {
   drafts: DraftPosting[];
   settings: ZohoAccountMap;
   accounts: ZohoAccount[];
   onClose: () => void;
   onPosted: () => void;
+  onDescriptionSaved?: (id: string, zohoDescription: string) => void;
 }) {
   const suggestedIds = useMemo(() => {
     const map = new Map<string, string>();
@@ -183,9 +186,22 @@ export function BankTxnPostDialog({
   };
   
 
+  const narrationOf = (d: DraftPosting) => d.bankNarration ?? d.description;
+  const descriptionOf = (d: DraftPosting) => zohoDescriptionFor(d.note, narrationOf(d));
+  const original = useMemo(() => new Map((drafts ?? []).map((d) => [d.bankLineId, d.note ?? ""])), [drafts]);
+
   const confirm = async () => {
     setPosting(true);
     try {
+      // Keep edited descriptions on the line (DB only — no Zoho call), so the
+      // table and any re-post show the same text.
+      for (const d of items) {
+        const note = (d.note ?? "").trim();
+        if (note === (original.get(d.bankLineId) ?? "").trim()) continue;
+        const stored = note === (d.defaultNote ?? "").trim() ? "" : note;
+        await saveBankLineNote(d.bankLineId, stored);
+        onDescriptionSaved?.(d.bankLineId, stored);
+      }
       const res = await fetch("/api/integrations/zoho/post-bank-lines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -197,7 +213,7 @@ export function BankTxnPostDialog({
             toAccountId: d.toAccountId,
             amount: d.amount,
             date: d.date,
-            description: d.description,
+            description: descriptionOf(d),
             reference: d.reference,
           })),
           actor: "founder",
@@ -232,11 +248,14 @@ export function BankTxnPostDialog({
           {(items ?? []).map((d) => (
             <div key={d.bankLineId} className="rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-4">
               <div className="mb-3 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[13px] font-medium text-[#1F1B16]">{d.description}</div>
-                  <div className="mt-1 text-[12px] text-[#8A8175]">
-                    {aed2(d.amount)} · {d.date}{d.reference ? ` · Ref: ${d.reference}` : ""} · {d.reasons[0] || "Manual review"}
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-[#1F1B16]">
+                    {d.amount > 0 ? aed2(d.amount) : ""} · {d.date?.slice(0, 10)}{d.reference ? ` · Ref: ${d.reference}` : ""}
                   </div>
+                  <div className="mt-1 break-words text-[11.5px] leading-relaxed text-[#8A8175]">
+                    <span className="font-semibold">Bank narration:</span> {narrationOf(d)}
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-[#8A8175]">{d.reasons[0] || "Manual review"}</div>
                 </div>
                 <div className={`rounded-full px-2.5 py-1 text-[11px] ${d.confidence === "ready" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                   {d.confidence}
@@ -267,6 +286,19 @@ export function BankTxnPostDialog({
                       onChange={(id) => updateDraft(d.bankLineId, { toAccountId: id })} />
                   </div>
                 </div>
+              </div>
+
+              <label className="mt-3 block text-[12px] text-[#1F1B16]">
+                Description (pre-filled, edit freely)
+                <textarea
+                  value={d.note ?? ""}
+                  onChange={(e) => updateDraft(d.bankLineId, { note: e.target.value })}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-[#B08343]"
+                />
+              </label>
+              <div className="mt-1 rounded-md bg-[#F3EFE7] px-2.5 py-1.5 text-[11px] leading-relaxed text-[#6F6457]">
+                <span className="font-semibold">Zoho will get:</span> {descriptionOf(d)}
               </div>
 
               {(!d.fromAccountId || !d.toAccountId) && (

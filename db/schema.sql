@@ -460,6 +460,17 @@ create index if not exists insight_runs_generated_idx on insight_runs (generated
 alter table recon_lines add column if not exists review_flag boolean not null default false;
 alter table recon_lines add column if not exists review_note text not null default '';
 
+-- recon_lines force-book: a founder books a PAYOUT_VARIANCE credit whose gap is
+-- too large to pass as the bank's own cut (over 1% / AED 500). Every invoice
+-- still closes in full; the gap books ONCE to the account chosen here, with a
+-- required note saying why. Upserts in persistResults() never name these, so
+-- a recompute keeps them.
+alter table recon_lines add column if not exists force_booked_by text;
+alter table recon_lines add column if not exists force_booked_at timestamptz;
+alter table recon_lines add column if not exists force_note text not null default '';
+alter table recon_lines add column if not exists force_residual_account_id text;
+alter table recon_lines add column if not exists force_residual_account_name text;
+
 -- zoho_postings: what has actually been written to Zoho Books, one row per
 -- bank credit. Without this, the "Post to Zoho" button double-counts real money
 -- on a double click — the API had no memory of what it had already posted.

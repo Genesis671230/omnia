@@ -74,7 +74,12 @@ export type ReconLine = {
   // Never set by matching — only by a person, via POST /api/reconcile/flag.
   reviewFlag: boolean;
   reviewNote: string;
+  /** A founder's override on a variance too large to book automatically:
+   *  the orders close in full and the gap books once to `accountId`. */
+  forceBook: ForceBook | null;
 };
+
+export type ForceBook = { by: string; at: string; note: string; accountId: string | null; accountName: string | null };
 
 export type ReconTransactionShare = {
   ref: string;
@@ -222,6 +227,8 @@ export type ComputeReconInputs = {
   reviews?: Map<string, { flag: boolean; note: string }>;
   /** Manual ref → order links, keyed `${payoutId}|${ref}`. */
   links?: Map<string, string>;
+  /** Founder force-book overrides, keyed by bank line id. */
+  forceBooks?: Map<string, ForceBook>;
 };
 
 /** Decide which unpinned payout explains which credit, best match first.
@@ -285,7 +292,7 @@ function assignPayoutsToCredits(
 // runReconciliation() so it can be fixture-tested without a live database —
 // see tests/reconciliation/engine.test.ts.
 export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
-  const { credits, payouts, orders, confirmations, reviews, links } = inputs;
+  const { credits, payouts, orders, confirmations, reviews, links, forceBooks } = inputs;
   const orderNumbers = new Set(orders.map((o) => o.order_number));
   const claimedPayouts = new Set<string>();
   const lines: ReconLine[] = [];
@@ -321,6 +328,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       confirmedAt: confirmation?.at ?? null,
       reviewFlag: review?.flag ?? false,
       reviewNote: review?.note ?? "",
+      forceBook: forceBooks?.get(credit.id) ?? null,
     };
 
     if (!payout) {
@@ -452,11 +460,13 @@ export async function runReconciliation(): Promise<ReconLine[]> {
   const existing = await selectAllPages<{
     bank_line_id: string; confirmed_by: string | null; confirmed_at: string | null;
     review_flag: boolean | null; review_note: string | null;
+    force_booked_by: string | null; force_booked_at: string | null; force_note: string | null;
+    force_residual_account_id: string | null; force_residual_account_name: string | null;
   }>(
     (from, to) =>
       supabase
         .from("recon_lines")
-        .select("bank_line_id, confirmed_by, confirmed_at, review_flag, review_note")
+        .select("bank_line_id, confirmed_by, confirmed_at, review_flag, review_note, force_booked_by, force_booked_at, force_note, force_residual_account_id, force_residual_account_name")
         .range(from, to),
     "recon_lines select",
   );
@@ -479,7 +489,16 @@ export async function runReconciliation(): Promise<ReconLine[]> {
   );
   const links = new Map(linkRows.map((r) => [`${r.payout_id}|${r.order_ref}`, r.order_number]));
 
-  const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews, links });
+  const forceBooks = new Map<string, ForceBook>(
+    existing
+      .filter((r) => r.force_booked_by)
+      .map((r) => [r.bank_line_id, {
+        by: r.force_booked_by!, at: r.force_booked_at ?? "", note: r.force_note ?? "",
+        accountId: r.force_residual_account_id, accountName: r.force_residual_account_name,
+      }]),
+  );
+
+  const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews, links, forceBooks });
   await persistResults(lines, orders);
   return lines;
 }
@@ -530,12 +549,23 @@ export function isBankFxVariance(
   return Math.abs(l.variance) <= bankFxVarianceLimit(l.bankAmount);
 }
 
-/** Settled, a partial that can be confirmed with lines still unmatched, or a
- *  cross-border credit whose only gap is the bank's own cut. */
-export function isConfirmable(
-  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
+/** A variance too large to pass as the bank's cut, that a founder chose to
+ *  book anyway (with a note and the account the gap goes to). Needs matched
+ *  orders — there is nothing to close without them. */
+export function isForceBooked(
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "forceBook">,
 ): boolean {
-  return l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l);
+  return l.state === "PAYOUT_VARIANCE" && !!l.payout && l.resolvedOrders.length > 0 && !!l.forceBook;
+}
+
+/** Settled, a partial that can be confirmed with lines still unmatched, a
+ *  cross-border credit whose only gap is the bank's own cut, or a variance a
+ *  founder force-booked. */
+export function isConfirmable(
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount"> & Partial<Pick<ReconLine, "forceBook">>,
+): boolean {
+  return l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l) ||
+    isForceBooked({ ...l, forceBook: l.forceBook ?? null });
 }
 
 async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typeof OrdersRepository.listAll>>) {
@@ -565,7 +595,7 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
 
   // Stamp orders: settled ONLY because a bank-confirmed payout reached them.
   for (const l of lines) {
-    if (l.payout && (l.state === "SETTLED" || ((isConfirmablePartial(l) || isBankFxVariance(l)) && l.confirmedBy))) {
+    if (l.payout && (l.state === "SETTLED" || ((isConfirmablePartial(l) || isBankFxVariance(l) || isForceBooked(l)) && l.confirmedBy))) {
       await OrdersRepository.markSettled(l.resolvedOrders, l.payout.id);
     }
   }
@@ -576,7 +606,7 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
   const settlementRows = lines
     // A bank-FX variance gets its settlement rows too — without them the
     // booking bar has nothing to publish even once a founder confirms it.
-    .filter((l) => l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l))
+    .filter((l) => l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l) || isForceBooked(l))
     .flatMap((l) =>
       l.resolvedOrders
         .map((num) => orderByNumber.get(num))
@@ -768,6 +798,50 @@ export async function confirmLine(bankLineId: string, actor: string) {
   // before this they stayed unconfirmed forever and the publish batch, which
   // filters on evidence_confirmed, never saw them.
   return SettlementsRepository.confirmEvidenceForBankLine(bankLineId, actor);
+}
+
+export class NotForceBookableError extends Error {}
+
+/**
+ * Book a variance credit that is too large to pass as the bank's own cut.
+ *
+ * The founder states why (required) and which Zoho account the gap goes to.
+ * The credit is then confirmed exactly like any other: settlement records are
+ * written for its matched orders, every invoice closes in full at its own
+ * amount through the normal booking bar, and publishWireResidual() books the
+ * gap ONCE to the chosen account — it is never spread across the orders.
+ */
+export async function forceBookLine(opts: {
+  bankLineId: string; actor: string; note: string; accountId: string; accountName: string;
+}) {
+  const note = opts.note.trim();
+  if (!note) throw new NotForceBookableError("Say why this credit is being booked despite the gap.");
+  if (!opts.accountId) throw new NotForceBookableError("Pick the account the gap books to.");
+
+  const line = (await runReconciliation()).find((l) => l.id === opts.bankLineId);
+  if (!line) throw new NotForceBookableError(`No reconciliation line ${opts.bankLineId}`);
+  if (!line.payout) throw new NoPayoutToConfirmError(opts.bankLineId);
+  if (line.state !== "PAYOUT_VARIANCE") {
+    throw new NotForceBookableError(`This credit is ${line.state}, not a variance — use Confirm instead.`);
+  }
+  if (line.resolvedOrders.length === 0) {
+    throw new NotForceBookableError("No order on this payout matched — link the orders first; there is no invoice to close.");
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("recon_lines")
+    .update({
+      force_booked_by: opts.actor, force_booked_at: now, force_note: note,
+      force_residual_account_id: opts.accountId, force_residual_account_name: opts.accountName || null,
+      confirmed_by: opts.actor, confirmed_at: now,
+    })
+    .eq("bank_line_id", opts.bankLineId);
+  if (error) throw new Error(`force-book failed: ${error.message}`);
+
+  // Recompute so the settlement records for its orders exist, then confirm them.
+  await runReconciliation();
+  return SettlementsRepository.confirmEvidenceForBankLine(opts.bankLineId, opts.actor);
 }
 
 /** Raise or clear a "needs a look" flag on a credit. Deliberately separate from

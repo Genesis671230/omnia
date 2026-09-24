@@ -144,7 +144,11 @@ async function publishWireResidual(opts: PublishOptions): Promise<WirePublishRes
   const reference = wireResidualReference(
     (opts.referenceOverride || line.reference || line.id).trim(),
   );
-  if (!accounts.differenceAccountId) {
+  // A force-booked credit names its own account for the gap (bank charges,
+  // gateway fees, write-off…) — that choice wins over the FX account.
+  const force = line.forceBook;
+  const residualAccountId = force?.accountId || accounts.differenceAccountId;
+  if (!residualAccountId) {
     return {
       amount: residual.amount, status: "review", ok: false, reference,
       message: `The bank kept AED ${Math.abs(residual.amount).toFixed(2)} on this ${line.provider} credit — pick the Exchange Gain or Loss account so it can be booked.`,
@@ -160,7 +164,8 @@ async function publishWireResidual(opts: PublishOptions): Promise<WirePublishRes
     `${line.provider} ${crossBorder ? `${line.payout?.currency} wire charge` : "settlement difference"} · ` +
     `payout ${line.payout?.net.toFixed(2)}${crossBorder ? " at the bank's quoted rate" : ""}, ` +
     `AED ${line.bankAmount.toFixed(2)} credited · ` +
-    `${residual.amount > 0 ? "loss" : "gain"} AED ${Math.abs(residual.amount).toFixed(2)}`;
+    `${residual.amount > 0 ? "loss" : "gain"} AED ${Math.abs(residual.amount).toFixed(2)}` +
+    (force ? ` · force-booked by ${force.by}: ${force.note}` : "");
 
   try {
     const existing = await findDocumentByReference("journals", reference, accessToken);
@@ -170,7 +175,7 @@ async function publishWireResidual(opts: PublishOptions): Promise<WirePublishRes
     if (dryRun) return { amount: residual.amount, status: "planned", ok: true, reference };
 
     const journalId = await createJournal(
-      buildResidualJournalBody({ amount: residual.amount, accounts, date, reference, description }),
+      buildResidualJournalBody({ amount: residual.amount, accounts: { ...accounts, differenceAccountId: residualAccountId }, date, reference, description }),
       accessToken,
     );
     return { amount: residual.amount, status: "booked", ok: true, journalId, reference };

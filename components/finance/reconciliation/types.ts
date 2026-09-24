@@ -58,6 +58,8 @@ export type ReconLine = {
   confirmedBy: string | null;
   reviewFlag: boolean;
   reviewNote: string;
+  /** Founder override on a variance too large to book automatically. */
+  forceBook?: { by: string; at: string; note: string; accountId: string | null; accountName: string | null } | null;
 };
 
 export type ZohoPostingState = {
@@ -191,8 +193,17 @@ export const isDownloadableSource = (source: string | null | undefined): boolean
  *  The payout check is explicit rather than implied by SETTLED so the button
  *  can never reappear on a fileless row. */
 export const isConfirmable = (
-  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount">,
-) => !!l.payout && (l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l));
+  l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount"> & Partial<Pick<ReconLine, "forceBook">>,
+) => !!l.payout && (l.state === "SETTLED" || isConfirmablePartial(l) || isBankFxVariance(l) || isForceBooked(l));
+
+/** A variance past the bank-cut limit that a founder chose to book anyway.
+ *  Mirrors isForceBooked() in lib/reconciliation/engine.ts. */
+export const isForceBooked = (l: Pick<ReconLine, "state" | "payout" | "resolvedOrders"> & Partial<Pick<ReconLine, "forceBook">>) =>
+  l.state === "PAYOUT_VARIANCE" && !!l.payout && l.resolvedOrders.length > 0 && !!l.forceBook;
+
+/** Can a founder force-book it: a variance with matched orders, not yet booked. */
+export const canForceBook = (l: Pick<ReconLine, "state" | "payout" | "resolvedOrders" | "variance" | "bankAmount" | "confirmedBy"> & Partial<Pick<ReconLine, "forceBook">>) =>
+  l.state === "PAYOUT_VARIANCE" && !!l.payout && l.resolvedOrders.length > 0 && !l.forceBook && !l.confirmedBy && !isBankFxVariance(l);
 
 export const STATE_META = {
   SETTLED: { label: "Settled", tone: "ok" },

@@ -207,11 +207,11 @@ export function ReconTable({
         return (
           <div className="flex flex-wrap items-center gap-1">
             <span
-              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${proofMissing ? TONE_BG.warn : TONE_BG[meta.tone]}`}
-              title={proofMissing ? "Confirmed without a payout file — upload the settlement report to complete it" : undefined}
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${proofMissing ? TONE_BG.warn : r.forceBook && r.confirmedBy ? TONE_BG.ok : TONE_BG[meta.tone]}`}
+              title={proofMissing ? "Confirmed without a payout file — upload the settlement report to complete it" : r.forceBook ? `Force-booked: ${r.forceBook.note}` : undefined}
             >
               <Icon size={11} />
-              {proofMissing ? "Confirmed · proof missing" : r.confirmedBy ? "Confirmed" : meta.label}
+              {proofMissing ? "Confirmed · proof missing" : r.forceBook && r.confirmedBy ? `Force-booked · ${aed2(Math.abs(r.variance))} gap` : r.confirmedBy ? "Confirmed" : meta.label}
             </span>
             {posting && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#FBF3E6] px-2 py-0.5 text-[11px] font-medium text-[#6F5325]" title="Recorded in Zoho">

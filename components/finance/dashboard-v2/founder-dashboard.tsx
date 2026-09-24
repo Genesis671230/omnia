@@ -229,9 +229,9 @@ export function FounderDashboard({ version }: { version: number }) {
       <style>{DASH_CSS}</style>
       <style>{CHARTS_CSS}</style>
 
-      <PulseTicker />
+      {/* <PulseTicker /> */}
 
-      <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} />
+      {/* <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} /> */}
 
       {/* Top line first: what the stores sold, straight from orders, before
           any of the payout and settlement views below it. */}

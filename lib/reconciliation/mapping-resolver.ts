@@ -32,6 +32,12 @@ export type DraftPosting = {
   reference?: string;
   confidence: "ready" | "needs_review";
   reasons: string[];
+  /** The bank's own narration, verbatim — what matching reads. */
+  bankNarration?: string;
+  /** Extra description a person adds (pre-filled); Zoho gets note | narration. */
+  note?: string;
+  /** The pre-filled note, before any edit. */
+  defaultNote?: string;
 };
 
 const KIND_TO_ZOHO_TYPE: Record<TransactionKind, ZohoTransactionType> = {

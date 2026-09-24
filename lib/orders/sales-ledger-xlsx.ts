@@ -7,6 +7,9 @@
 //             fee, VAT and net for this order, in its currency and in AED)
 //             → CHECK (order amount vs payout gross) → BANK (credit date,
 //             total, reference, net received). Column groups are colour-banded.
+//   By gateway  every gateway on one tab: a summary line each (orders, gross,
+//             fees, VAT, net, received vs not settled), then each gateway's
+//             orders under it with a subtotal.
 //   Payouts   one row per payout touched: its stated total vs the sum of its
 //             lines, the part this export covers, and the bank credit vs the
 //             payout net — so every payout foots on one line.
@@ -68,6 +71,55 @@ function totalsRow(sheet: ExcelJS.Worksheet, values: Record<string, string | num
   return row;
 }
 
+
+const aed = (n: number) => `AED ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const isSettled = (o: LedgerOrder) => o.status === "received";
+const isOpen = (o: LedgerOrder) => o.status !== "received" && o.status !== "cod";
+
+/** Plain-words account of every amount taken out between the order amount
+ *  and what the order nets in its payout: fee (and where the number comes
+ *  from), VAT on the fee, and any gap between the order and its payout line. */
+export function deductionNote(o: LedgerOrder): string {
+  if (o.status === "cod") return "No gateway deduction: cash collected by the courier (arrives with the courier's remittance, less their COD charge).";
+  const parts: string[] = [];
+  const pct = o.grossAed > 0 ? ` (${((o.feeAed / o.grossAed) * 100).toFixed(2)}% of ${aed(o.grossAed)})` : "";
+  const src =
+    o.status === "awaiting_payout" ? `live charge from ${o.gateway}; the payout has not been issued yet`
+    : o.feeBasis === "measured" ? `stated by ${o.gateway} for this order in the payout file`
+    : o.feeBasis === "allocated" ? `this order's share of the payout file's total fee, split by order value`
+    : `ESTIMATE at ${o.gateway}'s published rate; no payout file states it yet`;
+  parts.push(`Gateway fee ${aed(o.feeAed)}${pct}: ${src}.`);
+  if (o.vatAed) parts.push(`VAT on the fee ${aed(o.vatAed)}, charged by ${o.gateway}.`);
+  const line = o.payoutLine;
+  if (line?.isRefund) parts.push("The matched payout line is a refund: money returned to the customer.");
+  if (line) {
+    const gap = r2(o.grossAed - line.grossAed);
+    if (Math.abs(gap) > DIFF_FLAG_AED) {
+      parts.push(gap > 0
+        ? `Payout line is ${aed(gap)} less than the order: a partial capture, a partial refund, or an FX conversion difference${o.currency !== "AED" ? ` on this ${o.currency} order` : ""}.`
+        : `Payout line is ${aed(-gap)} more than the order: usually FX conversion${o.currency !== "AED" ? ` on this ${o.currency} order` : ""}, or shipping/tip added after the order.`);
+    }
+  }
+  const total = r2(o.feeAed + (o.vatAed ?? 0));
+  parts.push(`Total deducted ${aed(total)}; net for this order ${aed(o.payoutNetAed)}.`);
+  return parts.join(" ");
+}
+
+/** The same for a whole payout: gross → fees → refunds → net, and any money
+ *  in it that belongs to no order. */
+function payoutDeductionNote(p: NonNullable<LedgerOrder["payout"]>): string {
+  const parts: string[] = [];
+  if (p.grossAed != null) parts.push(`Gross ${aed(p.grossAed)}`);
+  if (p.feeAed != null) parts.push(`− fees ${aed(Math.abs(p.feeAed))}`);
+  if (p.refundLines) parts.push(`− ${p.refundLines} refund line${p.refundLines === 1 ? "" : "s"} ${aed(p.refundsAed)}`);
+  parts.push(`= net ${aed(p.netAed)}${p.currency !== "AED" && p.netOriginal != null ? ` (${p.currency} ${p.netOriginal})` : ""}.`);
+  const gap = p.lineCount ? r2(p.netAed - p.linesNetAed) : 0;
+  if (Math.abs(gap) > DIFF_FLAG_AED) {
+    parts.push(`${aed(Math.abs(gap))} ${gap < 0 ? "was taken out" : "was added"} that belongs to no order: a chargeback/dispute, an adjustment, a reserve, or a line without an order number.`);
+  }
+  return parts.join(" ");
+}
+
 /* ── Orders ─────────────────────────────────────────────────────────────── */
 
 type Col = Partial<ExcelJS.Column> & { key: string; group: keyof typeof FILL; money?: boolean };
@@ -97,6 +149,7 @@ const ORDER_COLS: Col[] = [
   { header: "VAT on fee (AED)", key: "vat", width: 10, group: "payout", money: true },
   { header: "Net payout for this order (AED)", key: "pnet", width: 14, group: "payout", money: true },
   { header: "Fee source", key: "basis", width: 30, group: "payout" },
+  { header: "Deductions (what was taken and why)", key: "ded", width: 70, group: "payout" },
   // CHECK
   { header: "Order vs payout gross (AED)", key: "diff", width: 13, group: "check", money: true },
   // BANK
@@ -129,6 +182,7 @@ function orderRow(o: LedgerOrder): Record<string, string | number | null> {
     vat: o.vatAed,
     pnet: cod ? null : o.payoutNetAed,
     basis: cod ? "Cash on delivery — no gateway fee" : o.status === "awaiting_payout" ? "Gateway charge, live (payout not issued yet)" : BASIS_LABEL[o.feeBasis],
+    ded: deductionNote(o),
     diff: line ? r2(o.grossAed - line.grossAed) : null,
     status: STATUS_LABEL[o.status],
     bankDate: o.bank?.date ?? "",
@@ -176,6 +230,111 @@ function ordersSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
   s.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ORDER_COLS.length } };
 }
 
+
+/* ── By gateway ─────────────────────────────────────────────────────────── */
+
+const GW_SUMMARY_HEAD = [
+  "Gateway", "Orders", "Order amount (AED)", "Fees (AED)", "VAT on fees (AED)", "Net payout (AED)",
+  "Received in bank: orders", "Received in bank: net (AED)", "Not settled yet: orders", "Not settled yet: order amount (AED)",
+  "Effective fee %", "Fee source",
+];
+const GW_ORDER_HEAD = [
+  "Gateway", "Order date (Dubai)", "Time", "Store", "Order #", "Customer", "Order amount (AED)", "Fees (AED)",
+  "VAT on fee (AED)", "Net payout (AED)", "Net received in bank (AED)", "Status", "Payout ID", "Bank credit date",
+  "Bank reference", "Deductions (what was taken and why)",
+];
+const GW_WIDTHS = [18, 12, 7, 7, 11, 22, 14, 11, 11, 13, 14, 26, 28, 12, 16, 80];
+
+function gatewaysSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
+  const s = wb.addWorksheet("By gateway");
+  GW_WIDTHS.forEach((w, i) => (s.getColumn(i + 1).width = w));
+  const moneyCells = (row: ExcelJS.Row, cols: number[]) => cols.forEach((c) => (row.getCell(c).numFmt = MONEY));
+  const head = (values: string[]) => {
+    const row = s.addRow(values);
+    row.font = { bold: true, color: { argb: "FF1F1B16" } };
+    row.alignment = { vertical: "middle", wrapText: true };
+    row.height = 32;
+    values.forEach((_, i) => (row.getCell(i + 1).fill = fill(FILL.header)));
+    return row;
+  };
+  const title = (text: string) => {
+    const row = s.addRow([text]);
+    row.font = { bold: true, size: 13 };
+    return row;
+  };
+
+  const groups = new Map<string, LedgerOrder[]>();
+  for (const o of orders) groups.set(o.gateway || "Unknown", [...(groups.get(o.gateway || "Unknown") ?? []), o]);
+  const sum = (list: LedgerOrder[], f: (o: LedgerOrder) => number | null | undefined) =>
+    r2(list.reduce((a, o) => a + (Number(f(o)) || 0), 0));
+  const stats = (list: LedgerOrder[]) => {
+    const gross = sum(list, (o) => o.grossAed);
+    const fee = sum(list, (o) => (o.status === "cod" ? 0 : o.feeAed));
+    return {
+      gross, fee,
+      vat: sum(list, (o) => o.vatAed),
+      net: sum(list, (o) => (o.status === "cod" ? 0 : o.payoutNetAed)),
+      recvN: list.filter(isSettled).length,
+      recv: sum(list.filter(isSettled), (o) => o.receivedAed),
+      openN: list.filter(isOpen).length,
+      open: sum(list.filter(isOpen), (o) => o.grossAed),
+      pct: gross > 0 ? `${((fee / gross) * 100).toFixed(2)}%` : "",
+    };
+  };
+  const sorted = [...groups.entries()].sort((a, b) => stats(b[1]).gross - stats(a[1]).gross);
+
+  // 1. One line per gateway.
+  title("Gateway summary");
+  head(GW_SUMMARY_HEAD);
+  for (const [gw, list] of sorted) {
+    const t = stats(list);
+    const bases = [...new Set(list.map((o) =>
+      o.status === "cod" ? "cash on delivery" : o.status === "awaiting_payout" ? "live gateway charge" : o.feeBasis))].join(", ");
+    const row = s.addRow([gw, list.length, t.gross, t.fee, t.vat, t.net, t.recvN, t.recv, t.openN, t.open, t.pct, bases]);
+    moneyCells(row, [3, 4, 5, 6, 8, 10]);
+    if (t.openN > 0) row.getCell(10).fill = fill(FILL.flag);
+  }
+  const all = stats(orders);
+  const tot = totalsRowArr(s, ["Total", orders.length, all.gross, all.fee, all.vat, all.net, all.recvN, all.recv, all.openN, all.open, all.pct, ""]);
+  moneyCells(tot, [3, 4, 5, 6, 8, 10]);
+
+  // 2. Each gateway's orders, with a subtotal.
+  s.addRow([]);
+  title("Orders by gateway");
+  const headerRow = head(GW_ORDER_HEAD);
+  for (const [gw, list] of sorted) {
+    const band = s.addRow([`${gw}: ${list.length} order${list.length === 1 ? "" : "s"}`]);
+    band.font = { bold: true };
+    GW_ORDER_HEAD.forEach((_, i) => (band.getCell(i + 1).fill = fill(FILL.payout)));
+    for (const o of list.slice().sort((a, b) => (a.orderDate < b.orderDate ? -1 : 1))) {
+      const { date, time } = dubaiDateTime(o.orderDate);
+      const cod = o.status === "cod";
+      const row = s.addRow([
+        gw, date, time, o.store, o.orderNumber, o.customerName, o.grossAed,
+        cod ? null : o.feeAed, o.vatAed, cod ? null : o.payoutNetAed,
+        isSettled(o) ? o.receivedAed : null, STATUS_LABEL[o.status],
+        o.payout?.id ?? "", o.bank?.date ?? "", o.bank?.reference ?? "", deductionNote(o),
+      ]);
+      moneyCells(row, [7, 8, 9, 10, 11]);
+      if (o.feeBasis === "estimated" && !cod) for (const c of [8, 10]) row.getCell(c).font = { italic: true, color: { argb: "FF8A8175" } };
+      if (isSettled(o)) row.getCell(12).fill = fill(FILL.bank);
+    }
+    const t = stats(list);
+    const sub = totalsRowArr(s, [`${gw} subtotal`, "", "", "", `${list.length} orders`, "", t.gross, t.fee, t.vat, t.net, t.recv,
+      `${t.recvN} received · ${t.openN} not settled`]);
+    moneyCells(sub, [7, 8, 9, 10, 11]);
+    s.addRow([]);
+  }
+  s.autoFilter = { from: { row: headerRow.number, column: 1 }, to: { row: headerRow.number, column: GW_ORDER_HEAD.length } };
+}
+
+function totalsRowArr(sheet: ExcelJS.Worksheet, values: (string | number | null)[]) {
+  const row = sheet.addRow(values);
+  row.font = { bold: true };
+  row.border = { top: { style: "thin", color: { argb: "FF8A8175" } } };
+  return row;
+}
+
 /* ── Payouts ────────────────────────────────────────────────────────────── */
 
 function payoutsSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
@@ -204,6 +363,8 @@ function payoutsSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
     { header: "Bank reference", key: "br", width: 16 },
     { header: "Bank vs payout net (AED)", key: "bdiff", width: 13 },
     { header: "Bank's rate (AED per 1 payout currency)", key: "brate", width: 14 },
+    { header: "Refunds in payout (AED)", key: "rf", width: 12 },
+    { header: "Deductions (what was taken and why)", key: "ded", width: 70 },
     { header: "Note", key: "note", width: 50 },
   ];
   for (const [id, list] of byPayout) {
@@ -224,6 +385,8 @@ function payoutsSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
       pcur: p.currency,
       pno: p.currency !== "AED" ? p.netOriginal : null,
       brate: bank && p.currency !== "AED" && p.netOriginal ? +(bank.amountAed / p.netOriginal).toFixed(6) : null,
+      rf: p.refundLines ? p.refundsAed : null,
+      ded: payoutDeductionNote(p),
       note: "",
     });
     const cross = p.currency !== "AED";
@@ -241,7 +404,7 @@ function payoutsSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
       }
     }
   }
-  for (const k of ["pg", "pf", "pn", "pno", "ln", "foot", "og", "of", "on", "ba", "bdiff"]) s.getColumn(k).numFmt = MONEY;
+  for (const k of ["pg", "pf", "pn", "pno", "ln", "foot", "og", "of", "on", "ba", "bdiff", "rf"]) s.getColumn(k).numFmt = MONEY;
   styleHeader(s);
 }
 
@@ -298,6 +461,8 @@ function howToSheet(wb: ExcelJS.Workbook) {
     ["Payouts sheet", "'Payout total vs lines' checks the payout adds up from its order lines; 'Bank vs payout net' checks the bank credited what the gateway said it paid. Highlighted when over AED 1."],
     ["Payout total vs lines ≠ 0", "The payout carries money that belongs to no order — a dispute or chargeback, an adjustment, a reserve, or a charge whose description had no order number (common on Stripe). Open the payout file and look for rows without an order."],
     ["SAR / KWD payouts", "The AED figures for a payout settled in another currency are converted at a fixed estimate. The bank converts at its own rate, shown as 'Bank's rate' — a gap there is exchange rate, not missing money. The reconciliation matches these using the rate quoted in the bank narration."],
+    ["By gateway sheet", "Top: one line per gateway (orders, order amount, fees, VAT, net payout, what is received in the bank and what is not settled yet). Below: each gateway's orders with a subtotal. 'Not settled yet' = not confirmed in the bank; cash-on-delivery is counted in neither."],
+    ["Deductions (what was taken and why)", "Every amount taken out between the order amount and the order's net: the gateway fee (as a % of the order, and whether the gateway stated it, it was split from a file total, or it is an estimate), VAT on the fee, refunds, and any gap between the order and its payout line. On the Payouts sheet: gross − fees − refunds = net, plus any money in the payout that belongs to no order."],
     ["Dates", "All order dates and times are Dubai time; a 'day' is the Dubai calendar day."],
   ];
   for (const [c, d] of rows) s.addRow({ c, d }).alignment = { wrapText: true, vertical: "top" };
@@ -311,6 +476,7 @@ export async function buildDayWorkbook(day: LedgerDay): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
   summarySheet(wb, `Sales on ${day.day} (Dubai day)`, { ...day }, day.orderList, day.reason);
+  gatewaysSheet(wb, day.orderList);
   ordersSheet(wb, day.orderList);
   payoutsSheet(wb, day.orderList);
   howToSheet(wb);
@@ -323,6 +489,7 @@ export async function buildMonthWorkbook(ledger: SalesLedger): Promise<Buffer> {
   wb.created = new Date();
   const orders = ledger.days.flatMap((x) => x.orderList);
   summarySheet(wb, `Sales · ${ledger.label}`, ledger.totals, orders);
+  gatewaysSheet(wb, orders);
 
   const d = wb.addWorksheet("Days", { views: [{ state: "frozen", ySplit: 1 }] });
   d.columns = [

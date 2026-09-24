@@ -8,7 +8,7 @@ import {
   postPayoutToZoho,
   type PayoutPostingInput,
 } from "@/lib/integrations/zoho-banking";
-import { isBankFxVariance, isConfirmablePartial, runReconciliation } from "@/lib/reconciliation/engine";
+import { isBankFxVariance, isConfirmablePartial, isForceBooked, runReconciliation } from "@/lib/reconciliation/engine";
 import { ZohoConfigRepository } from "@/lib/repositories/zoho-config.repository";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   // whole point of the confirmation step is that it gates real money.
   // A cross-border credit whose only gap is the remitting bank's own cut is
   // bookable too — the remainder posts to Exchange Gain or Loss.
-  if (line.state !== "SETTLED" && !isConfirmablePartial(line) && !isBankFxVariance(line)) {
+  if (line.state !== "SETTLED" && !isConfirmablePartial(line) && !isBankFxVariance(line) && !isForceBooked(line)) {
     return NextResponse.json(
       { error: `Bank line is ${line.state}, not SETTLED — resolve it before posting to Zoho` },
       { status: 409 },

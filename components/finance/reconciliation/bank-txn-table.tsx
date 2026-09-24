@@ -1,8 +1,9 @@
 // bank-txn-table.tsx
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowUpDown } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { ArrowUpDown, Pencil } from "lucide-react";
+import { BankLineNoteEditor } from "./bank-line-note";
 import { PostingStatusBadge, type PostingStatus } from "./posting-status-badge";
 import type { BankTxnLine, BankTxnPostingState } from "./bank-txn-row";
 import type { DraftPosting } from "@/lib/reconciliation/mapping-resolver";
@@ -16,14 +17,16 @@ function resolveStatus(posting?: BankTxnPostingState): PostingStatus {
 }
 
 export function BankTxnTable({
-  lines, postings, draftsByLineId, selected, onToggleSelect,
+  lines, postings, draftsByLineId, selected, onToggleSelect, onDescriptionSaved,
 }: {
   lines: BankTxnLine[];
   postings: Record<string, BankTxnPostingState>;
   draftsByLineId: Map<string, DraftPosting>;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
+  onDescriptionSaved: (id: string, zohoDescription: string) => void;
 }) {
+  const [editing, setEditing] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -74,14 +77,24 @@ export function BankTxnTable({
             const posting = postings[l.id];
             const draft = draftsByLineId.get(l.id);
             const status = resolveStatus(posting);
+            const note = draft?.note ?? "";
             return (
-              <tr key={l.id} className="border-t border-[#EAE3D6] hover:bg-[#FBF8F1]">
+              <Fragment key={l.id}>
+              <tr className="border-t border-[#EAE3D6] hover:bg-[#FBF8F1]">
                 <td className="px-3 py-2">
                   <input type="checkbox" checked={selected.has(l.id)} onChange={() => onToggleSelect(l.id)} />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-[#1F1B16]">{l.date}</td>
-                <td className="max-w-xs truncate px-3 py-2 text-[#1F1B16]" title={l.zohoDescription || l.description}>
-                  {l.zohoDescription || l.description}
+                <td className="max-w-md px-3 py-2">
+                  <div className="truncate text-[#1F1B16]" title={l.description}>{l.description}</div>
+                  <button
+                    onClick={() => setEditing(editing === l.id ? null : l.id)}
+                    className="group mt-0.5 flex w-full items-start gap-1 text-left text-[12px] text-[#6F5325]"
+                    title="Edit the description sent to Zoho"
+                  >
+                    <Pencil size={11} className="mt-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100" />
+                    <span className={`truncate ${l.zohoDescription ? "font-medium" : "italic"}`}>{note || "Add a description"}</span>
+                  </button>
                 </td>
                 <td className="px-3 py-2 text-[#8A8175]">{l.reference || "—"}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-[#1F1B16]">{aed2(l.amount)}</td>
@@ -91,6 +104,25 @@ export function BankTxnTable({
                   <PostingStatusBadge status={status} zohoStatus={(posting as any)?.zohoStatus} />
                 </td>
               </tr>
+              {editing === l.id && (
+                <tr className="bg-[#FBF8F1]">
+                  <td />
+                  <td colSpan={7} className="px-3 pb-3 pt-1">
+                    <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8A8175]">
+                      Description for Zoho ({l.direction})
+                    </div>
+                    <BankLineNoteEditor
+                      lineId={l.id}
+                      note={note}
+                      defaultNote={draft?.defaultNote ?? ""}
+                      narration={l.description}
+                      autoFocus
+                      onSaved={(id, saved) => { onDescriptionSaved(id, saved); setEditing(null); }}
+                    />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>

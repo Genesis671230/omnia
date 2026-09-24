@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
+import { defaultBankLineNote } from "@/lib/reconciliation/bank-line-description";
+import { BankLineNoteEditor } from "./bank-line-note";
 import { gatewayColor } from "./colors";
 import { aed2 } from "./types";
 
@@ -18,6 +19,8 @@ export type BankTxnLine = {
   confidence: string | null;
   kind: string | null;
   batchId: string | null;
+  /** The gateway payout reconciliation matched to this credit, if any. */
+  payout?: { id: string; gateway: string; orders: string[] } | null;
 };
 
 export type BankTxnPostingState = { status: string; zohoTransactionId: string | null; error: string; postedAt: string } | undefined;
@@ -32,27 +35,10 @@ export function BankTxnRow({
   onDescriptionSaved: (id: string, zohoDescription: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(line.zohoDescription ?? "");
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/reconcile/bank-line/${line.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zohoDescription: draft }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      onDescriptionSaved(line.id, draft);
-      toast.success("Description saved");
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const defaultNote = defaultBankLineNote({
+    direction: line.direction, amount: line.amount, date: line.date, narration: line.description,
+    reference: line.reference, entity: line.gatewayGuess, kind: line.kind, payout: line.payout ?? null,
+  });
 
   const statusTone =
     posting?.status === "posted" ? "bg-[#F0F5EF] text-[#4B7A54]" :
@@ -66,7 +52,7 @@ export function BankTxnRow({
         <input type="checkbox" checked={selected} onChange={() => onToggleSelect(line.id)} className="h-4 w-4" />
         <button onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-3 text-left">
           <span className="w-24 flex-shrink-0 text-[12.5px] text-[#8A8175]">{line.date ?? "—"}</span>
-          <span className="flex-1 truncate text-[13px] text-[#1F1B16]">{line.description.slice(0,40)+"..."+line.description.slice(-40)}</span>
+          <span className="flex-1 truncate text-[13px] text-[#1F1B16]">{line.description}</span>
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
               line.direction === "credit" ? "bg-[#FBF3E6] text-[#6F5325]" : "bg-[#F3EFE7] text-[#8A8175]"
@@ -101,23 +87,18 @@ export function BankTxnRow({
           {posting?.status === "failed" && (
             <div className="mt-2 rounded-lg bg-[#F9ECE7] px-3 py-2 text-[#A6472F]">{posting.error}</div>
           )}
-          <label className="mt-3 block text-[12px] font-medium text-[#1F1B16]">
-            Description sent to Zoho
-            <div className="mt-1 flex gap-2">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                className="flex-1 rounded-lg border border-[#D6CCBA] bg-white px-3 py-1.5 text-[13px] text-[#1F1B16] outline-none focus:border-[#B08343]"
+          <div className="mt-3 text-[12px] font-medium text-[#1F1B16]">
+            Description for Zoho ({line.direction})
+            <div className="mt-1">
+              <BankLineNoteEditor
+                lineId={line.id}
+                note={line.zohoDescription || defaultNote}
+                defaultNote={defaultNote}
+                narration={line.description}
+                onSaved={onDescriptionSaved}
               />
-              <button
-                onClick={save}
-                disabled={saving || draft === (line.zohoDescription ?? "")}
-                className="rounded-lg bg-[#B08343] px-3 py-1.5 text-[12.5px] font-medium text-white disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={13} className="animate-spin" /> : "Save"}
-              </button>
             </div>
-          </label>
+          </div>
         </div>
       )}
     </div>

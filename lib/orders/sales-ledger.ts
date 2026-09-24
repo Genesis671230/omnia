@@ -159,6 +159,9 @@ export type LedgerOrder = {
      *  anyone check the payout total foots without opening the file. */
     lineCount: number;
     linesNetAed: number;
+    /** Refund / reversal lines inside the payout — money the gateway took back. */
+    refundLines: number;
+    refundsAed: number;
     /** Set when the payout settled in another currency (SAR/KWD statements). */
     currency: string;
     netOriginal: number | null;
@@ -538,6 +541,8 @@ export function computeSalesLedger({
             grossAed: hit.payout.gross_amount != null ? money(Number(hit.payout.gross_amount)) : null,
             lineCount: hit.payout.transactions.length,
             linesNetAed: money(hit.payout.transactions.reduce((a, t) => a + Number(t.net_aed || 0), 0)),
+            refundLines: hit.payout.transactions.filter((t) => t.is_refund).length,
+            refundsAed: money(hit.payout.transactions.filter((t) => t.is_refund).reduce((a, t) => a + Math.abs(Number(t.net_aed || 0)), 0)),
             currency: (hit.payout.original_currency || "AED").toUpperCase(),
             netOriginal: hit.payout.net_original != null ? money(Number(hit.payout.net_original)) : null,
           }

@@ -10,8 +10,8 @@
    invoice/ship modals before. */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight, Download, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight, Download, Loader2, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { STORE_COLOR, GATEWAY_COLOR, aed2 } from "./types";
@@ -95,8 +95,53 @@ export async function downloadSalesXlsx(q: { day?: string; month?: string }): Pr
   URL.revokeObjectURL(url);
 }
 
+type Settle = "all" | "received" | "open" | "cod";
+const SETTLE_LABEL: Record<Settle, string> = { all: "All", received: "Received", open: "Not yet settled", cod: "Cash on delivery" };
+const settleOf = (o: LedgerOrder): Settle => (o.status === "received" ? "received" : o.status === "cod" ? "cod" : "open");
+
+/** Every field someone might type: order #, customer, store, gateway, the
+ *  store's payment method, status, payout ID / file, bank reference. */
+const haystack = (o: LedgerOrder) =>
+  [o.orderNumber, `#${o.orderNumber}`, o.customerName, o.store, o.gateway, o.paymentMethod, STATUS_META[o.status].label,
+    o.payout?.id, o.payout?.source, o.bank?.reference, o.bank?.date].filter(Boolean).join(" ").toLowerCase();
+
 export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClose: () => void }) {
   const [exporting, setExporting] = useState(false);
+  const [settle, setSettle] = useState<Settle>("all");
+  const [gateway, setGateway] = useState("all");
+  const [status, setStatus] = useState<LedgerStatus | "all">("all");
+  const [query, setQuery] = useState("");
+
+  // A new day starts unfiltered.
+  useEffect(() => {
+    setSettle("all"); setGateway("all"); setStatus("all"); setQuery("");
+  }, [day?.day]);
+
+  const orders = day?.orderList ?? [];
+  const gateways = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of orders) m.set(o.gateway, (m.get(o.gateway) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [orders]);
+  const settleCounts = useMemo(() => {
+    const c: Record<Settle, number> = { all: orders.length, received: 0, open: 0, cod: 0 };
+    for (const o of orders) c[settleOf(o)] += 1;
+    return c;
+  }, [orders]);
+  const shown = useMemo(() => {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return orders.filter((o) =>
+      (settle === "all" || settleOf(o) === settle) &&
+      (gateway === "all" || o.gateway === gateway) &&
+      (status === "all" || o.status === status) &&
+      (words.length === 0 || words.every((w) => haystack(o).includes(w))));
+  }, [orders, settle, gateway, status, query]);
+  const filtered = shown.length !== orders.length;
+  const shownGross = shown.reduce((a, o) => a + o.grossAed, 0);
+  const shownFee = shown.reduce((a, o) => a + (o.status === "cod" ? 0 : o.feeAed), 0);
+  const shownRecv = shown.reduce((a, o) => a + o.receivedAed, 0);
+  const clear = () => { setSettle("all"); setGateway("all"); setStatus("all"); setQuery(""); };
+
   if (typeof document === "undefined") return null;
 
   const exportDay = async () => {
@@ -152,17 +197,58 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
               {(Object.keys(STATUS_META) as LedgerStatus[]).filter((s) => day.statusCounts[s].orders > 0).map((s) => {
                 const m = STATUS_META[s];
                 return (
-                  <span key={s} className={`dsd-pill ${m.tone}`}>
+                  <button
+                    key={s}
+                    type="button"
+                    className={`dsd-pill dsd-pill-btn ${m.tone}${status === s ? " on" : ""}`}
+                    onClick={() => setStatus(status === s ? "all" : s)}
+                    title={status === s ? "Show all statuses" : `Show only: ${m.label}`}
+                  >
                     <m.icon size={11} />{m.label} · {day.statusCounts[s].orders} · {aed2(day.statusCounts[s].grossAed)}
-                  </span>
+                  </button>
                 );
               })}
             </div>
 
+            {day.orderList.length > 0 && (
+              <div className="dsd-filters">
+                <div className="dsd-search">
+                  <Search size={13} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search order #, customer, gateway, store, payout ID, bank ref…"
+                    aria-label="Search orders"
+                  />
+                  {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={12} /></button>}
+                </div>
+                <div className="dsd-filter-row">
+                  <div className="dsd-seg" role="group" aria-label="Settlement">
+                    {(Object.keys(SETTLE_LABEL) as Settle[]).filter((k) => k === "all" || settleCounts[k] > 0).map((k) => (
+                      <button key={k} type="button" className={settle === k ? "on" : ""} onClick={() => setSettle(k)}>
+                        {SETTLE_LABEL[k]} <span>{settleCounts[k]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <select className="dsd-select" value={gateway} onChange={(e) => setGateway(e.target.value)} aria-label="Gateway">
+                    <option value="all">All gateways</option>
+                    {gateways.map(([g, n]) => <option key={g} value={g}>{g} ({n})</option>)}
+                  </select>
+                </div>
+                {filtered && (
+                  <div className="dsd-shown">
+                    <span>Showing {shown.length} of {orders.length} · gross {aed2(shownGross)} · fees {aed2(shownFee)} · received {aed2(shownRecv)}</span>
+                    <button type="button" onClick={clear}>Clear filters</button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {day.orderList.length === 0 && <p className="dsd-quiet">No sales on this day.</p>}
+            {day.orderList.length > 0 && shown.length === 0 && <p className="dsd-quiet">No orders match these filters.</p>}
 
             <div className="dsd-list">
-              {day.orderList.map((o) => {
+              {shown.map((o) => {
                 const m = STATUS_META[o.status];
                 return (
                   <article key={o.uid} className="dsd-order">
@@ -258,6 +344,21 @@ const DRAWER_CSS = `
   .dsd-pill.warn { background: #fef3c7; color: #b45309; } .dsd-pill.info { background: #dbeafe; color: #1d4ed8; }
   .dsd-pill.muted { background: #F3EFE7; color: #6F6457; }
   .dsd-quiet { color: #8A8175; font-size: 13px; }
+  .dsd-pill-btn { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 11.5px; }
+  .dsd-pill-btn.on { border-color: currentColor; box-shadow: 0 0 0 1px currentColor inset; }
+  .dsd-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .dsd-search { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #EAE3D6; border-radius: 10px; padding: 0 10px; height: 36px; color: #8A8175; }
+  .dsd-search:focus-within { border-color: #c4b5fd; }
+  .dsd-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 12.5px; color: #1F1B16; }
+  .dsd-search button { border: 0; background: #F3EFE7; border-radius: 6px; width: 20px; height: 20px; display: grid; place-items: center; cursor: pointer; color: #6F6457; }
+  .dsd-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .dsd-seg { display: inline-flex; background: #F3EFE7; border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+  .dsd-seg button { border: 0; background: transparent; border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 500; color: #6F6457; cursor: pointer; }
+  .dsd-seg button span { font-size: 10.5px; color: #8A8175; margin-left: 3px; font-variant-numeric: tabular-nums; }
+  .dsd-seg button.on { background: #fff; color: #1F1B16; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .dsd-select { height: 32px; border: 1px solid #EAE3D6; background: #fff; border-radius: 9px; padding: 0 8px; font-size: 12px; color: #1F1B16; cursor: pointer; }
+  .dsd-shown { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11.5px; color: #6F6457; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .dsd-shown button { border: 0; background: none; color: #6d28d9; font-weight: 600; font-size: 11.5px; cursor: pointer; padding: 0; }
   .dsd-list { display: flex; flex-direction: column; gap: 8px; }
   .dsd-order { background: #fff; border: 1px solid #EAE3D6; border-radius: 14px; padding: 11px 13px; display: flex; flex-direction: column; gap: 9px; }
   .dsd-order-top { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }

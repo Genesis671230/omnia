@@ -109,14 +109,14 @@ function itemFigures(li: LineItem) {
   return { qty, total, unit: qty > 0 ? total / qty : total };
 }
 
-function readPrefs(key: string): Partial<Record<string, string>> {
+export function readPrefs(key: string): Partial<Record<string, string>> {
   try {
     return JSON.parse(localStorage.getItem(key) || "{}");
   } catch {
     return {};
   }
 }
-function writePrefs(key: string, value: Record<string, string>) {
+export function writePrefs(key: string, value: Record<string, string>) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
@@ -644,7 +644,7 @@ function ProofRow({
 
 /* ── Account picker ─────────────────────────────────────────────────────── */
 
-function AccountSelect({ label, hint, value, onChange, options, placeholder, allowNone }: {
+export function AccountSelect({ label, hint, value, onChange, options, placeholder, allowNone }: {
   label: string;
   hint?: string;
   value: string;
@@ -1350,6 +1350,10 @@ export function GatewayProof({ r, live, onChanged }: {
                         ? <> together with the VAT {r.provider} charged on top (<b>{vatName}</b>): VAT = Total Fees × 5% is claimed as input VAT.</>
                         : <> as VAT-inclusive (<b>{vatName}</b>): VAT = fee ÷ 105 × 5 is claimed as input VAT.</>
                       : <> with no VAT.</>}</>
+                )}
+                {r.forceBook && wireResidual.needed && (
+                  <> The <b className="tabular-nums">{aed2(Math.abs(wireResidual.amount))}</b> gap on this credit was force-booked:
+                    it posts once to <b>{r.forceBook.accountName || "the account chosen"}</b>, whatever is picked above.</>
                 )}
               </p>
 
