@@ -557,6 +557,9 @@ export function buildCustomerPaymentBody(
      *  to nothing, leaving the invoice open with the money sitting unapplied. */
     amountApplied?: number;
     balance?: number;
+    /** Apply this one payment across several invoices of the same customer
+     *  (a founder's force allocation). Overrides invoiceId/amountApplied. */
+    allocations?: { invoiceId: string; amount: number }[];
   },
 ): CustomerPaymentBody {
   return {
@@ -573,7 +576,9 @@ export function buildCustomerPaymentBody(
     ...(input.description ? { description: input.description } : {}),
     ...(input.bankCharges ? { bank_charges: input.bankCharges } : {}),
     ...(input.customFields ? { custom_fields: input.customFields } : {}),
-    invoices: [{ invoice_id: input.invoiceId, amount_applied: input.amountApplied ?? input.amount }],
+    invoices: input.allocations?.length
+      ? input.allocations.map((a) => ({ invoice_id: a.invoiceId, amount_applied: a.amount }))
+      : [{ invoice_id: input.invoiceId, amount_applied: input.amountApplied ?? input.amount }],
   };
 }
 

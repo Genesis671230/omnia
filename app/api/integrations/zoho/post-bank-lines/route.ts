@@ -8,6 +8,7 @@ import {
   type ZohoPosting,
 } from "@/lib/integrations/zoho-banking";
 import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { postPlainBankExpense } from "@/lib/integrations/zoho-expenses";
 
 export const maxDuration = 120;
 
@@ -160,7 +161,9 @@ export async function POST(request: Request) {
       const existing = await findBankTransactionByReference(posting.referenceNumber, accessToken, posting.amount);
       const zohoTransactionId = existing
         ? existing.transaction_id
-        : (await createBankTransaction(posting, accessToken)).transaction_id;
+        : posting.transaction_type === "expense"
+          ? await postPlainBankExpense(posting, accessToken)
+          : (await createBankTransaction(posting, accessToken)).transaction_id;
 
       await ZohoBankTxnRepository.recordPosting({
         bank_line_id: draft.bankLineId,

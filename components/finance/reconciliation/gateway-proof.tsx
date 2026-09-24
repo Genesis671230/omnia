@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight, Loader2, Package, RotateCcw, Truck, AlertTriangle, Download,
-  BadgeCheck, CheckCircle2, AlertCircle, Eye, RefreshCw, Link2, Unlink, Search, Undo2,
+  BadgeCheck, CheckCircle2, AlertCircle, Eye, RefreshCw, Link2, Unlink, Search, Undo2, Gavel,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,8 @@ import type { SettlementRecord } from "@/lib/repositories/settlements.repository
 import type { PostingOptions } from "@/lib/integrations/zoho-settlement-posting";
 import type { OrderPublishResult, WirePublishResult } from "@/lib/finance/publish-settlements";
 import type { RefundResult } from "@/lib/finance/publish-refunds";
+import { ForceOrderPanel } from "./force-order-panel";
+import { DeliveryChargesPanel } from "./delivery-charges-panel";
 import {
   bankScaleFor,
   isCrossBorderCurrency,
@@ -389,19 +391,62 @@ function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: Recon
 
 type RefundRow = {
   ref: string; orderNumber: string | null; amount: number; booked: boolean;
+  /** net − gross: + fee handed back, − extra charge. */
+  charge: number; refundBooked: boolean; chargeBooked: boolean; chargeLegacy: boolean; chargeId: string | null;
   creditNoteId: string | null; creditNoteReused: boolean; refundId: string | null; error: string | null;
 };
 
+type LiveCN = {
+  id: string; number: string; date: string; status: string; total: number; balance: number;
+  refunds: { id: string; date: string; amount: number; mode: string; reference: string; description: string }[];
+  staleRefundCleared?: boolean;
+};
+
+type AccountOpt = { id: string; name: string };
+
 /** Each refund the gateway took back out of this payout becomes a credit note
- *  against the order's invoice (or reuses an open one already raised for that
- *  customer) plus a refund of it paid from the clearing account — so the
- *  clearing account still nets to what the bank received. */
-function RefundsPanel({ r, depositAccountId, depositName, reloadKey }: {
+ *  for the FULL refunded amount against the order's invoice (or reuses an open
+ *  one already raised for that customer), closed by ONE refund of the full
+ *  amount out of clearing. When the gateway handed its fee back, a journal
+ *  under the same reference debits clearing and credits gateway charges — so
+ *  clearing shows the net refund under one reference. An extra charge on a
+ *  refund is expensed out of clearing.
+ *  "Check credit notes" (and the booking bar's Re-check invoices) reads every
+ *  credit note live from Zoho; any one still open can be closed by hand with
+ *  full control of accounts, amounts and descriptions. */
+function RefundsPanel({
+  r, depositAccountId, depositName, reloadKey, feeAccountId, feeName, vatTaxId, inputVatAccountId, refreshSignal, accounts,
+}: {
   r: ReconLine; depositAccountId: string; depositName: string; reloadKey: string;
+  feeAccountId: string; feeName: string; vatTaxId: string; inputVatAccountId: string | null;
+  /** Bumped by the booking bar's "Re-check invoices". */
+  refreshSignal: number;
+  /** Every account a credit note can be refunded from. */
+  accounts: AccountOpt[];
 }) {
   const [rows, setRows] = useState<RefundRow[] | null>(null);
   const [results, setResults] = useState<{ dryRun: boolean; results: RefundResult[] } | null>(null);
-  const [busy, setBusy] = useState<"preview" | "post" | null>(null);
+  const [busy, setBusy] = useState<"preview" | "post" | "live" | "restructure" | null>(null);
+  const [restructuring, setRestructuring] = useState<string | null>(null);
+  const [restructurePlan, setRestructurePlan] = useState<{
+    creditNote: { number: string; total: number; open: number };
+    delete: { id: string; reference: string; amount: number }[];
+    refund: { amount: number; reference: string; from: string } | null;
+    journal: { amount: number; vat: number; vatBasis: "original_fee" | "payout" | "none"; charges: number; reference: string; debit: string; credit: string; vatAccount: string | null } | null;
+    netRefund: number;
+    journalVatFix: { id: string; amount: number; vat: number; charges: number; vatBasis: string } | null;
+  } | null>(null);
+  const [live, setLive] = useState<Record<string, LiveCN | { error: string } | null> | null>(null);
+  const [liveAt, setLiveAt] = useState<string | null>(null);
+  const [closing, setClosing] = useState<string | null>(null);
+  const prefKey = `omnia.refunds.feeRefundAccount.${r.provider}`;
+  const [feeRefundAccountId, setFeeRefundAccountId] = useState("");
+
+  useEffect(() => {
+    const saved = readPrefs(prefKey).accountId;
+    setFeeRefundAccountId(saved && accounts.some((a) => a.id === saved) ? saved : feeAccountId);
+    // accounts is rebuilt by the parent on every render; its length is what changes.
+  }, [prefKey, feeAccountId, accounts.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async () => {
     try {
@@ -410,29 +455,93 @@ function RefundsPanel({ r, depositAccountId, depositName, reloadKey }: {
       if (res.ok) setRows(json.refunds ?? []);
     } catch { /* the table still shows the refund lines */ }
   };
+  const loadLive = async (quiet = false) => {
+    setBusy("live");
+    try {
+      const res = await fetch(`/api/settlements/refunds/credit-notes?bankLineId=${encodeURIComponent(r.id)}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setLive(json.creditNotes ?? {});
+      setLiveAt(json.checkedAt ?? null);
+      const stale = Object.values(json.creditNotes ?? {}).filter((c) => c && "staleRefundCleared" in (c as object) && (c as LiveCN).staleRefundCleared).length;
+      if (stale) toast.error(`${stale} refund(s) we had recorded were deleted in Zoho — they show as open again.`);
+      else if (!quiet) toast.success("Credit notes read from Zoho.");
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
   useEffect(() => { void load(); }, [r.id, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (refreshSignal > 0) void loadLive(true); }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!rows || rows.length === 0) return null;
   const resultFor = (ref: string) => results?.results.find((x) => x.ref === ref);
-  const pending = rows.filter((x) => !x.booked);
+  const liveFor = (ref: string): LiveCN | null => {
+    const c = live?.[ref];
+    return c && "id" in c ? c : null;
+  };
+  // Booked per our table AND (when read) no money left open on the credit note.
+  const isDone = (x: RefundRow) => x.booked && !((liveFor(x.ref)?.balance ?? 0) > 0.009);
+  const pending = rows.filter((x) => !isDone(x));
+  const accountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "";
+
+  const restructure = async (x: RefundRow, dryRun: boolean) => {
+    if (!depositAccountId) { toast.error("Pick the Deposit To account first."); return; }
+    setBusy("restructure");
+    try {
+      const res = await fetch("/api/settlements/refunds/restructure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bankLineId: r.id, ref: x.ref, depositAccountId, chargesAccountId: feeRefundAccountId, inputVatAccountId, vatTaxId, dryRun }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      if (dryRun) {
+        setRestructuring(x.ref);
+        setRestructurePlan(j.plan);
+      } else {
+        setRestructuring(null);
+        setRestructurePlan(null);
+        toast.success(`${j.plan.creditNote.number} rebooked: one full refund${j.plan.journal ? " + returned fee journal" : ""}.`);
+        if (j.note) toast.error(j.note);
+        await loadLive(true);
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const run = async (dryRun: boolean) => {
     if (!depositAccountId) { toast.error("Pick the Deposit To account first."); return; }
+    if (pending.some((x) => x.charge < -0.009 && !x.chargeBooked) && !feeAccountId) {
+      toast.error("Pick the Gateway charges account first — extra refund charges book there."); return;
+    }
+    if (pending.some((x) => x.charge > 0.009 && !x.chargeBooked) && !feeRefundAccountId) {
+      toast.error("Pick the account the returned fee is credited to."); return;
+    }
+    writePrefs(prefKey, { accountId: feeRefundAccountId });
     setBusy(dryRun ? "preview" : "post");
     try {
       const res = await fetch("/api/settlements/refunds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankLineId: r.id, depositAccountId, dryRun, refs: pending.map((x) => x.ref) }),
+        body: JSON.stringify({
+          bankLineId: r.id, depositAccountId, feeAccountId, feeRefundAccountId, vatTaxId, inputVatAccountId,
+          dryRun, refs: pending.map((x) => x.ref),
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setResults(json);
       const bad = (json.results as RefundResult[]).filter((x) => !x.ok).length;
       if (dryRun) toast.message(`Refund preview: ${json.results.length - bad} ready, ${bad} need attention — nothing posted.`);
-      else if (bad === 0) toast.success("Refunds booked as credit notes in Zoho.");
+      else if (bad === 0) toast.success("Refunds booked: credit notes refunded, fee parts and charges booked.");
       else toast.error(`${bad} refund(s) not booked — see the list.`);
-      if (!dryRun) await load();
+      if (!dryRun) await loadLive(true);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -446,51 +555,181 @@ function RefundsPanel({ r, depositAccountId, depositName, reloadKey }: {
         <Undo2 size={13} className="text-[#6F5325]" />
         <span className="font-medium text-[#1F1B16]">Refunds on this payout</span>
         <span className="text-[#8A8175]">
-          credit note against the order + refund paid from {depositName || "the deposit account"}
+          one full refund from {depositName || "the deposit account"} closes the credit note · returned fee: Dr {depositName || "clearing"} / Cr {accountName(feeRefundAccountId) || "gateway charges"}, same reference · extra charges to {feeName || "gateway charges"}
         </span>
-        {r.confirmedBy && pending.length > 0 && (
-          <span className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => run(true)}
-              disabled={!!busy || !depositAccountId}
-              className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
-            >
-              {busy === "preview" ? <Loader2 size={11} className="animate-spin" /> : <Eye size={11} />} Preview
-            </button>
-            <button
-              onClick={() => run(false)}
-              disabled={!!busy || !depositAccountId}
-              className="inline-flex items-center gap-1 rounded-md bg-[#6F5325] px-2.5 py-1 text-[11.5px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:bg-[#B8B0A0]"
-            >
-              {busy === "post" ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
-              Book {pending.length} refund{pending.length === 1 ? "" : "s"}
-            </button>
-          </span>
-        )}
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => loadLive()}
+            disabled={!!busy}
+            title="Read every refund's credit note from Zoho now: total, refunds against it, open balance"
+            className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
+          >
+            {busy === "live" ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} {live ? "Re-check credit notes" : "Check credit notes in Zoho"}
+          </button>
+          {r.confirmedBy && pending.length > 0 && (
+            <>
+              <button
+                onClick={() => run(true)}
+                disabled={!!busy || !depositAccountId}
+                className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
+              >
+                {busy === "preview" ? <Loader2 size={11} className="animate-spin" /> : <Eye size={11} />} Preview
+              </button>
+              <button
+                onClick={() => run(false)}
+                disabled={!!busy || !depositAccountId}
+                className="inline-flex items-center gap-1 rounded-md bg-[#6F5325] px-2.5 py-1 text-[11.5px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:bg-[#B8B0A0]"
+              >
+                {busy === "post" ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                Book {pending.length} refund{pending.length === 1 ? "" : "s"}
+              </button>
+            </>
+          )}
+        </span>
       </div>
+      {r.confirmedBy && rows.some((x) => x.charge > 0.009) && (
+        <div className="mt-2 max-w-sm">
+          <AccountSelect
+            label="Returned fee credited to" hint="Dr clearing / Cr this account"
+            value={feeRefundAccountId} onChange={(v) => { setFeeRefundAccountId(v); writePrefs(prefKey, { accountId: v }); }}
+            placeholder="Select account…" options={accounts}
+          />
+        </div>
+      )}
       {!r.confirmedBy && <p className="mt-1 text-[11.5px] text-[#8A8175]">Confirm the settlement to book refunds.</p>}
-      <ul className="mt-1.5 space-y-1">
+      {liveAt && <p className="mt-1 text-[11px] text-[#8A8175]">Credit notes as Zoho had them at {new Date(liveAt).toLocaleTimeString()}.</p>}
+      <ul className="mt-1.5 space-y-1.5">
         {rows.map((x) => {
           const res = resultFor(x.ref);
+          const cn = liveFor(x.ref);
+          const cnErr = live?.[x.ref] && !cn ? (live[x.ref] as { error: string }).error : null;
+          const open = cn ? cn.balance : null;
           return (
-            <li key={x.ref} className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-              <span className="font-mono text-[#1F1B16]">#{x.ref}</span>
-              {x.orderNumber && x.orderNumber !== x.ref && <span className="text-[#8A8175]">→ #{x.orderNumber}</span>}
-              <span className="tabular-nums text-[#A6472F]">−{aed2(x.amount)}</span>
-              {x.booked ? (
-                <StatusPill s={{ kind: "booked", title: `credit note ${x.creditNoteId}${x.creditNoteReused ? " (existing, reused)" : ""} · refund ${x.refundId}` }} />
-              ) : res ? (
-                <StatusPill s={{ kind: res.status === "unlinked" ? "no_settlement" : res.status }} />
-              ) : !x.orderNumber ? (
-                <StatusPill s={{ kind: "no_settlement", title: "Link this refund line to its order first" }} />
-              ) : x.error ? (
-                <StatusPill s={{ kind: "review", title: x.error }} />
-              ) : (
-                <StatusPill s={{ kind: "unpaid", title: "Not booked yet" }} />
+            <li key={x.ref} className="rounded-md border border-transparent px-1 py-0.5 hover:border-[#EAE3D6]">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                <span className="font-mono text-[#1F1B16]">#{x.ref}</span>
+                {x.orderNumber && x.orderNumber !== x.ref && <span className="text-[#8A8175]">→ #{x.orderNumber}</span>}
+                {x.amount >= 0.01 ? (
+                  <span className="tabular-nums text-[#A6472F]" title="The full amount refunded to the customer — the credit note">refund −{aed2(x.amount)}</span>
+                ) : (
+                  <span className="text-[11px] text-[#8A8175]">charge only · no credit note</span>
+                )}
+                {Math.abs(x.charge) >= 0.01 && (
+                  <span
+                    className={`tabular-nums text-[11.5px] ${x.charge > 0 ? "text-[#4B7A54]" : "text-[#A6472F]"}`}
+                    title={x.charge > 0
+                      ? "The gateway handed its fee back: Dr clearing / Cr gateway charges, same reference as the refund"
+                      : "The gateway charged extra on this refund: expensed out of clearing"}
+                  >
+                    {x.charge > 0 ? `fee returned ${aed2(x.charge)} · net refund ${aed2(x.amount - x.charge)}` : `charge −${aed2(-x.charge)}`}
+                    {x.chargeLegacy ? " · inside the credit note (booked earlier)" : x.chargeBooked ? " · booked" : ""}
+                  </span>
+                )}
+                {isDone(x) ? (
+                  <StatusPill s={{ kind: "booked", title: [x.creditNoteId ? `credit note ${x.creditNoteId}${x.creditNoteReused ? " (existing, reused)" : ""} · refund ${x.refundId}` : "", x.chargeId ? `charge ${x.chargeId}` : ""].filter(Boolean).join(" · ") }} />
+                ) : open != null && open > 0.009 ? (
+                  <StatusPill s={{ kind: "not_closed", title: `Credit note ${cn!.number} still has AED ${open.toFixed(2)} open in Zoho` }} />
+                ) : res ? (
+                  <StatusPill s={{ kind: res.status === "unlinked" ? "no_settlement" : res.status }} />
+                ) : !x.orderNumber && x.amount >= 0.01 ? (
+                  <StatusPill s={{ kind: "no_settlement", title: "Link this refund line to its order first" }} />
+                ) : x.error ? (
+                  <StatusPill s={{ kind: "review", title: x.error }} />
+                ) : (
+                  <StatusPill s={{ kind: "unpaid", title: "Not booked yet" }} />
+                )}
+                {r.confirmedBy && cn && x.amount >= 0.01 && restructuring !== x.ref &&
+                  (cn.refunds.length > 1 || (cn.refunds.length === 1 && Math.abs(cn.refunds[0].amount - x.amount) >= 0.01 && cn.balance < 0.01) || x.charge > 0.009) && (
+                  <button
+                    onClick={() => void restructure(x, true)}
+                    title="Check this refund's entries against the house model — one full refund, plus the returned fee as Dr clearing / Cr gateway charges (and Input VAT when the fee carried VAT), same reference — and fix what differs"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#B08343] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#6F5325] hover:bg-[#FBF3E6]"
+                  >
+                    <RefreshCw size={10} /> Check / fix entries
+                  </button>
+                )}
+                {r.confirmedBy && cn && open != null && open > 0.009 && closing !== x.ref && (
+                  <button
+                    onClick={() => setClosing(x.ref)}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#A6472F] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#A6472F] hover:bg-[#F9ECE7]"
+                  >
+                    <Gavel size={10} /> Close credit note
+                  </button>
+                )}
+              </div>
+              {cn && (
+                <div className="mt-0.5 pl-4 text-[11.5px] text-[#6F6457]">
+                  <span className="font-mono">{cn.number}</span> · {cn.date} · {cn.status} · total <b className="tabular-nums">{aed2(cn.total)}</b>
+                  {" "}· refunded <b className="tabular-nums">{aed2(cn.total - cn.balance)}</b>
+                  {" "}· open <b className={`tabular-nums ${cn.balance > 0.009 ? "text-[#A6472F]" : "text-[#4B7A54]"}`}>{aed2(cn.balance)}</b>
+                  {cn.refunds.length > 0 && (
+                    <ul className="mt-0.5 space-y-0.5">
+                      {cn.refunds.map((f) => (
+                        <li key={f.id} className="text-[11px] text-[#8A8175]">
+                          ↳ {f.date} · <span className="tabular-nums">{aed2(f.amount)}</span> · {f.mode || "refund"}
+                          {f.reference ? <> · <span className="font-mono">{f.reference}</span></> : null}
+                          {f.description ? <> · {f.description}</> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
-              {x.booked && x.creditNoteReused && <span className="text-[11px] text-[#8A8175]">used an existing open credit note</span>}
-              {(res?.message || (!res && !x.booked && x.error)) && (
-                <span className="basis-full pl-4 text-[11.5px] text-[#6F5325]">{res?.message ?? x.error}</span>
+              {cnErr && <div className="pl-4 text-[11px] text-[#A6472F]">Couldn&apos;t read the credit note: {cnErr}</div>}
+              {x.booked && x.creditNoteReused && !cn && <div className="pl-4 text-[11px] text-[#8A8175]">used an existing open credit note</div>}
+              {(res?.message || (!res && !isDone(x) && x.error)) && (
+                <div className="pl-4 text-[11.5px] text-[#6F5325]">{res?.message ?? x.error}</div>
+              )}
+              {restructuring === x.ref && restructurePlan && (
+                <div className="mt-1.5 ml-4 rounded-lg border border-[#D6CCBA] bg-[#FBF8F1] p-2.5 text-[12px] text-[#1F1B16]">
+                  <div className="font-semibold">Restructure {restructurePlan.creditNote.number} (total {aed2(restructurePlan.creditNote.total)})</div>
+                  <ul className="mt-1 space-y-0.5 text-[11.5px] text-[#6F6457]">
+                    {restructurePlan.delete.map((d) => (
+                      <li key={d.id}>Delete refund {aed2(d.amount)} · <span className="font-mono">{d.reference}</span></li>
+                    ))}
+                    {restructurePlan.refund && (
+                      <li>Refund the credit note in full: <b>{aed2(restructurePlan.refund.amount)}</b> from {accountName(restructurePlan.refund.from) || depositName} · <span className="font-mono">{restructurePlan.refund.reference}</span></li>
+                    )}
+                    {restructurePlan.journal && (
+                      <li>
+                        Journal, same reference: Dr {accountName(restructurePlan.journal.debit) || depositName} <b>{aed2(restructurePlan.journal.amount)}</b>
+                        {" "}/ Cr {accountName(restructurePlan.journal.credit)} <b>{aed2(restructurePlan.journal.charges)}</b>
+                        {restructurePlan.journal.vat > 0 ? (
+                          <> / Cr Input VAT <b>{aed2(restructurePlan.journal.vat)}</b>
+                            <span className="text-[#8A8175]"> ({restructurePlan.journal.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span></>
+                        ) : <span className="text-[#8A8175]"> · no VAT on this order&apos;s fee</span>}
+                      </li>
+                    )}
+                    {restructurePlan.journalVatFix && (
+                      <li>
+                        Correct the returned-fee journal in place (same reference): Cr {accountName(feeRefundAccountId) || "gateway charges"} <b>{aed2(restructurePlan.journalVatFix.charges)}</b>
+                        {" "}+ Cr Input VAT <b>{aed2(restructurePlan.journalVatFix.vat)}</b> instead of {aed2(restructurePlan.journalVatFix.amount)} to charges
+                        <span className="text-[#8A8175]"> ({restructurePlan.journalVatFix.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span>
+                      </li>
+                    )}
+                    {!restructurePlan.refund && !restructurePlan.journal && !restructurePlan.journalVatFix && restructurePlan.delete.length === 0 && (
+                      <li className="text-[#4B7A54]">Already booked correctly — nothing to change.</li>
+                    )}
+                    <li>Net refund out of {depositName || "clearing"}: <b>{aed2(restructurePlan.netRefund)}</b></li>
+                  </ul>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button onClick={() => { setRestructuring(null); setRestructurePlan(null); }} disabled={busy === "restructure"}
+                      className="rounded-md border border-[#D6CCBA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
+                    <button onClick={() => void restructure(x, false)}
+                      disabled={busy === "restructure" || (!restructurePlan.refund && !restructurePlan.journal && !restructurePlan.journalVatFix && restructurePlan.delete.length === 0)}
+                      className="inline-flex items-center gap-1 rounded-md bg-[#A6472F] px-2.5 py-1 text-[11.5px] font-medium text-white disabled:opacity-50">
+                      {busy === "restructure" ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Yes, rebook in Zoho
+                    </button>
+                  </div>
+                </div>
+              )}
+              {closing === x.ref && cn && (
+                <CloseCreditNotePanel
+                  r={r} row={x} cn={cn} accounts={accounts}
+                  depositAccountId={depositAccountId} feeRefundAccountId={feeRefundAccountId}
+                  onCancel={() => setClosing(null)}
+                  onClosed={async () => { setClosing(null); await loadLive(true); }}
+                />
               )}
             </li>
           );
@@ -500,13 +739,116 @@ function RefundsPanel({ r, depositAccountId, depositName, reloadKey }: {
   );
 }
 
+/** Close one credit note by hand: any number of refund parts, each with its
+ *  own account, amount and description. Pre-filled with ONE refund of what
+ *  Zoho says is still open, from the clearing account. */
+function CloseCreditNotePanel({ r, row, cn, accounts, depositAccountId, feeRefundAccountId, onCancel, onClosed }: {
+  r: ReconLine; row: RefundRow; cn: LiveCN; accounts: AccountOpt[];
+  depositAccountId: string; feeRefundAccountId: string;
+  onCancel: () => void; onClosed: () => Promise<void> | void;
+}) {
+  const order = row.orderNumber ?? row.ref;
+  const [date, setDate] = useState((r.date ?? new Date().toISOString()).slice(0, 10));
+  const [parts, setParts] = useState<{ accountId: string; amount: string; description: string }[]>(() => {
+    // One full refund of what is open, from clearing — the house model. Add
+    // parts only when this credit note genuinely needs another account.
+    void feeRefundAccountId;
+    return [{ accountId: depositAccountId, amount: cn.balance.toFixed(2), description: `${r.provider} refund for order ${order}` }];
+  });
+  const [busy, setBusy] = useState(false);
+  const total = +parts.reduce((s, p) => s + (Number(p.amount) || 0), 0).toFixed(2);
+  const left = +(cn.balance - total).toFixed(2);
+  const problem =
+    parts.some((p) => !p.accountId) ? "Pick an account for every part" :
+    parts.some((p) => !(Number(p.amount) > 0)) ? "Every part needs an amount" :
+    left < -0.009 ? `That refunds AED ${Math.abs(left).toFixed(2)} more than is open` :
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ? "Pick the date" : null;
+  const set = (i: number, patch: Partial<(typeof parts)[number]>) => setParts((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+
+  const submit = async () => {
+    if (problem) return toast.error(problem);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/settlements/refunds/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bankLineId: r.id, ref: row.ref, date, parts: parts.map((p) => ({ ...p, amount: Number(p.amount) })) }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      const after = j.creditNote as LiveCN;
+      toast.success(after.balance < 0.01 ? `${after.number} closed in Zoho.` : `${after.number}: AED ${after.balance.toFixed(2)} still open.`);
+      await onClosed();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-1.5 ml-4 rounded-lg border border-[#D6CCBA] bg-[#FBF8F1] p-2.5 text-[12px]">
+      <div className="mb-1.5 font-semibold text-[#1F1B16]">
+        Close {cn.number} · AED {cn.balance.toFixed(2)} open
+      </div>
+      <div className="space-y-1.5">
+        {parts.map((p, i) => (
+          <div key={i} className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(180px,1.2fr)_110px_minmax(180px,2fr)_auto] sm:items-end">
+            <AccountSelect label={`Part ${i + 1} · refunded from`} value={p.accountId} onChange={(v) => set(i, { accountId: v })} placeholder="Select account…" options={accounts} />
+            <label className="text-[11px] text-[#6F6457]">
+              Amount
+              <input value={p.amount} inputMode="decimal" onChange={(e) => set(i, { amount: e.target.value })}
+                className="mt-1 w-full rounded-md border border-[#D6CCBA] bg-white px-2 py-1.5 text-right font-mono text-[12px]" />
+            </label>
+            <label className="text-[11px] text-[#6F6457]">
+              Description
+              <input value={p.description} maxLength={500} onChange={(e) => set(i, { description: e.target.value })}
+                className="mt-1 w-full rounded-md border border-[#D6CCBA] bg-white px-2 py-1.5 text-[12px]" />
+            </label>
+            <button onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))} className="pb-1.5 text-[11px] text-[#8A8175] underline">remove</button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <button
+          onClick={() => setParts((ps) => [...ps, { accountId: "", amount: Math.max(0, left).toFixed(2), description: `${r.provider} refund · order ${order}` }])}
+          className="rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px]"
+        >
+          + Add part
+        </button>
+        <label className="text-[11px] text-[#6F6457]">
+          Refund date
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ml-1.5 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[12px]" />
+        </label>
+        <span className="text-[11.5px] text-[#6F5325]">
+          Refunding <b className="tabular-nums">{aed2(total)}</b> · leaves <b className={`tabular-nums ${Math.abs(left) < 0.01 ? "text-[#4B7A54]" : "text-[#A6472F]"}`}>{aed2(Math.max(left, 0))}</b> open
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          {problem && <span className="text-[11.5px] text-[#A6472F]">{problem}</span>}
+          <button onClick={onCancel} disabled={busy} className="rounded-md border border-[#D6CCBA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
+          <button onClick={submit} disabled={busy || !!problem}
+            className="inline-flex items-center gap-1 rounded-md bg-[#A6472F] px-2.5 py-1 text-[11.5px] font-medium text-white disabled:opacity-50">
+            {busy ? <Loader2 size={11} className="animate-spin" /> : <Gavel size={11} />} Post {parts.length} refund{parts.length === 1 ? "" : "s"} in Zoho
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ── One row of the proof table, expandable to its products ─────────────── */
 
 function ProofRow({
   t, order, missing, open, onToggle, status, originalCurrency, showSelectColumn,
   canSelect, selected, onSelectToggle, onRecordOne, busy, crossBorder, splitFigure, feeFigure,
-  invoiceAmount, colCount, linkPanel,
+  invoiceAmount, colCount, linkPanel, forcePanel, onForce, invoiceNote,
 }: {
+  /** "2 Zoho invoices · 1 open" when the order number carries several. */
+  invoiceNote?: string;
+  /** Inline "force book this order" panel; shown instead of the products while set. */
+  forcePanel?: React.ReactNode;
+  /** Offered on rows held for review: pick the invoice(s) and amounts by hand. */
+  onForce?: () => void;
   /** Link-to-order control, for lines not matched to an order (or linked by hand). */
   linkPanel?: React.ReactNode;
   t: ReconTxn;
@@ -609,6 +951,18 @@ function ProofRow({
               </span>
             )}
             {status && <StatusPill s={status} />}
+            {invoiceNote && (
+              <span className="rounded-full bg-[#F9ECE7] px-1.5 py-0.5 text-[10.5px] font-medium text-[#A6472F]">{invoiceNote}</span>
+            )}
+            {onForce && !forcePanel && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onForce(); }}
+                title="Pick which Zoho invoice(s) this payment closes, and how much, then book"
+                className="inline-flex items-center gap-1 rounded-full border border-[#A6472F] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#A6472F] hover:bg-[#F9ECE7]"
+              >
+                <Gavel size={10} /> Force book
+              </button>
+            )}
             {linkPanel && !t.orderNumber && !open && (
               <button
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
@@ -630,7 +984,12 @@ function ProofRow({
           </span>
         </td>
       </tr>
-      {open && (
+      {forcePanel && (
+        <tr>
+          <td colSpan={colCount} className="border-t border-[#EAE3D6] bg-[#FBF8F1] px-4 py-3">{forcePanel}</td>
+        </tr>
+      )}
+      {open && !forcePanel && (
         <tr>
           <td colSpan={colCount} className="border-t border-[#EAE3D6] bg-[#FBF8F1] px-4 py-3">
             {linkPanel}
@@ -717,6 +1076,7 @@ export function GatewayProof({ r, live, onChanged }: {
   live?: { transactions: ReconTxn[]; net: number; sourceLabel: string } | null;
 }) {
   const [openRow, setOpenRow] = useState<string | null>(null);
+  const [forcingRef, setForcingRef] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrdersResponse | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
@@ -732,6 +1092,9 @@ export function GatewayProof({ r, live, onChanged }: {
   const [refreshingInvoices, setRefreshingInvoices] = useState(false);
   /** Invoice status has been read from Zoho at least once in this panel. */
   const [invoicesChecked, setInvoicesChecked] = useState(false);
+  // Bumped on every "Re-check invoices" — the refunds panel re-reads its
+  // credit notes from Zoho at the same time.
+  const [refundCheck, setRefundCheck] = useState(0);
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const [options, setOptions] = useState<PostingOptions | null>(null);
@@ -895,12 +1258,26 @@ export function GatewayProof({ r, live, onChanged }: {
   /** Our table says booked, but Zoho still shows the invoice with a balance —
    *  e.g. the payment was deleted in Zoho afterwards. Never trust the table
    *  over Zoho for "closed". */
+  /** Every invoice under this order number that still has money owing, from
+   *  the last live "Re-check invoices". An order can carry two invoices and
+   *  have only one closed (804671). */
+  const openInvoicesFor = (ref: string) => {
+    const iv = invoiceFor(ref);
+    if (!iv || iv.status === "not_found" || ("cached" in iv && iv.cached)) return [];
+    return (iv.invoices ?? []).filter((x) => x.balance > 0.01 && !["void", "draft"].includes(x.status.toLowerCase()));
+  };
+  const invoiceNoteFor = (ref: string): string | undefined => {
+    const iv = invoiceFor(ref);
+    if (!iv || iv.status === "not_found" || !iv.invoices || iv.invoices.length < 2) return undefined;
+    const open = openInvoicesFor(ref).length;
+    return `${iv.invoices.length} Zoho invoices · ${open ? `${open} open` : "all closed"}`;
+  };
   const openInZoho = (ref: string) => {
     const iv = invoiceFor(ref);
     // A snapshot is what Zoho said last time, not now — it must never be the
     // reason we call an invoice closed or open. Only a live read decides.
     if (!iv || iv.status === "not_found" || ("cached" in iv && iv.cached)) return false;
-    return iv.status !== "paid" && Number(iv.balance) > 0.01;
+    return (iv.status !== "paid" && Number(iv.balance) > 0.01) || openInvoicesFor(ref).length > 0;
   };
 
   const statusFor = (t: ReconTxn): RowStatus | undefined => {
@@ -940,7 +1317,12 @@ export function GatewayProof({ r, live, onChanged }: {
     })();
     if (s) {
       if (fullyBooked(s) && openInZoho(t.ref)) {
-        return { kind: "not_closed", title: `Our records say booked (payment ${s.zoho_payment_id}), but the Zoho invoice still has a balance — select it and Record again; it re-checks Zoho and posts only what's missing.` };
+        const open = openInvoicesFor(t.ref);
+        const list = open.map((x) => `${x.invoiceNumber} ${x.status} AED ${x.balance.toFixed(2)} open`).join(", ");
+        return {
+          kind: "not_closed",
+          title: `Our records say booked (payment ${s.zoho_payment_id}), but Zoho still has money owing${list ? `: ${list}` : ""}. Use Force book to close ${open.length > 1 ? "them" : "it"}.`,
+        };
       }
       if (fullyBooked(s)) return { kind: "booked", title: `payment ${s.zoho_payment_id}` };
       if (s.zoho_post_error) return { kind: "review", title: s.zoho_post_error };
@@ -1157,6 +1539,7 @@ export function GatewayProof({ r, live, onChanged }: {
       setInvoiceByRef(d.statuses ?? {});
       setInvoiceMeta({ fetched: d.fetched ?? 0, cached: 0 });
       setInvoicesChecked(true);
+      setRefundCheck((n) => n + 1);
       toast.success(`Read ${d.fetched ?? 0} invoice${d.fetched === 1 ? "" : "s"} from Zoho.`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -1356,6 +1739,17 @@ export function GatewayProof({ r, live, onChanged }: {
                     it posts once to <b>{r.forceBook.accountName || "the account chosen"}</b>, whatever is picked above.</>
                 )}
               </p>
+
+              {(r.payout?.deliveryCharges?.length ?? 0) > 0 && (
+                <DeliveryChargesPanel
+                  r={r}
+                  expenseAccounts={options?.feeAccounts ?? []}
+                  depositAccountId={depositAccountId}
+                  vatTaxId={crossBorder ? "" : vatTaxId}
+                  vatName={vatName}
+                  referenceOverride={useCustomRef && customRef.trim() ? customRef.trim() : undefined}
+                />
+              )}
 
               {scopeCount > 0 && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-[#FBF3E6] px-2.5 py-1.5 text-[11.5px] text-[#6F5325]">
@@ -1576,6 +1970,31 @@ export function GatewayProof({ r, live, onChanged }: {
                 selected={selected.has(t.ref)}
                 onSelectToggle={() => toggleSelect(t.ref)}
                 onRecordOne={() => run([t.ref], false)}
+                invoiceNote={r.confirmedBy ? invoiceNoteFor(t.ref) : undefined}
+                onForce={(() => {
+                  if (!r.confirmedBy || !settlementFor(orderOf(t)) || t.isRefund) return undefined;
+                  const k = statusFor(t)?.kind;
+                  const forceable = k === "review" || k === "not_closed" || openInvoicesFor(t.ref).length > 0;
+                  return forceable ? () => setForcingRef(t.ref) : undefined;
+                })()}
+                forcePanel={forcingRef === t.ref && settlementFor(orderOf(t)) ? (() => {
+                  const plan = planFor(t);
+                  return (
+                    <ForceOrderPanel
+                      settlementId={settlementFor(orderOf(t))!.id}
+                      orderNumber={orderOf(t)}
+                      gatewayGross={+(t.grossShare * bankScale).toFixed(2)}
+                      fee={plan.fee}
+                      netReceived={plan.netReceived}
+                      differenceName={nameOf(options?.differenceAccounts, differenceAccountId)}
+                      depositOptions={(options?.depositAccounts ?? []).map((a) => ({ id: a.account_id, name: a.account_name }))}
+                      defaultDepositAccountId={depositAccountId}
+                      defaultDate={(r.date ?? "").slice(0, 10)}
+                      onCancel={() => setForcingRef(null)}
+                      onBooked={async () => { setForcingRef(null); await run([t.ref], false); }}
+                    />
+                  );
+                })() : undefined}
                 busy={!!busy || !!missingSetup}
                 crossBorder={crossBorder}
                 splitFigure={splitFigureFor(t)}
@@ -1602,6 +2021,18 @@ export function GatewayProof({ r, live, onChanged }: {
           depositAccountId={depositAccountId}
           depositName={nameOf(options?.depositAccounts, depositAccountId)}
           reloadKey={matchedKey}
+          feeAccountId={feeAccountId}
+          feeName={nameOf(options?.feeAccounts, feeAccountId)}
+          vatTaxId={crossBorder ? "" : vatTaxId}
+          inputVatAccountId={options?.inputVatAccountId ?? null}
+          refreshSignal={refundCheck}
+          accounts={(() => {
+            const m = new Map<string, { id: string; name: string }>();
+            for (const a of [...(options?.depositAccounts ?? []), ...(options?.feeAccounts ?? []), ...(options?.differenceAccounts ?? [])]) {
+              if (!m.has(a.account_id)) m.set(a.account_id, { id: a.account_id, name: `${a.account_name} · ${a.account_type.replace(/_/g, " ")}` });
+            }
+            return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+          })()}
         />
       )}
 

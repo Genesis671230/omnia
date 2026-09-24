@@ -30,6 +30,7 @@ import {
   bankScaleFor,
   buildDifferenceJournalBody,
   buildFeeExpenseBody,
+  buildDeliveryChargesExpenseBody,
   buildResidualJournalBody,
   planWireResidual,
   wireResidualReference,
@@ -96,6 +97,9 @@ export type PublishOptions = {
   /** Book fee + FX even on invoices someone already marked paid by hand.
    *  Off by default: those fees may already have been booked by hand too. */
   bookFeesOnExternallyPaid?: boolean;
+  /** COD vouchers: also book the courier's delivery / return charges. Off
+   *  for a single-order Record, on for a full run or the charges' own button. */
+  includeDelivery?: boolean;
 };
 
 /** The one charge the remitting bank took on the wire itself — not an order's. */
@@ -109,14 +113,74 @@ export type WirePublishResult = {
   message?: string;
 };
 
-export type PublishOutcome = { results: OrderPublishResult[]; wire: WirePublishResult };
+export type DeliveryPublishResult = {
+  amount: number;
+  count: number;
+  status: "booked" | "planned" | "found_existing" | "review" | "failed";
+  ok: boolean;
+  expenseId?: string | null;
+  reference?: string;
+  message?: string;
+};
+
+export type PublishOutcome = { results: OrderPublishResult[]; wire: WirePublishResult; delivery?: DeliveryPublishResult };
 
 export async function publishSettlements(opts: PublishOptions): Promise<PublishOutcome> {
   const results: OrderPublishResult[] = [];
   for (const s of opts.settlements) {
     results.push(await publishOne(s, opts));
   }
-  return { results, wire: await publishWireResidual(opts) };
+  const delivery = opts.includeDelivery ? await publishDeliveryCharges(opts) : undefined;
+  // A delivery-charges-only run (no orders) leaves the wire journal alone.
+  const wire: WirePublishResult = opts.settlements.length === 0 && opts.includeDelivery
+    ? { amount: 0, status: "not_needed", ok: true }
+    : await publishWireResidual(opts);
+  return { results, wire, ...(delivery ? { delivery } : {}) };
+}
+
+/**
+ * A COD courier's delivery / return charges on one voucher — money it kept
+ * that closes no invoice (the order was prepaid through a gateway, or came
+ * back). One VAT-inclusive expense out of the clearing account the whole
+ * remittance lands in; with it, clearing nets to what the bank received.
+ * Idempotent on its reference, like the wire charge.
+ */
+export async function publishDeliveryCharges(opts: PublishOptions): Promise<DeliveryPublishResult | undefined> {
+  const { line, accounts, dryRun, accessToken } = opts;
+  const charges = line.payout?.deliveryCharges ?? [];
+  if (charges.length === 0) return undefined;
+  const total = Math.round(charges.reduce((s, c) => s + c.amount, 0) * 100) / 100;
+  const reference = `${(opts.referenceOverride || line.reference || line.id).trim()}/DLV`.slice(0, 100);
+  const base = { amount: total, count: charges.length, reference };
+  if (!accounts.deliveryAccountId) {
+    return { ...base, status: "review", ok: false, message: `Pick the account for ${line.provider} delivery charges (AED ${total.toFixed(2)}) first.` };
+  }
+  if (!accounts.depositAccountId) {
+    return { ...base, status: "review", ok: false, message: "Pick the Deposit To (clearing) account first." };
+  }
+  const returns = charges.filter((c) => c.isReturn);
+  const refs = charges.filter((c) => !c.isReturn).map((c) => c.ref);
+  const description =
+    `${line.provider} delivery charges · voucher ${line.payout?.id ?? ""} · ${charges.length} × AED ${total.toFixed(2)}` +
+    (refs.length ? ` · deliveries: ${refs.join(", ")}` : "") +
+    (returns.length ? ` · returns: ${returns.map((c) => c.ref).join(", ")}` : "");
+  try {
+    const existing = await findDocumentByReference("expenses", reference, accessToken);
+    if (existing) return { ...base, status: "found_existing", ok: true, expenseId: existing };
+    if (dryRun) return { ...base, status: "planned", ok: true };
+    const date = (line.date ?? new Date().toISOString()).slice(0, 10);
+    const expenseId = await createExpense(
+      buildDeliveryChargesExpenseBody({ total, accounts, date, reference, description }),
+      accessToken,
+    );
+    return { ...base, status: "booked", ok: true, expenseId };
+  } catch (e) {
+    const { message, uncertain } = describe(e);
+    return {
+      ...base, status: "failed", ok: false,
+      message: uncertain ? `${message} — Zoho may not have answered; retrying is safe, it looks the expense up by reference first.` : message,
+    };
+  }
 }
 
 /**
@@ -242,13 +306,32 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     } catch (e) {
       throw new ZohoRejection((e as Error).message); // a read — nothing written
     }
-    const picked = pickInvoiceForOrder(candidates, {
-      orderNumber: s.order_number,
-      expectedAmount: tx.grossShare * bankScale,
-      crossBorder,
-      orderCurrency,
-      preferredInvoiceId: s.zoho_invoice_id,
-    });
+    // Founder's force allocation: the invoice(s) and amounts were chosen by
+    // hand, so skip the automatic pick — but re-validate against what Zoho
+    // says NOW (an invoice can be voided or paid since it was chosen).
+    const forced = s.force_allocations?.length ? s.force_allocations : null;
+    let picked: ReturnType<typeof pickInvoiceForOrder>;
+    if (forced) {
+      const byId = new Map(candidates.map((c) => [c.invoice_id, c]));
+      const gone = forced.find((a) => {
+        const c = byId.get(a.invoice_id);
+        return !c || ["void", "draft"].includes(String(c.status).toLowerCase());
+      });
+      const customers = new Set(forced.map((a) => byId.get(a.invoice_id)?.customer_id));
+      picked = gone
+        ? { error: `Invoice ${gone.invoice_number} chosen for this order is void, draft or deleted in Zoho now — choose again (Force book).` }
+        : customers.size > 1
+          ? { error: `The chosen invoices belong to different Zoho customers — one payment can't close them. Choose invoices of one customer.` }
+          : { invoice: byId.get(forced[0].invoice_id)! };
+    } else {
+      picked = pickInvoiceForOrder(candidates, {
+        orderNumber: s.order_number,
+        expectedAmount: tx.grossShare * bankScale,
+        crossBorder,
+        orderCurrency,
+        preferredInvoiceId: s.zoho_invoice_id,
+      });
+    }
     if (!picked.invoice) {
       await save({ zoho_post_error: picked.error });
       return { ...base, status: "review", ok: false, message: picked.error };
@@ -286,8 +369,9 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     const freshPlan = (invoiceAmount: number) =>
       planOrderPosting({
         invoiceBalance: invoiceAmount, grossAed: tx.grossShare, feeAed: tx.feeShare, feeVatAed: tx.vatShare, netAed: tx.netShare,
-        bankScale, crossBorder, orderCurrency, feeVatInclusive: !!accounts.vatTaxId,
+        bankScale, crossBorder, orderCurrency, feeVatInclusive: !!accounts.vatTaxId, forced: !!forced,
       });
+    const forcedTotal = forced ? Math.round(forced.reduce((sum, a) => sum + Number(a.amount), 0) * 100) / 100 : 0;
     const storedPlan = (): OrderPostingPlan => {
       const fee = Number(s.fee_aed);
       const vat = Number(s.fee_vat_aed ?? 0);
@@ -300,7 +384,26 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
       };
     };
 
-    if (paymentId) {
+    if (forced) {
+      if (paymentId) {
+        steps.payment = "already_done";
+        plan = s.fee_aed != null ? { ...storedPlan(), paymentAmount: forcedTotal } : freshPlan(forcedTotal);
+      } else {
+        // Each allocation must still fit what its invoice owes right now.
+        const over = forced.find((a) => {
+          const c = candidates.find((x) => x.invoice_id === a.invoice_id)!;
+          return Number(a.amount) > Number(c.balance ?? 0) + ROUNDING_TOLERANCE_AED;
+        });
+        if (over) {
+          const c = candidates.find((x) => x.invoice_id === over.invoice_id)!;
+          const msg = `Invoice ${over.invoice_number} has only AED ${Number(c.balance ?? 0).toFixed(2)} open, but AED ${Number(over.amount).toFixed(2)} was allocated — adjust it (Force book).`;
+          await save({ zoho_post_error: msg });
+          return { ...base, invoiceNumber, status: "review", ok: false, message: msg };
+        }
+        plan = freshPlan(forcedTotal);
+      }
+      invoiceNumber = forced.map((a) => a.invoice_number).join(" + ");
+    } else if (paymentId) {
       // Verified: something is applied to the invoice and it's ours. Reuse the
       // figures already booked so a half-finished order can't drift.
       steps.payment = "already_done";
@@ -369,9 +472,11 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
               referenceNumberOverride: refs.payment,
               date,
               accountId: accounts.depositAccountId,
-              description: `${gateway} settlement · order ${s.order_number}${line.payout ? ` · payout ${line.payout.id}` : ""}`,
+              description: `${gateway} settlement · order ${s.order_number}${line.payout ? ` · payout ${line.payout.id}` : ""}` +
+                (forced ? ` · force-booked to ${invoiceNumber}${s.force_note ? `: ${s.force_note}` : ""}` : ""),
               customerId: invoice.customer_id,
               invoiceId: invoice.invoice_id,
+              ...(forced ? { allocations: forced.map((a) => ({ invoiceId: a.invoice_id, amount: Number(a.amount) })) } : {}),
             } as Parameters<typeof buildCustomerPaymentBody>[0]),
             accessToken,
           );

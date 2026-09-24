@@ -199,8 +199,16 @@ export type InvoiceStatus =
       cached?: boolean;
       checkedAt?: string | null;
       ambiguous?: string;
+      /** EVERY Zoho invoice under this order number (live reads only). An
+       *  order can hold two — a re-issue, a top-up — and one can still be
+       *  open while the other is booked (804671). */
+      invoices?: OrderInvoice[];
     }
   | { status: "not_found" };
+
+export type OrderInvoice = {
+  invoiceId: string; invoiceNumber: string; date: string; status: string; total: number; balance: number;
+};
 
 export type InvoiceStatusesResponse = {
   bankLineId: string;
@@ -235,6 +243,10 @@ async function checkInvoice(
   } catch {
     return { status: "not_found" };
   }
+  const invoices: OrderInvoice[] = candidates.map((c) => ({
+    invoiceId: c.invoice_id, invoiceNumber: c.invoice_number, date: c.date,
+    status: String(c.status ?? ""), total: Number(c.total ?? 0), balance: Number(c.balance ?? 0),
+  }));
   const picked = pickInvoiceForOrder(candidates, { orderNumber: ref, ...hint });
   if (!picked.invoice) {
     const open = candidates.find((c) => Number(c.balance) > 0.01) ?? candidates[0];
@@ -242,7 +254,7 @@ async function checkInvoice(
       ? {
           status: open.status as ZohoInvoiceStatus, invoiceId: open.invoice_id,
           balance: Number(open.balance), total: Number(open.total ?? 0),
-          invoiceNumber: open.invoice_number, ambiguous: picked.error,
+          invoiceNumber: open.invoice_number, ambiguous: picked.error, invoices,
         }
       : { status: "not_found" };
   }
@@ -252,6 +264,7 @@ async function checkInvoice(
     balance: Number(picked.invoice.balance),
     total: Number(picked.invoice.total ?? 0),
     invoiceNumber: picked.invoice.invoice_number,
+    invoices,
   };
 }
 

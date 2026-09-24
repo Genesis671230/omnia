@@ -142,7 +142,7 @@ export function DocumentsPanel({ version, onDone }: { version: number; onDone: (
           <button className="btn" disabled={busyPayout} onClick={() => payoutInput.current?.click()}>
             {busyPayout ? <Loader2 size={14} className="spin" /> : <Upload size={14} />} Upload payout file
           </button>
-          <input ref={payoutInput} type="file" className="hidden-input" accept=".csv,.xls,.xlsx" onChange={(e) => uploadPayout(e.target.files?.[0])} />
+          <input ref={payoutInput} type="file" className="hidden-input" accept=".csv,.xls,.xlsx,.pdf" onChange={(e) => uploadPayout(e.target.files?.[0])} />
           <span className="docpanel-hint">.xls/.xlsx/.csv — format auto-detected</span>
         </div>
 

@@ -16,6 +16,8 @@ import type { Gateway } from "@/lib/gateways";
 // evenly across every ref it names — the same even-split the founder's prior
 // n8n reconciliation workflow used, now built into the app instead of run by
 // hand alongside it.
+import type { CodDeliveryCharge } from "./ontrack-voucher";
+
 export type PayoutTransactionShare = {
   ref: string;
   netShare: number;
@@ -66,6 +68,10 @@ export type ParsedPayout = {
   merchantCode?: string;
   /** The raw statement number, before any collision disambiguation. */
   statementNo?: string;
+  /** COD courier vouchers only: charges netted out of the remittance that
+   *  belong to no invoice (delivery of a prepaid order, a return). Booked as
+   *  one VAT-inclusive expense — see publishDeliveryCharges(). */
+  deliveryCharges?: CodDeliveryCharge[];
 };
 
 // ── Stripe: payout RECONCILIATION report (has automatic_payout_id) ───────────
@@ -458,7 +464,12 @@ export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[]
     throw new Error(`Checkout CSV missing column(s) [${missing.join(", ")}] — expected the Interchange++ settlement export.`);
   }
 
-  type Row = { key: string; paymentId: string; ref: string; amount: number; isRefund: boolean; holdingCcy: string };
+  // `principal`: the money itself (Breakdown Type "Capture" / "Refund");
+  // every other breakdown row is a fee or the VAT on one. Splitting on sign
+  // instead counted a refund's own amount as a FEE (a 2,550.64 refund stored
+  // as gross 0 / fee 2,597.25), which the refund booking would then have
+  // expensed as a gateway charge.
+  type Row = { key: string; paymentId: string; ref: string; amount: number; isRefund: boolean; holdingCcy: string; principal: boolean };
   const rows: Row[] = [];
   for (const r of records) {
     const amount = parseFloat((r["holding currency amount"] || "0").replace(/,/g, ""));
@@ -474,6 +485,9 @@ export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[]
       amount,
       isRefund: /refund/i.test(r["action type"] || ""),
       holdingCcy: (r["holding currency"] || "AED").trim().toUpperCase(),
+      principal: (r["breakdown type"] || "").trim()
+        ? /^(capture|refund)$/i.test(r["breakdown type"].trim())
+        : amount > 0, // no Breakdown Type (older exports): fall back to the sign
     });
   }
   if (rows.length === 0) throw new Error("Checkout CSV: no rows with a numeric Holding Currency Amount found.");
@@ -492,8 +506,9 @@ export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[]
       throw new Error(`Checkout CSV: payout group "${key}" mixes holding currencies (${[...holdingCcys].join(", ")}) — expected exactly one settlement currency per batch.`);
     }
     const net = groupRows.reduce((s, r) => s + r.amount, 0);
-    const grossTotal = groupRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-    const feeTotal = Math.abs(groupRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0));
+    // Captures only: refunds are money going back, not sales volume.
+    const grossTotal = groupRows.filter((r) => r.principal && r.amount > 0).reduce((s, r) => s + r.amount, 0);
+    const feeTotal = Math.abs(groupRows.filter((r) => !r.principal).reduce((s, r) => s + r.amount, 0));
 
     const byPayment = new Map<string, Row[]>();
     for (const r of groupRows) {
@@ -508,8 +523,10 @@ export function parseCheckoutCsv(text: string, filename: string): ParsedPayout[]
       const refs = [...new Set(paymentRows.map((r) => r.ref).filter(Boolean))];
       if (refs.length === 0) continue; // fee-only maintenance rows (e.g. Network Token Update) carry no reference by design — they still count toward net above, just unattributed to an order.
       const groupNet = paymentRows.reduce((s, r) => s + r.amount, 0);
-      const groupGross = paymentRows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-      const groupFee = Math.abs(paymentRows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0));
+      // Signed: a refund's principal is negative, so gross − fee = net holds
+      // for refunds too (−2,550.64 − 46.61 = −2,597.25).
+      const groupGross = paymentRows.filter((r) => r.principal).reduce((s, r) => s + r.amount, 0);
+      const groupFee = Math.abs(paymentRows.filter((r) => !r.principal).reduce((s, r) => s + r.amount, 0));
       const isRefund = paymentRows.some((r) => r.isRefund) || groupNet < 0;
       const quality: StripeQuality = refs.length > 1 ? "multi" : isRefund ? "refund" : "clean";
       const n = refs.length;
@@ -963,6 +980,21 @@ export function withShopifyStore(p: ParsedPayout, store: string): ParsedPayout {
 // ── universal entry point: detect the format, then parse ─────────────────────
 // Accepts .xls / .xlsx / .csv from any of the five providers; the optional
 // hint only matters when detection is ambiguous (generic CSVs).
+/** parsePayoutFile, plus PDF: an OnTrack Client Payment Voucher (the only
+ *  payout PDF we receive). PDF text extraction is async, hence the wrapper. */
+export async function parsePayoutFileAsync(
+  buf: Buffer | ArrayBuffer,
+  filename: string,
+  hint?: Gateway,
+): Promise<ParsedPayout[]> {
+  const buffer = buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
+  if (/\.pdf$/i.test(filename) || buffer.subarray(0, 5).toString("latin1") === "%PDF-") {
+    const { parseOnTrackVoucherPdf } = await import("./ontrack-voucher");
+    return [await parseOnTrackVoucherPdf(buffer, filename)];
+  }
+  return parsePayoutFile(buffer, filename, hint);
+}
+
 export function parsePayoutFile(
   buf: Buffer | ArrayBuffer,
   filename: string,

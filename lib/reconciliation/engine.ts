@@ -11,6 +11,7 @@
 // An order NEVER claims it settled itself. It waits to be claimed by a
 // bank-confirmed payout. Anything a payout can't explain is an exception.
 
+import type { CodDeliveryCharge } from "@/lib/parsers/ontrack-voucher";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
@@ -45,6 +46,8 @@ export type ReconLine = {
     currency: string | null;
     fxRate: number | null;
     fxSource: "bank" | "estimate" | null;
+    /** COD courier vouchers: charges that belong to no invoice. */
+    deliveryCharges?: CodDeliveryCharge[];
   } | null;
   variance: number;
   resolvedOrders: string[];
@@ -427,6 +430,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       payout: {
         id: payout.id, net: expected.net, source: payout.source,
         currency: expected.currency, fxRate: expected.fxRate, fxSource: expected.fxSource,
+        ...(payout.delivery_charges?.length ? { deliveryCharges: payout.delivery_charges } : {}),
       },
       variance,
       resolvedOrders,

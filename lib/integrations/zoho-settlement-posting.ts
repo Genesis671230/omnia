@@ -22,7 +22,7 @@ export class ZohoRejection extends Error {
 type BooksJson = { code?: number; message?: string; [k: string]: unknown };
 
 async function books(
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   accessToken: string,
   opts: { query?: Record<string, string>; body?: unknown } = {},
@@ -93,6 +93,19 @@ export async function findOurPaymentOnInvoice(opts: {
     return refOk && invoiceOk;
   });
   return hit?.payment_id ?? null;
+}
+
+/** Whether a customer payment still exists in Zoho. A payment id we stored
+ *  can be deleted in Zoho afterwards (order 804671: payment deleted, both
+ *  invoices overdue again, our record still said "booked"). */
+export async function customerPaymentExists(paymentId: string, accessToken: string): Promise<boolean> {
+  try {
+    await books("GET", `/customerpayments/${encodeURIComponent(paymentId)}`, accessToken);
+    return true;
+  } catch (e) {
+    if (e instanceof ZohoRejection && /HTTP 404|code 1002\b/.test(e.message)) return false;
+    throw e;
+  }
 }
 
 /** Find an expense or journal by the exact reference an earlier attempt used. */
@@ -187,6 +200,8 @@ export type PostingOptions = {
   feeAccounts: PostingAccountOption[];
   differenceAccounts: PostingAccountOption[];
   taxes: PostingTaxOption[];
+  /** The "Input VAT" ledger account — reversed when a refund hands a fee back. */
+  inputVatAccountId?: string | null;
 };
 
 const DEPOSIT_TYPES = new Set(["bank", "cash", "payment_clearing", "credit_card"]);
@@ -221,6 +236,7 @@ export async function fetchPostingOptions(accessToken: string): Promise<PostingO
     taxes: ((taxJson.taxes ?? []) as PostingTaxOption[]).map(({ tax_id, tax_name, tax_percentage }) => ({
       tax_id, tax_name, tax_percentage: Number(tax_percentage),
     })),
+    inputVatAccountId: active.find((a) => /^input\s*vat$/i.test(a.account_name.trim()))?.account_id ?? null,
   };
 }
 
@@ -272,6 +288,47 @@ export async function findCreditNoteRefund(creditnoteId: string, reference: stri
   const json = await books("GET", `/creditnotes/${creditnoteId}/refunds`, accessToken);
   const rows = (json.creditnote_refunds ?? []) as { creditnote_refund_id: string; reference_number?: string }[];
   return rows.find((r) => String(r.reference_number ?? "").trim() === reference)?.creditnote_refund_id ?? null;
+}
+
+export type LiveCreditNote = {
+  id: string; number: string; date: string; status: string; total: number; balance: number;
+  refunds: { id: string; date: string; amount: number; mode: string; reference: string; description: string }[];
+};
+
+/** A credit note as Zoho holds it right now, with every refund against it.
+ *  Two reads. Our own table can be stale — a refund can be deleted in Zoho
+ *  after we recorded its id (803120: stored refund gone, credit note fully open). */
+export async function getCreditNoteLive(creditnoteId: string, accessToken: string): Promise<LiveCreditNote> {
+  const [cnJson, rfJson] = await Promise.all([
+    books("GET", `/creditnotes/${encodeURIComponent(creditnoteId)}`, accessToken),
+    books("GET", `/creditnotes/${encodeURIComponent(creditnoteId)}/refunds`, accessToken),
+  ]);
+  const cn = cnJson.creditnote as { creditnote_id: string; creditnote_number: string; date: string; status: string; total: number; balance: number };
+  const refunds = ((rfJson.creditnote_refunds ?? []) as {
+    creditnote_refund_id: string; date: string; amount_bcy?: number; amount?: number; refund_mode?: string; reference_number?: string; description?: string;
+  }[]).map((r) => ({
+    id: r.creditnote_refund_id, date: r.date, amount: Number(r.amount_bcy ?? r.amount ?? 0),
+    mode: r.refund_mode ?? "", reference: r.reference_number ?? "", description: r.description ?? "",
+  }));
+  return {
+    id: cn.creditnote_id, number: cn.creditnote_number, date: cn.date, status: String(cn.status ?? ""),
+    total: Number(cn.total ?? 0), balance: Number(cn.balance ?? 0), refunds,
+  };
+}
+
+export type JournalLine = { account_id: string; account_name?: string; debit_or_credit: "debit" | "credit"; amount: number; description?: string };
+
+export async function getJournal(journalId: string, accessToken: string): Promise<{ id: string; date: string; reference: string; notes: string; lines: JournalLine[] }> {
+  const json = await books("GET", `/journals/${encodeURIComponent(journalId)}`, accessToken);
+  const j = json.journal as { journal_id: string; journal_date: string; reference_number?: string; notes?: string; line_items?: JournalLine[] };
+  return {
+    id: j.journal_id, date: j.journal_date, reference: j.reference_number ?? "", notes: j.notes ?? "",
+    lines: (j.line_items ?? []).map((l) => ({ account_id: l.account_id, account_name: l.account_name, debit_or_credit: l.debit_or_credit, amount: Number(l.amount), description: l.description })),
+  };
+}
+
+export async function deleteCreditNoteRefund(creditnoteId: string, refundId: string, accessToken: string): Promise<void> {
+  await books("DELETE", `/creditnotes/${encodeURIComponent(creditnoteId)}/refunds/${encodeURIComponent(refundId)}`, accessToken);
 }
 
 export async function createCreditNoteRefund(creditnoteId: string, body: unknown, accessToken: string): Promise<string> {

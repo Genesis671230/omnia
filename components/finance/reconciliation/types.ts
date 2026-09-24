@@ -45,6 +45,9 @@ export type ReconLine = {
     currency: string | null;
     fxRate: number | null;
     fxSource: "bank" | "estimate" | null;
+    /** COD courier vouchers: delivery charges / returns netted out of the
+     *  remittance that belong to no invoice. */
+    deliveryCharges?: { ref: string; amount: number; exVat: number; vat: number; isReturn: boolean; voucherNo: string; status: string }[];
   } | null;
   variance: number;
   resolvedOrders: string[];

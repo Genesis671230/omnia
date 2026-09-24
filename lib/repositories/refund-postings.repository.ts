@@ -15,6 +15,11 @@ export type RefundPostingRow = {
   error: string | null;
   claimed_at: string | null;
   posted_at: string | null;
+  /** net − gross of the refund line, AED. + = fee handed back, − = extra charge. */
+  charge_amount_aed?: number | null;
+  zoho_charge_id?: string | null;
+  /** cn_refund: fee part refunded against the credit note; expense: extra charge. */
+  charge_kind?: "journal" | "expense" | "cn_refund" | null;
 };
 
 export const refundPostingId = (payoutId: string, orderNumber: string) => `${payoutId}|${orderNumber}`;

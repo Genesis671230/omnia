@@ -59,7 +59,17 @@ export type SettlementRecord = {
   zoho_invoice_balance?: number | null;
   zoho_invoice_total?: number | null;
   zoho_invoice_checked_at?: string | null;
+  /** Founder's per-order override: which invoice(s) the payment closes and
+   *  how much goes to each. See publishSettlements(). */
+  force_allocations?: ForceAllocation[] | null;
+  force_note?: string | null;
+  force_by?: string | null;
+  force_at?: string | null;
+  force_payment_id?: string | null;
+  force_payment_amount?: number | null;
 };
+
+export type ForceAllocation = { invoice_id: string; invoice_number: string; amount: number };
 
 export type SettlementPostingColumns = Partial<
   Pick<
@@ -78,6 +88,12 @@ export type SettlementPostingColumns = Partial<
     | "zoho_invoice_balance"
     | "zoho_invoice_total"
     | "zoho_invoice_checked_at"
+    | "force_allocations"
+    | "force_note"
+    | "force_by"
+    | "force_at"
+    | "force_payment_id"
+    | "force_payment_amount"
   >
 >;
 
@@ -376,6 +392,40 @@ export const SettlementsRepository = {
         if (error) throw new Error(`settlement_records invoice snapshot failed: ${error.message}`);
       }),
     );
+  },
+
+  /** The order's original gateway fee as this app booked it (the sale's
+   *  settlement, not a refund) — decides whether a returned fee carries VAT. */
+  async originalFee(orderNumber: string): Promise<{ fee: number; vat: number } | null> {
+    const { data, error } = await supabase
+      .from("settlement_records")
+      .select("fee_aed, fee_vat_aed")
+      .eq("order_number", orderNumber)
+      .not("fee_aed", "is", null)
+      .gt("fee_aed", 0)
+      .limit(1);
+    if (error) throw new Error(`settlement_records fee lookup failed: ${error.message}`);
+    const r = data?.[0];
+    return r ? { fee: Number(r.fee_aed), vat: Number(r.fee_vat_aed ?? 0) } : null;
+  },
+
+  async getById(id: string): Promise<SettlementRecord | null> {
+    const { data, error } = await supabase.from("settlement_records").select("*").eq("id", id).maybeSingle();
+    if (error) throw new Error(`settlement_records read failed: ${error.message}`);
+    return (data as SettlementRecord) ?? null;
+  },
+
+  /** Save (or, with null, clear) the founder's invoice allocation for one order. */
+  async setForceAllocations(
+    id: string,
+    force: { allocations: ForceAllocation[]; note: string; by: string } | null,
+  ): Promise<void> {
+    const { error } = await supabase.from("settlement_records").update(
+      force
+        ? { force_allocations: force.allocations, force_note: force.note, force_by: force.by, force_at: new Date().toISOString(), zoho_post_error: null }
+        : { force_allocations: null, force_note: null, force_by: null, force_at: null },
+    ).eq("id", id);
+    if (error) throw new Error(`settlement_records force update failed: ${error.message}`);
   },
 
   async updatePosting(id: string, patch: SettlementPostingColumns): Promise<void> {

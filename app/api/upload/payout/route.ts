@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Gateway } from "@/lib/gateways";
-import { parsePayoutFile, type ParsedPayout } from "@/lib/parsers/payouts";
+import { parsePayoutFileAsync, type ParsedPayout } from "@/lib/parsers/payouts";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { FilesRepository } from "@/lib/repositories/files.repository";
 import { supabase } from "@/lib/supabase";
@@ -10,13 +10,13 @@ export const maxDuration = 60;
 
 // POST /api/upload/payout — multipart form with `file`; `provider` is an
 // optional hint. Format is auto-detected: Telr .xls/.csv, Tamara statement
-// .xlsx, Tabby settlement .xlsx, Stripe reconciliation/transfers .csv, or a
-// generic provider CSV. The raw file is stored for later download.
+// .xlsx, Tabby settlement .xlsx, Stripe reconciliation/transfers .csv, an
+// OnTrack COD Client Payment Voucher .pdf, or a generic provider CSV. The raw file is stored for later download.
 export async function POST(request: Request) {
   const form = await request.formData();
   const file = form.get("file");
   const providerRaw = String(form.get("provider") || "");
-  const provider = (["Stripe", "Telr", "Checkout", "Tabby", "Tamara", "Shopify Payments"].includes(providerRaw)
+  const provider = (["Stripe", "Telr", "Checkout", "Tabby", "Tamara", "Shopify Payments", "COD"].includes(providerRaw)
     ? providerRaw
     : undefined) as Gateway | undefined;
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   let payouts: ParsedPayout[];
   try {
-    payouts = parsePayoutFile(buf, file.name, provider);
+    payouts = await parsePayoutFileAsync(buf, file.name, provider);
     // A Shopify Payments export doesn't say which store it's from; the order
     // numbers in it do. Optional `store` form field overrides.
     payouts = await assignShopifyStores(payouts, String(form.get("store") || "").toUpperCase() || null);

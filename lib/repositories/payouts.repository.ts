@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedPayout, PayoutTransactionShare } from "@/lib/parsers/payouts";
+import type { CodDeliveryCharge } from "@/lib/parsers/ontrack-voucher";
 import { resolvePayoutId, type ExistingPayoutIdentity } from "@/lib/finance/payout-identity";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
@@ -114,6 +115,7 @@ export const PayoutsRepository = {
       source: p.source,
       original_currency: p.originalCurrency ?? null,
       net_original: p.netOriginal ?? null,
+      delivery_charges: p.deliveryCharges?.length ? p.deliveryCharges : null,
       uploaded_at: new Date().toISOString(),
     }));
     const { error } = await supabase.from("payouts").upsert(rows, { onConflict: "id" });
@@ -134,8 +136,27 @@ export const PayoutsRepository = {
       // quality per ref. Older parsers (Telr/Tamara/Tabby/generic) only total
       // the whole file — 0/false/null there are honest placeholders, not a
       // guess, since that granularity was never computed.
+      // One row per ref: a ref can recur within a payout (Checkout auth
+      // retries, a split capture) — sum them rather than keep only the last,
+      // which silently dropped the earlier rows' money.
       const sharesByRef = new Map<string, PayoutTransactionShare>();
-      for (const t of p.transactions ?? []) sharesByRef.set(t.ref, t);
+      const add = (a: number | undefined, b: number | undefined) =>
+        a == null && b == null ? undefined : +((a ?? 0) + (b ?? 0)).toFixed(2);
+      for (const t of p.transactions ?? []) {
+        const prev = sharesByRef.get(t.ref);
+        sharesByRef.set(t.ref, prev ? {
+          ...prev,
+          grossShare: add(prev.grossShare, t.grossShare)!,
+          feeShare: add(prev.feeShare, t.feeShare)!,
+          netShare: add(prev.netShare, t.netShare)!,
+          vatShare: add(prev.vatShare, t.vatShare),
+          grossOriginal: add(prev.grossOriginal, t.grossOriginal),
+          feeOriginal: add(prev.feeOriginal, t.feeOriginal),
+          netOriginal: add(prev.netOriginal, t.netOriginal),
+          vatOriginal: add(prev.vatOriginal, t.vatOriginal),
+          isRefund: prev.isRefund || t.isRefund,
+        } : t);
+      }
 
       const txRows = p.orderRefs.map((ref) => {
         const share = sharesByRef.get(ref);
@@ -190,6 +211,8 @@ export const PayoutsRepository = {
       bank_line_id?: string | null;
       uploaded_at?: string | null;
       original_currency: string | null; net_original: number | null;
+      /** COD vouchers: see ParsedPayout.deliveryCharges. */
+      delivery_charges?: CodDeliveryCharge[] | null;
       transactions: {
         order_ref: string; is_refund: boolean; quality: string | null;
         net_aed: number; gross_aed: number; fee_aed: number;
@@ -206,11 +229,12 @@ export const PayoutsRepository = {
       id: string; gateway: string; net_amount: number; gross_amount: number | null; fee_amount: number | null;
       source: string | null; status: string; original_currency: string | null; net_original: number | null;
       bank_line_id: string | null; uploaded_at: string | null;
+      delivery_charges: CodDeliveryCharge[] | null;
     }>(
       (from, to) =>
         supabase
           .from("payouts")
-          .select("id, gateway, net_amount, gross_amount, fee_amount, source, status, original_currency, net_original, bank_line_id, uploaded_at")
+          .select("id, gateway, net_amount, gross_amount, fee_amount, source, status, original_currency, net_original, bank_line_id, uploaded_at, delivery_charges")
           .range(from, to),
       "payouts select",
     );

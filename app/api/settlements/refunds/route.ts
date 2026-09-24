@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { runReconciliation } from "@/lib/reconciliation/engine";
-import { publishRefunds, refundLinesOf } from "@/lib/finance/publish-refunds";
+import { publishRefunds, refundLineState, refundLinesOf } from "@/lib/finance/publish-refunds";
 import { RefundPostingsRepository, refundPostingId } from "@/lib/repositories/refund-postings.repository";
 
 export const maxDuration = 120;
 
 // GET  /api/settlements/refunds?bankLineId=…  → refund lines on the payout + booking state (DB only)
-// POST /api/settlements/refunds  { bankLineId, depositAccountId, refs?, dryRun? }
-//      → credit note against the order's invoice + refund from the clearing account
+// POST /api/settlements/refunds  { bankLineId, depositAccountId, feeAccountId?, vatTaxId?, inputVatAccountId?, refs?, dryRun? }
+//      → credit note for the full refund + refund of it from clearing (closes it),
+//        and the gateway's charge on the refund (fee handed back / extra charge)
 export async function GET(request: Request) {
   const bankLineId = new URL(request.url).searchParams.get("bankLineId") ?? "";
   if (!bankLineId) return NextResponse.json({ error: "bankLineId is required" }, { status: 400 });
@@ -17,10 +18,15 @@ export async function GET(request: Request) {
   const rows = new Map((await RefundPostingsRepository.listByBankLine(bankLineId)).map((r) => [r.id, r]));
   return NextResponse.json({
     refunds: refundLinesOf(line).map((r) => {
-      const row = r.orderNumber ? rows.get(refundPostingId(line.payout!.id, r.orderNumber)) : undefined;
+      const row = rows.get(refundPostingId(line.payout!.id, r.orderNumber ?? r.ref));
+      const st = refundLineState(r, row);
       return {
         ...r,
-        booked: !!row?.zoho_refund_id && !row.zoho_refund_id.startsWith("PENDING:"),
+        booked: st.booked,
+        refundBooked: st.refundDone,
+        chargeBooked: st.chargeDone,
+        chargeLegacy: st.legacy,
+        chargeId: row?.zoho_charge_id ?? null,
         creditNoteId: row?.zoho_creditnote_id ?? null,
         creditNoteReused: row?.creditnote_reused ?? false,
         refundId: row?.zoho_refund_id ?? null,
@@ -46,6 +52,10 @@ export async function POST(request: Request) {
     const results = await publishRefunds({
       line,
       depositAccountId,
+      feeAccountId: String(body.feeAccountId ?? "") || null,
+      vatTaxId: String(body.vatTaxId ?? "") || null,
+      inputVatAccountId: String(body.inputVatAccountId ?? "") || null,
+      feeRefundAccountId: String(body.feeRefundAccountId ?? "") || null,
       refs: Array.isArray(body.refs) ? body.refs.map(String) : undefined,
       dryRun: body.dryRun === true,
       accessToken: await getAccessToken(),

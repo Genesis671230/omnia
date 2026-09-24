@@ -17,6 +17,8 @@ export const maxDuration = 300;
 //     vatTaxId?: string,               — AED payouts: fee is VAT-inclusive
 //     differenceAccountId?: string,    — Exchange Gain or Loss
 //     referenceNumberOverride?: string,
+//     deliveryAccountId?: string,      — COD: expense account for courier delivery charges
+//     deliveryOnly?: boolean,          — COD: book just the delivery charges
 //     bookFeesOnExternallyPaid?: boolean — also book fee/FX on invoices
 //                                         already paid by hand in Zoho
 //     dryRun?: boolean,                — reads Zoho, writes nothing
@@ -39,7 +41,10 @@ export async function POST(request: Request) {
     feeAccountId: str(body.feeAccountId),
     vatTaxId: str(body.vatTaxId) || null,
     differenceAccountId: str(body.differenceAccountId) || null,
+    deliveryAccountId: str(body.deliveryAccountId) || null,
   };
+  // COD vouchers: book only the courier's delivery / return charges.
+  const deliveryOnly = body.deliveryOnly === true;
 
   if (!bankLineId) {
     return NextResponse.json({ error: "bankLineId is required" }, { status: 400 });
@@ -61,8 +66,8 @@ export async function POST(request: Request) {
 
   const all = await SettlementsRepository.listByBankLineId(line.id);
   const wanted = settlementIds.length > 0 ? new Set(settlementIds) : null;
-  const settlements = all.filter((s) => !wanted || wanted.has(s.id));
-  if (settlements.length === 0) {
+  const settlements = deliveryOnly ? [] : all.filter((s) => !wanted || wanted.has(s.id));
+  if (settlements.length === 0 && !deliveryOnly) {
     return NextResponse.json(
       { error: "No settlement records for this credit — run reconciliation again after the payout file upload." },
       { status: 400 },
@@ -71,7 +76,7 @@ export async function POST(request: Request) {
 
   const runId = dryRun ? null : await ZohoPublishRunsRepository.start();
   try {
-    const { results, wire } = await publishSettlements({
+    const { results, wire, delivery } = await publishSettlements({
       line,
       settlements,
       accounts,
@@ -79,6 +84,8 @@ export async function POST(request: Request) {
       dryRun,
       accessToken: await getAccessToken(),
       bookFeesOnExternallyPaid: body.bookFeesOnExternallyPaid === true,
+      // A single-order Record never books the voucher's delivery charges.
+      includeDelivery: deliveryOnly || settlementIds.length === 0,
     });
     if (runId) {
       await ZohoPublishRunsRepository.finish(
@@ -97,6 +104,7 @@ export async function POST(request: Request) {
       // The bank's own cut on a cross-border wire, booked once for the whole
       // credit rather than smeared across its orders.
       wire,
+      delivery,
       settlements: await SettlementsRepository.listByBankLineId(line.id),
     });
   } catch (e) {

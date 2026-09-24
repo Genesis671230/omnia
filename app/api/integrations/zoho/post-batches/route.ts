@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { createBankTransaction, findBankTransactionByReference, type ZohoPosting } from "@/lib/integrations/zoho-banking";
 import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
+import { postPlainBankExpense } from "@/lib/integrations/zoho-expenses";
 import type { PostingBatch } from "@/lib/reconciliation/posting-batch-builder";
 
 export const maxDuration = 120;
@@ -94,7 +95,11 @@ export async function POST(request: Request) {
       }
 
       const existing = await findBankTransactionByReference(posting.referenceNumber, accessToken);
-      const zohoTransactionId = existing ? existing.transaction_id : (await createBankTransaction(posting, accessToken)).transaction_id;
+      const zohoTransactionId = existing
+        ? existing.transaction_id
+        : posting.transaction_type === "expense"
+          ? await postPlainBankExpense(posting, accessToken)
+          : (await createBankTransaction(posting, accessToken)).transaction_id;
 
       await Promise.all(bankLineIds.map((bankLineId) =>
         ZohoBankTxnRepository.recordPosting({

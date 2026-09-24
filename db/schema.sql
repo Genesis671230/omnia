@@ -910,3 +910,32 @@ create table if not exists gateway_pending_charges (
 );
 create index if not exists gateway_pending_charges_order_idx on gateway_pending_charges (order_ref);
 create index if not exists gateway_pending_charges_store_idx on gateway_pending_charges (store);
+
+-- Per-order force booking (2026-09-24): when an order is held for review —
+-- several Zoho invoices for one order number, or an invoice balance that
+-- doesn't match the gateway amount — the founder picks which invoice(s) the
+-- payment closes and how much goes to each. publishSettlements() then skips
+-- its own invoice pick and amount check and applies ONE customer payment to
+-- exactly these allocations: [{ invoice_id, invoice_number, amount }].
+alter table settlement_records add column if not exists force_allocations jsonb;
+alter table settlement_records add column if not exists force_note text;
+alter table settlement_records add column if not exists force_by text;
+alter table settlement_records add column if not exists force_at timestamptz;
+-- The customer payment a force booking created (or PENDING:<uuid> while the
+-- write is in flight — a retry then refuses instead of paying twice).
+alter table settlement_records add column if not exists force_payment_id text;
+alter table settlement_records add column if not exists force_payment_amount numeric;
+
+-- COD courier vouchers (OnTrack): charges netted out of the remittance that
+-- belong to no invoice — delivery of a prepaid order, or a return ("rtn").
+-- [{ ref, amount (VAT-incl), exVat, vat, isReturn, voucherNo, status }].
+-- Booked once per bank credit as a VAT-inclusive expense out of clearing.
+alter table payouts add column if not exists delivery_charges jsonb;
+
+-- Refund charges (2026-09-24). A refund line's net − gross is the gateway's
+-- charge on it: positive = it handed its fee back (Tabby), negative = it
+-- charged extra (Telr 1.05, Tamara/Checkout fee-only lines). Booked beside
+-- the credit note: a journal back into clearing, or an expense out of it.
+alter table refund_postings add column if not exists charge_amount_aed numeric;
+alter table refund_postings add column if not exists zoho_charge_id text;
+alter table refund_postings add column if not exists charge_kind text;   -- journal | expense

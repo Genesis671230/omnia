@@ -536,7 +536,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       <main className="ml-60 min-h-screen">
         <div className="mx-auto max-w-[1320px] px-10 pt-8 pb-28">
           {/* Header */}
-          {/* <header className="mb-7 flex items-end justify-between gap-6 border-b border-[#EAE3D6] pb-5">
+          <header className="mb-7 flex items-end justify-between gap-6 border-b border-[#EAE3D6] pb-5">
             <div className="flex flex-col leading-tight">
               <span className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#B08343]">
                 {pageEyebrow}
@@ -582,7 +582,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                 </>
               )}
             </div>
-          </header> */}
+          </header>
 
           {/* Date-range bar for context-sharing views (not on reconciliation — recon has its own) */}
           {showReconContext && view !== "reconciliation" && (
@@ -734,7 +734,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                   variant={variant === "dropzone" ? "dropzone" : "ghost"}
                   endpoint="/api/upload/payout"
                   extraFields={bankLineId ? { provider, bankLineId } : { provider }}
-                  accept=".csv,.xls,.xlsx"
+                  accept=".csv,.xls,.xlsx,.pdf"
                   label={`Upload ${provider} payout file`}
                   onDone={refresh}
                 />

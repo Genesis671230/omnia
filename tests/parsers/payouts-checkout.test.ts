@@ -117,3 +117,21 @@ test("parseCheckoutCsv: throws on a mixed holding currency within one payout gro
 
   assert.throws(() => parseCheckoutCsv(csv, "checkout.csv"), /mixes holding currencies/);
 });
+
+test("parseCheckoutCsv: a refund's own amount is its (negative) gross, not a fee", () => {
+  const base = { "Currency Account ID": "ca_x", "Payment ID": "pay_35jyrcab74", "Processed On": "2026-09-01 10:00:00",
+    "Holding Currency": "AED", "Reference": "zJnwy5Zus3isItJ2PDhwqqNZJ", "Action Type": "Partial Refund" };
+  const csv = [HEADER,
+    row({ ...base, "Breakdown Type": "Refund", "Holding Currency Amount": "-2550.64" }),
+    row({ ...base, "Breakdown Type": "Refund Fixed Fee", "Holding Currency Amount": "-0.65" }),
+    row({ ...base, "Breakdown Type": "Refund Fixed Fee Tax", "Holding Currency Amount": "-0.0325" }),
+    row({ ...base, "Breakdown Type": "Scheme Variable Fee", "Holding Currency Amount": "-38.56" }),
+  ].join("\n");
+  const [p] = parseCheckoutCsv(csv, "cko.csv");
+  const t = p.transactions![0];
+  assert.equal(t.isRefund, true);
+  assert.equal(t.grossShare, -2550.64);
+  assert.equal(t.feeShare, 39.24);
+  assert.equal(t.netShare, -2589.88);
+  assert.equal(p.gross, 0); // refunds are not sales volume
+});

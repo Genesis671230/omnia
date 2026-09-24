@@ -152,6 +152,9 @@ export type OrderPostingInput = {
   orderCurrency?: string | null;
   /** Whether the fee carries UAE VAT (a tax was chosen for an AED payout). */
   feeVatInclusive: boolean;
+  /** The founder chose the invoice(s) and amounts by hand: book whatever
+   *  difference results instead of holding the order for review. */
+  forced?: boolean;
   vatRatePct?: number;
 };
 
@@ -196,11 +199,17 @@ export function planOrderPosting(input: OrderPostingInput): OrderPostingPlan {
     plan.review = "The Zoho invoice has no balance left to pay.";
     return plan;
   }
-  if (netReceived <= 0) {
+  // Nothing received is only suspicious when the fee doesn't explain it: a
+  // COD order where the courier kept the whole 30 it collected nets to 0.
+  if ((netReceived < 0 || (netReceived === 0 && fee < ROUNDING_TOLERANCE_AED)) && !input.forced) {
     plan.review = "The payout file shows nothing received for this order.";
     return plan;
   }
   if (Math.abs(difference) < ROUNDING_TOLERANCE_AED) return plan;
+  if (input.forced) {
+    plan.differenceKind = isFxOrder({ crossBorder: input.crossBorder, orderCurrency: input.orderCurrency }) ? "fx" : "rounding";
+    return plan;
+  }
 
   // Note this asks isFxOrder, not input.crossBorder: the VAT split above is
   // keyed to the payout, this is keyed to the order.
@@ -237,7 +246,34 @@ export type PostingAccounts = {
   vatTaxId?: string | null;
   /** Exchange Gain or Loss — required whenever there is a difference. */
   differenceAccountId?: string | null;
+  /** COD vouchers: where the courier's delivery / return charges are expensed. */
+  deliveryAccountId?: string | null;
 };
+
+/** One VAT-inclusive expense for all the delivery / return charges a courier
+ *  netted out of a COD remittance, paid out of the clearing account. */
+export function buildDeliveryChargesExpenseBody(opts: {
+  total: number;
+  accounts: PostingAccounts;
+  date: string;
+  reference: string;
+  description: string;
+}) {
+  const withVat = !!opts.accounts.vatTaxId;
+  return {
+    account_id: opts.accounts.deliveryAccountId as string,
+    paid_through_account_id: opts.accounts.depositAccountId,
+    date: opts.date,
+    amount: round2(opts.total),
+    reference_number: opts.reference,
+    description: opts.description.slice(0, 500),
+    tax_treatment: "vat_registered",
+    place_of_supply: "DU",
+    is_reverse_charge_applied: false,
+    is_inclusive_tax: withVat,
+    ...(withVat ? { tax_id: opts.accounts.vatTaxId as string } : {}),
+  };
+}
 
 /** Stable per-order references, so a retry can find what an earlier attempt
  *  already wrote instead of writing it twice. */
@@ -445,6 +481,73 @@ export function pickInvoiceForOrder(
 
 // ── refunds netted out of a payout ───────────────────────────────────────────
 
+/**
+ * What one refund line on a payout books.
+ *
+ * Gateways disagree on the fee's sign, so the only safe figure is net − gross:
+ *   Tabby  gross −773.72, net −737.16 → +36.56: fee handed back to us
+ *   Telr   gross −885.75, net −886.80 → −1.05:  extra refund charge
+ *   Tamara gross 0,       net −67.31  → −67.31: a charge, no refund at all
+ * The credit note (and its refund, which closes it) is always the full
+ * refunded amount |gross| — the sale is reversed in full; the charge is
+ * booked beside it, never folded into the credit note.
+ */
+export function planRefundLine(t: { grossShare: number; netShare: number }, scale = 1): {
+  refundAmount: number;
+  charge: number;
+} {
+  const s = (n: number) => round2(n * scale);
+  const refundAmount = t.grossShare < 0 ? Math.abs(s(t.grossShare)) : 0;
+  // A row with no gross at all is entirely charge.
+  const charge = s(t.netShare) - (t.grossShare < 0 ? s(t.grossShare) : 0);
+  return { refundAmount, charge: round2(charge) };
+}
+
+/** Fee handed back on a refund: the money returns to clearing and the charge
+ *  expense (and, on an AED payout, the input VAT claimed on it) reverses. */
+export function returnedFeeVat(opts: {
+  returned: number;
+  /** The order's ORIGINAL fee booking, when this app made it. */
+  original?: { fee: number; vat: number } | null;
+  /** Fallback when there is no record: an AED payout with a VAT tax picked. */
+  payoutVatInclusive: boolean;
+}): { vat: number; basis: "original_fee" | "payout" | "none" } {
+  const o = opts.original;
+  if (o && o.fee > 0) {
+    return o.vat > 0
+      ? { vat: round2(opts.returned * (o.vat / o.fee)), basis: "original_fee" }
+      : { vat: 0, basis: "original_fee" };
+  }
+  return opts.payoutVatInclusive ? { vat: vatInclusiveSplit(opts.returned).vat, basis: "payout" } : { vat: 0, basis: "none" };
+}
+
+export function buildRefundChargeReversalJournal(opts: {
+  amount: number;            // positive
+  depositAccountId: string;
+  feeAccountId: string;
+  inputVatAccountId?: string | null;
+  /** The VAT inside `amount` to reverse to Input VAT. Omitted with an Input
+   *  VAT account → fee ÷ 105 × 5; 0 or no account → no VAT line. */
+  vatAmount?: number;
+  date: string;
+  reference: string;
+  description: string;
+}) {
+  const amount = round2(opts.amount);
+  const vat = !opts.inputVatAccountId ? 0 : round2(opts.vatAmount ?? vatInclusiveSplit(amount).vat);
+  const d = opts.description.slice(0, 500);
+  return {
+    journal_date: opts.date,
+    reference_number: opts.reference,
+    notes: d,
+    line_items: [
+      { account_id: opts.depositAccountId, debit_or_credit: "debit", amount, description: d },
+      { account_id: opts.feeAccountId, debit_or_credit: "credit", amount: round2(amount - vat), description: d },
+      ...(vat > 0 ? [{ account_id: opts.inputVatAccountId as string, debit_or_credit: "credit", amount: vat, description: `${d} · input VAT reversed` }] : []),
+    ],
+  };
+}
+
 export function refundReferences(baseReference: string, orderNumber: string) {
   const base = `${baseReference}/${orderNumber}`.slice(0, 88);
   return { creditNote: `${base}/RFN`, refund: `${base}/RFD` };
@@ -495,6 +598,8 @@ export function buildRefundCreditNoteBody(opts: {
 
 export function buildCreditNoteRefundBody(opts: {
   amount: number; date: string; reference: string; fromAccountId: string; orderNumber: string; gateway: string;
+  /** Overrides the default narration (the founder's own text). */
+  description?: string;
 }) {
   return {
     date: opts.date,
@@ -502,7 +607,7 @@ export function buildCreditNoteRefundBody(opts: {
     reference_number: opts.reference,
     amount: round2(Math.abs(opts.amount)),
     from_account_id: opts.fromAccountId,
-    description: `${opts.gateway} refund for order ${opts.orderNumber}, netted from the payout`,
+    description: (opts.description?.trim() || `${opts.gateway} refund for order ${opts.orderNumber}, netted from the payout`).slice(0, 500),
   };
 }
 
