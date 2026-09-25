@@ -5,8 +5,8 @@
  * bar (confirm, post to Zoho, download/delete payout, flag, upload).
  *
  * Extracted from the old always-expanded ReconRow so the same body can be
- * shown inside a modal (recon-detail-dialog.tsx) opened from a dense
- * TanStack row (recon-table.tsx). */
+ * shown inside the side drawer (recon-drawer.tsx) opened from a dense
+ * TanStack row (recon-grid.tsx). */
 
 import { useEffect, useState } from "react";
 import {

@@ -429,7 +429,7 @@ function ReconciliationTabs({
   return (
     <ZohoSettingsProvider>
       <Tabs value={activeTab} onValueChange={setTab} className="w-full">
-        <TabsList className="mb-5 h-auto gap-1 rounded-lg border border-[#EAE3D6] bg-white p-1">
+        {/* <TabsList className="mb-5 h-auto gap-1 rounded-lg border border-[#EAE3D6] bg-white p-1">
           <TabsTrigger
             value="recon"
             className="gap-1.5 rounded-md px-3.5 py-1.5 text-[12.5px] font-medium text-[#8A8175] data-[state=active]:bg-[#1F1B16] data-[state=active]:text-[#FBF8F1] data-[state=active]:shadow-none"
@@ -444,7 +444,7 @@ function ReconciliationTabs({
             <Receipt size={13} />
             Invoices workbench
           </TabsTrigger>
-        </TabsList>
+        </TabsList> */}
 
         <TabsContent
           value="recon"
@@ -563,16 +563,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
 
               {view === "reconciliation" && !isInvoicesTab && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="h-9 border border-[#D6CCBA] hover:bg-[#FBF3E6] hover:text-[#1F1B16]"
-                  >
-                    <a href={exportHref}>
-                      <FileChartColumn size={14} className="mr-1.5" /> Export
-                    </a>
-                  </Button>
+                  {/* Export lives in the reconciliation header row, next to search. */}
                   <UploadButton
                     endpoint="/api/upload/bank"
                     accept=".pdf,.csv,.txt,.xls,.xlsx"

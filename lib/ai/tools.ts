@@ -1,3 +1,4 @@
+import { getReconLines } from "@/lib/reconciliation/snapshot";
 // Read-only data tools the AI chat assistant may call. This is the ONLY
 // bridge between the assistant and live data — every tool here is a scoped,
 // capped, read-only query built on the same repositories the dashboard uses.
@@ -186,7 +187,7 @@ async function get_financial_report(input: { from: string; to: string }) {
 }
 
 async function get_reconciliation_status() {
-  const lines = await runReconciliation();
+  const lines = (await getReconLines()).lines;
   const summary = summarizeReconLines(lines);
   const [credits, payouts] = await Promise.all([BankRepository.listCredits(), PayoutsRepository.listWithRefs()]);
   const uploadedProviders = new Set(payouts.map((p) => p.gateway));

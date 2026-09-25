@@ -939,3 +939,18 @@ alter table payouts add column if not exists delivery_charges jsonb;
 alter table refund_postings add column if not exists charge_amount_aed numeric;
 alter table refund_postings add column if not exists zoho_charge_id text;
 alter table refund_postings add column if not exists charge_kind text;   -- journal | expense
+
+-- ── Reconciliation snapshot ────────────────────────────────────────────────
+-- The last computed bank → payout → orders result, so pages read it in
+-- milliseconds instead of recomputing the whole book on every request
+-- (a full run is tens of seconds). Refreshed after every recompute; `dirty`
+-- is raised by any write that changes the inputs (uploads, confirm, flag,
+-- ref links) so the next read waits for a fresh run instead of serving stale.
+create table if not exists recon_snapshots (
+  id           text primary key,          -- tenant id
+  payload      jsonb not null,            -- { lines, unmatchedPayouts }
+  computed_at  timestamptz not null default now(),
+  duration_ms  integer,
+  dirty        boolean not null default false,
+  dirty_at     timestamptz
+);

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import { supabase } from "@/lib/supabase";
+import { changeLineOrder, refForOrderOnPayout, RelinkError } from "@/lib/reconciliation/relink";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 
@@ -34,7 +36,8 @@ async function lineFor(payoutId: string, ref: string) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const payoutId = url.searchParams.get("payoutId") ?? "";
-  const ref = url.searchParams.get("ref") ?? "";
+  const fromOrder = url.searchParams.get("fromOrder");
+  const ref = url.searchParams.get("ref") || (fromOrder ? (await refForOrderOnPayout(payoutId, fromOrder)) ?? "" : "");
   const q = (url.searchParams.get("q") ?? "").trim();
   if (!payoutId || !ref) return NextResponse.json({ error: "payoutId and ref are required" }, { status: 400 });
 
@@ -136,40 +139,30 @@ export async function GET(request: Request) {
       reasons: o.reasons,
     }));
 
-  return NextResponse.json({ ref, amount, linkedTo: existing?.order_number ?? null, suggestions });
+  // The order this line resolves to today, when it matched directly (no link).
+  const currentOrder = existing?.order_number
+    ?? ((await supabase.from("orders").select("order_number").in("order_number", [...new Set([ref, ref.replace(/^(WA|UAE|KSA|WOO|SA)/i, "")])]).limit(1)).data?.[0]?.order_number ?? null);
+  return NextResponse.json({ ref, amount, linkedTo: existing?.order_number ?? null, currentOrder, suggestions: suggestions.filter((x) => x.orderNumber !== currentOrder) });
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  const payoutId = String(body.payoutId ?? "").trim();
-  const ref = String(body.ref ?? "").trim();
-  const orderNumber = String(body.orderNumber ?? "").trim().replace(/^#/, "");
-  if (!payoutId || !ref || !orderNumber) {
-    return NextResponse.json({ error: "payoutId, ref and orderNumber are required" }, { status: 400 });
+  // `ref` names the line; `fromOrder` finds it by the order it resolves to
+  // today (used from a row that says "already settled by another payout").
+  // Works for matched lines too — see lib/reconciliation/relink.ts.
+  try {
+    const result = await changeLineOrder({
+      payoutId: String(body.payoutId ?? ""),
+      ref: body.ref ? String(body.ref) : undefined,
+      fromOrder: body.fromOrder ? String(body.fromOrder) : undefined,
+      orderNumber: String(body.orderNumber ?? ""),
+      actor: body.actor ? String(body.actor) : undefined,
+    });
+    return NextResponse.json({ ok: true, ...result, orderNumber: result.to });
+  } catch (e) {
+    const status = e instanceof RelinkError ? e.status : 500;
+    return NextResponse.json({ error: (e as Error).message }, { status });
   }
-  if (!(await lineFor(payoutId, ref))) {
-    return NextResponse.json({ error: `Line ${ref} is not on payout ${payoutId}` }, { status: 404 });
-  }
-  const { data: order } = await supabase.from("orders").select("order_number").eq("order_number", orderNumber).maybeSingle();
-  if (!order) return NextResponse.json({ error: `Order ${orderNumber} isn't in the synced orders — run a sync first.` }, { status: 404 });
-
-  const { data: clash } = await supabase
-    .from("payout_ref_links")
-    .select("order_ref")
-    .eq("payout_id", payoutId)
-    .eq("order_number", orderNumber)
-    .neq("order_ref", ref)
-    .maybeSingle();
-  if (clash) {
-    return NextResponse.json({ error: `Order ${orderNumber} is already linked to line ${clash.order_ref} on this payout.` }, { status: 409 });
-  }
-
-  const { error } = await supabase.from("payout_ref_links").upsert(
-    { payout_id: payoutId, order_ref: ref, order_number: orderNumber, tenant_id: TENANT, linked_by: String(body.actor ?? "founder"), linked_at: new Date().toISOString() },
-    { onConflict: "payout_id,order_ref" },
-  );
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, payoutId, ref, orderNumber });
 }
 
 export async function DELETE(request: Request) {
@@ -205,5 +198,6 @@ export async function DELETE(request: Request) {
   // The engine only ever adds settlement records; drop the one this link
   // created so the order doesn't linger as bookable from this payout.
   await supabase.from("settlement_records").delete().eq("payout_id", payoutId).eq("order_number", link.order_number);
+  await markReconDirty("reconcile/ref-links");
   return NextResponse.json({ ok: true });
 }

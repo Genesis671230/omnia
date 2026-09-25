@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import { parseBankStatement } from "@/lib/parsers/bank";
 import { xlsxToCsvText } from "@/lib/parsers/xlsx-to-csv";
 import { BankRepository } from "@/lib/repositories/bank.repository";
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
     console.error("uploaded_files archive failed:", (e as Error).message);
   }
 
+  await markReconDirty("upload/bank");
   return NextResponse.json({
     batchId,
     format,

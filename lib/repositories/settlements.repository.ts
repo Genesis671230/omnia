@@ -237,6 +237,17 @@ export const SettlementsRepository = {
     return removed;
   },
 
+  /** Which of these settlement ids already carry this evidence type. */
+  async idsWithEvidence(ids: string[], evidenceType: string): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await supabase.from("settlement_records").select("id").in("id", ids.slice(i, i + 200)).eq("evidence_type", evidenceType);
+      if (error) throw new Error(`settlement_records evidence lookup failed: ${error.message}`);
+      for (const r of data ?? []) out.add(r.id as string);
+    }
+    return out;
+  },
+
   async markStripeEvidence(settlementIds: string[]): Promise<void> {
     if (settlementIds.length === 0) return;
     const { error } = await supabase

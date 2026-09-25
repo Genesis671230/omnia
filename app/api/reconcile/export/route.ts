@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getReconLines } from "@/lib/reconciliation/snapshot";
 import { runReconciliation } from "@/lib/reconciliation/engine";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { buildReconciliationWorkbook, type ExportOrder } from "@/lib/reconciliation/export-xlsx";
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   const to = url.searchParams.get("to");
   const format = (url.searchParams.get("format") ?? "csv").toLowerCase();
 
-  const allLines = await runReconciliation();
+  const allLines = (await getReconLines()).lines;
   const lines = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
 
   const rangeSuffix = from || to ? `-${from ?? "start"}_${to ?? "end"}` : "";

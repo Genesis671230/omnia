@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import type { Gateway } from "@/lib/gateways";
 import { parsePayoutFileAsync, type ParsedPayout } from "@/lib/parsers/payouts";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
     console.error("uploaded_files archive failed:", (e as Error).message);
   }
 
+  await markReconDirty("upload/payout");
   return NextResponse.json({
     saved,
     fileId,

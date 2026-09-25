@@ -70,7 +70,12 @@ const isReal = (v: string | null | undefined) => !!v && !/^(PENDING|CLAIMED):/.t
 
 /** Refund lines on the payout, with the order each resolved to. */
 export function refundLinesOf(line: ReconLine) {
-  const scale = bankScaleFor({ crossBorder: isCrossBorderCurrency(line.payout?.currency), bankAmount: line.bankAmount, payoutNet: line.payout?.net ?? 0 });
+  // Same rule as the order side: shares already at the bank's quoted rate are
+  // not rescaled again — the bank's wire charge books once, as its own journal.
+  const scale = bankScaleFor({
+    crossBorder: isCrossBorderCurrency(line.payout?.currency), bankAmount: line.bankAmount, payoutNet: line.payout?.net ?? 0,
+    sharesAtBankRate: line.payout?.fxSource === "bank",
+  });
   return line.transactions
     .filter((t) => t.isRefund)
     .map((t) => {

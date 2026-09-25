@@ -19,6 +19,7 @@ import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 import { FX_TO_AED } from "@/lib/fx";
 import { stripeConfigured, payoutOrderRefs } from "@/lib/integrations/stripe";
+import { saveReconSnapshot, markReconDirty } from "@/lib/reconciliation/snapshot";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 const TOLERANCE_AED = 1.0;
@@ -452,11 +453,17 @@ export function stripeEvidencedOrderNumbers(resolvedOrders: string[], stripeRefs
   return resolvedOrders.filter((num) => refSet.has(num));
 }
 
+const mark = (label: string, since: number) => { if (process.env.RECON_TIMING) console.log(`[recon] ${label} ${Date.now() - since}ms`); return Date.now(); };
+
 export async function runReconciliation(): Promise<ReconLine[]> {
+  const started = Date.now();
+  let t = started;
   const [credits, payouts, orders] = await Promise.all([
     BankRepository.listCredits(),
     PayoutsRepository.listWithRefs(),
-    OrdersRepository.listAll(),
+    // Only the columns matching and settlement rows use — the full order row
+    // (line items, addresses) made this one read ~19s of every run.
+    OrdersRepository.listForRecon(),
   ]);
 
   // Paged: an unpaginated PostgREST select stops at 1000 rows and says nothing,
@@ -502,8 +509,15 @@ export async function runReconciliation(): Promise<ReconLine[]> {
       }]),
   );
 
+  t = mark("load inputs", t);
   const lines = computeReconLines({ credits, payouts, orders, confirmations, reviews, links, forceBooks });
+  t = mark("compute", t);
   await persistResults(lines, orders);
+  t = mark("persist", t);
+  await saveReconSnapshot(lines, Date.now() - started, {
+    unmatchedPayouts: unmatchedPayoutsOf(lines, payouts),
+    payoutGateways: [...new Set(payouts.map((p) => p.gateway))],
+  });
   return lines;
 }
 
@@ -572,7 +586,8 @@ export function isConfirmable(
     isForceBooked({ ...l, forceBook: l.forceBook ?? null });
 }
 
-async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typeof OrdersRepository.listAll>>) {
+async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typeof OrdersRepository.listForRecon>>) {
+  let t = Date.now();
   const rows = lines.map((l) => ({
     id: l.id, // deterministic: recon line pk = bank line id, stable across recomputes
     tenant_id: TENANT,
@@ -596,13 +611,31 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
     .from("recon_lines")
     .upsert(rows, { onConflict: "bank_line_id" });
   if (error) throw new Error(`recon_lines upsert failed: ${error.message}`);
+  t = mark("  recon_lines upsert", t);
 
   // Stamp orders: settled ONLY because a bank-confirmed payout reached them.
-  for (const l of lines) {
-    if (l.payout && (l.state === "SETTLED" || ((isConfirmablePartial(l) || isBankFxVariance(l) || isForceBooked(l)) && l.confirmedBy))) {
-      await OrdersRepository.markSettled(l.resolvedOrders, l.payout.id);
-    }
+  // Independent per payout, so they run side by side (8 at a time) — one
+  // after another this was ~200 sequential round trips per run.
+  // Only orders whose stamp would actually change are written.
+  const stampByNumber = new Map<string, { payout_id: string | null; payout_status: string | null }[]>();
+  for (const o of orders) {
+    const list = stampByNumber.get(o.order_number) ?? [];
+    list.push({ payout_id: o.payout_id, payout_status: o.payout_status });
+    stampByNumber.set(o.order_number, list);
   }
+  const stamps = lines
+    .filter((l) => l.payout && l.resolvedOrders.length > 0 &&
+      (l.state === "SETTLED" || ((isConfirmablePartial(l) || isBankFxVariance(l) || isForceBooked(l)) && l.confirmedBy)))
+    .map((l) => ({
+      payoutId: l.payout!.id,
+      numbers: l.resolvedOrders.filter((n) =>
+        (stampByNumber.get(n) ?? [{ payout_id: null, payout_status: null }]).some((o) => o.payout_id !== l.payout!.id || o.payout_status !== "settled")),
+    }))
+    .filter((s) => s.numbers.length > 0);
+  for (let i = 0; i < stamps.length; i += 8) {
+    await Promise.all(stamps.slice(i, i + 8).map((s) => OrdersRepository.markSettled(s.numbers, s.payoutId)));
+  }
+  t = mark(`  stamp orders (${stamps.length} payouts)`, t);
 
   // audit trail: one immutable proof row per order the moment it settles —
   // what a founder points Zoho Books / an accountant at later.
@@ -721,6 +754,7 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
     if (rows.length > 0) await SettlementsRepository.upsertMany(rows);
   }
 
+  t = mark("  settlement records", t);
   // Stripe auto-verification: for settled lines on Stripe payouts, check
   // each order's ref against Stripe's own balance-transaction breakdown —
   // if Stripe agrees the order was paid out, no human confirmation step is
@@ -731,22 +765,65 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
     const stripeLines = lines.filter(
       (l) => l.state === "SETTLED" && l.provider === "Stripe" && l.payout?.id?.startsWith("STRIPE-") && !l.payout.id.startsWith("STRIPE-TRF-"),
     );
-    for (const l of stripeLines) {
-      try {
-        const stripePayoutId = l.payout!.id.slice("STRIPE-".length);
-        const { refs } = await payoutOrderRefs(stripePayoutId);
-        const evidenced = stripeEvidencedOrderNumbers(l.resolvedOrders, refs);
-        const ids = evidenced.map((num) => {
-          const order = orderByNumber.get(num);
-          return order ? `${order.uid}_${l.id}` : null;
-        }).filter((id): id is string => Boolean(id));
-        if (ids.length > 0) await SettlementsRepository.markStripeEvidence(ids);
-      } catch (e) {
-        console.error(`Stripe evidence check failed for payout ${l.payout?.id}:`, (e as Error).message);
-      }
+    const idFor = (l: ReconLine, num: string) => { const o = orderByNumber.get(num); return o ? `${o.uid}_${l.id}` : null; };
+    // Rows already Stripe-evidenced are done: no API call, and no rewrite of
+    // their confirmation time (re-marking every run moved it forward).
+    const candidates = stripeLines.flatMap((l) => l.resolvedOrders.map((n) => idFor(l, n)).filter((id): id is string => Boolean(id)));
+    const already = await SettlementsRepository.idsWithEvidence(candidates, "stripe_api");
+    const pending = stripeLines.filter((l) => l.resolvedOrders.some((n) => { const id = idFor(l, n); return id && !already.has(id); }));
+    const toMark: string[] = [];
+    for (let i = 0; i < pending.length; i += 6) {
+      await Promise.all(pending.slice(i, i + 6).map(async (l) => {
+        try {
+          const refs = await stripeRefsCached(l.payout!.id.slice("STRIPE-".length));
+          for (const num of stripeEvidencedOrderNumbers(l.resolvedOrders, refs)) {
+            const id = idFor(l, num);
+            if (id && !already.has(id)) toMark.push(id);
+          }
+        } catch (e) {
+          console.error(`Stripe evidence check failed for payout ${l.payout?.id}:`, (e as Error).message);
+        }
+      }));
     }
+    for (let i = 0; i < toMark.length; i += 200) await SettlementsRepository.markStripeEvidence(toMark.slice(i, i + 200));
+    t = mark(`  stripe evidence (${pending.length} payouts checked, ${toMark.length} marked)`, t);
   }
 }
+
+// A paid Stripe payout never changes, so its order refs are fetched once per
+// server process instead of once per payout per reconcile (dozens of API calls).
+const stripeRefsCache = new Map<string, Promise<string[]>>();
+function stripeRefsCached(stripePayoutId: string): Promise<string[]> {
+  let p = stripeRefsCache.get(stripePayoutId);
+  if (!p) {
+    p = payoutOrderRefs(stripePayoutId).then((r) => r.refs);
+    p.catch(() => stripeRefsCache.delete(stripePayoutId)); // retry next run on failure
+    stripeRefsCache.set(stripePayoutId, p);
+  }
+  return p;
+}
+
+/** Uploaded payout files no bank credit claimed. They stay visible and
+ *  downloadable until someone deletes them — a file must never look like it
+ *  vanished just because its total matched nothing. */
+export function unmatchedPayoutsOf(lines: ReconLine[], payouts: Awaited<ReturnType<typeof PayoutsRepository.listWithRefs>>) {
+  const claimed = new Set(lines.map((l) => l.payout?.id).filter(Boolean));
+  return payouts
+    .filter((p) => !claimed.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      provider: p.gateway,
+      net: Number(p.net_amount),
+      currency: p.original_currency,
+      netOriginal: p.net_original,
+      source: p.source,
+      orders: p.order_refs.length,
+      uploadedAt: p.uploaded_at ?? null,
+      pinnedTo: p.bank_line_id ?? null,
+    }))
+    .sort((a, b) => String(b.uploadedAt ?? "").localeCompare(String(a.uploadedAt ?? "")));
+}
+export type UnmatchedPayoutRow = ReturnType<typeof unmatchedPayoutsOf>[number];
 
 export function summarizeReconLines(lines: ReconLine[]) {
   const byState = (s: ReconState) => lines.filter((l) => l.state === s);
@@ -793,6 +870,7 @@ export async function confirmLine(bankLineId: string, actor: string) {
     .update({ confirmed_by: actor, confirmed_at: new Date().toISOString() })
     .eq("bank_line_id", bankLineId);
   if (error) throw new Error(`confirm failed: ${error.message}`);
+  await markReconDirty("confirm");
 
   // persistResults() writes a settlement record per resolved order the moment
   // a credit reaches SETTLED, but leaves it evidence_confirmed=false — the
@@ -859,5 +937,6 @@ export async function flagLine(bankLineId: string, flagged: boolean, note: strin
     .update({ review_flag: flagged, review_note: flagged ? note : "" })
     .eq("bank_line_id", bankLineId);
   if (error) throw new Error(`flag failed: ${error.message}`);
+  await markReconDirty("flag");
   return { bankLineId, flagged };
 }

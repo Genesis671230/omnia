@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { runReconciliation, type ReconLine } from "@/lib/reconciliation/engine";
-import { BankRepository } from "@/lib/repositories/bank.repository";
-import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
+import type { ReconLine } from "@/lib/reconciliation/engine";
+import { getReconLines } from "@/lib/reconciliation/snapshot";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { ZohoConfigRepository } from "@/lib/repositories/zoho-config.repository";
 
@@ -15,29 +14,30 @@ function inRange(date: string | null, from: string | null, to: string | null): b
   return true;
 }
 
-// GET /api/reconcile?from=YYYY-MM-DD&to=YYYY-MM-DD — recompute bank → payout
-// → orders over ALL data (matching can't be scoped to a window — a payout
-// can straddle it), then filter the returned lines to the requested range.
+// GET /api/reconcile?from=YYYY-MM-DD&to=YYYY-MM-DD[&fresh=1]
+// Reads the reconciliation SNAPSHOT (lib/reconciliation/snapshot.ts) instead of
+// recomputing the whole book per request. Matching still runs over ALL data
+// (a payout can straddle a window) — only the returned lines are filtered.
+// `fresh=1` forces a recompute; writes that change inputs mark the snapshot
+// dirty so the next read recomputes by itself.
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
 
-  const allLines = await runReconciliation();
-  const lines = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
-
-  // document checklist: which gateways have bank credits but no payout file
-  const [credits, payouts, orderCounts, postings] = await Promise.all([
-    BankRepository.listCredits(),
-    PayoutsRepository.listWithRefs(),
+  const [snap, orderCounts, postings] = await Promise.all([
+    getReconLines({ fresh: url.searchParams.get("fresh") === "1" }),
     OrdersRepository.getOrderCounts(),
     // One query for the whole page: the alternative is a per-row lookup (or a
     // Zoho round trip per row) just to decide whether to draw a button.
     ZohoConfigRepository.listPostings(),
   ]);
-  const rangeCredits = (from || to) ? credits.filter((c) => inRange(c.statement_date, from, to)) : credits;
+  const allLines = snap.lines;
+  const lines = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
+  // Every bank credit is exactly one line, so the lines ARE the credit list.
+  const rangeCredits = (from || to) ? allLines.filter((l) => inRange(l.date, from, to)) : allLines;
 
-  const uploadedProviders = new Set(payouts.map((p) => p.gateway));
+  const uploadedProviders = new Set(snap.extras.payoutGateways);
   const missingDocs = [...new Set(
     lines
       .filter((l: ReconLine) => l.state === "AWAITING_PAYOUT" && l.provider !== "Unclassified")
@@ -61,28 +61,10 @@ export async function GET(request: Request) {
         { status: p.status, postedAt: p.posted_at, reference: p.reference_number, result: p.zoho_result },
       ]),
     ),
-    // Uploaded payout files no bank credit claimed. They stay here, visible
-    // and downloadable, until someone deletes them — a file must never look
-    // like it vanished just because its total matched nothing.
-    unmatchedPayouts: (() => {
-      const claimed = new Set(allLines.map((l) => l.payout?.id).filter(Boolean));
-      return payouts
-        .filter((p) => !claimed.has(p.id))
-        .map((p) => ({
-          id: p.id,
-          provider: p.gateway,
-          net: Number(p.net_amount),
-          currency: p.original_currency,
-          netOriginal: p.net_original,
-          source: p.source,
-          orders: p.order_refs.length,
-          uploadedAt: p.uploaded_at ?? null,
-          pinnedTo: p.bank_line_id ?? null,
-        }))
-        .sort((a, b) => String(b.uploadedAt ?? "").localeCompare(String(a.uploadedAt ?? "")));
-    })(),
+    // Uploaded payout files no bank credit claimed — see unmatchedPayoutsOf().
+    unmatchedPayouts: snap.extras.unmatchedPayouts,
     documents: {
-      bankStatement: credits.length > 0,
+      bankStatement: allLines.length > 0,
       missingPayouts: missingDocs,
       // a range was requested but no bank credit at all falls inside it —
       // the founder needs to upload that period's statement, not run a sync
@@ -90,6 +72,9 @@ export async function GET(request: Request) {
         ? { from, to, noStatementForRange: rangeCredits.length === 0 }
         : null,
     },
-    computedAt: new Date().toISOString(),
+    computedAt: snap.computedAt,
+    computeMs: snap.durationMs,
+    stale: snap.stale,
+    refreshing: snap.refreshing,
   });
 }

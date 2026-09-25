@@ -211,6 +211,27 @@ export const OrdersRepository = {
   },
 
 
+  // The reconciler's read: only what matching and settlement rows need, and
+  // the pages fetched in parallel (count first). listAll() pulls every column
+  // including line_items and took ~19s for 27k orders.
+  async listForRecon() {
+    const COLS = "uid, order_number, store_id, customer_name, customer_email, order_date, currency, gross_aed, payout_id, payout_status";
+    const PAGE = 1000;
+    const { count, error: countErr } = await supabase.from("orders").select("uid", { count: "exact", head: true });
+    if (countErr) throw new Error(`orders count failed: ${countErr.message}`);
+    const pages = Math.ceil((count ?? 0) / PAGE) + 1; // +1: rows inserted between count and read
+    const results = await Promise.all(Array.from({ length: pages }, (_, i) =>
+      supabase.from("orders").select(COLS).order("uid", { ascending: true }).range(i * PAGE, i * PAGE + PAGE - 1),
+    ));
+    const rows: { uid: string; order_number: string; store_id: string; customer_name: string; customer_email: string; order_date: string | null; currency: string | null; gross_aed: number | string | null; payout_id: string | null; payout_status: string | null }[] = [];
+    const seen = new Set<string>();
+    for (const r of results) {
+      if (r.error) throw new Error(`orders select failed: ${r.error.message}`);
+      for (const row of r.data ?? []) { if (!seen.has(row.uid)) { seen.add(row.uid); rows.push(row as (typeof rows)[number]); } }
+    }
+    return rows;
+  },
+
   async getGatewaysByOrderNumbers(numbers: string[]) {
     if (numbers.length === 0) return [];
   

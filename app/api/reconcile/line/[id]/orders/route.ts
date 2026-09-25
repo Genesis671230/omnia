@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getReconLines } from "@/lib/reconciliation/snapshot";
 import { runReconciliation } from "@/lib/reconciliation/engine";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 
@@ -17,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
 
   try {
-    const line = (await runReconciliation()).find((l) => l.id === id);
+    const line = (await getReconLines()).lines.find((l) => l.id === id);
     if (!line) {
       return NextResponse.json({ error: `No reconciliation line ${id}` }, { status: 404 });
     }

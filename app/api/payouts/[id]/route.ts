@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import { supabase } from "@/lib/supabase";
 import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 
@@ -31,5 +32,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
+  await markReconDirty("payouts/[id]");
   return NextResponse.json({ ok: true });
 }

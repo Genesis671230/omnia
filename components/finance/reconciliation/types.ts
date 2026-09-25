@@ -95,6 +95,11 @@ export type ReconPayload = {
     missingPayouts: { provider: string; awaitingAmount: number }[];
     range: { from: string | null; to: string | null; noStatementForRange: boolean } | null;
   };
+  /** When the reconciliation snapshot was computed, and whether a newer one is being built. */
+  computedAt?: string;
+  computeMs?: number | null;
+  stale?: boolean;
+  refreshing?: boolean;
 };
 
 /** The shape actually stored on orders.line_items by the store sync — verified

@@ -17,9 +17,9 @@ import { aed2, fmtOriginal, isDownloadableSource, type UnmatchedPayout } from ".
  * visible here — downloadable, deletable — until someone deletes it. */
 
 export function UnmatchedPayouts({ payouts, refresh }: { payouts: UnmatchedPayout[]; refresh: () => void | Promise<void> }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  if (payouts.length === 0) return null;
+  if (payouts.length === 0) return null
 
   const remove = async (p: UnmatchedPayout) => {
     setDeleting(p.id);
