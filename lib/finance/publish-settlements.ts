@@ -18,7 +18,10 @@ import {
   createJournal,
   findDocumentByReference,
   findOurPaymentOnInvoice,
+  fetchDocument,
+  zohoDocumentExists,
   ZohoRejection,
+  ZOHO_ACCOUNT_TYPE_NOT_APPLICABLE,
 } from "@/lib/integrations/zoho-settlement-posting";
 import {
   isUnsettledZohoId,
@@ -31,6 +34,9 @@ import {
   buildDifferenceJournalBody,
   buildFeeExpenseBody,
   buildDeliveryChargesExpenseBody,
+  buildIntercompanyDeliveryJournalBody,
+  buildDeliveryChargesJournalBody,
+  deliveryReferences,
   buildResidualJournalBody,
   planWireResidual,
   wireResidualReference,
@@ -43,6 +49,11 @@ import {
   type OrderPostingPlan,
   type PostingAccounts,
 } from "@/lib/finance/settlement-posting";
+import { zohoConnectionId, zohoOrgId } from "@/lib/integrations/zoho-context";
+import { getAccessToken } from "@/lib/integrations/zoho";
+import { withZohoOrg } from "@/lib/integrations/zoho-org";
+import { deliveryLineDescription, type DeliveryEntityGroup } from "@/lib/finance/delivery-entities";
+import { loadDeliveryEntities, recordDeliveryPosting } from "@/lib/finance/delivery-entities.server";
 
 export type OrderPublishStatus =
   | "booked"         // every needed document exists in Zoho
@@ -70,6 +81,8 @@ export type OrderPublishResult = {
 };
 
 type StepOutcome = "posted" | "found_existing" | "already_done" | "not_needed" | "would_post" | "failed" | "skipped";
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
 const bareRef = (ref: string) => ref.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
 
@@ -100,7 +113,25 @@ export type PublishOptions = {
   /** COD vouchers: also book the courier's delivery / return charges. Off
    *  for a single-order Record, on for a full run or the charges' own button. */
   includeDelivery?: boolean;
+  /** COD vouchers: accounts for charges that belong to a sister company. */
+  deliveryIntercompany?: DeliveryIntercompanyAccounts;
 };
+
+/** Per sister company (keyed by its Zoho connection id): the accounts that
+ *  carry a charge the voucher company paid on its behalf. */
+export type DeliveryIntercompanyAccounts = Record<string, {
+  /** In the VOUCHER company's books: "Due from <sister>". */
+  dueFromAccountId: string;
+  /** In the SISTER company's books: its delivery charges expense. */
+  expenseAccountId: string;
+  /** In the SISTER company's books: "Due to <voucher company>". */
+  dueToAccountId: string;
+  /** The sister company's own VAT tax id (tax ids differ per org). */
+  vatTaxId?: string | null;
+  /** The sister company's Input VAT account — used when its side has to book
+   *  as a journal (Zoho code 11016) and VAT is claimed. */
+  inputVatAccountId?: string | null;
+}>;
 
 /** The one charge the remitting bank took on the wire itself — not an order's. */
 export type WirePublishResult = {
@@ -113,13 +144,33 @@ export type WirePublishResult = {
   message?: string;
 };
 
+type DeliveryDocStatus = "booked" | "planned" | "found_existing" | "review" | "failed";
+
+/** One Zoho document the charges book as. */
+export type DeliveryLegResult = {
+  leg: "own" | "ic-voucher" | "ic-counterpart";
+  /** Zoho connection the document lives in. */
+  org: string;
+  kind: "expense" | "journal";
+  amount: number;
+  /** Order numbers on it, one line each. */
+  refs: string[];
+  status: DeliveryDocStatus;
+  ok: boolean;
+  id?: string | null;
+  reference: string;
+  message?: string;
+};
+
 export type DeliveryPublishResult = {
   amount: number;
   count: number;
-  status: "booked" | "planned" | "found_existing" | "review" | "failed";
+  /** Worst leg wins: failed > review > planned > booked > found_existing. */
+  status: DeliveryDocStatus;
   ok: boolean;
-  expenseId?: string | null;
-  reference?: string;
+  legs: DeliveryLegResult[];
+  /** Companies the charges belong to, voucher company first. */
+  groups: { entity: string; own: boolean; count: number; total: number }[];
   message?: string;
 };
 
@@ -140,45 +191,211 @@ export async function publishSettlements(opts: PublishOptions): Promise<PublishO
 
 /**
  * A COD courier's delivery / return charges on one voucher — money it kept
- * that closes no invoice (the order was prepaid through a gateway, or came
- * back). One VAT-inclusive expense out of the clearing account the whole
- * remittance lands in; with it, clearing nets to what the bank received.
- * Idempotent on its reference, like the wire charge.
+ * that closes no invoice. The voucher was remitted to ONE company (the org
+ * this request runs in), but each charge belongs to the company that owns the
+ * order (lib/finance/delivery-entities.ts):
+ *
+ *   own charges      one itemized expense in the voucher company, a line per
+ *                    order, paid out of clearing                 — ref /DLV
+ *   a sister's       its remittance paid them on the sister's behalf:
+ *   charges            voucher company: journal Dr Due from <sister> (a line
+ *                      per order) / Cr clearing
+ *                      sister company: itemized expense, a line per order,
+ *                      paid through Due to <voucher company>  — ref /DLV-IC-<org>
+ *
+ * With every leg booked, clearing nets to what the bank received and the two
+ * intercompany accounts mirror each other. Every document is idempotent on
+ * its reference, so a retry after a partial failure only books what's missing.
  */
 export async function publishDeliveryCharges(opts: PublishOptions): Promise<DeliveryPublishResult | undefined> {
   const { line, accounts, dryRun, accessToken } = opts;
   const charges = line.payout?.deliveryCharges ?? [];
-  if (charges.length === 0) return undefined;
-  const total = Math.round(charges.reduce((s, c) => s + c.amount, 0) * 100) / 100;
-  const reference = `${(opts.referenceOverride || line.reference || line.id).trim()}/DLV`.slice(0, 100);
-  const base = { amount: total, count: charges.length, reference };
-  if (!accounts.deliveryAccountId) {
-    return { ...base, status: "review", ok: false, message: `Pick the account for ${line.provider} delivery charges (AED ${total.toFixed(2)}) first.` };
+  if (charges.length === 0 || !line.payout) return undefined;
+  const payoutId = line.payout.id;
+
+  const state = await loadDeliveryEntities(payoutId);
+  if (!state) return undefined;
+  const voucherOrg = zohoConnectionId();
+  const total = r2(charges.reduce((s, c) => s + c.amount, 0));
+  const summary = {
+    amount: total,
+    count: charges.length,
+    groups: state.groups.map((g) => ({ entity: g.entity, own: g.own, count: g.charges.length, total: g.total })),
+  };
+  if (state.voucherOrg !== voucherOrg) {
+    return { ...summary, status: "review", ok: false, legs: [], message: "This payout's organisation changed — reopen the drawer and book again." };
   }
   if (!accounts.depositAccountId) {
-    return { ...base, status: "review", ok: false, message: "Pick the Deposit To (clearing) account first." };
+    return { ...summary, status: "review", ok: false, legs: [], message: "Pick the Deposit To (clearing) account first." };
   }
-  const returns = charges.filter((c) => c.isReturn);
-  const refs = charges.filter((c) => !c.isReturn).map((c) => c.ref);
-  const description =
-    `${line.provider} delivery charges · voucher ${line.payout?.id ?? ""} · ${charges.length} × AED ${total.toFixed(2)}` +
-    (refs.length ? ` · deliveries: ${refs.join(", ")}` : "") +
-    (returns.length ? ` · returns: ${returns.map((c) => c.ref).join(", ")}` : "");
+
+  const base = (opts.referenceOverride || line.reference || line.id).trim();
+  const date = (line.date ?? new Date().toISOString()).slice(0, 10);
+  const label = (id: string) => state.orgs.find((o) => o.id === id)?.label ?? id;
+  const linesOf = (g: DeliveryEntityGroup) => g.charges.map((c) => ({ description: deliveryLineDescription(c, line.provider), amount: c.amount }));
+  const refsOf = (g: DeliveryEntityGroup) => g.charges.map((c) => c.ref);
+  const note = (g: DeliveryEntityGroup, extra: string) =>
+    `${line.provider} voucher ${line.payout?.id ?? ""} · ${g.charges.length} × delivery/return charges AED ${g.total.toFixed(2)} · ${extra}`;
+
+  // Before this split existed, a voucher's charges were booked as ONE expense
+  // under /DLV in the voucher company — including the sister company's.
+  // Booking the sister legs on top would count those charges twice.
+  const own = state.groups.find((g) => g.own);
+  const sisters = state.groups.filter((g) => !g.own);
+  const legacy = sisters.length > 0 ? await legacyWholeVoucherExpense(deliveryReferences(base), total, own?.total ?? 0, accessToken) : null;
+
+  const legs: DeliveryLegResult[] = [];
+
+  if (own) {
+    const reference = deliveryReferences(base);
+    const expenseAccountId = accounts.deliveryAccountId;
+    legs.push(await bookDeliveryDoc({
+      leg: "own", org: voucherOrg, kind: "expense", amount: own.total, refs: refsOf(own), reference, dryRun, payoutId, accessToken,
+      missing: legacy ? null
+        : !expenseAccountId ? `Pick the delivery charges account for ${label(voucherOrg)}'s ${own.charges.length} charge(s) (AED ${own.total.toFixed(2)}).`
+        : null,
+      found: legacy ? { id: legacy, message: "Booked earlier as one expense for the whole voucher." } : undefined,
+      body: () => buildDeliveryChargesExpenseBody({
+        lines: linesOf(own), expenseAccountId: expenseAccountId as string, paidThroughAccountId: accounts.depositAccountId,
+        vatTaxId: accounts.vatTaxId, date, reference, description: note(own, `paid from ${line.provider} clearing`),
+      }),
+    }));
+  }
+
+  for (const g of sisters) {
+    const reference = deliveryReferences(base, g.entity);
+    const ic = opts.deliveryIntercompany?.[g.entity];
+    if (legacy) {
+      const message = `All of this voucher's charges, including ${label(g.entity)}'s AED ${g.total.toFixed(2)}, were already booked in ${label(voucherOrg)} as one expense (${legacy}). ` +
+        `To move them to ${label(g.entity)}, delete that expense in Zoho and book again.`;
+      legs.push({ leg: "ic-counterpart", org: g.entity, kind: "expense", amount: g.total, refs: refsOf(g), status: "review", ok: false, reference, message });
+      continue;
+    }
+    const missing = !ic?.dueFromAccountId ? `Pick ${label(voucherOrg)}'s "Due from ${label(g.entity)}" account.`
+      : !ic.expenseAccountId ? `Pick ${label(g.entity)}'s delivery charges account.`
+      : !ic.dueToAccountId ? `Pick ${label(g.entity)}'s "Due to ${label(voucherOrg)}" account.`
+      : null;
+
+    // The sister company's expense first: its books and credentials are the
+    // likelier to refuse, and the voucher side must not stand alone.
+    let counterpart: DeliveryLegResult;
+    try {
+      counterpart = await withZohoOrg(g.entity, async () => bookDeliveryDoc({
+        leg: "ic-counterpart", org: g.entity, kind: "expense", amount: g.total, refs: refsOf(g), reference, dryRun, payoutId,
+        accessToken: missing ? "" : await getAccessToken(),
+        missing,
+        body: () => buildDeliveryChargesExpenseBody({
+          lines: linesOf(g), expenseAccountId: ic!.expenseAccountId, paidThroughAccountId: ic!.dueToAccountId,
+          vatTaxId: ic!.vatTaxId, date, reference, description: note(g, `paid for us by ${label(voucherOrg)} out of its remittance`),
+        }),
+        asJournal: () => ic!.vatTaxId && !ic!.inputVatAccountId
+          ? `Zoho won't use that "Due to ${label(voucherOrg)}" account for an expense, and ${label(g.entity)} has no Input VAT account to book the journal's VAT to. Pick a liability account, or book with No VAT.`
+          : buildDeliveryChargesJournalBody({
+            lines: g.charges.map((c) => ({ description: deliveryLineDescription(c, line.provider), amount: c.amount, exVat: c.exVat, vat: c.vat })),
+            expenseAccountId: ic!.expenseAccountId, creditAccountId: ic!.dueToAccountId,
+            inputVatAccountId: ic!.vatTaxId ? ic!.inputVatAccountId : null,
+            date, reference, description: note(g, `paid for us by ${label(voucherOrg)} out of its remittance`),
+          }),
+      }));
+    } catch (e) {
+      counterpart = { leg: "ic-counterpart", org: g.entity, kind: "expense", amount: g.total, refs: refsOf(g), status: "failed", ok: false, reference, message: (e as Error).message };
+    }
+    legs.push(counterpart);
+
+    const voucherSideBlocked = !counterpart.ok && counterpart.status !== "review";
+    legs.push(await bookDeliveryDoc({
+      leg: "ic-voucher", org: voucherOrg, kind: "journal", amount: g.total, refs: refsOf(g), reference, dryRun, payoutId, accessToken,
+      missing: missing ?? (voucherSideBlocked ? `Waiting for ${label(g.entity)}'s expense — it wasn't booked.` : null),
+      body: () => buildIntercompanyDeliveryJournalBody({
+        lines: linesOf(g), dueFromAccountId: ic!.dueFromAccountId, clearingAccountId: accounts.depositAccountId,
+        date, reference, description: note(g, `paid on behalf of ${label(g.entity)}`),
+      }),
+    }));
+  }
+
+  const rank: Record<DeliveryDocStatus, number> = { failed: 4, review: 3, planned: 2, booked: 1, found_existing: 0 };
+  const worst = legs.reduce<DeliveryDocStatus>((w, l) => (rank[l.status] > rank[w] ? l.status : w), "found_existing");
+  const firstProblem = legs.find((l) => !l.ok);
+  return { ...summary, status: worst, ok: !firstProblem, legs, ...(firstProblem?.message ? { message: firstProblem.message } : {}) };
+}
+
+
+/** A /DLV expense that already covers the WHOLE voucher (booked before charges
+ *  were split by company). Returns its id, or null when /DLV is absent or is
+ *  just the voucher company's own share. */
+async function legacyWholeVoucherExpense(reference: string, voucherTotal: number, ownTotal: number, accessToken: string): Promise<string | null> {
+  const id = await findDocumentByReference("expenses", reference, accessToken);
+  if (!id) return null;
+  if (Math.abs(voucherTotal - ownTotal) < 0.01) return null;
+  const doc = await fetchDocument("expenses", id, accessToken);
+  const amount = Number(doc?.total ?? doc?.amount ?? NaN);
+  return Math.abs(amount - voucherTotal) < 0.01 ? id : null;
+}
+
+/** Look up by reference → dry run or write → remember. One Zoho document. */
+async function bookDeliveryDoc(a: {
+  leg: DeliveryLegResult["leg"];
+  org: string;
+  kind: "expense" | "journal";
+  amount: number;
+  refs: string[];
+  reference: string;
+  dryRun: boolean;
+  payoutId: string;
+  accessToken: string;
+  /** Set = can't book yet; says what to pick. */
+  missing: string | null;
+  /** Already booked under another reference (see legacyWholeVoucherExpense). */
+  found?: { id: string; message: string };
+  body: () => unknown;
+  /** An expense Zoho refuses for its account types (code 11016) books as this
+   *  journal instead — or, when it returns a string, stops with that message. */
+  asJournal?: () => unknown | string;
+}): Promise<DeliveryLegResult> {
+  const out = { leg: a.leg, org: a.org, kind: a.kind, amount: a.amount, refs: a.refs, reference: a.reference };
+  const remember = (kind: "expense" | "journal", id: string) =>
+    recordDeliveryPosting(a.payoutId, { leg: a.leg, org: a.org, kind, id, reference: a.reference, amount: a.amount, refs: a.refs, at: new Date().toISOString() });
+  if (a.found) {
+    await remember(a.kind, a.found.id);
+    return { ...out, status: "found_existing", ok: true, id: a.found.id, message: a.found.message };
+  }
+  if (a.missing) return { ...out, status: "review", ok: false, message: a.missing };
   try {
-    const existing = await findDocumentByReference("expenses", reference, accessToken);
-    if (existing) return { ...base, status: "found_existing", ok: true, expenseId: existing };
-    if (dryRun) return { ...base, status: "planned", ok: true };
-    const date = (line.date ?? new Date().toISOString()).slice(0, 10);
-    const expenseId = await createExpense(
-      buildDeliveryChargesExpenseBody({ total, accounts, date, reference, description }),
-      accessToken,
-    );
-    return { ...base, status: "booked", ok: true, expenseId };
+    // A retry must find the document whichever form an earlier run wrote.
+    const kinds: ("expense" | "journal")[] = a.kind === "expense" && a.asJournal ? ["expense", "journal"] : [a.kind];
+    for (const kind of kinds) {
+      const existing = await findDocumentByReference(kind === "expense" ? "expenses" : "journals", a.reference, a.accessToken);
+      if (existing) {
+        await remember(kind, existing);
+        return { ...out, kind, status: "found_existing", ok: true, id: existing };
+      }
+    }
+    if (a.dryRun) return { ...out, status: "planned", ok: true };
+    if (a.kind === "journal") {
+      const id = await createJournal(a.body(), a.accessToken);
+      await remember("journal", id);
+      return { ...out, status: "booked", ok: true, id };
+    }
+    try {
+      const id = await createExpense(a.body(), a.accessToken);
+      await remember("expense", id);
+      return { ...out, status: "booked", ok: true, id };
+    } catch (e) {
+      if (!(e instanceof ZohoRejection) || e.code !== ZOHO_ACCOUNT_TYPE_NOT_APPLICABLE || !a.asJournal) throw e;
+      const journal = a.asJournal();
+      if (typeof journal === "string") return { ...out, status: "review", ok: false, message: journal };
+      const id = await createJournal(journal, a.accessToken);
+      await remember("journal", id);
+      return {
+        ...out, kind: "journal", status: "booked", ok: true, id,
+        message: "Zoho won't use that account as an expense's Paid Through, so this was booked as a journal with the same effect.",
+      };
+    }
   } catch (e) {
     const { message, uncertain } = describe(e);
     return {
-      ...base, status: "failed", ok: false,
-      message: uncertain ? `${message} — Zoho may not have answered; retrying is safe, it looks the expense up by reference first.` : message,
+      ...out, status: "failed", ok: false,
+      message: uncertain ? `${message} — Zoho may not have answered; retrying is safe, it looks the document up by reference first.` : message,
     };
   }
 }
@@ -302,7 +519,7 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     // kept a stale id and showed "booked" while its invoice sat overdue).
     let candidates;
     try {
-      candidates = await findZohoInvoiceCandidates(s.order_number, accessToken, process.env.ZOHO_ORGANIZATION_ID!);
+      candidates = await findZohoInvoiceCandidates(s.order_number, accessToken, zohoOrgId());
     } catch (e) {
       throw new ZohoRejection((e as Error).message); // a read — nothing written
     }
@@ -499,6 +716,13 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     if (missing) return { ...base, invoiceNumber, status: "review", ok: false, message: missing, plan, paymentId };
 
     // ── 2. gateway fee (VAT-inclusive on AED) ────────────────────────────
+    // A stored id is only a claim — the expense may have been deleted in Zoho
+    // since. Check before trusting it; if it's gone, forget it and re-post.
+    if (feeExpenseId && plan.fee >= ROUNDING_TOLERANCE_AED && !(await zohoDocumentExists("expenses", feeExpenseId, accessToken))) {
+      notes.push(`Fee expense ${feeExpenseId} no longer exists in Zoho — re-posting it.`);
+      feeExpenseId = null;
+      await save({ zoho_fee_expense_id: null });
+    }
     if (plan.fee < ROUNDING_TOLERANCE_AED) {
       steps.fee = "not_needed";
     } else if (feeExpenseId) {
@@ -529,6 +753,11 @@ async function publishOne(s: SettlementRecord, opts: PublishOptions): Promise<Or
     }
 
     // ── 3. exchange-rate / rounding difference ──────────────────────────
+    if (fxJournalId && plan.differenceKind !== "none" && !(await zohoDocumentExists("journals", fxJournalId, accessToken))) {
+      notes.push(`Exchange journal ${fxJournalId} no longer exists in Zoho — re-posting it.`);
+      fxJournalId = null;
+      await save({ zoho_fx_journal_id: null });
+    }
     if (plan.differenceKind === "none") {
       steps.difference = "not_needed";
     } else if (fxJournalId) {

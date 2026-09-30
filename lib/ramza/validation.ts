@@ -69,3 +69,57 @@ export function validateLead(body: unknown): ValidationResult {
     value: { name, whatsapp, email, storeUrl, gateways, monthlyOrders, accountingTool },
   };
 }
+
+/* ── Corporate Tax penalty lead (/ramza hero form) ─────────────────────────
+   Kept deliberately short so it can be filled in the hero: name, WhatsApp,
+   email, company and what happened. Dates and the checker's result ride
+   along when the visitor ran the checker first. */
+
+const SITUATIONS = new Set(["file_return", "books_behind", "got_penalty", "missed_deadline", "register_or_file", "other"]);
+const PENALTY_TYPES = new Set(["late_registration", "late_filing", "other", "not_sure", ""]);
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export type CtLeadInput = {
+  name: string;
+  whatsapp: string;
+  email: string;
+  company: string;
+  situation: string;
+  penaltyType: string;
+  penaltyIssuedOn: string | null;
+  checker: Record<string, unknown> | null;
+};
+
+export function validateCtLead(body: unknown): { ok: true; value: CtLeadInput } | { ok: false; errors: Record<string, string> } {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const errors: Record<string, string> = {};
+
+  const name = s(b.name, 120);
+  if (name.length < 2) errors.name = "Enter your name.";
+  const whatsapp = s(b.whatsapp, 40);
+  if (!PHONE_RE.test(whatsapp)) errors.whatsapp = "Add a WhatsApp number with country code, e.g. +971 50 123 4567.";
+  const email = s(b.email, 200).toLowerCase();
+  if (!EMAIL_RE.test(email)) errors.email = "Enter a valid email.";
+  const company = s(b.company, 160);
+  if (company.length < 2) errors.company = "Enter your company name.";
+  const situation = s(b.situation, 40);
+  if (!SITUATIONS.has(situation)) errors.situation = "Pick what happened.";
+  const penaltyType = s(b.penaltyType, 40);
+  const issued = s(b.penaltyIssuedOn, 10);
+
+  const checker = b.checker && typeof b.checker === "object" ? (b.checker as Record<string, unknown>) : null;
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: {
+      name, whatsapp, email, company, situation,
+      penaltyType: PENALTY_TYPES.has(penaltyType) ? penaltyType : "",
+      penaltyIssuedOn: DAY_RE.test(issued) ? issued : null,
+      // Only the summary fields — never an arbitrary blob from the browser.
+      checker: checker
+        ? { headline: s(checker.headline, 300), tone: s(checker.tone, 20), estimatedAed: Number(checker.estimatedAed) || 0 }
+        : null,
+    },
+  };
+}

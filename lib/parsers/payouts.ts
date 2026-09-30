@@ -258,9 +258,11 @@ export function parseTelrXls(buf: Buffer | ArrayBuffer, filename: string, provid
     if (!orderRefs.includes(ref)) orderRefs.push(ref);
 
     // Retries / partial captures on one order → merge (same pattern as Tabby/Tamara)
-    // rather than emit duplicate rows in the proof table.
-    const prior = shareByRef.get(ref);
-    shareByRef.set(ref, prior
+    // rather than emit duplicate rows in the proof table — but never merge a
+    // sale with a refund of that order; those book differently.
+    const shareKey = `${ref}|${isRefund ? "refund" : "sale"}`;
+    const prior = shareByRef.get(shareKey);
+    shareByRef.set(shareKey, prior
       ? {
           ref,
           netShare:   +(prior.netShare   + rowNet).toFixed(2),
@@ -713,8 +715,13 @@ export function parseTamaraXlsx(buf: Buffer | ArrayBuffer, filename: string): Pa
       if (clean && !orderRefs.includes(clean)) orderRefs.push(clean);
 
       if (clean) {
-        const prior = shareByRef.get(clean);
-        shareByRef.set(clean, prior
+        // Merge by order AND direction: a sale and a refund of the same
+        // order in one payout (WA55588, Tabby20260907SAR) are two bookings —
+        // the invoice closes on the sale, the credit note refunds on the
+        // other. Summed into one row the sale vanished behind a "refund".
+        const shareKey = `${clean}|${isRefund ? "refund" : "sale"}`;
+        const prior = shareByRef.get(shareKey);
+        shareByRef.set(shareKey, prior
           ? {
               ref: clean,
               netShare: +(prior.netShare + rowNetAed).toFixed(2),
@@ -823,8 +830,13 @@ export function parseTabbyXlsx(buf: Buffer | ArrayBuffer, filename: string): Par
       if (clean && !orderRefs.includes(clean)) orderRefs.push(clean);
 
       if (clean) {
-        const prior = shareByRef.get(clean);
-        shareByRef.set(clean, prior
+        // Merge by order AND direction: a sale and a refund of the same
+        // order in one payout (WA55588, Tabby20260907SAR) are two bookings —
+        // the invoice closes on the sale, the credit note refunds on the
+        // other. Summed into one row the sale vanished behind a "refund".
+        const shareKey = `${clean}|${isRefund ? "refund" : "sale"}`;
+        const prior = shareByRef.get(shareKey);
+        shareByRef.set(shareKey, prior
           ? {
               ref: clean,
               netShare: +(prior.netShare + rowNetAed).toFixed(2),

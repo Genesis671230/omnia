@@ -19,8 +19,9 @@ import {
   FileSpreadsheet, Upload, ShieldCheck, ChevronRight, CheckCircle2,
   RefreshCcw, Loader2, LayoutDashboard, PackageSearch, Receipt,
   WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings,
-  Megaphone, Boxes, Users, ArrowLeftRight,
+  Megaphone, Boxes, Users, ArrowLeftRight, Store,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -34,11 +35,15 @@ import { FounderDashboard } from "@/components/finance/dashboard-v2/founder-dash
 import { StoreChat } from "@/components/finance/store-chat";
 import { DocumentsPanel } from "@/components/finance/documents-panel";
 import { ReportsPanel } from "@/components/finance/reports-panel";
-import { MarketingPanel } from "@/components/finance/marketing-panel";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
+import { OrdersAnalyticsPanel } from "@/components/finance/orders-analytics/orders-analytics";
+import { AdsExplorer } from "@/components/finance/ads/ads-explorer";
+import { StorefrontPanel } from "@/components/finance/storefront/storefront-panel";
 import { CustomersPanel } from "@/components/finance/customers-panel";
 import { ReconView } from "@/components/finance/reconciliation/recon-view";
+import { ZohoOrgsPanel } from "@/components/finance/zoho/zoho-orgs-panel";
+import { BRAND } from "@/lib/config/brand";
 import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-settings-panel";
 import { PaymentSheetMonthsPanel } from "@/components/finance/payment-sheet-months-panel";
 import { InvoicesWorkbench } from "@/components/finance/invoices-workbench";
@@ -49,7 +54,7 @@ import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
-  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "inventory" | "customers" | "settings";
+  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings";
 
 /* ── Nav config ─────────────────────────────────────────────────────────── */
 
@@ -86,6 +91,7 @@ const NAV: NavItem[] = [
   { href: "/documents", view: "documents", label: "Bank actuals", icon: FolderOpen },
   { href: "/returns", view: "returns", label: "Returns", icon: RotateCcw },
   { href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
+  { href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
   { href: "/inventory", view: "inventory", label: "Inventory", icon: Boxes },
   { href: "/customers", view: "customers", label: "Customers", icon: Users },
   { href: "/settings", view: "settings", label: "Settings", icon: Settings },
@@ -184,15 +190,15 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
   }
 
   return (
-    <span {...dropProps} className={`inline-flex rounded-md ${dragging ? "ring-2 ring-[#B08343] ring-offset-1" : ""}`}>
+    <span {...dropProps} className={`inline-flex rounded-full ${dragging ? "ring-2 ring-[#3B82F6] ring-offset-1" : ""}`}>
       <Button
         variant={variant}
         size="sm"
         disabled={busy}
         onClick={() => input.current?.click()}
         className={variant === "outline"
-          ? "h-9 border-[#D6CCBA] bg-white text-[#1F1B16] hover:bg-[#FBF3E6] hover:border-[#C4B896]"
-          : "h-9 border-[#D6CCBA] hover:bg-[#FBF3E6] hover:text-[#1F1B16]"
+          ? "h-9 rounded-full border-[#0F1B3D] bg-[#0F1B3D] px-3.5 text-[13px] text-white hover:bg-[#1E3A8A] hover:text-white"
+          : "h-9 rounded-full border-[#D8E1F1] hover:bg-[#EAF1FD] hover:text-[#0F1B3D]"
         }
       >
         {busy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Upload size={14} className="mr-1.5" />}
@@ -205,7 +211,23 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
 
 /* ── Sidebar ────────────────────────────────────────────────────────────── */
 
-function Sidebar({ pathname, searchParams }: { pathname: string; searchParams: URLSearchParams }) {
+/** Sidebar width, collapsed or not — remembered per browser, mirrored on
+ *  <html> as --sb-w so fixed elements (the chat dock) can follow it. */
+function useSidebarCollapsed() {
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(localStorage.getItem("omnia.sidebar.collapsed") === "1"); } catch { /* storage blocked */ }
+  }, []);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sb-w", collapsed ? "76px" : "240px");
+    try { localStorage.setItem("omnia.sidebar.collapsed", collapsed ? "1" : "0"); } catch { /* storage blocked */ }
+  }, [collapsed]);
+  return [collapsed, setCollapsed] as const;
+}
+
+function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
+  pathname: string; searchParams: URLSearchParams; collapsed: boolean; onToggle: () => void;
+}) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const paramString = searchParams.toString();
@@ -223,115 +245,117 @@ function Sidebar({ pathname, searchParams }: { pathname: string; searchParams: U
     item.children?.some((c) => matchChild(c, item.href)) ?? false;
 
   const isOpen = (item: NavItem) => {
-    if (!item.children?.length) return false;
+    if (collapsed || !item.children?.length) return false;
     if (item.href in expanded) return expanded[item.href];
     return pathname === item.href || pathname.startsWith(item.href + "/") || isChildActive(item);
   };
 
   return (
-    <aside
-      className="fixed inset-y-0 left-0 z-20 flex w-60 flex-col text-[#8B8478]"
-      style={{ backgroundImage: "linear-gradient(180deg, #1B1712 0%, #181510 40%, #14110D 100%)" }}
+    <motion.aside
+      animate={{ width: collapsed ? 76 : 240 }}
+      transition={{ type: "spring", stiffness: 380, damping: 38 }}
+      /* light rail: white, hairline right edge, no heavy colour */
+      className="fixed inset-y-0 left-0 z-30 flex flex-col border-r border-slate-200/70 bg-white"
     >
+      {/* Collapse toggle — a small round button sitting on the rail's edge */}
+      <button
+        onClick={onToggle}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className="absolute -right-3.5 top-7 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 transition hover:bg-slate-900 hover:text-white"
+      >
+        <ChevronRight size={14} className={`transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`} />
+      </button>
+
       {/* Brand */}
-      <div className="border-b border-[#2A251E] px-5 pt-7 pb-6">
-        <div className="flex flex-col leading-none">
-          <span
-            className="text-[22px] tracking-[0.24em] text-[#F5EFDF] italic font-normal"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-          >
-            OMNIA
-          </span>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="h-px w-4 bg-[#B08343]" aria-hidden />
-            <span className="text-[9.5px] font-semibold uppercase tracking-[0.24em] text-[#8B8478]">
-              Finance OS
-            </span>
+      <div className={`flex h-20 items-center ${collapsed ? "justify-center" : "gap-3 px-5"}`}>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[15px] font-semibold text-white">O</span>
+        {!collapsed && (
+          <div className="leading-tight">
+            <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-slate-900">{BRAND.name}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Finance OS</div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4" aria-label="Finance navigation">
+      {/* Nav — overflow-x-hidden stops labels spilling while the rail animates */}
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-3 py-2" aria-label="Finance navigation">
         {NAV.map((item) => {
           const active = pathname === item.href && (!item.children || paramString === "");
           const hasChildren = Boolean(item.children?.length);
           const open = isOpen(item);
-          const childHot = isChildActive(item);
+          const childHot = isChildActive(item) || (collapsed && pathname === item.href);
+          const on = active || (collapsed && childHot);
 
           return (
             <div key={item.href} className="flex flex-col">
               <div className="group relative flex items-center gap-0.5">
-                {active && (
-                  <span aria-hidden className="absolute -left-3 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r bg-[#C99655]" />
-                )}
                 <Link
                   href={item.href}
+                  title={collapsed ? item.label : undefined}
                   className={[
-                    "flex flex-1 items-center gap-2.5 rounded-md px-3 py-[9px] text-[13px] transition-colors",
-                    active
-                      ? "bg-[#26221C] font-medium text-[#FBF8F1]"
-                      : childHot
-                      ? "text-[#C6BDA8] hover:bg-[#221E18]"
-                      : "text-[#8B8478] hover:bg-[#221E18] hover:text-[#D6CCBA]",
+                    "flex flex-1 items-center gap-3 rounded-full py-1.5 text-[13.5px] transition-colors",
+                    collapsed ? "justify-center px-0" : "pl-1.5 pr-3",
+                    on ? "bg-slate-900 text-white" : childHot ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
                   ].join(" ")}
                 >
-                  <item.icon
-                    size={14}
-                    strokeWidth={active ? 2.2 : 1.8}
-                    className={active ? "text-[#C99655]" : childHot ? "text-[#8B8478]" : "text-[#5F594F] group-hover:text-[#8B8478]"}
-                  />
-                  <span className="truncate">{item.label}</span>
+                  {/* round icon well, like the reference's top nav */}
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${on ? "bg-white/10" : "bg-white ring-1 ring-slate-200/80 group-hover:ring-slate-300"}`}>
+                    <item.icon size={16} strokeWidth={1.8} />
+                  </span>
+                  {!collapsed && <span className="truncate">{item.label}</span>}
                 </Link>
 
-                {hasChildren && (
+                {hasChildren && !collapsed && (
                   <button
                     onClick={() => setExpanded((prev) => ({ ...prev, [item.href]: !open }))}
-                    className="rounded p-1.5 text-[#5F594F] transition-colors hover:bg-[#221E18] hover:text-[#8B8478]"
+                    className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                     aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
                   >
-                    <ChevronRight size={11} className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
+                    <ChevronRight size={13} className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
                   </button>
                 )}
               </div>
 
-              {hasChildren && open && (
-                <div className="ml-[26px] mt-1 mb-1.5 flex flex-col gap-0.5 border-l border-[#2A251E] pl-3">
-                  {item.children!.map((child) => {
-                    const childActive = matchChild(child, item.href);
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className={[
-                          "truncate rounded px-2.5 py-1.5 text-[12px] transition-colors",
-                          childActive
-                            ? "bg-[#26221C] font-medium text-[#FBF8F1]"
-                            : "text-[#6B655A] hover:bg-[#221E18] hover:text-[#C6BDA8]",
-                        ].join(" ")}
-                      >
-                        {child.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {hasChildren && open && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="ml-[30px] flex flex-col gap-0.5 overflow-hidden border-l border-slate-200 pl-3"
+                  >
+                    <div className="h-1" />
+                    {item.children!.map((child) => {
+                      const childActive = matchChild(child, item.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={[
+                            "truncate rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
+                            childActive ? "bg-slate-100 font-medium text-slate-900" : "text-slate-500 hover:text-slate-900",
+                          ].join(" ")}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                    <div className="h-1" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="flex items-center gap-2.5 border-t border-[#2A251E] px-5 py-4">
-        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#3B342A] bg-[#26221C]">
-          <ShieldCheck size={11} className="text-[#C99655]" />
-        </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-[10.5px] text-[#8B8478]">Bank-verified truth</span>
-          <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#5F594F]">Server-side matching</span>
-        </div>
+      <div className={`flex items-center gap-2.5 border-t border-slate-100 py-4 ${collapsed ? "justify-center" : "px-5"}`}>
+        <ShieldCheck size={15} className="shrink-0 text-emerald-500" />
+        {!collapsed && <span className="text-[11.5px] text-slate-400">Bank-verified truth</span>}
       </div>
-    </aside>
+    </motion.aside>
   );
 }
 
@@ -522,6 +546,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
     return `/api/reconcile/export${qs ? `?${qs}` : ""}`;
   })();
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useSidebarCollapsed();
   const activeItem = NAV.find((n) => n.href === pathname);
   const pageTitle = isInvoicesTab ? "Invoices workbench" : activeItem?.label ?? "Reconciliation";
   const pageEyebrow =
@@ -530,32 +555,29 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       : "Workspace";
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8] text-[#1F1B16] antialiased">
-      <Sidebar pathname={pathname} searchParams={searchParams} />
+    <div className="min-h-screen bg-[var(--os-page)] text-slate-900 antialiased">
+      <Sidebar pathname={pathname} searchParams={searchParams} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
 
-      <main className="ml-60 min-h-screen">
-        <div className="mx-auto max-w-[1320px] px-10 pt-8 pb-28">
-          {/* Header */}
-          <header className="mb-7 flex items-end justify-between gap-6 border-b border-[#EAE3D6] pb-5">
+      <main className="min-h-screen transition-[margin] duration-300" style={{ marginLeft: sidebarCollapsed ? 76 : 240 }}>
+        <div className="mx-auto max-w-[1440px] px-8 pt-0 pb-28">
+
+          <header className="mb-2 flex items-center justify-between gap-6">
             <div className="flex flex-col leading-tight">
-              <span className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#B08343]">
-                {pageEyebrow}
-              </span>
-              <h1
-                className="text-[28px] tracking-[-0.01em] text-[#1F1B16]"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 500 }}
-              >
+              {/* <span className="mb-3 inline-flex items-center gap-2 text-[13px] text-[#5E6B85]">
+                Finance <span className="text-[#B6C1D6]">/</span> {pageEyebrow}
+              </span> */}
+              {/* <h1 className="text-[30px] font-light tracking-[-0.03em] text-slate-900">
                 {pageTitle}
-              </h1>
+              </h1> */}
             </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            {view === "reconciliation" && !isInvoicesTab && (
+            <div className="flex flex-wrap absolute top-0 right-0 items-center justify-end gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={syncing}
                 onClick={sync}
-                className="h-9 border-[#D6CCBA] bg-white text-[#1F1B16] hover:bg-[#FBF3E6] hover:border-[#C4B896]"
+                className="h-9 rounded-full border-[#D8E1F1] bg-white px-3.5 text-[13px] text-[#0F1B3D] hover:bg-[#0F1B3D] hover:text-white hover:border-[#0F1B3D]"
               >
                 {syncing ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RefreshCcw size={14} className="mr-1.5" />}
                 Sync stores
@@ -563,7 +585,6 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
 
               {view === "reconciliation" && !isInvoicesTab && (
                 <>
-                  {/* Export lives in the reconciliation header row, next to search. */}
                   <UploadButton
                     endpoint="/api/upload/bank"
                     accept=".pdf,.csv,.txt,.xls,.xlsx"
@@ -573,6 +594,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                 </>
               )}
             </div>
+            )}
           </header>
 
           {/* Date-range bar for context-sharing views (not on reconciliation — recon has its own) */}
@@ -698,15 +720,21 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           ) : showReports ? (
             <ReportsPanel version={dashVersion} />
           ) : showMarketing ? (
-            <MarketingPanel />
+            <AdsExplorer />
+          ) : view === "storefronts" ? (
+            <StorefrontPanel />
           ) : showInventory ? (
             <InventoryPanel />
           ) : showCustomers ? (
             <CustomersPanel />
           ) : showOrders ? (
-            <OrdersLedger fromDate={fromDate} toDate={toDate} />
+            <>
+              {view === "orders" && <OrdersAnalyticsPanel />}
+              <OrdersLedger fromDate={fromDate} toDate={toDate} />
+            </>
           ) : view === "settings" ? (
             <div className="space-y-6">
+              <ZohoOrgsPanel />
               <ZohoSettingsPanel />
               <PaymentSheetMonthsPanel />
             </div>
@@ -726,7 +754,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                   endpoint="/api/upload/payout"
                   extraFields={bankLineId ? { provider, bankLineId } : { provider }}
                   accept=".csv,.xls,.xlsx,.pdf"
-                  label={`Upload ${provider} payout file`}
+                  label={variant === "dropzone" ? `Upload ${provider} payout file` : `Upload ${provider === "Shopify Payments" ? "Shopify" : provider} file`}
                   onDone={refresh}
                 />
               )}

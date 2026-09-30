@@ -8,6 +8,7 @@ import { matchesBankTxnQuery, matchesPostStatus, type PostStatusFilter } from "@
 import { BankTxnFilters, type Direction, type PostStatusFilterValue } from "./bank-txn-filters";
 import { BankTxnRow, type BankTxnLine, type BankTxnPostingState } from "./bank-txn-row";
 import { BankTxnPostDialog } from "./bank-txn-post-dialog";
+import { SupplierPaymentDialog } from "./supplier-payment-dialog";
 import { resolveDraftPosting, normalizeAccountMap, type DraftPosting } from "@/lib/reconciliation/mapping-resolver";
 import { defaultBankLineNote, zohoDescriptionFor } from "@/lib/reconciliation/bank-line-description";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
@@ -42,6 +43,7 @@ const chargeSettings: BankChargeSettings = {
   const [postStatus, setPostStatus] = useState<PostStatusFilterValue>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [supplierLine, setSupplierLine] = useState<BankTxnLine | null>(null);
 
   const [syncing, setSyncing] = useState(false);
 const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -156,7 +158,7 @@ const syncWithZoho = async (force = false) => {
         reference: line.reference, entity: draft.intent.entity ?? line.gatewayGuess, kind: draft.intent.kind, payout: line.payout ?? null,
       });
       const note = line.zohoDescription || defaultNote;
-      draft = { ...draft, bankNarration: line.description, note, defaultNote, description: zohoDescriptionFor(note, line.description) };
+      draft = { ...draft, direction: line.direction, bankNarration: line.description, note, defaultNote, description: zohoDescriptionFor(note, line.description) };
 
       // Fill gaps with the sticky default — never overwrite a real gateway match.
       const usedFromDefault = !draft.fromAccountId && Boolean(defaultFromAccountId);
@@ -209,11 +211,11 @@ const deSelectAll = ()=>setSelected(new Set())
 <div className="mb-3 flex flex-wrap items-center gap-3">
   <button onClick={() => syncWithZoho()} disabled={syncing}
     title="Re-read the Zoho Books ledger for this date range. Page loads never call Zoho."
-    className="inline-flex items-center gap-1.5 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16] disabled:opacity-50">
+    className="inline-flex items-center gap-1.5 rounded-full border border-[#C9D5EA] bg-white px-3 py-1.5 text-[12px] text-[#0F1B3D] disabled:opacity-50">
     <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
     {syncing ? "Checking Zoho…" : "Refresh Zoho status"}
   </button>
-  <span className="text-[11px] text-[#8A8175]">
+  <span className="text-[11px] text-[#5E6B85]">
     {lastSyncedAt
       ? `Zoho status as of ${new Date(lastSyncedAt).toLocaleString()} — edits made in Zoho show after the next refresh`
       : "Zoho status not checked for this range yet — press Refresh"}
@@ -232,40 +234,40 @@ const deSelectAll = ()=>setSelected(new Set())
 <BankChargesPanel lines={lines} postings={postings}  onPosted={load} />
 
 
-   <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
+   <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#D8E1F1] bg-[#F3F6FC] p-3">
         <div className="w-56">
-          <div className="mb-1 text-[11px] text-[#8A8175]">Default from-account (fallback)</div>
+          <div className="mb-1 text-[11px] text-[#5E6B85]">Default from-account (fallback)</div>
           <AccountCombobox accounts={zohoAccounts} value={defaultFromAccountId}
             defaultAccountId={settings.bankAccountId} placeholder="None set"
             onChange={setDefaultFromAccountId} />
         </div>
         <div className="w-56">
-          <div className="mb-1 text-[11px] text-[#8A8175]">Default to-account (fallback)</div>
+          <div className="mb-1 text-[11px] text-[#5E6B85]">Default to-account (fallback)</div>
           <AccountCombobox accounts={zohoAccounts} value={defaultToAccountId}
             defaultAccountId={settings.bankAccountId} placeholder="None set"
             onChange={setDefaultToAccountId} />
         </div>
-        <div className="text-[11px] text-[#8A8175]">
+        <div className="text-[11px] text-[#5E6B85]">
           Applied only when a line has no real gateway match — matched lines always keep their own mapping.
         </div>
       </div>
 
       {readyIds.length > 0 && (
-  <button onClick={toggleSelectAllReady} className="mb-3 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] text-[#1F1B16]">
+  <button onClick={toggleSelectAllReady} className="mb-3 rounded-full border border-[#C9D5EA] bg-white px-3 py-1.5 text-[12px] text-[#0F1B3D]">
     {allReadySelected ? "Deselect all" : `Select all ready (${readyIds.length})`}
   </button>
 )}
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-[14px] text-[#8A8175]">
+        <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-10 text-[14px] text-[#5E6B85]">
           <Loader2 size={18} className="animate-spin" /> Loading bank transactions…
         </div>
       ) : lines.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#8A8175]">
+        <div className="rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#5E6B85]">
           No bank lines imported yet. Upload a statement (PDF, CSV, or XLS/XLSX) above.
         </div>
       ) : visible.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#8A8175]">
+        <div className="rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#5E6B85]">
           No lines match the current filters. {lines.length} line{lines.length === 1 ? " is" : "s are"} loaded.
         </div>
       ) : (
@@ -282,20 +284,31 @@ const deSelectAll = ()=>setSelected(new Set())
               selected={selected}
               onToggleSelect={toggleSelect}
               onDescriptionSaved={onDescriptionSaved}
+              onPaySupplier={setSupplierLine}
             />
       )}
      
       {selected.size > 0 && (
-        <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[#D6CCBA] bg-white px-5 py-3 shadow-lg">
-          <span className="text-[13px] text-[#1F1B16]">
+        <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[#C9D5EA] bg-white px-5 py-3 shadow-lg">
+          <span className="text-[13px] text-[#0F1B3D]">
             {selected.size} selected{selectedInZoho ? ` · ${selectedInZoho} already in Zoho, skipped` : ""}
           </span>
           <button onClick={() => setDialogOpen(true)} disabled={selectedDrafts.length === 0}
-            className="rounded-full bg-[#B08343] px-4 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">
+            className="rounded-full bg-[#0F1B3D] px-4 py-1.5 text-[13px] font-medium text-white disabled:opacity-50">
             Post {selectedDrafts.length} to Zoho
           </button>
-          <button onClick={deSelectAll} className="text-[12px] text-[#8A8175] underline">Clear</button>
+          <button onClick={deSelectAll} className="text-[12px] text-[#5E6B85] underline">Clear</button>
         </div>
+      )}
+
+      {supplierLine && (
+        <SupplierPaymentDialog
+          line={supplierLine}
+          bankAccountId={chargeSettings.bankAccountId}
+          accounts={zohoAccounts}
+          onClose={() => setSupplierLine(null)}
+          onBooked={() => load()}
+        />
       )}
 
       {dialogOpen && (

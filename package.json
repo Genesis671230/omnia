@@ -13,6 +13,7 @@
     "test:woo-rate-limit": "tsx scripts/test-woo-rate-limit.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@api/docs-tam": "file:.api/apis/docs-tam",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
@@ -52,6 +53,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "d3-geo": "^3.1.1",
     "date-fns": "4.1.0",
     "dotenv": "^17.4.2",
     "embla-carousel-react": "8.5.1",
@@ -74,6 +76,7 @@
     "stripe": "^22.3.2",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "topojson-client": "^3.1.0",
     "unpdf": "^1.6.2",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
@@ -81,10 +84,12 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
+    "@types/d3-geo": "^3.1.1",
     "@types/node": "^22",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/topojson-client": "^3.1.5",
     "baseline-browser-mapping": "^2.10.43",
     "pg": "^8.22.0",
     "postcss": "^8.5",

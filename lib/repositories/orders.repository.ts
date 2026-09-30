@@ -15,7 +15,25 @@ const ORDER_COLUMNS =
     q: string;
     fulfillableFrom: "KSA" | "UAE" | null;
     orderNumbers: string[];
+    status: OrderStatusTab;
   };
+
+/** The Orders list's tabs. "not_in_zoho" is resolved in the route (it needs
+ *  Zoho); the rest are plain status filters. */
+export const ORDER_STATUS_TABS = ["all", "cancelled", "voided", "refunded", "failed", "not_in_zoho"] as const;
+export type OrderStatusTab = (typeof ORDER_STATUS_TABS)[number];
+
+/** PostgREST filter for a status tab — refunded covers returns too: a returned
+ *  order is refunded in full or in part (Shopify rewrites its status). */
+export function statusTabFilter(status: OrderStatusTab): { eq?: string; or?: string } | null {
+  switch (status) {
+    case "cancelled": return { eq: "cancelled" };
+    case "voided": return { eq: "voided" };
+    case "failed": return { eq: "failed" };
+    case "refunded": return { or: "financial_status.in.(refunded,partially_refunded),refunded_amount.gt.0" };
+    default: return null;
+  }
+}
 export type OrderRowRaw = {
   uid: string; store_id: string; order_number: string; order_date: string | null;
   customer_name: string; customer_email: string; customer_phone: string; customer_id: string | null;
@@ -69,7 +87,9 @@ export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
     ),
   ];
   const fulfillableFrom = fulfillRaw === "KSA" || fulfillRaw === "UAE" ? fulfillRaw : null;
-  return { days, page, limit, store, location, q, fulfillableFrom,orderNumbers };
+  const statusRaw = (params.get("status") || "all").trim() as OrderStatusTab;
+  const status: OrderStatusTab = (ORDER_STATUS_TABS as readonly string[]).includes(statusRaw) ? statusRaw : "all";
+  return { days, page, limit, store, location, q, fulfillableFrom, orderNumbers, status };
 }
 
 // Supabase's fluent query builder returns an increasingly specific generic
@@ -78,9 +98,12 @@ export function parseOrdersQuery(params: URLSearchParams): OrdersQuery {
 // the caller re-asserts the final row shape it actually wants.
 function applyOrdersFilters(
   query: any,
-  opts: { from?: string; to?: string; store?: string | null; location?: string | null; q?: string;fulfillableFrom?: "KSA" | "UAE" | null; },
+  opts: { from?: string; to?: string; store?: string | null; location?: string | null; q?: string;fulfillableFrom?: "KSA" | "UAE" | null; status?: OrderStatusTab },
 ): any {
   let qy = query;
+  const tab = statusTabFilter(opts.status ?? "all");
+  if (tab?.eq) qy = qy.eq("financial_status", tab.eq);
+  if (tab?.or) qy = qy.or(tab.or);
   if (opts.from) qy = qy.gte("order_date", opts.from);
   if (opts.to) qy = qy.lte("order_date", opts.to);
   if (opts.store) qy = qy.eq("store_id", opts.store);
@@ -352,18 +375,31 @@ export const OrdersRepository = {
   // UI-facing paginated + filtered query — the ledger's data source going
   // forward. listAll() stays untouched for the reconciler, which needs the
   // full book regardless of any UI filter.
-  async listPage({ from, to, store, location, q, page, limit ,fulfillableFrom}: {
+  async listPage({ from, to, store, location, q, page, limit ,fulfillableFrom, status}: {
     from?: string; to?: string; store?: string | null; location?: string | null;
-    q?: string; fulfillableFrom?: "KSA" | "UAE" | null;page: number; limit: number;
+    q?: string; fulfillableFrom?: "KSA" | "UAE" | null;page: number; limit: number; status?: OrderStatusTab;
   }) {
     let query = supabase.from("orders").select(ORDER_COLUMNS, { count: "exact" });
-    query = applyOrdersFilters(query, { from, to, store, location, q ,fulfillableFrom});
+    query = applyOrdersFilters(query, { from, to, store, location, q ,fulfillableFrom, status});
     const fromIdx = (page - 1) * limit;
     const { data, error, count } = await query
       .order("order_date", { ascending: false })
       .range(fromIdx, fromIdx + limit - 1);
     if (error) throw new Error(`orders page select failed: ${error.message}`);
     return { rows: (data ?? []) as OrderRowRaw[], total: count ?? 0 };
+  },
+
+  /** How many orders each status tab holds, for the tab badges. */
+  async countStatusTabs(opts: { from?: string; store?: string | null; location?: string | null; q?: string }) {
+    const tabs = ["all", "cancelled", "voided", "refunded", "failed"] as const;
+    const counts = await Promise.all(tabs.map(async (status) => {
+      let query = supabase.from("orders").select("uid", { count: "exact", head: true });
+      query = applyOrdersFilters(query, { ...opts, status });
+      const { count, error } = await query;
+      if (error) throw new Error(`orders count failed: ${error.message}`);
+      return [status, count ?? 0] as const;
+    }));
+    return Object.fromEntries(counts) as Record<(typeof tabs)[number], number>;
   },
 
   async getDispatchDetailsByUids(uids: string[]) {

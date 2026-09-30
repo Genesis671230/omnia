@@ -8,6 +8,7 @@
 
 import { getAccessToken } from "@/lib/integrations/zoho";
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 const API_BASE = "https://www.zohoapis.com/inventory/v1";
 
@@ -36,7 +37,7 @@ export type ZohoWarehouse = {
 
 export async function fetchZohoWarehouses(accessToken?: string): Promise<ZohoWarehouse[]> {
   const token = accessToken ?? (await getAccessToken());
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const res = await zohoThrottledFetch(`${API_BASE}/settings/warehouses?organization_id=${orgId}`, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
     cache: "no-store",
@@ -82,7 +83,7 @@ export type ZohoItemDetail = {
 // calls on a backfill. Retries on Zoho's documented 429 (rate limit) up to
 // 4 times with exponential backoff — a real backfill WILL trip this.
 export async function fetchZohoItemDetail(itemId: string, accessToken: string): Promise<ZohoItemDetail> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const url = `${API_BASE}/items/${itemId}?organization_id=${orgId}`;
 
   for (let attempt = 1; attempt <= 4; attempt++) {
@@ -119,7 +120,7 @@ export type ZohoItemChangeRow = {
 
 export async function fetchZohoItemChangesSince(sinceIso: string | null, accessToken?: string): Promise<ZohoItemChangeRow[]> {
   const token = accessToken ?? (await getAccessToken());
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const rows: ZohoItemChangeRow[] = [];
   let page = 1;
 

@@ -1,0 +1,137 @@
+{
+  "_note": "compliance-gate owns this file. Every value must carry a source URL + verified_on date before ship. Code reads it through lib/ramza/rules.ts — never hardcode these numbers elsewhere.",
+  "campaign": {
+    "deadline_mode_until": "2026-09-30",
+    "rescue_mode_until": "2026-10-31",
+    "_how": "DEADLINE mode through deadline_mode_until (Dubai day), RESCUE mode through rescue_mode_until, then evergreen. See rulesMode() in lib/ramza/rules.ts."
+  },
+  "partner": {
+    "filing_partner": "Lexoro Solutions",
+    "role": "Licensed partner that files returns on EmaraTax and issues the filing invoice",
+    "_decided": "founder decision 2026-09-28",
+    "VERIFY": "compliance-gate: confirm Lexoro Solutions' licence / tax-agent registration number for the footer before paid traffic"
+  },
+  "channels": {
+    "meta_day_one": "instant_form_lead_ads",
+    "_decided": "founder decision 2026-09-28"
+  },
+  "ct": {
+    "filing_rule": "Return + payment due within 9 months of tax period end",
+    "filing_months_after_period_end": 9,
+    "deadlines": [
+      {
+        "fy_end": "2025-12-31",
+        "due": "2026-09-30"
+      },
+      {
+        "fy_end": "2026-03-31",
+        "due": "2026-12-31"
+      },
+      {
+        "fy_end": "2026-06-30",
+        "due": "2027-03-31"
+      }
+    ],
+    "late_filing_penalty": {
+      "months_1_12_aed": 500,
+      "month_13_plus_aed": 1000,
+      "per": "month or part thereof",
+      "legal_basis": "Cabinet Decision No. 75 of 2023 (Corporate Tax administrative penalties)",
+      "verified_note": "Cabinet Decision No. 129 of 2025 (eff. 14 Apr 2026) amends Cabinet Decision No. 40 of 2017 for VAT/Excise only — it aligns those with the CT regime and does NOT change CT late-filing amounts.",
+      "source": "https://www.mondaq.com/tax-authorities/1709644/middle-east-tax-alert-|-uae-|-cabinet-decision-no-129-of-2025-|-penalties",
+      "verified_on": "2026-09-28",
+      "VERIFY": "compliance-gate: confirm Cabinet Decision 75/2023 schedule on tax.gov.ae (primary source) before the estimator ships in paid traffic"
+    },
+    "late_payment": {
+      "rate_pa": 0.14,
+      "calc": "monthly on unpaid tax",
+      "legal_basis": "Cabinet Decision No. 75 of 2023",
+      "VERIFY": "compliance-gate: primary source on tax.gov.ae"
+    },
+    "late_registration_aed": 10000,
+    "late_registration_waiver": {
+      "months_after_first_period_end": 7,
+      "rule": "Penalty waived (or refunded as credit) if the FIRST tax return / annual declaration is filed within 7 months of the end of the first tax period. First tax period only.",
+      "effect_for_dec_2025_year_end": "Window closed 2026-07-31 — do NOT pitch the waiver as available to Dec-2025 year-end businesses in this campaign.",
+      "status": "Initiative active per FTA news, May 2026",
+      "source": "https://tax.gov.ae/en/media.centre/news/fta.expects.number.of.beneficiaries.from.corporate.tax.late.registration.penalty.waiver.initiative.to.rise.to.91000.aspx",
+      "verified_on": "2026-09-28"
+    },
+    "reconsideration_business_days": 40,
+    "record_keeping_aed": {
+      "first": 10000,
+      "repeat_24m": 20000,
+      "VERIFY": "compliance-gate: confirm against Cabinet Decision 75/2023"
+    },
+    "sbr_must_still_file": true,
+    "rate": {
+      "zero_rate_up_to_aed": 375000,
+      "rate_above": 0.09,
+      "legal_basis": "Federal Decree-Law No. 47 of 2022, Cabinet Decision No. 116 of 2023",
+      "VERIFY": "compliance-gate: primary source on mof.gov.ae"
+    }
+  },
+  "vat": {
+    "standard_rate": 0.05,
+    "legal_basis": "Federal Decree-Law No. 8 of 2017",
+    "VERIFY": "compliance-gate: primary source on tax.gov.ae"
+  },
+  "einvoicing": {
+    "large": {
+      "revenue_gte_aed": 50000000,
+      "asp_by": "2026-10-30",
+      "go_live": "2027-01-01"
+    },
+    "sme": {
+      "asp_by": "2027-03-31",
+      "go_live": "2027-07-01"
+    },
+    "scope": "B2B/B2G; B2C-only currently out of scope",
+    "source": "https://www.deloitte.com/middle-east/en/services/tax/perspectives/uae-e-invoicing-asp-appointment-deadline-extended-but-go-live-remains-01012027.html",
+    "verified_on": "2026-09-28",
+    "VERIFY": "compliance-gate: confirm 'B2C-only out of scope' on mof.gov.ae before using it in copy"
+  },
+  "pricing": {
+    "_status": "Tier model decided (transaction-based). Tier AED amounts still null = founder to set; UI shows 'Get a quote' until then.",
+    "competitor_anchor": {
+      "name": "typical AI-accounting firm",
+      "aed_month": 799,
+      "txn_included": 10
+    },
+    "gateway_lines_per_txn": 10,
+    "gateways": [
+      "Stripe",
+      "Network International",
+      "Telr",
+      "Checkout.com",
+      "Tabby",
+      "Tamara",
+      "Amazon",
+      "Noon"
+    ],
+    "tiers": [
+      {
+        "max_txn": 50,
+        "aed_month": null
+      },
+      {
+        "max_txn": 150,
+        "aed_month": null
+      },
+      {
+        "max_txn": 300,
+        "aed_month": null
+      },
+      {
+        "max_txn": 500,
+        "aed_month": null
+      }
+    ],
+    "one_off": {
+      "late_filing_rescue_aed": 4999,
+      "backlog_discount_pct": null,
+      "_decided": "Rescue fee AED 4,999 one-off — founder decision 2026-09-28"
+    },
+    "model": "transaction-based: billable txn = bank lines + ceil(gateway lines / gateway_lines_per_txn), priced by tier"
+  }
+}

@@ -79,3 +79,66 @@ export async function notifyLead(input: LeadInput, attr: LeadAttribution): Promi
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+/* Corporate Tax penalty lead — same table, dedupe and Telegram ping as the
+   payout-audit form, tagged source = 'ramza-ct-penalty'. */
+export async function insertCtLead(
+  input: import("@/lib/ramza/validation").CtLeadInput,
+  attr: LeadAttribution,
+  eventId: string,
+  userAgent: string,
+): Promise<{ id: string } | { deduped: true } | { error: string }> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await supabase
+    .from("leads").select("id").eq("email", input.email).eq("source", "ramza-ct-penalty").gte("created_at", since).limit(1);
+  if (recent && recent.length > 0) return { deduped: true };
+
+  const { data, error } = await supabase
+    .from("leads")
+    .insert({
+      name: input.name,
+      whatsapp: input.whatsapp,
+      email: input.email,
+      company: input.company,
+      situation: input.situation,
+      penalty_type: input.penaltyType,
+      penalty_issued_on: input.penaltyIssuedOn,
+      checker: input.checker,
+      utm_source: clip(attr.utm_source, 200),
+      utm_medium: clip(attr.utm_medium, 200),
+      utm_campaign: clip(attr.utm_campaign, 200),
+      utm_content: clip(attr.utm_content, 200),
+      fbc: clip(attr.fbc, 400),
+      fbp: clip(attr.fbp, 200),
+      referrer: clip(attr.referrer, 500),
+      landing_path: clip(attr.landing_path, 300),
+      event_id: eventId,
+      user_agent: userAgent.slice(0, 400),
+      source: "ramza-ct-penalty",
+    })
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+  return { id: data.id };
+}
+
+const SITUATION_LABEL: Record<string, string> = {
+  file_return: "Needs the Corporate Tax return filed",
+  books_behind: "Bookkeeping behind",
+  got_penalty: "Received a penalty",
+  missed_deadline: "Worried a deadline was missed",
+  register_or_file: "Needs to register / file",
+  other: "Other",
+};
+
+export async function notifyCtLead(input: import("@/lib/ramza/validation").CtLeadInput, attr: LeadAttribution): Promise<void> {
+  const line = [
+    "<b>New RAMZA Corporate Tax penalty lead</b>",
+    `${escapeHtml(input.name)} — ${escapeHtml(input.company)}`,
+    `${escapeHtml(input.email)} · ${escapeHtml(input.whatsapp)}`,
+    `${escapeHtml(SITUATION_LABEL[input.situation] ?? input.situation)}${input.penaltyType ? ` · ${escapeHtml(input.penaltyType)}` : ""}${input.penaltyIssuedOn ? ` · notice ${input.penaltyIssuedOn}` : ""}`,
+    input.checker ? `Checker: ${escapeHtml(String(input.checker.headline ?? ""))}` : "",
+    attr.utm_campaign || attr.utm_source ? `Campaign: ${escapeHtml(attr.utm_source || "?")} / ${escapeHtml(attr.utm_campaign || "?")}` : "",
+  ].filter(Boolean).join("\n");
+  await sendTelegramMessage(line).catch(() => {});
+}

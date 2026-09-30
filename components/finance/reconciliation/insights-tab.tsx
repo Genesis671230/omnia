@@ -31,14 +31,14 @@ function ChartCard({ title, subtitle, icon: Icon, children, empty }: {
   children: React.ReactNode; empty?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EAE3D6] bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-[#D8E1F1] bg-white p-5 shadow-sm">
       <div className="mb-1 flex items-center gap-2">
-        <Icon size={15} className="text-[#B08343]" />
-        <h3 className="text-[14.5px] font-semibold text-[#1F1B16]">{title}</h3>
+        <Icon size={15} className="text-[#1D4ED8]" />
+        <h3 className="text-[14.5px] font-semibold text-[#0F1B3D]">{title}</h3>
       </div>
-      <p className="mb-4 text-[12.5px] leading-relaxed text-[#8A8175]">{subtitle}</p>
+      <p className="mb-4 text-[12.5px] leading-relaxed text-[#5E6B85]">{subtitle}</p>
       {empty ? (
-        <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed border-[#D6CCBA] px-6 text-center text-[13px] text-[#8A8175]">
+        <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed border-[#C9D5EA] px-6 text-center text-[13px] text-[#5E6B85]">
           {empty}
         </div>
       ) : (
@@ -52,23 +52,23 @@ function StatTile({ label, value, note, icon: Icon, tone }: {
   label: string; value: string; note: string; icon: React.ElementType; tone: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EAE3D6] bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-[12px] text-[#8A8175]">
+    <div className="rounded-2xl border border-[#D8E1F1] bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-1.5 text-[12px] text-[#5E6B85]">
         <Icon size={13} style={{ color: tone }} /> {label}
       </div>
-      <div className="mt-1.5 font-serif text-[26px] tabular-nums" style={{ color: tone }}>{value}</div>
-      <div className="mt-0.5 text-[11.5px] text-[#8A8175]">{note}</div>
+      <div className="mt-1.5 font-normal tracking-[-0.02em] text-[26px] tabular-nums" style={{ color: tone }}>{value}</div>
+      <div className="mt-0.5 text-[11.5px] text-[#5E6B85]">{note}</div>
     </div>
   );
 }
 
 const tooltipStyle = {
   background: "#FFFFFF",
-  border: "1px solid #EAE3D6",
+  border: "1px solid #D8E1F1",
   borderRadius: 10,
   fontSize: 12.5,
   padding: "8px 10px",
-  boxShadow: "0 4px 16px rgba(31,27,22,0.08)",
+  boxShadow: "0 4px 16px rgba(15,27,61,0.08)",
 };
 
 export function InsightsTab({ lines }: { lines: ReconLine[] }) {
@@ -102,7 +102,7 @@ export function InsightsTab({ lines }: { lines: ReconLine[] }) {
         <StatTile
           label="Exception exposure" value={money(totals.exceptionAed)}
           note={`${totals.exceptionCount} credits need a decision`}
-          icon={AlertTriangle} tone={totals.exceptionCount ? "#A6472F" : "#8A8175"}
+          icon={AlertTriangle} tone={totals.exceptionCount ? "#A6472F" : "#5E6B85"}
         />
       </div>
 
@@ -196,28 +196,28 @@ export function InsightsTab({ lines }: { lines: ReconLine[] }) {
           icon={AlertTriangle}
           empty={exceptions.length === 0 ? "No exceptions. Every credit either settled or is waiting on its file." : undefined}
         >
-          <div className="overflow-hidden rounded-xl border border-[#EAE3D6]">
+          <div className="overflow-hidden rounded-xl border border-[#D8E1F1]">
             <table className="w-full border-collapse text-[12.5px]">
               <thead>
-                <tr className="bg-[#FBF8F1]">
-                  <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Gateway</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Variance</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Missing orders</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Credits</th>
+                <tr className="bg-[#F3F6FC]">
+                  <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Gateway</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Variance</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Missing orders</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Credits</th>
                 </tr>
               </thead>
               <tbody>
                 {exceptions.map((e) => (
-                  <tr key={e.gateway} className="border-t border-[#EAE3D6]">
+                  <tr key={e.gateway} className="border-t border-[#D8E1F1]">
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-[#1F1B16]">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-[#0F1B3D]">
                         <i className="h-2.5 w-2.5 rounded-full" style={{ background: gatewayColor(e.gateway) }} />
                         {e.gateway}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right font-mono tabular-nums text-[#A6472F]">{aed2(e.varianceAed)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-[#1F1B16]">{e.unresolvedOrders || "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-[#8A8175]">{e.lineCount}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[#0F1B3D]">{e.unresolvedOrders || "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[#5E6B85]">{e.lineCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -231,34 +231,34 @@ export function InsightsTab({ lines }: { lines: ReconLine[] }) {
           icon={TrendingUp}
           empty={drift.length === 0 ? "No cross-border payouts in this range — everything settled in AED." : undefined}
         >
-          <div className="overflow-hidden rounded-xl border border-[#EAE3D6]">
+          <div className="overflow-hidden rounded-xl border border-[#D8E1F1]">
             <table className="w-full border-collapse text-[12.5px]">
               <thead>
-                <tr className="bg-[#FBF8F1]">
-                  <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Payout</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Rate</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Drift</th>
-                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">FX fee</th>
+                <tr className="bg-[#F3F6FC]">
+                  <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Payout</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Rate</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Drift</th>
+                  <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">FX fee</th>
                 </tr>
               </thead>
               <tbody>
                 {drift.slice(0, 8).map((d) => (
-                  <tr key={d.id} className="border-t border-[#EAE3D6]">
+                  <tr key={d.id} className="border-t border-[#D8E1F1]">
                     <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-[#1F1B16]">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-[#0F1B3D]">
                         <i className="h-2.5 w-2.5 rounded-full" style={{ background: gatewayColor(d.gateway) }} />
                         {d.gateway}
                       </span>
-                      <div className="text-[11px] text-[#8A8175]">{d.date?.slice(0, 10)} · {d.currency}</div>
+                      <div className="text-[11px] text-[#5E6B85]">{d.date?.slice(0, 10)} · {d.currency}</div>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#1F1B16]">
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#0F1B3D]">
                       {d.fxRate ?? "—"}
-                      <div className="text-[10.5px] font-sans text-[#8A8175]">
+                      <div className="text-[10.5px] font-sans text-[#5E6B85]">
                         {d.fxSource === "bank" ? "bank-quoted" : "estimate"}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#8A8175]">{aed2(d.rateDriftAed)}</td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#1F1B16]">{aed2(d.fxFeeAed)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#5E6B85]">{aed2(d.rateDriftAed)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[#0F1B3D]">{aed2(d.fxFeeAed)}</td>
                   </tr>
                 ))}
               </tbody>

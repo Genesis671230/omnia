@@ -4,10 +4,14 @@ import { normalizeRef } from "@/lib/inventory-compare";
 import { NextResponse } from "next/server";
 import "dotenv/config";
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+import { currentZohoScope, zohoOrgId } from "@/lib/integrations/zoho-context";
+import { getScopedAccessToken } from "@/lib/integrations/zoho-org";
 const ACCOUNTS_BASE = "https://accounts.zoho.com";
 const API_BASE = "https://www.zohoapis.com/books/v3";
 
 export function zohoConfigured(): boolean {
+  // Inside withZohoOrg() the scope was resolved from a stored connection.
+  if (currentZohoScope()) return true;
   return Boolean(
     process.env.ZOHO_REFRESH_TOKEN &&
     process.env.ZOHO_CLIENT_ID &&
@@ -151,12 +155,6 @@ export type CreatePaymentResult = {
 };
 
 
-let cachedAccessToken: {
-  token: string;
-  expiresAt: number;
-} | null = null;
-
-let refreshPromise: Promise<string> | null = null;
 async function zohoFetch(
   url: string,
   accessToken: string,
@@ -175,81 +173,11 @@ async function zohoFetch(
 
   return res;
 }
+/** Access token for the Zoho organisation in scope — the default (env)
+ *  organisation unless the caller is inside withZohoOrg(). One cache per
+ *  organisation lives in lib/integrations/zoho-org.ts. */
 export async function getAccessToken(): Promise<string> {
-  const now = Date.now();
-
-  // Reuse token until ~5 minutes before expiry.
-  if (
-    cachedAccessToken &&
-    cachedAccessToken.expiresAt > now + 5 * 60 * 1000
-  ) {
-    return cachedAccessToken.token;
-  }
-
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = refreshZohoAccessToken();
-
-  try {
-    const token = await refreshZohoAccessToken();
-    return token;
-  } finally {
-    refreshPromise = null;
-  }
-}
-
-async function refreshZohoAccessToken(): Promise<string> {
-  const refreshToken = process.env.ZOHO_REFRESH_TOKEN!;
-  const clientId = process.env.ZOHO_CLIENT_ID!;
-  const clientSecret = process.env.ZOHO_CLIENT_SECRET!;
-  const accountsUrl =
-    process.env.ZOHO_ACCOUNTS_URL ?? "https://accounts.zoho.com";
-
-
-
-  const body = new URLSearchParams({
-    refresh_token: refreshToken,
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "refresh_token",
-  });
-
-  const res = await zohoThrottledFetch(
-    `${accountsUrl}/oauth/v2/token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body,
-      cache: "no-store",
-    },
-    // OAuth refresh is a different host with its own limit and is cached
-    // ~55min — pace it, but don't spend Books/Inventory quota on it.
-    { skipQuota: true, label: "oauth.token" },
-  );
-
-  const json = await res.json();
-
-  if (!res.ok || json.error) {
-    throw new Error(
-      `Zoho OAuth refresh failed HTTP ${res.status}: ${
-        json.error_description ?? json.error ?? JSON.stringify(json)
-      }`,
-    );
-  }
-
-  const expiresIn = Number(json.expires_in ?? 3600);
-
-  cachedAccessToken = {
-    token: json.access_token,
-    // Keep a safety margin so we don't use an expired token.
-    expiresAt: Date.now() + (expiresIn - 5 * 60) * 1000,
-  };
-
-  return json.access_token;
+  return getScopedAccessToken();
 }
 
 /**
@@ -273,7 +201,7 @@ export async function zohoGetPaginated<T>(
   accessToken: string,
   opts: { sinceIso?: string | null; label?: string } = {},
 ): Promise<T[]> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const out: T[] = [];
   let page = 1;
   for (;;) {
@@ -448,7 +376,7 @@ export async function listCustomerPaymentCustomFields(
   accessToken: string,
   opts?: { sampleSize?: number },
 ): Promise<ZohoPaymentCustomFieldMeta[]> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const sampleSize = opts?.sampleSize ?? 10;
 
   const listRes = await zohoThrottledFetch(
@@ -686,7 +614,7 @@ export async function findZohoInvoice(
 export async function createZohoCustomerPayment(input: ZohoCustomerPaymentInput & { writeOffResidualAsFee?: boolean,invoiceId:string,paymentMode:string,referenceNumber:string }, accessToken: string,opts?: { customFieldSchema?: ZohoPaymentCustomFieldMeta[] },
 ): Promise<CreatePaymentResult> {
   let invoiceDetail = input.invoice;
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   let invoice = input.invoice;
 
 if(!invoiceDetail){
@@ -935,7 +863,7 @@ export async function listZohoInvoices(
   if (!zohoConfigured()) {
     throw new Error("error: Zoho is not configured — set ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_ORGANIZATION_ID");
   }
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
     const accessToken = await getAccessToken();
   const qs = new URLSearchParams({
     organization_id: orgId,

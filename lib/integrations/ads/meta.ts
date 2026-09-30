@@ -19,9 +19,9 @@ import { normalizeAdAccountId } from "./account-id";
 const API_VERSION = "v21.0";
 const BASE = `https://graph.facebook.com/${API_VERSION}`;
 
-type MetaAccountGroup = { label: string; accessToken: string; adAccountIds: string[] };
+export type MetaAccountGroup = { label: string; accessToken: string; adAccountIds: string[] };
 
-function accountGroups(): MetaAccountGroup[] {
+export function accountGroups(): MetaAccountGroup[] {
   const groups: MetaAccountGroup[] = [];
   if (process.env.META_MAIN_ACCESS_TOKEN && process.env.META_MAIN_AD_ACCOUNT_IDS) {
     groups.push({
@@ -80,7 +80,7 @@ export async function metaTokenStatus(): Promise<MetaTokenStatus[]> {
   return out;
 }
 
-type MetaAction = { action_type: string; value: string };
+export type MetaAction = { action_type: string; value: string };
 type MetaInsightRow = {
   campaign_id: string;
   campaign_name: string;

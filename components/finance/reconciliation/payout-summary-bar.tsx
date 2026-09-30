@@ -9,12 +9,12 @@ function Tile({ label, value, icon: Icon, tone, note }: {
   label: string; value: string; icon: React.ElementType; tone: string; note?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EAE3D6] bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-[11.5px] text-[#8A8175]">
+    <div className="rounded-2xl border border-[#D8E1F1] bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-1.5 text-[11.5px] text-[#5E6B85]">
         <Icon size={13} style={{ color: tone }} /> {label}
       </div>
-      <div className="mt-1.5 font-serif text-[22px] tabular-nums" style={{ color: tone }}>{value}</div>
-      {note && <div className="mt-0.5 text-[11px] text-[#8A8175]">{note}</div>}
+      <div className="mt-1.5 font-normal tracking-[-0.02em] text-[22px] tabular-nums" style={{ color: tone }}>{value}</div>
+      {note && <div className="mt-0.5 text-[11px] text-[#5E6B85]">{note}</div>}
     </div>
   );
 }
@@ -49,13 +49,13 @@ export function PayoutSummaryBar({ lines }: { lines: ReconLine[] }) {
       <Tile label="Gross Sales" value={aed2(totals.grossAed)} icon={TrendingUp} tone="#2E6B7A" />
       <Tile label="Net Sales" value={aed2(totals.netAed)} icon={Banknote} tone="#4B7A54" />
       <Tile label="Awaiting Payments" value={aed2(totals.awaitingAed)} icon={Clock} tone="#B0742E" />
-      <Tile label="Fees" value={aed2(totals.feesAed)} icon={Percent} tone="#8A8175" />
+      <Tile label="Fees" value={aed2(totals.feesAed)} icon={Percent} tone="#5E6B85" />
       <Tile label="Refunds" value={aed2(totals.refundsAed)} icon={RotateCcw} tone="#A6472F" />
       <Tile
         label="Exchanges"
         value={exchangesLoading ? "…" : exchangeCount == null ? "—" : String(exchangeCount)}
         note={exchangeCount == null && !exchangesLoading ? "couldn't load" : undefined}
-        icon={ArrowLeftRight} tone="#6F5325"
+        icon={ArrowLeftRight} tone="#1E3A8A"
       />
     </div>
   );

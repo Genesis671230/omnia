@@ -49,6 +49,8 @@ export type ReconLine = {
     fxSource: "bank" | "estimate" | null;
     /** COD courier vouchers: charges that belong to no invoice. */
     deliveryCharges?: CodDeliveryCharge[];
+    /** Zoho organisation whose books this payout closes ('' = default). */
+    zohoConnectionId?: string;
   } | null;
   variance: number;
   resolvedOrders: string[];
@@ -254,6 +256,22 @@ export type ComputeReconInputs = {
  *  decision made by uploading a file from a credit's own panel, and it
  *  outranks amount proximity in the caller.
  */
+/** Stripe and Shopify Payments both settle through Network International.
+ *  About half their credits carry a "STRIPE-…"/"SHOPIFY-…" token; the rest
+ *  arrive as ".../BATC…/IPPCG…/…\\HCP" with no rail named at all. Those are
+ *  classified Stripe with confidence "inferred" — a guess that sent e.g. the
+ *  AED 785.79 credit FT26267TVX45 looking for a Stripe payout when it was
+ *  Shopify Payments UAE payout 149110423710. For such credits either rail's
+ *  payout may match, but only on the exact amount. */
+const ACQUIRER_EXACT_AED = 0.01;
+function isNetworkRail(gateway: string): boolean {
+  return gateway === "Stripe" || gateway.startsWith("Shopify Payments");
+}
+function isAcquirerInferred(credit: { gateway_guess: string | null; confidence: string | null; description: string }): boolean {
+  return credit.confidence === "inferred" && isNetworkRail(credit.gateway_guess ?? "")
+    && /NETWORK INTERNATIONAL/i.test(credit.description ?? "");
+}
+
 function assignPayoutsToCredits(
   credits: ComputeReconInputs["credits"],
   payouts: PayoutWithRefs[],
@@ -267,10 +285,13 @@ function assignPayoutsToCredits(
     if (pinnedCredits.has(credit.id)) continue;
     const provider = credit.gateway_guess || "Unclassified";
     const window = Math.max(TOLERANCE_AED, Number(credit.amount) * 0.02);
+    const acquirerOnly = isAcquirerInferred(credit);
     for (const p of open) {
-      if (p.gateway !== provider) continue;
+      const sameRail = p.gateway === provider;
+      if (!sameRail && !(acquirerOnly && isNetworkRail(p.gateway))) continue;
       const diff = Math.abs(expectedNetFor(p, credit).net - Number(credit.amount));
-      if (diff <= window) pairs.push({ creditId: credit.id, payout: p, diff });
+      // Across rails the name proves nothing, so only an exact amount counts.
+      if (diff <= (sameRail ? window : ACQUIRER_EXACT_AED)) pairs.push({ creditId: credit.id, payout: p, diff });
     }
   }
 
@@ -303,7 +324,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
   const assignment = assignPayoutsToCredits(credits, payouts);
 
   for (const credit of credits) {
-    const provider = credit.gateway_guess || "Unclassified";
+    let provider = credit.gateway_guess || "Unclassified";
 
     // a payout explains a credit when provider agrees AND net ≈ bank amount
     // (expectedNetFor prefers the bank's own quoted wire rate over our static
@@ -317,6 +338,9 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       (assignment.get(credit.id) && !claimedPayouts.has(assignment.get(credit.id)!.id)
         ? assignment.get(credit.id)
         : undefined);
+
+    // An acquirer-only credit is whichever rail its payout turned out to be.
+    if (payout && isAcquirerInferred(credit) && isNetworkRail(payout.gateway)) provider = payout.gateway;
 
     const confirmation = confirmations.get(credit.id);
     const review = reviews?.get(credit.id);
@@ -362,7 +386,12 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
       expected.fxSource === "bank" && payout.net_amount !== 0
         ? expected.net / payout.net_amount
         : 1;
-    const transactions = rescaleShares(payout.transactions, scale, expected.net);
+    // A COD voucher's courier charges are netted out of its remittance but
+    // belong to no order, so the orders foot to net + charges. Footing them to
+    // the bare net dumped every charge onto the largest order (CP17192:
+    // WA55811 read −272.50 instead of the 892.50 remitted for it).
+    const deliveryTotal = +(payout.delivery_charges ?? []).reduce((s, c) => s + c.amount, 0).toFixed(2);
+    const transactions = rescaleShares(payout.transactions, scale, +(expected.net + deliveryTotal).toFixed(2));
 
     const rateDriftAed =
       expected.fxSource === "bank" ? +(expected.net - payout.net_amount).toFixed(2) : null;
@@ -376,36 +405,42 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
     // per-ref refund/quality info, when the parser produced it (Stripe live
     // API + CSV uploads) — absent for older parsers (Telr/Tamara/Tabby/
     // generic), which fall through to the pre-existing charge/hit behavior.
-    const txByRef = new Map(payout.transactions.map((t) => [t.order_ref, t]));
+    // An order can have BOTH a sale and a refund line on one payout, so a ref
+    // maps to a list — a single-entry map kept only whichever came last.
+    const txsByRef = new Map<string, typeof payout.transactions>();
+    for (const t of payout.transactions) txsByRef.set(t.order_ref, [...(txsByRef.get(t.order_ref) ?? []), t]);
 
     const resolvedOrders: string[] = [];
     const unresolvedRefs: string[] = [];
     const refundedOrders: string[] = [];
     const qualityIssues: QualityIssue[] = [];
     const orderByRef = new Map<string, string>();
-    for (const ref of payout.order_refs) {
+    // Unique refs: a sale + refund of one order must not resolve it twice
+    // (that produced two settlement rows with one id and failed the upsert).
+    for (const ref of new Set(payout.order_refs)) {
       const linked = links?.get(`${payout.id}|${ref}`);
       const hit = (linked && orderNumbers.has(linked) ? linked : undefined) ?? refCandidates(ref).find((c) => orderNumbers.has(c));
       if (hit) orderByRef.set(ref, hit);
-      const tx = txByRef.get(ref);
-      const isRefund = tx?.is_refund ?? false;
+      const txs = txsByRef.get(ref) ?? [];
+      const hasRefund = txs.some((t) => t.is_refund);
+      // No transaction rows (older uploads) → treated as a sale, as before.
+      const hasSale = txs.length === 0 || txs.some((t) => !t.is_refund);
 
-      if (isRefund) {
+      if (hasRefund) {
         if (hit) refundedOrders.push(hit);
         else qualityIssues.push({ ref, quality: "refund_unmatched" });
-      } else if (hit) {
-        resolvedOrders.push(hit);
-      } else {
-        unresolvedRefs.push(ref);
+      }
+      if (hasSale) {
+        if (hit) resolvedOrders.push(hit);
+        else unresolvedRefs.push(ref);
       }
 
       // messy descriptions (blank/unparseable/multi/note) surface for review
       // regardless of whether the ref itself resolved — a multi-ref charge
       // that matched fine still had its net split evenly, an approximation
       // worth a founder's eyes.
-      if (tx?.quality && tx.quality !== "clean" && tx.quality !== "refund") {
-        qualityIssues.push({ ref, quality: tx.quality });
-      }
+      const messy = txs.find((t) => t.quality && t.quality !== "clean" && t.quality !== "refund");
+      if (messy) qualityIssues.push({ ref, quality: messy.quality! });
     }
 
     // Candidate selection above already accepted this payout within a
@@ -432,6 +467,7 @@ export function computeReconLines(inputs: ComputeReconInputs): ReconLine[] {
         id: payout.id, net: expected.net, source: payout.source,
         currency: expected.currency, fxRate: expected.fxRate, fxSource: expected.fxSource,
         ...(payout.delivery_charges?.length ? { deliveryCharges: payout.delivery_charges } : {}),
+        ...(payout.zoho_connection_id ? { zohoConnectionId: payout.zoho_connection_id } : {}),
       },
       variance,
       resolvedOrders,

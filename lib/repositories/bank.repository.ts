@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedBankLine } from "@/lib/parsers/bank";
 import { dedupeKey, hasStableWireIdentity } from "@/lib/parsers/bank-dedupe";
+import { chunkForInFilter } from "./in-filter-chunks";
 
 export { dedupeKey } from "@/lib/parsers/bank-dedupe";
 
@@ -96,26 +97,32 @@ async function resolveExisting(
 
   const plainRows = rows.filter((r) => !hasStableWireIdentity(r));
   if (plainRows.length) {
-    const { data, error } = await supabase
-      .from("bank_lines")
-      .select("id, dedupe_key, amount, description")
-      .in("dedupe_key", plainRows.map((r) => r.dedupe_key));
-    if (error) throw new Error(`bank_lines lookup failed: ${error.message}`);
-    for (const r of data ?? []) existingByKey.set(r.dedupe_key, { id: r.id, amount: r.amount, description: r.description });
+    for (const keys of chunkForInFilter(plainRows.map((r) => r.dedupe_key))) {
+      const { data, error } = await supabase
+        .from("bank_lines")
+        .select("id, dedupe_key, amount, description")
+        .in("dedupe_key", keys);
+      if (error) throw new Error(`bank_lines lookup failed: ${error.message}`);
+      for (const r of data ?? []) existingByKey.set(r.dedupe_key, { id: r.id, amount: r.amount, description: r.description });
+    }
   }
 
   const wireCreditRows = rows.filter((r) => hasStableWireIdentity(r));
   if (wireCreditRows.length) {
     const refs = [...new Set(wireCreditRows.map((r) => r.reference))];
-    const { data, error } = await supabase
-      .from("bank_lines")
-      .select("id, statement_date, reference, amount, description")
-      .eq("direction", "credit")
-      .in("reference", refs);
-    if (error) throw new Error(`bank_lines lookup failed: ${error.message}`);
+    const data: { id: string; statement_date: string; reference: string; amount: number; description: string }[] = [];
+    for (const chunk of chunkForInFilter(refs)) {
+      const res = await supabase
+        .from("bank_lines")
+        .select("id, statement_date, reference, amount, description")
+        .eq("direction", "credit")
+        .in("reference", chunk);
+      if (res.error) throw new Error(`bank_lines lookup failed: ${res.error.message}`);
+      data.push(...(res.data ?? []));
+    }
 
     const groups = new Map<string, { id: string; amount: number; description: string }[]>();
-    for (const r of data ?? []) {
+    for (const r of data) {
       const key = `${dateOnly(r.statement_date)}|${r.reference}`;
       groups.set(key, [...(groups.get(key) ?? []), { id: r.id, amount: r.amount, description: r.description }]);
     }

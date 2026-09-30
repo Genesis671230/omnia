@@ -37,7 +37,7 @@ export function RowTags({ line, posted }: { line: ReconLine; posted: boolean }) 
         </span>
       )}
       {posted && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-1.5 py-0.5 text-[10.5px] font-medium text-[#6F5325]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF2FA] px-1.5 py-0.5 text-[10.5px] font-medium text-[#1E3A8A]">
           <BookCheck size={10} aria-hidden /> In Zoho
         </span>
       )}

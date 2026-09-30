@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { selectAllPages, supabase } from "@/lib/supabase";
 import type { NormalizedInsight } from "@/lib/integrations/ads/types";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
@@ -78,17 +78,25 @@ export const AdInsightsRepository = {
   // the join in JS rather than relying on a PostgREST embedded resource,
   // matching how the rest of this codebase's repositories work.
   async listInsights(fromDate: string, toDate: string): Promise<AdInsightRow[]> {
-    const [{ data: campaigns, error: cErr }, { data: insights, error: iErr }] = await Promise.all([
+    // PostgREST caps every response at 1000 rows whatever .limit() asks for —
+    // a month of the WOO account alone is ~700 campaign-days, so an unpaged
+    // read silently dropped spend (and inflated ROAS) past the first 1000.
+    const [{ data: campaigns, error: cErr }, insights] = await Promise.all([
       supabase.from("ad_campaigns").select("id, platform, account_id, store_id, name, status"),
-      supabase
-        .from("ad_insights")
-        .select("campaign_id, date, spend, currency, impressions, clicks, conversions, conversion_value, landing_page_views, view_content, add_to_cart, initiate_checkout")
-        .gte("date", fromDate)
-        .lte("date", toDate)
-        .limit(5000),
+      selectAllPages(
+        (from, to) =>
+          supabase
+            .from("ad_insights")
+            .select("campaign_id, date, spend, currency, impressions, clicks, conversions, conversion_value, landing_page_views, view_content, add_to_cart, initiate_checkout")
+            .gte("date", fromDate)
+            .lte("date", toDate)
+            .order("date")
+            .order("campaign_id")
+            .range(from, to),
+        "ad_insights select",
+      ),
     ]);
     if (cErr) throw new Error(`ad_campaigns select failed: ${cErr.message}`);
-    if (iErr) throw new Error(`ad_insights select failed: ${iErr.message}`);
 
     const campaignById = new Map((campaigns ?? []).map((c) => [c.id, c]));
     const rows: AdInsightRow[] = [];

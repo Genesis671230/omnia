@@ -1,3 +1,5 @@
+import { getZohoConnection, zohoOrgForProvider } from "@/lib/integrations/zoho-org";
+import { ENV_CONNECTION_ID } from "@/lib/integrations/zoho-context";
 import { NextResponse } from "next/server";
 import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import type { Gateway } from "@/lib/gateways";
@@ -40,9 +42,38 @@ export async function POST(request: Request) {
   // A colliding statement number is stored under a disambiguated id (Tabby
   // reuses one number across every store it pays that day), so everything
   // downstream must act on the id the row actually claimed, not the parser's.
+  // Which Zoho organisation's books these payouts close. An explicit choice
+  // wins ("env" = main); otherwise the provider's routing rule from Settings
+  // (e.g. COD / OnTrack → House of Omnia). Validated before anything is saved.
+  const zohoOrgField = String(form.get("zohoOrg") ?? "").trim();
+  if (zohoOrgField && zohoOrgField !== ENV_CONNECTION_ID && !(await getZohoConnection(zohoOrgField))) {
+    return NextResponse.json({ error: `Unknown Zoho organisation "${zohoOrgField}"` }, { status: 400 });
+  }
+
   const resolvedIds = await PayoutsRepository.upsertPayoutsWithIds(payouts);
   const storedId = (p: ParsedPayout) => resolvedIds.get(p.id) ?? p.id;
   const saved = resolvedIds.size;
+
+  const orgOf = new Map<string, string>();
+  for (const p of payouts) {
+    const org = zohoOrgField ? (zohoOrgField === ENV_CONNECTION_ID ? "" : zohoOrgField) : await zohoOrgForProvider(p.provider);
+    if (zohoOrgField || org) orgOf.set(storedId(p), org);
+  }
+  // A payout that already booked settlements keeps its organisation: moving
+  // it would let the same voucher be booked again in the other org's books.
+  const kept: string[] = [];
+  if (orgOf.size) {
+    const { data: booked } = await supabase.from("settlement_records").select("payout_id").in("payout_id", [...orgOf.keys()]);
+    const { data: current } = await supabase.from("payouts").select("id, zoho_connection_id").in("id", [...orgOf.keys()]);
+    const was = new Map((current ?? []).map((r) => [r.id as string, (r.zoho_connection_id as string) ?? ""]));
+    for (const { payout_id } of booked ?? []) {
+      const id = payout_id as string;
+      if (orgOf.has(id) && orgOf.get(id) !== was.get(id)) { kept.push(id); orgOf.set(id, was.get(id) ?? ""); }
+    }
+  }
+  for (const org of new Set(orgOf.values())) {
+    await PayoutsRepository.setZohoConnection([...orgOf].filter(([, o]) => o === org).map(([id]) => id), org);
+  }
 
   // Uploaded from a bank credit's own panel → attach it to that credit so it
   // lists there immediately, even if its total doesn't match (shows Variance).
@@ -85,6 +116,7 @@ export async function POST(request: Request) {
   await markReconDirty("upload/payout");
   return NextResponse.json({
     saved,
+    ...(kept.length ? { zohoOrgKept: kept, zohoOrgNote: `${kept.length} payout(s) already have booked settlements, so they stay in their current Zoho organisation.` } : {}),
     fileId,
     pinnedTo,
     payouts: payouts.map((p) => ({
@@ -92,6 +124,7 @@ export async function POST(request: Request) {
       provider: p.provider,
       net: p.net,
       store: p.store ?? null,
+      zohoOrg: orgOf.get(storedId(p)) ?? null,
       // Surfaced so the uploader can see when a report had to take a
       // disambiguated id because another store already held its statement number.
       statementNo: p.statementNo ?? p.id,

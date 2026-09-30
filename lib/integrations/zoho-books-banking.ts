@@ -6,6 +6,7 @@
 
 
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 const BOOKS_API_BASE = "https://www.zohoapis.com/books/v3";
 
@@ -24,7 +25,7 @@ export async function listZohoBankTransactions(
   params: { accountId?: string; dateStart: string; dateEnd: string },
   accessToken: string,
 ): Promise<ZohoBankTransaction[]> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const out: ZohoBankTransaction[] = [];
   let page = 1;
 

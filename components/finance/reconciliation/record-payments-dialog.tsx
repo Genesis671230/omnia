@@ -36,10 +36,10 @@ export type PaymentRowStatus =
   | { status: "not_in_zoho" };
 
   const map = {
-    ready:          { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "ready" },
+    ready:          { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "ready" },
     posted:         { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
     failed:         { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
-    review:         { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+    review:         { cls: "bg-[#EAF1FD] text-[#946E1F]", text: "needs review" },
     paid_external:  { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "already paid" },
     not_in_zoho:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },
   } as const;
@@ -67,8 +67,8 @@ export function RecordPaymentsBar({
         title={!canOpen ? "A founder must confirm this settlement before invoices can be marked paid" : undefined}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] font-medium transition-colors ${
           canOpen
-            ? "border-[#D6CCBA] bg-white text-[#1F1B16] hover:border-[#B08343] hover:text-[#6F5325]"
-            : "cursor-not-allowed border-[#EAE3D6] bg-[#F3EFE7] text-[#B8B0A0]"
+            ? "border-[#C9D5EA] bg-white text-[#0F1B3D] hover:border-[#1D4ED8] hover:text-[#1E3A8A]"
+            : "cursor-not-allowed border-[#D8E1F1] bg-[#EEF2FA] text-[#9AA6BD]"
         }`}
       >
         <BadgeCheck size={12} /> Record payments
@@ -197,16 +197,16 @@ function RecordPaymentsDialog({
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto bg-white text-[#1F1B16]">
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto bg-white text-[#0F1B3D]">
         <DialogHeader>
-          <DialogTitle className="font-serif text-[20px] text-[#1F1B16]">Record payments</DialogTitle>
-          <DialogDescription className="text-[#8A8175]">
+          <DialogTitle className="font-normal tracking-[-0.02em] text-[20px] text-[#0F1B3D]">Record payments</DialogTitle>
+          <DialogDescription className="text-[#5E6B85]">
             {line.provider} · {line.payout?.id ?? line.reference} · bank credit {line.date?.slice(0, 10) ?? "—"}
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-[13px] text-[#8A8175]">
+          <div className="flex items-center gap-2 py-8 text-[13px] text-[#5E6B85]">
             <Loader2 size={15} className="animate-spin" /> Loading the orders in this payout…
           </div>
         ) : error && !settlements ? (
@@ -215,17 +215,17 @@ function RecordPaymentsDialog({
           </div>
         ) : (
           <>
-            <div className="space-y-1.5 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3">
+            <div className="space-y-1.5 rounded-xl border border-[#D8E1F1] bg-[#F3F6FC] p-3">
               {(settlements ?? []).map((s) => {
                 const st = rowStatus.get(s.order_number) ?? ({ status: "ready" } as const);
                 return (
                   <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-[12.5px]">
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className="font-mono text-[#1F1B16]">#{s.order_number}</span>
-                      <span className="truncate text-[#8A8175]">{s.customer_name}</span>
+                      <span className="font-mono text-[#0F1B3D]">#{s.order_number}</span>
+                      <span className="truncate text-[#5E6B85]">{s.customer_name}</span>
                     </span>
                     <span className="flex flex-shrink-0 items-center gap-2">
-                      <span className="font-mono tabular-nums text-[#1F1B16]">{aed2(s.gross_aed)}</span>
+                      <span className="font-mono tabular-nums text-[#0F1B3D]">{aed2(s.gross_aed)}</span>
                       <AnimatePresence mode="wait">
                         <motion.span
                           key={st.status}
@@ -242,20 +242,20 @@ function RecordPaymentsDialog({
                 );
               })}
               {(settlements ?? []).length === 0 && (
-                <p className="px-1 py-2 text-[12.5px] text-[#8A8175]">No settlement records for this payout yet.</p>
+                <p className="px-1 py-2 text-[12.5px] text-[#5E6B85]">No settlement records for this payout yet.</p>
               )}
             </div>
 
             <div className="mt-3 space-y-3">
               <div>
-                <label className="mb-1 block text-[12px] font-medium text-[#1F1B16]">Deposit account</label>
+                <label className="mb-1 block text-[12px] font-medium text-[#0F1B3D]">Deposit account</label>
                 {accounts.length === 0 ? (
                   <p className="rounded-lg bg-[#F9ECE7] px-3 py-2 text-[12.5px] text-[#A6472F]">
                     No deposit account configured — set one in Zoho Settings before recording payments.
                   </p>
                 ) : (
                   <Select value={accountId} onValueChange={setAccountId}>
-                    <SelectTrigger className="w-full border-[#D6CCBA] text-[13px]">
+                    <SelectTrigger className="w-full border-[#C9D5EA] text-[13px]">
                       <SelectValue placeholder="Select an account…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -270,12 +270,12 @@ function RecordPaymentsDialog({
                 )}
               </div>
 
-              <p className="text-[12.5px] text-[#8A8175]">
-                Payment mode: <b className="text-[#1F1B16]">{modeSummary || "—"}</b>
+              <p className="text-[12.5px] text-[#5E6B85]">
+                Payment mode: <b className="text-[#0F1B3D]">{modeSummary || "—"}</b>
               </p>
 
               <div>
-                <label className="flex items-center gap-2 text-[12.5px] text-[#1F1B16]">
+                <label className="flex items-center gap-2 text-[12.5px] text-[#0F1B3D]">
                   <Checkbox checked={useCustomRef} onCheckedChange={(v) => setUseCustomRef(v === true)} />
                   Use a custom reference number instead of the bank reference
                 </label>
@@ -292,7 +292,7 @@ function RecordPaymentsDialog({
                         value={customRef}
                         onChange={(e) => setCustomRef(e.target.value)}
                         placeholder="e.g. Batch 42"
-                        className="mt-1.5 border-[#D6CCBA] text-[13px]"
+                        className="mt-1.5 border-[#C9D5EA] text-[13px]"
                       />
                     </motion.div>
                   )}
@@ -309,14 +309,14 @@ function RecordPaymentsDialog({
             <DialogFooter className="mt-4">
               <button
                 onClick={onClose}
-                className="rounded-lg border border-[#D6CCBA] bg-white px-4 py-2 text-[13px] font-medium text-[#1F1B16] hover:border-[#B08343]"
+                className="rounded-lg border border-[#C9D5EA] bg-white px-4 py-2 text-[13px] font-medium text-[#0F1B3D] hover:border-[#1D4ED8]"
               >
                 Close
               </button>
               <button
                 onClick={submit}
                 disabled={posting || postable.length === 0 || accounts.length === 0 || !accountId}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#6F5325] px-4 py-2 text-[13px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:cursor-not-allowed disabled:bg-[#B8B0A0]"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#1E3A8A] px-4 py-2 text-[13px] font-medium text-[#F3F6FC] hover:bg-[#5A4320] disabled:cursor-not-allowed disabled:bg-[#9AA6BD]"
               >
                 {posting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 Record {postable.length} payment{postable.length === 1 ? "" : "s"}
@@ -331,10 +331,10 @@ function RecordPaymentsDialog({
 
 export function PaymentRowPill({ s }: { s: PaymentRowStatus }) {
   const map = {
-    ready:          { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "unpaid" },       // was "ready" — meaningless on main panel
+    ready:          { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "unpaid" },       // was "ready" — meaningless on main panel
     posted:         { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "posted" },
     failed:         { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
-    review:         { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+    review:         { cls: "bg-[#EAF1FD] text-[#946E1F]", text: "needs review" },
     paid_external:  { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "paid" },         // green — Zoho says paid, not by us
     overdue:        { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "overdue" },      // red — past due date
     not_in_zoho:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },   // red — sync problem

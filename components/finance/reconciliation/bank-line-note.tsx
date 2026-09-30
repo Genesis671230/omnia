@@ -59,13 +59,13 @@ export function BankLineNoteEditor({
         autoFocus={autoFocus}
         onChange={(e) => setDraft(e.target.value)}
         rows={2}
-        className="w-full rounded-lg border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12.5px] leading-relaxed text-[#1F1B16] outline-none focus:border-[#B08343]"
+        className="w-full rounded-lg border border-[#C9D5EA] bg-white px-3 py-1.5 text-[12.5px] leading-relaxed text-[#0F1B3D] outline-none focus:border-[#1D4ED8]"
       />
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => save(draft)}
           disabled={saving || draft.trim() === note.trim()}
-          className="inline-flex items-center gap-1 rounded-lg bg-[#B08343] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full bg-[#0F1B3D] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50"
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : null} Save
         </button>
@@ -73,14 +73,14 @@ export function BankLineNoteEditor({
           <button
             onClick={() => { setDraft(defaultNote); save(defaultNote); }}
             disabled={saving}
-            className="inline-flex items-center gap-1 rounded-lg border border-[#D6CCBA] bg-white px-2.5 py-1 text-[12px] text-[#6F5325]"
+            className="inline-flex items-center gap-1 rounded-lg border border-[#C9D5EA] bg-white px-2.5 py-1 text-[12px] text-[#1E3A8A]"
           >
             <RotateCcw size={11} /> Pre-filled
           </button>
         )}
-        <span className="text-[11px] text-[#8A8175]">Saving doesn&apos;t call Zoho</span>
+        <span className="text-[11px] text-[#5E6B85]">Saving doesn&apos;t call Zoho</span>
       </div>
-      <div className="rounded-md bg-[#F3EFE7] px-2.5 py-1.5 text-[11px] leading-relaxed text-[#6F6457]">
+      <div className="rounded-md bg-[#EEF2FA] px-2.5 py-1.5 text-[11px] leading-relaxed text-[#46546F]">
         <span className="font-semibold">Zoho will get:</span> {zohoDescriptionFor(draft, narration)}
       </div>
     </div>

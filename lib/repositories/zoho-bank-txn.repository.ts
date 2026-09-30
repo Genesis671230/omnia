@@ -63,7 +63,9 @@ export const ZohoBankTxnRepository = {
     return out;
   },
 
-  async recordPosting(row: Omit<ZohoBankTxnPostingRow, "posted_at"> & { posted_at?: string }) {
+  // verified_at is set only by markVerified — a fresh posting has none; the
+  // callers that don't know Zoho's own status leave zoho_status untouched.
+  async recordPosting(row: Omit<ZohoBankTxnPostingRow, "posted_at" | "verified_at" | "zoho_status"> & { posted_at?: string; zoho_status?: string }) {
     const { error } = await supabase.from("zoho_bank_txn_postings").upsert(
       { ...row, tenant_id: TENANT, posted_at: row.posted_at ?? new Date().toISOString() },
       { onConflict: "bank_line_id" },

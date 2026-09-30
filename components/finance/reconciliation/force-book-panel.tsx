@@ -71,7 +71,7 @@ export function ForceBookPanel({ r, onDone, onCancel }: { r: ReconLine; onDone: 
 
   useEffect(() => {
     // Cached server-side for 10 minutes: reopening costs no Zoho calls.
-    fetch("/api/settlements/posting-options")
+    fetch(`/api/settlements/posting-options?bankLineId=${encodeURIComponent(r.id)}`)
       .then(async (x) => {
         const j = await x.json();
         if (!x.ok) throw new Error(j.error || `HTTP ${x.status}`);
@@ -169,23 +169,23 @@ export function ForceBookPanel({ r, onDone, onCancel }: { r: ReconLine; onDone: 
   const done = !!result;
 
   return (
-    <div className="mb-3.5 rounded-xl border border-[#D6CCBA] bg-white p-4 text-[13px] text-[#1F1B16]">
+    <div className="mb-3.5 rounded-xl border border-[#C9D5EA] bg-white p-4 text-[13px] text-[#0F1B3D]">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-1.5 text-[14px] font-semibold"><Gavel size={15} /> Force book and close {r.resolvedOrders.length} invoice{r.resolvedOrders.length === 1 ? "" : "s"}</div>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#6F5325]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[#1E3A8A]">
             Bank credited <b>{aed2(r.bankAmount)}</b>, {r.provider} payout says <b>{aed2(r.payout?.net ?? 0)}</b>: a{" "}
             {shortfall ? "shortfall" : "surplus"} of <b>{aed2(gap)}</b>.
             {r.unresolvedRefs.length > 0 && <> {r.unresolvedRefs.length} unmatched line(s) stay open until linked.</>}
           </p>
         </div>
-        <button onClick={done ? onDone : onCancel} aria-label="Close" className="text-[#8A8175]"><X size={15} /></button>
+        <button onClick={done ? onDone : onCancel} aria-label="Close" className="text-[#5E6B85]"><X size={15} /></button>
       </div>
 
       {loadError ? (
         <div className="mb-3 rounded-md bg-[#F9ECE7] px-3 py-2 text-[12px] text-[#A6472F]">Couldn&apos;t load Zoho accounts: {loadError}</div>
       ) : !options ? (
-        <div className="mb-3 flex items-center gap-1.5 text-[12px] text-[#8A8175]"><Loader2 size={12} className="animate-spin" /> Loading Zoho accounts…</div>
+        <div className="mb-3 flex items-center gap-1.5 text-[12px] text-[#5E6B85]"><Loader2 size={12} className="animate-spin" /> Loading Zoho accounts…</div>
       ) : (
         <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AccountSelect
@@ -224,22 +224,22 @@ export function ForceBookPanel({ r, onDone, onCancel }: { r: ReconLine; onDone: 
         Why (saved on the credit and written into the Zoho journal)
         <textarea
           value={note} onChange={(e) => setNote(e.target.value)} rows={2}
-          className="mt-1 w-full rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-[#B08343]"
+          className="mt-1 w-full rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-[#1D4ED8]"
         />
       </label>
 
-      <label className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-[#6F6457]">
+      <label className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-[#46546F]">
         <input type="checkbox" checked={useCustomRef} onChange={(e) => setUseCustomRef(e.target.checked)} />
         Use a custom reference number
         {useCustomRef && (
           <input
             value={customRef} onChange={(e) => setCustomRef(e.target.value)} placeholder={r.reference || r.id}
-            className="rounded-md border border-[#D6CCBA] px-2 py-1 text-[12px]"
+            className="rounded-md border border-[#C9D5EA] px-2 py-1 text-[12px]"
           />
         )}
       </label>
 
-      <div className="mb-3 rounded-lg bg-[#FBF3E6] px-3 py-2.5 text-[12px] leading-relaxed text-[#6F5325]">
+      <div className="mb-3 rounded-lg bg-[#EAF1FD] px-3 py-2.5 text-[12px] leading-relaxed text-[#1E3A8A]">
         Each of the {r.resolvedOrders.length} invoices is paid <b>in full</b> into <b>{depositName || "the deposit account"}</b>.
         The {r.provider} fee goes to <b>{feeName || "gateway charges"}</b>
         {!crossBorder && vatTaxId ? <> with input VAT (<b>{vatName}</b>)</> : <> with no VAT</>}.
@@ -251,18 +251,18 @@ export function ForceBookPanel({ r, onDone, onCancel }: { r: ReconLine; onDone: 
       {error && <div className="mb-3 rounded-md bg-[#F9ECE7] px-3 py-2 text-[12px] text-[#A6472F]">{error}</div>}
 
       {result && (
-        <div className="mb-3 space-y-1 rounded-lg border border-[#EAE3D6] p-2.5 text-[12px]">
+        <div className="mb-3 space-y-1 rounded-lg border border-[#D8E1F1] p-2.5 text-[12px]">
           {result.results.map((x) => (
             <div key={x.settlementId} className="flex items-start gap-1.5">
               {x.ok ? <CheckCircle2 size={13} className="mt-0.5 text-[#4B7A54]" /> : <XCircle size={13} className="mt-0.5 text-[#A6472F]" />}
               <span>
                 <b>#{x.orderNumber}</b>{x.invoiceNumber ? ` · ${x.invoiceNumber}` : ""} · {x.ok ? "invoice closed" : x.message || x.status}
-                {x.plan && x.ok && <span className="text-[#8A8175]"> · paid {aed2(x.plan.paymentAmount)}, fee {aed2(x.plan.fee)}{x.plan.difference ? `, diff ${aed2(x.plan.difference)}` : ""}</span>}
+                {x.plan && x.ok && <span className="text-[#5E6B85]"> · paid {aed2(x.plan.paymentAmount)}, fee {aed2(x.plan.fee)}{x.plan.difference ? `, diff ${aed2(x.plan.difference)}` : ""}</span>}
               </span>
             </div>
           ))}
           {result.wire && (
-            <div className="flex items-start gap-1.5 border-t border-[#EAE3D6] pt-1">
+            <div className="flex items-start gap-1.5 border-t border-[#D8E1F1] pt-1">
               {result.wire.ok ? <CheckCircle2 size={13} className="mt-0.5 text-[#4B7A54]" /> : <XCircle size={13} className="mt-0.5 text-[#A6472F]" />}
               <span>Gap {aed2(Math.abs(result.wire.amount))} → {gapName}: {result.wire.status.replace("_", " ")}{result.wire.message ? ` (${result.wire.message})` : ""}</span>
             </div>
@@ -273,18 +273,18 @@ export function ForceBookPanel({ r, onDone, onCancel }: { r: ReconLine; onDone: 
       <div className="flex flex-wrap items-center justify-end gap-2">
         {missing && !done && <span className="mr-auto text-[12px] text-[#A6472F]">{missing}</span>}
         {done ? (
-          <button onClick={onDone} className="rounded-lg bg-[#B08343] px-4 py-2 text-[12.5px] font-medium text-white">Done</button>
+          <button onClick={onDone} className="rounded-full bg-[#0F1B3D] px-4 py-2 text-[12.5px] font-medium text-white">Done</button>
         ) : step === "confirming" ? (
           <>
-            <span className="mr-auto text-[12px] text-[#6F5325]">This writes {r.resolvedOrders.length} payments, their fees and one gap journal to Zoho.</span>
-            <button onClick={() => setStep("idle")} className="rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px]">Back</button>
+            <span className="mr-auto text-[12px] text-[#1E3A8A]">This writes {r.resolvedOrders.length} payments, their fees and one gap journal to Zoho.</span>
+            <button onClick={() => setStep("idle")} className="rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px]">Back</button>
             <button onClick={run} className="inline-flex items-center gap-1.5 rounded-lg bg-[#A6472F] px-4 py-2 text-[12.5px] font-medium text-white">
               <Gavel size={13} /> Yes, book it
             </button>
           </>
         ) : (
           <>
-            <button onClick={onCancel} disabled={busy} className="rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px]">Cancel</button>
+            <button onClick={onCancel} disabled={busy} className="rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px]">Cancel</button>
             <button
               onClick={() => setStep("confirming")}
               disabled={busy || !!missing || !options}

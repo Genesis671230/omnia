@@ -1,9 +1,11 @@
+import { ENV_CONNECTION_ID, zohoConnectionId } from "@/lib/integrations/zoho-context";
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 import { ZohoPublishRunsRepository } from "@/lib/repositories/zoho-publish-runs.repository";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { runReconciliation } from "@/lib/reconciliation/engine";
-import { publishSettlements } from "@/lib/finance/publish-settlements";
+import { publishSettlements, type DeliveryIntercompanyAccounts } from "@/lib/finance/publish-settlements";
 
 // A 28-order payout is ~150 paced Zoho calls.
 export const maxDuration = 300;
@@ -19,6 +21,9 @@ export const maxDuration = 300;
 //     referenceNumberOverride?: string,
 //     deliveryAccountId?: string,      — COD: expense account for courier delivery charges
 //     deliveryOnly?: boolean,          — COD: book just the delivery charges
+//     deliveryIntercompany?: {         — COD: charges that belong to a sister company,
+//       [zohoConnectionId]: { dueFromAccountId, expenseAccountId, dueToAccountId, vatTaxId?, inputVatAccountId? }
+//     },                                 see publishDeliveryCharges()
 //     bookFeesOnExternallyPaid?: boolean — also book fee/FX on invoices
 //                                         already paid by hand in Zoho
 //     dryRun?: boolean,                — reads Zoho, writes nothing
@@ -26,7 +31,7 @@ export const maxDuration = 300;
 //
 // Per order: payment for the full invoice → fee expense → FX/rounding journal.
 // See lib/finance/publish-settlements.ts.
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
@@ -45,6 +50,7 @@ export async function POST(request: Request) {
   };
   // COD vouchers: book only the courier's delivery / return charges.
   const deliveryOnly = body.deliveryOnly === true;
+  const deliveryIntercompany = parseIntercompany(body.deliveryIntercompany);
 
   if (!bankLineId) {
     return NextResponse.json({ error: "bankLineId is required" }, { status: 400 });
@@ -55,6 +61,12 @@ export async function POST(request: Request) {
 
   const line = (await runReconciliation()).find((l) => l.id === bankLineId);
   if (!line) return NextResponse.json({ error: `No reconciliation line ${bankLineId}` }, { status: 404 });
+  // Defence in depth: the org this request runs in (resolved from recon_lines)
+  // must be the one on the freshly computed line's payout.
+  const lineOrg = line.payout?.zohoConnectionId || ENV_CONNECTION_ID;
+  if (lineOrg !== zohoConnectionId()) {
+    return NextResponse.json({ error: "This payout's Zoho organisation just changed — reopen the drawer and book again." }, { status: 409 });
+  }
   if (!line.confirmedBy) {
     return NextResponse.json({ error: "Confirm this settlement before recording payments." }, { status: 409 });
   }
@@ -86,6 +98,7 @@ export async function POST(request: Request) {
       bookFeesOnExternallyPaid: body.bookFeesOnExternallyPaid === true,
       // A single-order Record never books the voucher's delivery charges.
       includeDelivery: deliveryOnly || settlementIds.length === 0,
+      deliveryIntercompany,
     });
     if (runId) {
       await ZohoPublishRunsRepository.finish(
@@ -111,4 +124,27 @@ export async function POST(request: Request) {
     if (runId) await ZohoPublishRunsRepository.finish(runId, [], (e as Error).message).catch(() => {});
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
+}
+
+function parseIntercompany(v: unknown): DeliveryIntercompanyAccounts {
+  const out: DeliveryIntercompanyAccounts = {};
+  if (!v || typeof v !== "object") return out;
+  const str = (x: unknown) => (typeof x === "string" ? x.trim() : "");
+  for (const [org, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!raw || typeof raw !== "object") continue;
+    const a = raw as Record<string, unknown>;
+    out[org] = {
+      dueFromAccountId: str(a.dueFromAccountId),
+      expenseAccountId: str(a.expenseAccountId),
+      dueToAccountId: str(a.dueToAccountId),
+      vatTaxId: str(a.vatTaxId) || null,
+      inputVatAccountId: str(a.inputVatAccountId) || null,
+    };
+  }
+  return out;
+}
+
+// Multi-org: every Zoho call below runs in the organisation of the bankLineId's payout — lib/integrations/zoho-org.ts.
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForBankLine(String(((await req.clone().json().catch(() => ({}))) as { bankLineId?: unknown }).bankLineId ?? "")), () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

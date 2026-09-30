@@ -9,17 +9,16 @@
  * TanStack row (recon-grid.tsx). */
 
 import { useEffect, useState } from "react";
-import {
-  AlertTriangle, ArrowRight, BadgeCheck, BookCheck, Check, Clock, Copy, Download,
-  FileSpreadsheet, Flag, Gavel, HelpCircle, Landmark, Loader2, Lock, Package, Trash2,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, BookCheck, Check, Clock, Copy, Download, FileSpreadsheet, Flag, Gavel, HelpCircle, Landmark, Loader2, Lock, Package, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { GatewayProof } from "./gateway-proof";
+import { Callout } from "./callout";
 import { ZohoPostDialog } from "./zoho-post-dialog";
+import { RevertPayoutDialog } from "./revert-payout-dialog";
 import { ForceBookPanel } from "./force-book-panel";
 import { aed2, canForceBook, isBankFxVariance, isConfirmable, isConfirmablePartial, isDownloadableSource, isForceBooked, type ReconLine, type ReconTxn, type ZohoPostingState } from "./types";
 
@@ -35,8 +34,8 @@ function ChainLink({ icon: Icon, label, sub, status }: {
   icon: React.ElementType; label: string; sub: string; status: "resolved" | "pending" | "broken";
 }) {
   const c = {
-    resolved: { border: "#B08343", bg: "#FBF3E6", fg: "#1F1B16", sub: "#6F5325" },
-    pending: { border: "#EAE3D6", bg: "transparent", fg: "#8A8175", sub: "#8A8175" },
+    resolved: { border: "#1D4ED8", bg: "#EAF1FD", fg: "#0F1B3D", sub: "#1E3A8A" },
+    pending: { border: "#D8E1F1", bg: "transparent", fg: "#5E6B85", sub: "#5E6B85" },
     broken: { border: "#A6472F", bg: "#F9ECE7", fg: "#A6472F", sub: "#A6472F" },
   }[status];
   return (
@@ -56,10 +55,10 @@ export function ActionButton({ icon: Icon, label, onClick, tone = "default", dis
 }) {
   const cls =
     tone === "primary"
-      ? "border-[#B08343] bg-[#B08343] text-white hover:bg-[#9a723a]"
+      ? "border-[#1D4ED8] bg-[#0F1B3D] text-white hover:bg-[#1E3A8A]"
       : tone === "locked"
-        ? "border-dashed border-[#D6CCBA] bg-[#F3EFE7] text-[#8A8175] cursor-not-allowed"
-        : "border-[#D6CCBA] bg-white text-[#1F1B16] hover:border-[#B08343] hover:text-[#6F5325]";
+        ? "border-dashed border-[#C9D5EA] bg-[#EEF2FA] text-[#5E6B85] cursor-not-allowed"
+        : "border-[#C9D5EA] bg-white text-[#0F1B3D] hover:border-[#1D4ED8] hover:text-[#1E3A8A]";
   return (
     <button
       onClick={onClick}
@@ -85,6 +84,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
   const [flagging, setFlagging] = useState(false);
   const [flagged, setFlagged] = useState(r.reviewFlag);
   const [deleting, setDeleting] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [forcing, setForcing] = useState(false);
 
   // A gap that is only the remitting bank's own cut still explains the credit,
@@ -152,14 +152,14 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <ChainLink icon={Landmark} label={aed2(r.bankAmount)} sub={`Bank · ${r.reference || r.id.slice(0, 8)}`} status="resolved" />
-        <ArrowRight size={13} style={{ color: payoutOk ? "#B08343" : "#D6CCBA" }} className="flex-shrink-0" />
+        <ArrowRight size={13} style={{ color: payoutOk ? "#1D4ED8" : "#C9D5EA" }} className="flex-shrink-0" />
         <ChainLink
           icon={FileSpreadsheet}
           label={r.payout ? aed2(r.payout.net) : "No file"}
           sub={r.payout ? r.payout.id : "not uploaded"}
           status={r.payout ? (payoutOk ? "resolved" : "broken") : "pending"}
         />
-        <ArrowRight size={13} style={{ color: ordersOk ? "#B08343" : "#D6CCBA" }} className="flex-shrink-0" />
+        <ArrowRight size={13} style={{ color: ordersOk ? "#1D4ED8" : "#C9D5EA" }} className="flex-shrink-0" />
         <ChainLink
           icon={Package}
           label={ordersOk ? `${r.resolvedOrders.length} orders` : r.unresolvedRefs.length ? `${r.unresolvedRefs.length} missing` : "—"}
@@ -179,7 +179,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         />
       </div>
 
-      <p className="mb-3 font-mono text-[12px] leading-relaxed text-[#8A8175]">{r.narration}</p>
+      <p className="mb-3 font-mono text-[12px] leading-relaxed text-[#5E6B85]">{r.narration}</p>
 
       <div className="mb-3.5 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
@@ -189,10 +189,10 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
           ["Variance", aed2(r.variance)],
         ].map(([k, v], i) => (
           <div key={k}>
-            <div className="text-[11px] text-[#8A8175]">{k}</div>
+            <div className="text-[11px] text-[#5E6B85]">{k}</div>
             <div
               className="text-[14px] font-semibold tabular-nums"
-              style={{ color: i === 3 && Math.abs(r.variance) > 1 ? "#A6472F" : "#1F1B16" }}
+              style={{ color: i === 3 && Math.abs(r.variance) > 1 ? "#A6472F" : "#0F1B3D" }}
             >
               {v}
             </div>
@@ -201,104 +201,114 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
       </div>
 
       {flagged && r.reviewNote && (
-        <div className="mb-3.5 rounded-lg bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] text-[#6F5325]">
-          <b>Flagged for review:</b> {r.reviewNote}
-        </div>
+        <Callout tone="warn" title={<>Flagged for review — {r.reviewNote}</>} />
       )}
 
       {r.state === "SETTLED" && r.payout && (
-        <div className="mb-3.5 rounded-lg bg-[#F0F5EF] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#4B7A54]">
-          The {r.provider} payout ({r.payout.id}) net matches the bank credit exactly, and all{" "}
-          {r.resolvedOrders.length} order{r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for.
-          {r.confirmedBy ? " Confirmed by the founder." : " Ready for founder confirmation."}
-        </div>
+        <Callout
+          tone="success"
+          title={<>Payout matches the bank exactly · {r.resolvedOrders.length} order{r.resolvedOrders.length === 1 ? "" : "s"} accounted for · {r.confirmedBy ? "confirmed" : "ready to confirm"}</>}
+          facts={[{ label: "Payout", value: r.payout.id }, { label: "Net", value: aed2(r.payout.net), emphasis: true }]}
+        />
       )}
       {r.state === "PAYOUT_VARIANCE" && r.payout && !r.forceBook && (
         isBankFxVariance(r) ? (
           /* The orders all match and the gap is small enough to be the
              remitting bank's own cut — a cost to book, not a broken payout. */
-          <div className="mb-3.5 rounded-lg bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#6F5325]">
-            The {r.provider} payout is worth{" "}
-            <b>{aed2(r.payout.net)}</b>
+          <Callout
+            tone="warn"
+            title={<>Bank kept {aed2(Math.abs(r.variance))} on the wire — confirmable, books once to exchange gain / loss</>}
+            facts={[
+              { label: "Payout net", value: aed2(r.payout.net) },
+              { label: "Landed", value: aed2(r.bankAmount) },
+              { label: "Kept", value: `${aed2(Math.abs(r.variance))} · ${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}%`, emphasis: true },
+              { label: "Orders", value: `${r.resolvedOrders.length} matched` },
+            ]}
+          >
+            The {r.provider} payout is worth {aed2(r.payout.net)}
             {(r.payout.currency ?? "AED").toUpperCase() === "AED" ? "" : " at the rate the bank itself quoted"}, but only{" "}
-            <b>{aed2(r.bankAmount)}</b> landed — the bank kept <b>{aed2(Math.abs(r.variance))}</b> on the way in
-            ({((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit
-            {(r.payout.currency ?? "AED").toUpperCase() === "AED"
-              ? ", within the 1% a bank charge can be"
-              : `, the usual inward-telex charge on a ${r.payout.currency} wire`}
-            ). All {r.resolvedOrders.length} order
-            {r.resolvedOrders.length > 1 ? "s are" : " is"} accounted for, so this can be confirmed and booked: each
-            invoice still closes in full at its own amount, the {r.provider} fee goes to gateway charges, and the{" "}
-            <b>{aed2(Math.abs(r.variance))}</b> books once to <b>exchange gain / loss</b> — it is never spread across
-            the orders, so no invoice&apos;s own exchange difference moves.
-          </div>
+            {aed2(r.bankAmount)} landed{(r.payout.currency ?? "AED").toUpperCase() === "AED"
+              ? " — within the 1% a bank charge can be"
+              : ` — the usual inward-telex charge on a ${r.payout.currency} wire`}. Each invoice still closes in full at its
+            own amount, the {r.provider} fee goes to gateway charges, and the gap books <b>once</b> to exchange gain / loss —
+            never spread across orders, so no invoice&apos;s own exchange difference moves.
+          </Callout>
         ) : (
-          <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
-            Bank credited <b>{aed2(r.bankAmount)}</b> but the {r.provider} payout says <b>{aed2(r.payout.net)}</b> — a{" "}
-            {r.variance > 0 ? "surplus" : "shortfall"} of <b>{aed2(Math.abs(r.variance))}</b>. Likely cause:{" "}
+          <Callout
+            tone="danger"
+            title={<>{r.variance > 0 ? "Surplus" : "Shortfall"} of {aed2(Math.abs(r.variance))} — {r.resolvedOrders.length === 0 ? "no order matched yet" : isForceBooked(r) ? "force-booked" : "needs a decision before invoices close"}</>}
+            facts={[
+              { label: "Bank", value: aed2(r.bankAmount) },
+              { label: "Payout", value: aed2(r.payout.net) },
+              { label: "Gap", value: `${aed2(Math.abs(r.variance))} · ${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}%`, emphasis: true },
+            ]}
+            actions={
+              <>
+                {canForceBook(r) && isFounder && !forcing && (
+                  <button
+                    onClick={() => setForcing(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#A6472F] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#A6472F] hover:bg-[#F9ECE7]"
+                  >
+                    <Gavel size={13} /> Force book the {r.resolvedOrders.length} invoice{r.resolvedOrders.length === 1 ? "" : "s"} anyway
+                  </button>
+                )}
+                {r.resolvedOrders.length === 0 && isFounder && (
+                  <span className="text-[12px] text-[#5E6B85]">Link the orders first — there is no invoice to force book yet.</span>
+                )}
+              </>
+            }
+          >
+            Likely cause:{" "}
             {r.payout.fxSource === "estimate"
-              ? "the FX estimate used to convert this payout drifted from the bank's actual wire rate"
+              ? "the FX estimate used to convert this payout drifted from the bank's actual wire rate."
               : r.refundedOrders.length > 0
-                ? `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} may not net out the way expected`
-                : "a bank fee, rounding, or a partial settlement not reflected in the payout file"}
-            {r.resolvedOrders.length === 0
-              ? "."
-              : isForceBooked(r)
-                ? "."
-                : ` — too large (${((Math.abs(r.variance) / (r.bankAmount || 1)) * 100).toFixed(2)}% of the credit) to book as an exchange difference, so it needs a person before the invoices close.`}
-            {canForceBook(r) && isFounder && !forcing && (
-              <div className="mt-2">
-                <button
-                  onClick={() => setForcing(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#A6472F] bg-white px-3 py-1.5 text-[12.5px] font-medium text-[#A6472F] hover:bg-[#F9ECE7]"
-                >
-                  <Gavel size={13} /> Force book the {r.resolvedOrders.length} invoice{r.resolvedOrders.length === 1 ? "" : "s"} anyway
-                </button>
-              </div>
-            )}
-            {r.resolvedOrders.length === 0 && isFounder && (
-              <div className="mt-1.5 text-[12px]">No order on this payout matched yet, so there is no invoice to force book. Link the orders first.</div>
-            )}
-          </div>
+                ? `${r.refundedOrders.length} refund${r.refundedOrders.length > 1 ? "s" : ""} may not net out the way expected.`
+                : "a bank fee, rounding, or a partial settlement not reflected in the payout file."}
+            {r.resolvedOrders.length > 0 && !isForceBooked(r) && " It is too large to book as an exchange difference, so a person decides."}
+          </Callout>
         )
       )}
       {forcing && canForceBook(r) && (
         <ForceBookPanel r={r} onCancel={() => setForcing(false)} onDone={() => { setForcing(false); refresh(); }} />
       )}
       {r.forceBook && (
-        <div className="mb-3.5 rounded-lg border border-[#D6CCBA] bg-[#FBF3E6] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#6F5325]">
-          <b className="inline-flex items-center gap-1"><Gavel size={13} /> Force-booked</b> by {r.forceBook.by}
-          {r.forceBook.at ? ` on ${r.forceBook.at.slice(0, 10)}` : ""}. Bank credited <b>{aed2(r.bankAmount)}</b> against a{" "}
-          {r.provider} payout of <b>{aed2(r.payout?.net ?? 0)}</b>. Every invoice closes in full; the{" "}
-          <b>{aed2(Math.abs(r.variance))}</b> {r.variance < 0 ? "shortfall" : "surplus"} books once to{" "}
-          <b>{r.forceBook.accountName || "the chosen account"}</b>. Any order that didn&apos;t post can be retried from the
-          booking bar below.
-          <div className="mt-1 text-[12px] text-[#8A8175]">Why: {r.forceBook.note}</div>
-        </div>
+        <Callout
+          tone="info"
+          title={<><Gavel size={13} className="-mt-0.5 mr-1 inline" />Force-booked by {r.forceBook.by}{r.forceBook.at ? ` on ${r.forceBook.at.slice(0, 10)}` : ""} — gap to {r.forceBook.accountName || "the chosen account"}</>}
+          facts={[
+            { label: "Bank", value: aed2(r.bankAmount) },
+            { label: "Payout", value: aed2(r.payout?.net ?? 0) },
+            { label: r.variance < 0 ? "Shortfall" : "Surplus", value: aed2(Math.abs(r.variance)), emphasis: true },
+            { label: "Why", value: r.forceBook.note || "—" },
+          ]}
+        >
+          Every invoice closes in full; the gap books once to {r.forceBook.accountName || "the chosen account"}. Any order that
+          didn&apos;t post can be retried from the booking bar below.
+        </Callout>
       )}
       {r.state === "ORDERS_UNRESOLVED" && (
-        <div className="mb-3.5 rounded-lg bg-[#F9ECE7] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#A6472F]">
-          {r.unresolvedRefs.length > 0 ? (
-            <>The payout net matches the bank, but line{r.unresolvedRefs.length > 1 ? "s" : ""} <b>#{r.unresolvedRefs.join(", #")}</b>{" "}
-              {r.unresolvedRefs.length > 1 ? "don't" : "doesn't"} match an order.
-              {isConfirmablePartial(r) ? (
-                <> You can confirm the {r.resolvedOrders.length} matched order{r.resolvedOrders.length > 1 ? "s" : ""} now and
-                  link the rest to their real orders in the table below (<b>Link order</b>) — linked orders become bookable too.</>
-              ) : (
-                <> Link {r.unresolvedRefs.length > 1 ? "them" : "it"} to the real order in the table below, or run a sync.</>
-              )}</>
-          ) : (
-            <>The payout net matches the bank, but it carries no chargeable order references — nothing to settle yet.</>
-          )}
-        </div>
+        r.unresolvedRefs.length > 0 ? (
+          <Callout
+            tone="danger"
+            title={<>{r.unresolvedRefs.length} line{r.unresolvedRefs.length > 1 ? "s" : ""} on this payout {r.unresolvedRefs.length > 1 ? "don't" : "doesn't"} match an order{isConfirmablePartial(r) ? ` — the ${r.resolvedOrders.length} matched can be confirmed now` : ""}</>}
+            facts={[{ label: "Unmatched", value: `#${r.unresolvedRefs.join(", #")}`, emphasis: true }]}
+          >
+            The payout net matches the bank. Use <b>Link order</b> in the table below to point each line at its real order —
+            linked orders become bookable too{isConfirmablePartial(r) ? "" : ", or run a sync"}.
+          </Callout>
+        ) : (
+          <Callout tone="info" title="Payout matches the bank but carries no chargeable order references — nothing to settle yet." />
+        )
       )}
       {r.state === "AWAITING_PAYOUT" && (
-        <div className="mb-3.5 rounded-lg bg-[#E8F1F3] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#2E6B7A]">
-          Bank credit confirmed as {r.provider}
-          {r.reference ? <> (ref <b>{r.reference}</b>)</> : null}. Upload the {r.provider} payout file that
-          explains it — the reference number here should match the file.
-          {overdue && <> This credit is <b>{ageDays} days old</b>, so the file is overdue.</>}
-        </div>
+        <Callout
+          tone={overdue ? "warn" : "info"}
+          title={<>Waiting for the {r.provider} payout file{overdue ? ` — ${ageDays} days old, overdue` : ""}</>}
+          facts={r.reference ? [{ label: "Bank ref", value: r.reference }] : undefined}
+        >
+          The bank credit is classified as {r.provider}. Upload the {r.provider} payout file that explains it below — its
+          reference should match the bank ref.
+        </Callout>
       )}
 
       {isStripe && proof?.available && proof.transactions.length > 0 && (
@@ -309,12 +319,12 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         />
       )}
       {isStripe && !proof && (
-        <div className="mb-3.5 flex items-center gap-2 text-[12.5px] text-[#8A8175]">
+        <div className="mb-3.5 flex items-center gap-2 text-[12.5px] text-[#5E6B85]">
           <Loader2 size={13} className="animate-spin" /> Pulling live Stripe transactions…
         </div>
       )}
       {isStripe && proof && !proof.available && (
-        <div className="mb-3.5 rounded-lg bg-[#F3EFE7] px-3.5 py-2.5 text-[13px] text-[#8A8175]">
+        <div className="mb-3.5 rounded-lg bg-[#EEF2FA] px-3.5 py-2.5 text-[13px] text-[#5E6B85]">
           Couldn&apos;t load live Stripe proof: {proof.reason}
         </div>
       )}
@@ -363,7 +373,7 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
 
         {posting ? (
           <span
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-[#FBF3E6] px-3 py-2 text-[12.5px] font-medium text-[#6F5325]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-[#EAF1FD] px-3 py-2 text-[12.5px] font-medium text-[#1E3A8A]"
             title={`Posted ${posting.postedAt?.slice(0, 10)} · ref ${posting.reference}`}
           >
             <BookCheck size={14} />
@@ -387,22 +397,35 @@ export function ReconDetail({ r, isFounder, posting, onConfirm, refresh, uploadS
         {isDownloadableSource(r.payout?.source) ? (
           <a
             href={`/api/files/by-name?filename=${encodeURIComponent(r.payout!.source!)}&provider=${encodeURIComponent(r.provider)}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#0F1B3D] transition-colors hover:border-[#1D4ED8] hover:text-[#1E3A8A]"
           >
             <Download size={14} /> Payout file
           </a>
         ) : r.payout ? (
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#D6CCBA] px-3 py-2 text-[12.5px] text-[#8A8175]">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#C9D5EA] px-3 py-2 text-[12.5px] text-[#5E6B85]">
             Synced from the {r.provider} API — no file
           </span>
         ) : null}
+
+        {r.payout && r.confirmedBy && (
+          <button
+            onClick={() => setReverting(true)}
+            title="The wrong payout file was booked? Delete its Zoho entries and upload the correct file"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px] font-medium text-[#9B3A24] transition-colors hover:border-[#9B3A24] hover:bg-[#FBECE8]"
+          >
+            <RotateCcw size={14} /> Revert &amp; replace payout
+          </button>
+        )}
+        {reverting && (
+          <RevertPayoutDialog bankLineId={r.id} uploadSlot={uploadSlot} onClose={() => setReverting(false)} onDone={refresh} />
+        )}
 
         {r.payout && !r.confirmedBy && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
                 disabled={deleting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] z-99999999999999999999 font-medium text-[#A6472F] transition-colors hover:border-[#A6472F] hover:bg-[#F9ECE7] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px] z-99999999999999999999 font-medium text-[#A6472F] transition-colors hover:border-[#A6472F] hover:bg-[#F9ECE7] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete payout
               </button>

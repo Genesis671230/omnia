@@ -1,3 +1,4 @@
+import { GATEWAY_COLORS } from "@/components/finance/reconciliation/colors";
 /* Shared types for the founder dashboard v2. Dash mirrors /api/dashboard's
    payload; Insight* mirrors /api/insights. */
 
@@ -70,10 +71,8 @@ export type MoneyDrawerKind = "revenue" | "cash" | "awaiting" | "cod" | null;
 export const STORE_COLOR: Record<string, string> = {
   WA: "#38bdf8", UAE: "#34d399", KSA: "#fbbf24", WOO: "#a78bfa", MAIN: "#fb923c",
 };
-export const GATEWAY_COLOR: Record<string, string> = {
-  Stripe: "#818cf8", Telr: "#34d399", Checkout: "#fbbf24", Tabby: "#4ade80",
-  Tamara: "#a78bfa", "Shopify Payments": "#f87171", COD: "#f472b6", Unclassified: "#94a3b8",
-};
+// One colour per gateway, app-wide — see reconciliation/colors.ts.
+export const GATEWAY_COLOR: Record<string, string> = GATEWAY_COLORS;
 
 export const aed = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(v || 0);

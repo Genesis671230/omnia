@@ -49,14 +49,24 @@ export async function payoutOrderRefs(
     const json = await stripeGet(`/balance_transactions?${qs}`);
     const rows = json.data ?? [];
     for (const row of rows) {
+      // The list includes the payout's own balance transaction (type
+      // "payout", −net). Summed in, it cancelled everything to 0 — the live
+      // proof showed "payout file totals AED 0.00" and Net settled 0.00.
+      const type = String(row.type || "").toLowerCase();
+      if (type.startsWith("payout")) continue;
       const rowNet = Number(row.net || 0) / 100;
       const rowGross = Number(row.amount || 0) / 100;
       const rowFee = Number(row.fee || 0) / 100;
       net += rowNet;
 
       const desc = String(row.description || "");
-      const isRefund = String(row.type || "").toLowerCase().includes("refund");
-      const { refs: rowRefs } = stripeOrderRefs(desc);
+      const isRefund = type.includes("refund");
+      const parsed = stripeOrderRefs(desc).refs;
+      // A charge with no order reference in its description still moved
+      // money. Dropping it (the old behaviour) left the rows short of the
+      // payout — po_1UBOwz lost a 130.96 charge. Key it by its Stripe charge
+      // id so it shows as an unmatched line that Link order can resolve.
+      const rowRefs = parsed.length ? parsed : [String(row.source || row.id || "")].filter(Boolean);
       const quality = classifyStripeQuality(desc, rowRefs, isRefund);
       for (const tok of rowRefs) if (!refs.includes(tok)) refs.push(tok);
 

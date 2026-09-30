@@ -135,7 +135,7 @@ export function HeroBand({ data, days, store, onDays, onStore, onOpenDrawer }: {
 
 const HERO_CSS = `
   .hero { position: relative; overflow: hidden; border-radius: 24px; padding: 26px 28px 28px;
-    background: linear-gradient(130deg, #1e1b4b 0%, #312e81 30%, #4c1d95 62%, #7c3aed 100%);
+    background: linear-gradient(130deg, #1e1b4b 0%, #312e81 30%, #4c1d95 62%, #1D4ED8 100%);
     color: #fff; box-shadow: 0 24px 60px -24px rgba(76, 29, 149, .55); }
   .hero * { box-sizing: border-box; }
   .hero-glow { position: absolute; border-radius: 50%; filter: blur(70px); pointer-events: none; }
@@ -144,7 +144,7 @@ const HERO_CSS = `
 
   .hero-top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
   .hero-eyebrow { margin: 0 0 6px; font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.65); font-weight: 600; }
-  .hero-title { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 26px; letter-spacing: -.01em; }
+  .hero-title { margin: 0; font-family: var(--os-font); font-weight: 500; font-size: 26px; letter-spacing: -.01em; }
   .hero-filters { display: flex; gap: 8px; flex-wrap: wrap; }
   .hero-pills { display: inline-flex; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 3px; backdrop-filter: blur(8px); }
   .hero-pills button { border: 0; background: transparent; color: rgba(255,255,255,.75); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer; transition: all .15s; }
@@ -157,7 +157,7 @@ const HERO_CSS = `
   .hero-card:hover { transform: translateY(-3px); background: rgba(255,255,255,.16); }
   .hero-card:hover .hero-arrow { transform: translateX(3px); opacity: 1; }
   .hero-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.72); }
-  .hero-value { font-family: Georgia, serif; font-size: clamp(20px, 2.1vw, 27px); line-height: 1.1; }
+  .hero-value { font-family: var(--os-font); font-size: clamp(20px, 2.1vw, 27px); line-height: 1.1; }
   .hero-value.green { color: #6ee7b7; } .hero-value.amber { color: #fcd34d; } .hero-value.pink { color: #f9a8d4; }
   .hero-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
   .hero-delta.up { background: rgba(52, 211, 153, .18); color: #6ee7b7; }

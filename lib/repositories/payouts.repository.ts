@@ -19,6 +19,67 @@ export function makeDeletePayout(client: typeof supabase) {
   };
 }
 
+/** payout_transactions rows for one payout — pure, so the merge rules are
+ *  testable without a database. */
+export function buildTransactionRows(payoutId: string, orderRefs: string[], transactions: PayoutTransactionShare[]) {
+  // When the parser gave us a per-transaction breakdown (Stripe, live API
+  // + CSV uploads), persist the real net/gross/fee share and is_refund/
+  // quality per ref. Older parsers (Telr/Tamara/Tabby/generic) only total
+  // the whole file — 0/false/null there are honest placeholders, not a
+  // guess, since that granularity was never computed.
+  // One row per ref AND direction: a ref can recur within a payout
+  // (Checkout auth retries, a split capture) — sum those rather than keep
+  // only the last, which silently dropped the earlier rows' money. But a
+  // sale and a refund of the same order (WA55548 on po_1UBOwz, WA55588 on
+  // Tabby20260907SAR) are two bookings and stay two rows; summed, the
+  // refund vanished into a smaller "sale".
+  const keyOf = (t: PayoutTransactionShare) => `${t.ref}|${t.isRefund ? "refund" : "sale"}`;
+  const sharesByRef = new Map<string, PayoutTransactionShare>();
+  const add = (a: number | undefined, b: number | undefined) =>
+    a == null && b == null ? undefined : +((a ?? 0) + (b ?? 0)).toFixed(2);
+  for (const t of transactions) {
+    const prev = sharesByRef.get(keyOf(t));
+    sharesByRef.set(keyOf(t), prev ? {
+      ...prev,
+      grossShare: add(prev.grossShare, t.grossShare)!,
+      feeShare: add(prev.feeShare, t.feeShare)!,
+      netShare: add(prev.netShare, t.netShare)!,
+      vatShare: add(prev.vatShare, t.vatShare),
+      grossOriginal: add(prev.grossOriginal, t.grossOriginal),
+      feeOriginal: add(prev.feeOriginal, t.feeOriginal),
+      netOriginal: add(prev.netOriginal, t.netOriginal),
+      vatOriginal: add(prev.vatOriginal, t.vatOriginal),
+      isRefund: prev.isRefund || t.isRefund,
+    } : t);
+  }
+
+  // Refs with a breakdown emit one row per direction; refs the parser
+  // only listed (older whole-file parsers) keep a single placeholder row.
+  const pairs = orderRefs.flatMap((ref) => {
+    const found = [sharesByRef.get(`${ref}|sale`), sharesByRef.get(`${ref}|refund`)].filter(Boolean) as PayoutTransactionShare[];
+    return found.length ? found.map((share) => ({ ref, share })) : [{ ref, share: undefined }];
+  });
+  const txRows = pairs.map(({ ref, share }) => {
+    return {
+      id: randomUUID(),
+      tenant_id: TENANT,
+      payout_id: payoutId,
+      order_ref: ref,
+      gross_aed: share?.grossShare ?? 0,
+      fee_aed: share?.feeShare ?? 0,
+      net_aed: share?.netShare ?? 0,
+      is_refund: share?.isRefund ?? false,
+      quality: share?.quality ?? null,
+      gross_original: share?.grossOriginal ?? null,
+      fee_original: share?.feeOriginal ?? null,
+      net_original: share?.netOriginal ?? null,
+      vat_aed: share?.vatShare ?? null,
+      vat_original: share?.vatOriginal ?? null,
+    };
+  });
+  return txRows;
+}
+
 /** Decide which primary key each incoming payout should claim.
  *
  *  Tabby reuses one statement number for every store it pays on a date, so a
@@ -131,52 +192,7 @@ export const PayoutsRepository = {
       if (delErr) throw new Error(`payout_transactions clear failed: ${delErr.message}`);
       if (p.orderRefs.length === 0) continue;
 
-      // When the parser gave us a per-transaction breakdown (Stripe, live API
-      // + CSV uploads), persist the real net/gross/fee share and is_refund/
-      // quality per ref. Older parsers (Telr/Tamara/Tabby/generic) only total
-      // the whole file — 0/false/null there are honest placeholders, not a
-      // guess, since that granularity was never computed.
-      // One row per ref: a ref can recur within a payout (Checkout auth
-      // retries, a split capture) — sum them rather than keep only the last,
-      // which silently dropped the earlier rows' money.
-      const sharesByRef = new Map<string, PayoutTransactionShare>();
-      const add = (a: number | undefined, b: number | undefined) =>
-        a == null && b == null ? undefined : +((a ?? 0) + (b ?? 0)).toFixed(2);
-      for (const t of p.transactions ?? []) {
-        const prev = sharesByRef.get(t.ref);
-        sharesByRef.set(t.ref, prev ? {
-          ...prev,
-          grossShare: add(prev.grossShare, t.grossShare)!,
-          feeShare: add(prev.feeShare, t.feeShare)!,
-          netShare: add(prev.netShare, t.netShare)!,
-          vatShare: add(prev.vatShare, t.vatShare),
-          grossOriginal: add(prev.grossOriginal, t.grossOriginal),
-          feeOriginal: add(prev.feeOriginal, t.feeOriginal),
-          netOriginal: add(prev.netOriginal, t.netOriginal),
-          vatOriginal: add(prev.vatOriginal, t.vatOriginal),
-          isRefund: prev.isRefund || t.isRefund,
-        } : t);
-      }
-
-      const txRows = p.orderRefs.map((ref) => {
-        const share = sharesByRef.get(ref);
-        return {
-          id: randomUUID(),
-          tenant_id: TENANT,
-          payout_id: payoutId,
-          order_ref: ref,
-          gross_aed: share?.grossShare ?? 0,
-          fee_aed: share?.feeShare ?? 0,
-          net_aed: share?.netShare ?? 0,
-          is_refund: share?.isRefund ?? false,
-          quality: share?.quality ?? null,
-          gross_original: share?.grossOriginal ?? null,
-          fee_original: share?.feeOriginal ?? null,
-          net_original: share?.netOriginal ?? null,
-          vat_aed: share?.vatShare ?? null,
-          vat_original: share?.vatOriginal ?? null,
-        };
-      });
+      const txRows = buildTransactionRows(payoutId, p.orderRefs, p.transactions ?? []);
       const { error: insErr } = await supabase.from("payout_transactions").insert(txRows);
       if (insErr) throw new Error(`payout_transactions insert failed: ${insErr.message}`);
     }
@@ -186,6 +202,14 @@ export const PayoutsRepository = {
   async upsertPayouts(payouts: ParsedPayout[]): Promise<number> {
     const ids = await this.upsertPayoutsWithIds(payouts);
     return ids.size;
+  },
+
+  /** Which Zoho organisation these payouts settle into. Set separately from
+   *  the upsert (which never names the column) so a re-upload keeps it. */
+  async setZohoConnection(payoutIds: string[], connectionId: string): Promise<void> {
+    if (payoutIds.length === 0) return;
+    const { error } = await supabase.from("payouts").update({ zoho_connection_id: connectionId }).in("id", payoutIds);
+    if (error) throw new Error(`payouts organisation update failed: ${error.message}`);
   },
 
   /** Attach payouts to the bank credit they were uploaded from. Any other
@@ -213,6 +237,8 @@ export const PayoutsRepository = {
       original_currency: string | null; net_original: number | null;
       /** COD vouchers: see ParsedPayout.deliveryCharges. */
       delivery_charges?: CodDeliveryCharge[] | null;
+      /** Zoho organisation this payout settles into ('' = default org). */
+      zoho_connection_id?: string | null;
       transactions: {
         order_ref: string; is_refund: boolean; quality: string | null;
         net_aed: number; gross_aed: number; fee_aed: number;
@@ -234,7 +260,7 @@ export const PayoutsRepository = {
       (from, to) =>
         supabase
           .from("payouts")
-          .select("id, gateway, net_amount, gross_amount, fee_amount, source, status, original_currency, net_original, bank_line_id, uploaded_at, delivery_charges")
+          .select("id, gateway, net_amount, gross_amount, fee_amount, source, status, original_currency, net_original, bank_line_id, uploaded_at, delivery_charges, zoho_connection_id")
           .range(from, to),
       "payouts select",
     );
@@ -265,7 +291,8 @@ export const PayoutsRepository = {
     >();
     for (const t of txs ?? []) {
       const refs = refsByPayout.get(t.payout_id) ?? [];
-      refs.push(t.order_ref);
+      // A sale and a refund of one order are two rows but one ref.
+      if (!refs.includes(t.order_ref)) refs.push(t.order_ref);
       refsByPayout.set(t.payout_id, refs);
 
       const list = transactionsByPayout.get(t.payout_id) ?? [];

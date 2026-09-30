@@ -769,6 +769,14 @@ create table if not exists leads (
 create index if not exists leads_created_idx on leads (created_at desc);
 create index if not exists leads_status_idx on leads (status);
 
+-- Corporate Tax penalty leads from the RAMZA hero form share this table
+-- (source = 'ramza-ct-penalty'); these columns are empty for payout-audit leads.
+alter table leads add column if not exists company           text not null default '';
+alter table leads add column if not exists situation         text not null default '';
+alter table leads add column if not exists penalty_type      text not null default '';
+alter table leads add column if not exists penalty_issued_on date;
+alter table leads add column if not exists checker           jsonb;
+
 
 -- A payout file uploaded from a specific bank credit's panel is pinned to that
 -- credit: it always shows there (as Variance if the totals disagree) instead
@@ -954,3 +962,235 @@ create table if not exists recon_snapshots (
   dirty        boolean not null default false,
   dirty_at     timestamptz
 );
+
+-- ── Payout reverts ─────────────────────────────────────────────────────────
+-- A wrongly uploaded payout file that was already booked into Zoho is
+-- reverted (every Zoho document it created deleted, our records cleared) so
+-- the correct file can be uploaded. One row per revert: exactly what was
+-- deleted, for the accountants' trail. See lib/finance/revert-payout.ts.
+create table if not exists payout_reverts (
+  id            uuid primary key default gen_random_uuid(),
+  tenant_id     text not null default 'omnia',
+  bank_line_id  text not null,
+  payout_id     text not null,
+  payout_source text,
+  reason        text not null default '',
+  deleted_docs  jsonb not null default '[]',
+  failed_docs   jsonb not null default '[]',
+  reverted_by   text not null default '',
+  reverted_at   timestamptz not null default now()
+);
+create index if not exists payout_reverts_line_idx on payout_reverts (bank_line_id);
+
+-- ── Zoho ledger snapshot ───────────────────────────────────────────────────
+-- A month of Zoho account transactions for a watch-list of accounts (every
+-- gateway clearing account, the banks, Sales, A/R, VAT, gateway charges, FX),
+-- pulled on demand so the Ledger tab can chart and search it without the
+-- accountant exporting the ledger. Zoho has no "all accounts" transactions
+-- call (the unfiltered one returns 0 rows; /reports/generalledger is 401), so
+-- a snapshot is one paged read per account — ~50–120 of the ~5,000 daily
+-- calls. Reads never touch Zoho. See lib/integrations/zoho-ledger.ts.
+create table if not exists zoho_ledger_snapshots (
+  month         text primary key,              -- YYYY-MM
+  status        text not null default 'idle',  -- running | ready | failed
+  started_at    timestamptz,
+  finished_at   timestamptz,
+  api_calls     integer not null default 0,
+  line_count    integer not null default 0,
+  accounts      jsonb not null default '[]',   -- [{account_id,name,type,group,balance,currency}]
+  error         text,
+  requested_by  text not null default ''
+);
+
+create table if not exists zoho_ledger_lines (
+  id                 text primary key,          -- month|categorized_transaction_id
+  month              text not null,
+  account_id         text not null,
+  account_name       text not null default '',
+  txn_date           date,
+  txn_type           text not null default '',
+  txn_type_label     text not null default '',
+  transaction_id     text not null default '',
+  entry_number       text not null default '',
+  reference_number   text not null default '',
+  payee              text not null default '',
+  description        text not null default '',
+  offset_account     text not null default '',
+  debit              numeric(14,2) not null default 0,
+  credit             numeric(14,2) not null default 0,
+  currency_code      text not null default 'AED',
+  reconcile_status   text not null default ''
+);
+create index if not exists zoho_ledger_lines_month_acct_idx on zoho_ledger_lines (month, account_id);
+-- Rows from an older snapshot run are pruned only after the new run's rows
+-- land, so the Ledger tab never reads an empty month mid-refresh.
+alter table zoho_ledger_lines add column if not exists run_id text not null default '';
+-- Open (unrefunded, unapplied) credit notes at snapshot time, for the Ledger
+-- tab's close checklist: a credit note that never became a refund or an
+-- application is money owed to a customer that nothing has paid out.
+alter table zoho_ledger_snapshots add column if not exists open_credit_notes jsonb not null default '[]';
+
+-- ── Multi-organisation Zoho (2026-09-29) ──────────────────────────────────
+-- zoho_connections: every Zoho Books organisation the platform can read or
+-- post to, added from Settings (or onboarding) instead of env vars. Secrets
+-- are AES-256-GCM encrypted by lib/crypto/secret-box.ts with
+-- ZOHO_CREDENTIALS_KEY — the database never sees them in plain text.
+-- The env-var organisation (ZOHO_ORGANIZATION_ID …) stays the implicit
+-- default ("env") so nothing that exists changes behaviour.
+create table if not exists zoho_connections (
+  id                    text primary key,           -- slug, e.g. 'house-of-omnia'
+  tenant_id             text not null default 'omnia',
+  label                 text not null,
+  org_id                text not null,
+  org_name              text not null default '',
+  accounts_url          text not null default 'https://accounts.zoho.com',
+  api_domain            text not null default 'https://www.zohoapis.com',
+  client_id             text not null,
+  client_secret_enc     text not null,
+  refresh_token_enc     text not null,
+  login_email           text not null default '',   -- which Zoho user granted it (display only)
+  daily_budget          integer not null default 4500,
+  status                text not null default 'active',  -- active | error | disabled
+  last_checked_at       timestamptz,
+  last_error            text not null default '',
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now(),
+  created_by            text not null default '',
+  unique (tenant_id, org_id)
+);
+
+-- Zoho's ~5,000/day cap is per organisation, so a second org gets its own
+-- counter. The default (env) org keeps using zoho_api_usage unchanged.
+create table if not exists zoho_api_usage_org (
+  usage_date    date not null default current_date,
+  org_id        text not null,
+  request_count integer not null default 0,
+  updated_at    timestamptz not null default now(),
+  primary key (usage_date, org_id)
+);
+
+create or replace function zoho_consume_quota_org(p_org text, p_limit integer, p_label text default 'unlabelled')
+returns table(allowed boolean, used integer)
+language plpgsql
+as $$
+declare
+  v_count integer;
+begin
+  insert into zoho_api_usage_org (usage_date, org_id, request_count, updated_at)
+  values (current_date, p_org, 1, now())
+  on conflict (usage_date, org_id)
+  do update set request_count = zoho_api_usage_org.request_count + 1, updated_at = now()
+  returning zoho_api_usage_org.request_count into v_count;
+
+  if v_count > p_limit then
+    update zoho_api_usage_org set request_count = zoho_api_usage_org.request_count - 1
+      where usage_date = current_date and org_id = p_org;
+    return query select false, v_count - 1;
+    return;
+  end if;
+
+  insert into zoho_api_usage_labels (usage_date, label, request_count, updated_at)
+  values (current_date, p_org || ':' || p_label, 1, now())
+  on conflict (usage_date, label)
+  do update set request_count = zoho_api_usage_labels.request_count + 1, updated_at = now();
+
+  return query select true, v_count;
+end;
+$$;
+
+-- Chart-of-accounts mapping is per organisation (account ids differ). Rows
+-- are keyed by connection id; the existing 'omnia' row is the env org's.
+alter table zoho_account_config add column if not exists zoho_connection_id text not null default '';
+
+-- Which organisation's books an uploaded payout / voucher settles into.
+-- '' = the default (env) organisation, as before.
+alter table payouts add column if not exists zoho_connection_id text not null default '';
+
+-- Upload routing: payouts from these providers settle into this organisation
+-- unless the uploader picks another (e.g. COD / OnTrack → House of Omnia).
+alter table zoho_connections add column if not exists default_for_providers text[] not null default '{}';
+
+-- Every write the generic Zoho Books action layer makes (lib/integrations/
+-- zoho-books-actions.ts): who, which org, what, and what Zoho answered.
+create table if not exists zoho_action_log (
+  id             bigserial primary key,
+  at             timestamptz not null default now(),
+  actor          text not null default '',
+  connection_id  text not null default 'env',
+  org_id         text not null default '',
+  entity         text not null,
+  action         text not null,      -- create | update | delete | void | mark_sent | email
+  record_id      text not null default '',
+  request        jsonb,
+  ok             boolean not null default false,
+  http_status    integer,
+  zoho_code      integer,
+  message        text not null default ''
+);
+create index if not exists zoho_action_log_at_idx on zoho_action_log (at desc);
+
+-- Incremental sync of any registry entity into one table (opt-in per entity:
+-- a full pull of a large org costs thousands of the ~5,000/day requests).
+create table if not exists zoho_records (
+  connection_id  text not null,
+  entity         text not null,
+  record_id      text not null,
+  data           jsonb not null,
+  modified_at    timestamptz,
+  synced_at      timestamptz not null default now(),
+  primary key (connection_id, entity, record_id)
+);
+create table if not exists zoho_sync_cursors (
+  connection_id  text not null,
+  entity         text not null,
+  cursor         timestamptz,
+  last_run_at    timestamptz,
+  last_count     integer not null default 0,
+  last_error     text not null default '',
+  primary key (connection_id, entity)
+);
+
+-- OAuth scopes the connection's refresh token was granted (space-separated,
+-- as Zoho returns them) — shows which Books entities are locked.
+alter table zoho_connections add column if not exists scopes text not null default '';
+
+-- COD delivery charges across companies (2026-09-29). A voucher is remitted
+-- to one company (the payout's Zoho org) but its charge-only rows can be the
+-- sister company's prepaid orders — booked there through an intercompany
+-- account. See lib/finance/delivery-entities.ts.
+--   delivery_charge_entities  { "<ref>|<voucherNo>": "<zoho connection id>" }
+--                             companies picked by hand; the rest are automatic
+--   delivery_postings         [{ leg, org, kind, id, reference, amount, refs[], at }]
+--                             every Zoho document the charges were booked as —
+--                             per order, so each charge traces to its document
+alter table payouts add column if not exists delivery_charge_entities jsonb;
+alter table payouts add column if not exists delivery_postings jsonb;
+
+-- AI ads analyst (2026-09-30): every review it writes, so the next one can say
+-- what changed since the last check. lib/ai/ads-analyst.ts.
+create table if not exists ad_analyst_reports (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'omnia',
+  created_at timestamptz not null default now(),
+  range_from date not null,
+  range_to date not null,
+  model text not null default '',
+  report jsonb not null,
+  -- the headline figures the review was based on, to compare runs by number
+  snapshot jsonb not null default '{}'::jsonb
+);
+create index if not exists ad_analyst_reports_created_idx on ad_analyst_reports (tenant_id, created_at desc);
+
+-- AI storefront roasts (2026-09-30): one teardown of a storefront page with
+-- the funnel it was judged against. lib/ai/site-roast.ts.
+create table if not exists site_roasts (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'omnia',
+  created_at timestamptz not null default now(),
+  site text not null,
+  url text not null,
+  model text not null default '',
+  roast jsonb not null,
+  snapshot jsonb not null default '{}'::jsonb
+);
+create index if not exists site_roasts_site_idx on site_roasts (tenant_id, site, created_at desc);

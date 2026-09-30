@@ -13,8 +13,8 @@ const STATUS_STYLE: Record<PostingStatus, { label: string; className: string }> 
   amount_differs:  { label: "Ref in Zoho · amount differs", className: "bg-orange-100 text-orange-700" },
   missing_in_zoho: { label: "Posted · gone from Zoho", className: "bg-red-100 text-red-700" },
   failed:          { label: "Post failed",           className: "bg-red-100 text-red-700" },
-  not_in_zoho:     { label: "Not in Zoho",           className: "bg-[#EAE3D6] text-[#8A8175]" },
-  not_posted:      { label: "Not checked",           className: "bg-[#EAE3D6] text-[#8A8175]" },
+  not_in_zoho:     { label: "Not in Zoho",           className: "bg-[#D8E1F1] text-[#5E6B85]" },
+  not_posted:      { label: "Not checked",           className: "bg-[#D8E1F1] text-[#5E6B85]" },
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -37,7 +37,7 @@ export function PostingStatusBadge({
         {s.label}
       </span>
       {zoho && (status === "verified" || status === "amount_differs" || status === "uncategorized") && (
-        <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-[#8A8175]">
+        <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-[#5E6B85]">
           {zoho.amount != null && aed2(zoho.amount)}
           {zoho.account ? ` · ${zoho.account}` : zoho.type ? ` · ${TYPE_LABEL[zoho.type] ?? zoho.type}` : ""}
           {zoho.matchKind === "combined" && " · booked together with sibling lines"}

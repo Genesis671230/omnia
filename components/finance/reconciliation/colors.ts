@@ -26,6 +26,7 @@ export const GATEWAY_COLORS: Record<string, string> = {
   Checkout: "#eda100", // slot 4 yellow
   COD: "#e87ba4", // slot 5 magenta
   Telr: "#008300", // slot 6 green
+  "Shopify Payments": "#4a3aa7", // slot 7 violet
   Unclassified: "#898781", // muted ink — not a series color
 };
 

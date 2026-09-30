@@ -1,3 +1,4 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { getCreditNoteLive, type LiveCreditNote } from "@/lib/integrations/zoho-settlement-posting";
@@ -19,7 +20,7 @@ export const maxDuration = 60;
 // here so the refund can be booked again instead of reading "booked" forever.
 const isReal = (v: string | null | undefined) => !!v && !/^(PENDING|CLAIMED|CLOSED):/.test(v);
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!zohoConfigured()) return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   const bankLineId = new URL(request.url).searchParams.get("bankLineId") ?? "";
   if (!bankLineId) return NextResponse.json({ error: "bankLineId is required" }, { status: 400 });
@@ -59,4 +60,9 @@ export async function GET(request: Request) {
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: e instanceof ZohoQuotaExceededError ? 429 : 500 });
   }
+}
+
+// Multi-org: every Zoho call below runs in the organisation of the bankLineId's payout — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForBankLine(new URL(req.url).searchParams.get("bankLineId")), () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

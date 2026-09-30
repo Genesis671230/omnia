@@ -72,12 +72,12 @@
 //     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
 //       <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
 //         <div className="mb-4 flex items-center justify-between">
-//           <h3 className="text-[15px] font-semibold text-[#1F1B16]">Post {bankLineIds.length} to Zoho</h3>
-//           <button onClick={onClose}><X size={16} className="text-[#8A8175]" /></button>
+//           <h3 className="text-[15px] font-semibold text-[#0F1B3D]">Post {bankLineIds.length} to Zoho</h3>
+//           <button onClick={onClose}><X size={16} className="text-[#5E6B85]" /></button>
 //         </div>
 
 //         {loading ? (
-//           <div className="flex items-center gap-2 py-8 text-[13px] text-[#8A8175]">
+//           <div className="flex items-center gap-2 py-8 text-[13px] text-[#5E6B85]">
 //             <Loader2 size={16} className="animate-spin" /> Building preview…
 //           </div>
 //         ) : (
@@ -86,13 +86,13 @@
 //               <div
 //                 key={r.bankLineId}
 //                 className={`rounded-lg border px-3 py-2 text-[12.5px] ${
-//                   r.status === "failed" ? "border-[#A6472F]/30 bg-[#F9ECE7]" : "border-[#EAE3D6] bg-[#FBF8F1]"
+//                   r.status === "failed" ? "border-[#A6472F]/30 bg-[#F9ECE7]" : "border-[#D8E1F1] bg-[#F3F6FC]"
 //                 }`}
 //               >
 //                 {r.status === "failed" ? (
 //                   <span className="inline-flex items-center gap-1.5 text-[#A6472F]"><AlertTriangle size={13} /> {r.error}</span>
 //                 ) : (
-//                   <span className="text-[#1F1B16]">
+//                   <span className="text-[#0F1B3D]">
 //                     {r.posting?.transaction_type} · {aed2(r.posting?.amount ?? 0)} · {r.posting?.description}
 //                   </span>
 //                 )}
@@ -102,13 +102,13 @@
 //         )}
 
 //         <div className="mt-5 flex justify-end gap-2">
-//           <button onClick={onClose} className="rounded-lg border border-[#D6CCBA] bg-white px-4 py-2 text-[13px] text-[#1F1B16]">
+//           <button onClick={onClose} className="rounded-lg border border-[#C9D5EA] bg-white px-4 py-2 text-[13px] text-[#0F1B3D]">
 //             Cancel
 //           </button>
 //           <button
 //             onClick={confirm}
 //             disabled={posting || loading || !preview?.some((r) => r.status === "posted")}
-//             className="inline-flex items-center gap-2 rounded-lg bg-[#B08343] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+//             className="inline-flex items-center gap-2 rounded-full bg-[#0F1B3D] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
 //           >
 //             {posting ? <Loader2 size={15} className="animate-spin" /> : null} Confirm & post
 //           </button>
@@ -238,24 +238,24 @@ export function BankTxnPostDialog({
       <div className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-[15px] font-semibold text-[#1F1B16]">Review {items.length} Zoho posting{items.length === 1 ? "" : "s"}</h3>
-            <p className="mt-1 text-[12px] text-[#8A8175]">Confirm or edit account mapping before posting.</p>
+            <h3 className="text-[15px] font-semibold text-[#0F1B3D]">Review {items.length} Zoho posting{items.length === 1 ? "" : "s"}</h3>
+            <p className="mt-1 text-[12px] text-[#5E6B85]">Confirm or edit account mapping before posting.</p>
           </div>
-          <button onClick={onClose}><X size={16} className="text-[#8A8175]" /></button>
+          <button onClick={onClose}><X size={16} className="text-[#5E6B85]" /></button>
         </div>
 
         <div className="space-y-3">
           {(items ?? []).map((d) => (
-            <div key={d.bankLineId} className="rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-4">
+            <div key={d.bankLineId} className="rounded-xl border border-[#D8E1F1] bg-[#F3F6FC] p-4">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-[#1F1B16]">
+                  <div className="text-[13px] font-medium text-[#0F1B3D]">
                     {d.amount > 0 ? aed2(d.amount) : ""} · {d.date?.slice(0, 10)}{d.reference ? ` · Ref: ${d.reference}` : ""}
                   </div>
-                  <div className="mt-1 break-words text-[11.5px] leading-relaxed text-[#8A8175]">
+                  <div className="mt-1 break-words text-[11.5px] leading-relaxed text-[#5E6B85]">
                     <span className="font-semibold">Bank narration:</span> {narrationOf(d)}
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-[#8A8175]">{d.reasons[0] || "Manual review"}</div>
+                  <div className="mt-0.5 text-[11.5px] text-[#5E6B85]">{d.reasons[0] || "Manual review"}</div>
                 </div>
                 <div className={`rounded-full px-2.5 py-1 text-[11px] ${d.confidence === "ready" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                   {d.confidence}
@@ -263,14 +263,14 @@ export function BankTxnPostDialog({
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <label className="text-[12px] text-[#1F1B16]">
+                <label className="text-[12px] text-[#0F1B3D]">
                   Transaction type
-                  <select className="mt-1 w-full rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[13px]"
+                  <select className="mt-1 w-full rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[13px]"
                     value={d.transactionType} onChange={(e) => updateDraft(d.bankLineId, { transactionType: e.target.value as ZohoTransactionType })}>
                     {TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </label>
-                <div className="text-[12px] text-[#1F1B16]">
+                <div className="text-[12px] text-[#0F1B3D]">
                   From account
                   <div className="mt-1">
                     <AccountCombobox accounts={accounts} value={d.fromAccountId}
@@ -278,7 +278,7 @@ export function BankTxnPostDialog({
                       onChange={(id) => updateDraft(d.bankLineId, { fromAccountId: id })} />
                   </div>
                 </div>
-                <div className="text-[12px] text-[#1F1B16]">
+                <div className="text-[12px] text-[#0F1B3D]">
                   To account
                   <div className="mt-1">
                     <AccountCombobox accounts={accounts} value={d.toAccountId}
@@ -288,16 +288,16 @@ export function BankTxnPostDialog({
                 </div>
               </div>
 
-              <label className="mt-3 block text-[12px] text-[#1F1B16]">
+              <label className="mt-3 block text-[12px] text-[#0F1B3D]">
                 Description (pre-filled, edit freely)
                 <textarea
                   value={d.note ?? ""}
                   onChange={(e) => updateDraft(d.bankLineId, { note: e.target.value })}
                   rows={2}
-                  className="mt-1 w-full rounded-lg border border-[#D6CCBA] bg-white px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-[#B08343]"
+                  className="mt-1 w-full rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-[#1D4ED8]"
                 />
               </label>
-              <div className="mt-1 rounded-md bg-[#F3EFE7] px-2.5 py-1.5 text-[11px] leading-relaxed text-[#6F6457]">
+              <div className="mt-1 rounded-md bg-[#EEF2FA] px-2.5 py-1.5 text-[11px] leading-relaxed text-[#46546F]">
                 <span className="font-semibold">Zoho will get:</span> {descriptionOf(d)}
               </div>
 
@@ -309,9 +309,9 @@ export function BankTxnPostDialog({
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-[#D6CCBA] bg-white px-4 py-2 text-[13px] text-[#1F1B16]">Cancel</button>
+          <button onClick={onClose} className="rounded-lg border border-[#C9D5EA] bg-white px-4 py-2 text-[13px] text-[#0F1B3D]">Cancel</button>
           <button onClick={confirm} disabled={posting || !canPost}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#B08343] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-full bg-[#0F1B3D] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50">
             {posting ? <Loader2 size={15} className="animate-spin" /> : null} Confirm & post
           </button>
         </div>

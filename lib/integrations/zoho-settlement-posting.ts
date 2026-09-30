@@ -9,15 +9,24 @@
 
 import { zohoThrottledFetch, ZohoQuotaExceededError } from "@/lib/integrations/zoho-throttle";
 import { fetchZohoBankAccounts, fetchZohoChartOfAccounts } from "@/lib/integrations/zoho-banking";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 const BOOKS_BASE = process.env.ZOHO_BOOKS_BASE ?? "https://www.zohoapis.com/books/v3";
 
 export class ZohoRejection extends Error {
-  constructor(message: string) {
+  /** Zoho's own error code when it sent one (e.g. 11016). */
+  readonly code?: number;
+  constructor(message: string, code?: number) {
     super(message);
     this.name = "ZohoRejection";
+    this.code = code;
   }
 }
+
+/** Zoho code 11016, "Involved account types are not applicable": an account
+ *  of a type this document can't use — e.g. an "other asset" intercompany
+ *  account as an expense's Paid Through. Nothing was written. */
+export const ZOHO_ACCOUNT_TYPE_NOT_APPLICABLE = 11016;
 
 type BooksJson = { code?: number; message?: string; [k: string]: unknown };
 
@@ -27,7 +36,7 @@ async function books(
   accessToken: string,
   opts: { query?: Record<string, string>; body?: unknown } = {},
 ): Promise<BooksJson> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID ?? "";
+  const orgId = zohoOrgId();
   const url = new URL(`${BOOKS_BASE}${path}`);
   url.searchParams.set("organization_id", orgId);
   for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, v);
@@ -59,7 +68,7 @@ async function books(
     throw new Error(`Zoho ${method} ${path} returned non-JSON: ${text.slice(0, 300)}`);
   }
   if (!res.ok || (json.code !== undefined && json.code !== 0)) {
-    throw new ZohoRejection(`Zoho ${method} ${path} (HTTP ${res.status}, code ${json.code}): ${json.message ?? text.slice(0, 300)}`);
+    throw new ZohoRejection(`Zoho ${method} ${path} (HTTP ${res.status}, code ${json.code}): ${json.message ?? text.slice(0, 300)}`, json.code);
   }
   return json;
 }
@@ -101,6 +110,20 @@ export async function findOurPaymentOnInvoice(opts: {
 export async function customerPaymentExists(paymentId: string, accessToken: string): Promise<boolean> {
   try {
     await books("GET", `/customerpayments/${encodeURIComponent(paymentId)}`, accessToken);
+    return true;
+  } catch (e) {
+    if (e instanceof ZohoRejection && /HTTP 404|code 1002\b/.test(e.message)) return false;
+    throw e;
+  }
+}
+
+/** Whether a fee expense / FX journal we stored still exists in Zoho. Five
+ *  Shopify fees (3470, SA3926, SA3927, SA3929, SA3931 — 2026-09-10) were
+ *  deleted in Zoho while settlement_records kept their ids, so the drawer
+ *  said "booked" and re-publishing skipped them as already done. */
+export async function zohoDocumentExists(kind: "expenses" | "journals", id: string, accessToken: string): Promise<boolean> {
+  try {
+    await books("GET", `/${kind}/${encodeURIComponent(id)}`, accessToken);
     return true;
   } catch (e) {
     if (e instanceof ZohoRejection && /HTTP 404|code 1002\b/.test(e.message)) return false;
@@ -202,11 +225,15 @@ export type PostingOptions = {
   taxes: PostingTaxOption[];
   /** The "Input VAT" ledger account — reversed when a refund hands a fee back. */
   inputVatAccountId?: string | null;
+  /** Balance-sheet accounts that can carry what one company owes a sister
+   *  company ("Due from …", "… - sis company", "Omnia Stores- Dubai"). */
+  intercompanyAccounts: PostingAccountOption[];
 };
 
 const DEPOSIT_TYPES = new Set(["bank", "cash", "payment_clearing", "credit_card"]);
 const FEE_TYPES = new Set(["expense", "other_expense", "cost_of_goods_sold"]);
 const DIFFERENCE_TYPES = new Set(["other_expense", "other_income", "expense", "income"]);
+const INTERCOMPANY_TYPES = new Set(["other_asset", "other_current_asset", "other_current_liability", "other_liability", "long_term_liability", "equity"]);
 
 export async function fetchPostingOptions(accessToken: string): Promise<PostingOptions> {
   const [bank, coa, taxJson] = await Promise.all([
@@ -237,6 +264,7 @@ export async function fetchPostingOptions(accessToken: string): Promise<PostingO
       tax_id, tax_name, tax_percentage: Number(tax_percentage),
     })),
     inputVatAccountId: active.find((a) => /^input\s*vat$/i.test(a.account_name.trim()))?.account_id ?? null,
+    intercompanyAccounts: pick(INTERCOMPANY_TYPES),
   };
 }
 
@@ -260,6 +288,45 @@ export async function getInvoiceTaxProfile(invoiceId: string, accessToken: strin
   const inv = json.invoice as InvoiceTaxProfile | undefined;
   if (!inv) throw new ZohoRejection(`Zoho returned no invoice for ${invoiceId}`);
   return inv;
+}
+
+/** An invoice's money — totals, what paid it, what credited it — with no
+ *  customer details, for the batch advisor (lib/ai/batch-advisor.ts). */
+export type InvoiceMoneySummary = {
+  invoice_id: string;
+  invoice_number: string;
+  customer_id: string;
+  date: string;
+  status: string;
+  currency_code: string;
+  total: number;
+  balance: number;
+  payments: { date: string; amount: number; reference: string; mode: string }[];
+  credits: { creditnote_number: string; date: string; amount: number }[];
+};
+
+export async function getInvoiceMoneySummary(invoiceId: string, accessToken: string): Promise<InvoiceMoneySummary> {
+  const json = await books("GET", `/invoices/${encodeURIComponent(invoiceId)}`, accessToken);
+  const inv = json.invoice as Record<string, unknown> | undefined;
+  if (!inv) throw new ZohoRejection(`Zoho returned no invoice for ${invoiceId}`);
+  const list = (k: string) => (Array.isArray(inv[k]) ? (inv[k] as Record<string, unknown>[]) : []);
+  return {
+    invoice_id: String(inv.invoice_id ?? invoiceId),
+    invoice_number: String(inv.invoice_number ?? ""),
+    customer_id: String(inv.customer_id ?? ""),
+    date: String(inv.date ?? ""),
+    status: String(inv.status ?? ""),
+    currency_code: String(inv.currency_code ?? ""),
+    total: Number(inv.total ?? 0),
+    balance: Number(inv.balance ?? 0),
+    payments: list("payments").map((p) => ({
+      date: String(p.date ?? ""), amount: Number(p.amount ?? 0),
+      reference: String(p.reference_number ?? ""), mode: String(p.payment_mode ?? ""),
+    })),
+    credits: list("credits").map((c) => ({
+      creditnote_number: String(c.creditnote_number ?? ""), date: String(c.credited_date ?? c.date ?? ""), amount: Number(c.amount ?? c.amount_applied ?? 0),
+    })),
+  };
 }
 
 export type CreditNoteRow = {
@@ -336,4 +403,38 @@ export async function createCreditNoteRefund(creditnoteId: string, body: unknown
   const id = (json.creditnote_refund as { creditnote_refund_id?: string } | undefined)?.creditnote_refund_id;
   if (!id) throw new Error("Zoho recorded the refund but returned no creditnote_refund_id");
   return id;
+}
+
+// ── reverting a payout's bookings (lib/finance/revert-payout.ts) ─────────────
+// Each read returns null when the document no longer exists in Zoho, so a
+// revert can be re-run after a partial failure without tripping on what it
+// already removed.
+
+const notFound = (e: unknown) => /HTTP 404|does not exist|not exist|code 1002|code 5/i.test((e as Error).message);
+
+export async function getCustomerPayment(id: string, accessToken: string): Promise<{
+  payment_id: string; payment_number: string; amount: number; date: string; reference_number: string;
+  account_name: string; customer_name: string; invoices: { invoice_number: string; amount_applied: number }[];
+} | null> {
+  try {
+    const json = await books("GET", `/customerpayments/${encodeURIComponent(id)}`, accessToken);
+    return (json.payment as never) ?? null;
+  } catch (e) { if (notFound(e)) return null; throw e; }
+}
+
+export async function getExpenseOrJournal(kind: "expenses" | "journals", id: string, accessToken: string) {
+  try { return await fetchDocument(kind, id, accessToken); } catch (e) { if (notFound(e)) return null; throw e; }
+}
+
+export async function deleteCustomerPayment(id: string, accessToken: string): Promise<void> {
+  await books("DELETE", `/customerpayments/${encodeURIComponent(id)}`, accessToken);
+}
+export async function deleteExpense(id: string, accessToken: string): Promise<void> {
+  await books("DELETE", `/expenses/${encodeURIComponent(id)}`, accessToken);
+}
+export async function deleteJournal(id: string, accessToken: string): Promise<void> {
+  await books("DELETE", `/journals/${encodeURIComponent(id)}`, accessToken);
+}
+export async function deleteCreditNote(id: string, accessToken: string): Promise<void> {
+  await books("DELETE", `/creditnotes/${encodeURIComponent(id)}`, accessToken);
 }

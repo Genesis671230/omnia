@@ -4,47 +4,35 @@
  *   1. header row: page tabs (Reconciliation, Bank Transactions, Insights) +
  *      search + export, right aligned, never overlapping what's below
  *   2. KPI strip (sticky with the header on desktop)
- *   3. filters: status pills (+ date range), then gateway multi-select chips
- *   4. one table for every filtered credit; a row opens the side drawer
+ *   3. one table card: its toolbar holds status tabs, gateway and date menus
+ *      and the unmatched-files toggle, so the rows get the screen
+ *   4. a row opens the side drawer
  *
  * Search, status and gateway filters run in memory. The DATE range stays
  * server-side: /api/reconcile matches over all data and filters its output,
  * because a payout can straddle the boundary. */
 
 import { useCallback, useMemo, useState } from "react";
-import { BarChart3, Check, ChevronDown, Download, Landmark, Loader2, RefreshCcw, Search, X } from "lucide-react";
+import { BarChart3, BookOpen, Building2, Library, Download, Landmark, Loader2, RefreshCcw, Search, X } from "lucide-react";
 import { matchesQuery } from "@/lib/reconciliation/filters";
 import { inStatus, type StatusFilter } from "@/lib/reconciliation/match-status";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
-import { gatewayColor } from "./colors";
 import { InsightsTab } from "./insights-tab";
+import { LedgerTab } from "./ledger-tab";
 import { BankTransactionsTab } from "./bank-transactions-tab";
 import { UnmatchedPayouts } from "./unmatched-payouts";
 import { ReconKpis } from "./recon-kpis";
 import { ReconGrid } from "./recon-grid";
 import { ReconDrawer } from "./recon-drawer";
+import { ReconToolbar, STATUS_TABS as STATUS } from "./recon-toolbar";
 import type { ReconLine, ReconPayload, UploadSlotFor } from "./types";
+import { useScreenZohoOrg, useZohoOrgs } from "@/components/finance/zoho/org-picker";
+import { BooksExplorer } from "@/components/finance/zoho/books-explorer";
 
-type PageTab = "recon" | "transactions" | "insights";
-
-const STATUS: { key: StatusFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "settled", label: "Settled" },
-  { key: "awaiting", label: "Awaiting" },
-  { key: "exceptions", label: "Exceptions" },
-  { key: "flagged", label: "Flagged" },
-];
+type PageTab = "recon" | "transactions" | "insights" | "ledger" | "books";
 
 // Spec order first; any other gateway present in the data follows.
 const GATEWAY_ORDER = ["Tabby", "Stripe", "Telr", "Tamara", "Checkout", "COD", "Shopify Payments"];
-
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const PRESETS: { label: string; range: () => [string, string] }[] = [
-  { label: "7d", range: () => [iso(new Date(Date.now() - 6 * 864e5)), iso(new Date())] },
-  { label: "30d", range: () => [iso(new Date(Date.now() - 29 * 864e5)), iso(new Date())] },
-  { label: "This month", range: () => { const n = new Date(); return [iso(new Date(n.getFullYear(), n.getMonth(), 1)), iso(n)]; } },
-  { label: "All", range: () => ["", ""] },
-];
 
 function ago(isoTime?: string) {
   if (!isoTime) return "";
@@ -71,10 +59,14 @@ export function ReconView({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [gateways, setGateways] = useState<Set<string>>(new Set()); // empty = all
-  const [gwMenu, setGwMenu] = useState(false);
+  const [showUnmatched, setShowUnmatched] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const { config: zohoConfig } = useZohoSettings();
+  // Which Zoho books the page is looking at: "all", or one organisation —
+  // filters the payouts and drives the Zoho Ledger tab.
+  const [books, setBooks] = useScreenZohoOrg("reconciliation-books", "all");
+  const { orgs } = useZohoOrgs();
 
   const lines = useMemo(() => recon?.lines ?? [], [recon]);
   const postings = recon?.zohoPostings ?? {};
@@ -87,9 +79,13 @@ export function ReconView({
   }, [lines]);
 
   // Search + gateway: the scope the KPIs, status counts and Insights describe.
+  const inBooks = useCallback(
+    (l: ReconLine) => books === "all" || (!!l.payout && (l.payout.zohoConnectionId || "env") === books),
+    [books],
+  );
   const scoped = useMemo(
-    () => lines.filter((l) => (gateways.size === 0 || gateways.has(l.provider)) && matchesQuery(l, query)),
-    [lines, gateways, query],
+    () => lines.filter((l) => inBooks(l) && (gateways.size === 0 || gateways.has(l.provider)) && matchesQuery(l, query)),
+    [lines, gateways, query, inBooks],
   );
   const asLine = (l: ReconLine) => ({ ...l, forceBook: l.forceBook ?? null });
   const counts = useMemo(() => Object.fromEntries(STATUS.map((s) => [s.key, scoped.filter((l) => inStatus(asLine(l), s.key)).length])) as Record<StatusFilter, number>, [scoped]);
@@ -129,46 +125,54 @@ export function ReconView({
     }
   };
 
-  const pill = (active: boolean) =>
-    `inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-      active ? "bg-[#1F1B16] text-[#FBF8F1]" : "bg-white text-[#5E564B] ring-1 ring-inset ring-[#EAE3D6] hover:text-[#1F1B16] hover:ring-[#D6CCBA]"
-    }`;
-
   return (
     <div className="space-y-4">
       {/* 1 + 2: header row and KPI strip, sticky together on desktop */}
-      <div className="z-30 -mx-2 space-y-3 bg-[#f8f8f8]/95 px-2 pb-3 pt-1 backdrop-blur md:sticky md:top-0">
+      <div className="z-30 -mx-2 space-y-3 bg-[#F1F3F7]/85 px-2 pb-3 pt-1 backdrop-blur md:sticky md:top-0">
         <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
-          <nav className="flex items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-inset ring-[#EAE3D6]" aria-label="Reconciliation sections">
-            {([["recon", "Reconciliation", RefreshCcw], ["transactions", "Bank Transactions", Landmark], ["insights", "Insights", BarChart3]] as const).map(([k, label, Icon]) => (
+          <nav className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-inset ring-[#D8E1F1]" aria-label="Reconciliation sections">
+            {([["recon", "Reconciliation", RefreshCcw], ["transactions", "Bank Transactions", Landmark], ["insights", "Insights", BarChart3], ["ledger", "Zoho Ledger", BookOpen], ["books", "Zoho Books", Library]] as const).map(([k, label, Icon]) => (
               <button
                 key={k}
                 onClick={() => setTab(k)}
                 aria-current={tab === k ? "page" : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${tab === k ? "bg-[#1F1B16] text-[#FBF8F1]" : "text-[#6B6358] hover:bg-[#FBF8F1] hover:text-[#1F1B16]"}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${tab === k ? "bg-[#0F1B3D] text-[#F3F6FC]" : "text-[#46546F] hover:bg-[#F3F6FC] hover:text-[#0F1B3D]"}`}
               >
                 <Icon size={13} aria-hidden /> {label}
               </button>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-3 pr-1 text-[12.5px] text-[#46546F] ring-1 ring-inset ring-[#D8E1F1]">
+            <Building2 size={13} className="text-[#1D4ED8]" aria-hidden /> Books
+            <select
+              value={books}
+              onChange={(e) => setBooks(e.target.value)}
+              aria-label="Zoho organisation"
+              className="h-8 rounded-full bg-[#EEF3FF] px-2.5 text-[12.5px] font-medium text-[#0F1B3D] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+            >
+              {tab !== "ledger" && tab !== "books" && <option value="all">All books</option>}
+              {orgs.filter((o) => o.status !== "disabled").map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+          {/* Search + export act on the payout rows; the Ledger tab has its own. */}
+          <div className={`flex items-center gap-2 ${tab === "ledger" || tab === "books" ? "hidden" : ""}`}>
             <label className="relative flex-1 md:w-72 md:flex-none">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8A8175]" aria-hidden />
+              <Search size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5E6B85]" aria-hidden />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search ref, order, amount…"
                 aria-label="Search credits"
-                className="h-9 w-full rounded-lg border-0 bg-white pl-8 pr-8 text-[13px] text-[#1F1B16] ring-1 ring-inset ring-[#EAE3D6] placeholder:text-[#B5AC98] focus:outline-none focus:ring-2 focus:ring-[#B08343]"
+                className="h-10 w-full rounded-full border-0 bg-white pl-9 pr-8 text-[13px] text-[#0F1B3D] ring-1 ring-inset ring-[#D8E1F1] placeholder:text-[#97A3BA] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
               />
               {query && (
-                <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#8A8175] hover:text-[#1F1B16]"><X size={13} /></button>
+                <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#5E6B85] hover:text-[#0F1B3D]"><X size={13} /></button>
               )}
             </label>
             <button
               onClick={exportXlsx}
               disabled={exporting || lines.length === 0}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#B08343] px-3 text-[12.5px] font-medium text-white transition-colors hover:bg-[#9A723A] disabled:opacity-60"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#0F1B3D] px-4 text-[12.5px] font-medium text-white transition-colors hover:bg-[#1E3A8A] disabled:opacity-60"
             >
               {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Export .xlsx
             </button>
@@ -184,72 +188,25 @@ export function ReconView({
 
       {tab === "insights" && <InsightsTab lines={scoped} />}
 
+      {tab === "ledger" && <LedgerTab org={books === "all" ? "env" : books} />}
+
+      {tab === "books" && <BooksExplorer org={books === "all" ? "env" : books} />}
+
       {tab === "recon" && (
         <>
-          {/* 3a: status + date range */}
-          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Status">
-              {STATUS.map((s) => (
-                <button key={s.key} onClick={() => setStatus(s.key)} aria-pressed={status === s.key} className={pill(status === s.key)}>
-                  {s.label}
-                  <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${status === s.key ? "bg-white/20" : "bg-[#F3EFE7] text-[#6B6358]"}`}>{counts[s.key] ?? 0}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
-              {PRESETS.map((p) => {
-                const [f, t] = p.range();
-                const active = f === fromDate && t === toDate;
-                return <button key={p.label} onClick={() => onRange(f, t)} className={`rounded-md px-2.5 py-1 font-medium ${active ? "bg-[#FBF3E6] text-[#6F5325] ring-1 ring-inset ring-[#E7D3B0]" : "text-[#6B6358] hover:bg-white"}`}>{p.label}</button>;
-              })}
-              <input type="date" value={fromDate} max={toDate || undefined} onChange={(e) => onRange(e.target.value, toDate)} aria-label="From date" className="h-8 rounded-md border-0 bg-white px-2 text-[12px] ring-1 ring-inset ring-[#EAE3D6] focus:outline-none focus:ring-2 focus:ring-[#B08343]" />
-              <span className="text-[#B5AC98]">to</span>
-              <input type="date" value={toDate} min={fromDate || undefined} onChange={(e) => onRange(fromDate, e.target.value)} aria-label="To date" className="h-8 rounded-md border-0 bg-white px-2 text-[12px] ring-1 ring-inset ring-[#EAE3D6] focus:outline-none focus:ring-2 focus:ring-[#B08343]" />
-            </div>
-          </div>
-
-          {/* 3b: gateways — chips on desktop, one dropdown on phones. None selected = all. */}
-          <div className="flex items-center gap-2">
-            <div className="hidden flex-wrap items-center gap-1.5 md:flex" role="group" aria-label="Gateways">
-              <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8175]">Gateway</span>
-              {gatewayOptions.map((g) => {
-                const on = gateways.has(g);
-                return (
-                  <button key={g} onClick={() => toggleGateway(g)} aria-pressed={on} className={pill(on)}>
-                    <i className="h-2 w-2 rounded-full" style={{ background: gatewayColor(g) }} aria-hidden />
-                    {g}
-                    {on && <Check size={12} aria-hidden />}
-                  </button>
-                );
-              })}
-              {gateways.size > 0 && <button onClick={() => setGateways(new Set())} className="ml-1 text-[12px] font-medium text-[#B08343] hover:underline">All gateways</button>}
-            </div>
-            <div className="relative w-full md:hidden">
-              <button onClick={() => setGwMenu((v) => !v)} aria-expanded={gwMenu} className="flex h-9 w-full items-center justify-between rounded-lg bg-white px-3 text-[13px] ring-1 ring-inset ring-[#EAE3D6]">
-                <span>{gateways.size === 0 ? "All gateways" : [...gateways].join(", ")}</span>
-                <ChevronDown size={14} className="text-[#8A8175]" />
-              </button>
-              {gwMenu && (
-                <div className="absolute left-0 right-0 z-20 mt-1 rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-[#EAE3D6]">
-                  {gatewayOptions.map((g) => (
-                    <button key={g} onClick={() => toggleGateway(g)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] hover:bg-[#FBF8F1]">
-                      <span className={`flex h-4 w-4 items-center justify-center rounded border ${gateways.has(g) ? "border-[#1F1B16] bg-[#1F1B16] text-white" : "border-[#D6CCBA]"}`}>{gateways.has(g) && <Check size={11} />}</span>
-                      <i className="h-2 w-2 rounded-full" style={{ background: gatewayColor(g) }} aria-hidden /> {g}
-                    </button>
-                  ))}
-                  <button onClick={() => { setGateways(new Set()); setGwMenu(false); }} className="mt-1 w-full rounded-lg px-2.5 py-2 text-left text-[12.5px] font-medium text-[#B08343] hover:bg-[#FBF8F1]">All gateways</button>
-                </div>
-              )}
-            </div>
-            <span className="ml-auto hidden shrink-0 text-[11.5px] text-[#8A8175] md:inline" title={recon?.computedAt}>
-              {recon?.refreshing ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Updating…</span> : recon?.computedAt ? `Updated ${ago(recon.computedAt)}` : null}
-            </span>
-          </div>
-
-          <UnmatchedPayouts payouts={recon?.unmatchedPayouts ?? []} refresh={refresh} />
-
           {/* 4: one table */}
           <ReconGrid
+            toolbar={
+              <ReconToolbar
+                status={status} onStatus={setStatus} counts={counts}
+                gatewayOptions={gatewayOptions} gateways={gateways} onToggleGateway={toggleGateway} onClearGateways={() => setGateways(new Set())}
+                fromDate={fromDate} toDate={toDate} onRange={onRange}
+                unmatchedCount={recon?.unmatchedPayouts?.length ?? 0} unmatchedOpen={showUnmatched} onToggleUnmatched={() => setShowUnmatched((v) => !v)}
+                shown={visible.length} total={lines.length}
+                updatedLabel={recon?.computedAt ? `updated ${ago(recon.computedAt)}` : ""} refreshing={!!recon?.refreshing}
+              />
+            }
+            above={showUnmatched ? <UnmatchedPayouts payouts={recon?.unmatchedPayouts ?? []} refresh={refresh} defaultOpen /> : undefined}
             lines={visible}
             loading={loading}
             postings={postings}

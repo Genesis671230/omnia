@@ -16,7 +16,9 @@ import type { PostingOptions } from "@/lib/integrations/zoho-settlement-posting"
 import type { OrderPublishResult, WirePublishResult } from "@/lib/finance/publish-settlements";
 import type { RefundResult } from "@/lib/finance/publish-refunds";
 import { ForceOrderPanel } from "./force-order-panel";
+import { Callout, FactChips } from "./callout";
 import { DeliveryChargesPanel } from "./delivery-charges-panel";
+import { BatchAdvisorPanel } from "./batch-advisor-panel";
 import {
   bankScaleFor,
   isCrossBorderCurrency,
@@ -25,6 +27,7 @@ import {
   suggestPostingAccounts,
   vatInclusiveSplit,
 } from "@/lib/finance/settlement-posting";
+import { ZohoOrgTag } from "@/components/finance/zoho/org-picker";
 
 /* Per-order proof, the products behind each order, and booking the payout
  * into Zoho.
@@ -69,19 +72,19 @@ type RowStatus =
 const PILL: Record<RowStatus["kind"], { cls: string; text: string }> = {
   booked:        { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "booked" },
   not_closed:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "not closed in Zoho" },
-  no_settlement: { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "no settlement record" },
+  no_settlement: { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "no settlement record" },
   planned:       { cls: "bg-[#E8F1F3] text-[#2E6B7A]", text: "preview ok" },
-  fee_pending:   { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "fee pending" },
-  unpaid:        { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "unpaid" },
+  fee_pending:   { cls: "bg-[#EAF1FD] text-[#946E1F]", text: "fee pending" },
+  unpaid:        { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "unpaid" },
   overdue:       { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "overdue in Zoho" },
-  stale:         { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "not re-checked" },
+  stale:         { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "not re-checked" },
   paid:          { cls: "bg-[#F0F5EF] text-[#4B7A54]", text: "paid" },
-  paid_external: { cls: "bg-[#F3EFE7] text-[#6F5325]", text: "paid by hand" },
-  review:        { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "needs review" },
+  paid_external: { cls: "bg-[#EEF2FA] text-[#1E3A8A]", text: "paid by hand" },
+  review:        { cls: "bg-[#EAF1FD] text-[#946E1F]", text: "needs review" },
   failed:        { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "failed" },
-  busy:          { cls: "bg-[#FBF0DB] text-[#946E1F]", text: "in progress" },
+  busy:          { cls: "bg-[#EAF1FD] text-[#946E1F]", text: "in progress" },
   no_invoice:    { cls: "bg-[#F9ECE7] text-[#A6472F]", text: "no invoice" },
-  load_failed:   { cls: "bg-[#F3EFE7] text-[#8A8175]", text: "couldn't check" },
+  load_failed:   { cls: "bg-[#EEF2FA] text-[#5E6B85]", text: "couldn't check" },
 };
 
 const bare = (ref: string) => ref.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
@@ -164,8 +167,8 @@ function OrderProducts({ order, missing }: { order: OrderDetail | undefined; mis
           ["Order total", aed2(num(order.gross_aed))],
         ].map(([k, v]) => (
           <div key={k as string} className="min-w-0">
-            <div className="text-[10.5px] uppercase tracking-wider text-[#8A8175]">{k}</div>
-            <div className="truncate text-[13px] font-medium text-[#1F1B16]">{v}</div>
+            <div className="text-[10.5px] uppercase tracking-wider text-[#5E6B85]">{k}</div>
+            <div className="truncate text-[13px] font-medium text-[#0F1B3D]">{v}</div>
           </div>
         ))}
       </div>
@@ -178,7 +181,7 @@ function OrderProducts({ order, missing }: { order: OrderDetail | undefined; mis
       )}
 
       {items.length === 0 ? (
-        <p className="text-[12.5px] text-[#8A8175]">
+        <p className="text-[12.5px] text-[#5E6B85]">
           No product lines were captured for this order at sync time.
         </p>
       ) : (
@@ -186,28 +189,28 @@ function OrderProducts({ order, missing }: { order: OrderDetail | undefined; mis
           {items.map((li, i) => {
             const { qty, total, unit } = itemFigures(li);
             return (
-              <div key={i} className="flex gap-3 rounded-lg border border-[#EAE3D6] bg-white p-2.5">
+              <div key={i} className="flex gap-3 rounded-lg border border-[#D8E1F1] bg-white p-2.5">
                 {li.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={li.image_url}
                     alt=""
                     loading="lazy"
-                    className="h-14 w-14 flex-shrink-0 rounded-md border border-[#EAE3D6] object-cover"
+                    className="h-14 w-14 flex-shrink-0 rounded-md border border-[#D8E1F1] object-cover"
                   />
                 ) : (
-                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-[#D6CCBA] text-[#D6CCBA]">
+                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-[#C9D5EA] text-[#C9D5EA]">
                     <Package size={18} />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[12.5px] font-medium leading-snug text-[#1F1B16]">{itemName(li)}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-[#8A8175]">{li.sku || "no SKU"}</p>
+                  <p className="line-clamp-2 text-[12.5px] font-medium leading-snug text-[#0F1B3D]">{itemName(li)}</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-[#5E6B85]">{li.sku || "no SKU"}</p>
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-2.5 text-[11.5px]">
-                    <span className="text-[#8A8175]">
+                    <span className="text-[#5E6B85]">
                       {qty} × <span className="tabular-nums">{unit ? aed2(unit) : "—"}</span>
                     </span>
-                    <span className="font-semibold tabular-nums text-[#1F1B16]">{total ? aed2(total) : "—"}</span>
+                    <span className="font-semibold tabular-nums text-[#0F1B3D]">{total ? aed2(total) : "—"}</span>
                     {typeof li.stock === "number" && (
                       <span
                         className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-medium ${
@@ -239,18 +242,26 @@ type LinkSuggestion = {
  *  carry the customer's phone). Suggests orders by phone and amount; any order
  *  can be searched or typed. Linking re-runs matching, so the line becomes a
  *  normal order row — confirmable and bookable. */
-function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: ReconTxn; onChanged?: () => void | Promise<void> }) {
-  const linked = t.orderNumber && t.orderNumber !== t.ref && t.orderNumber !== bare(t.ref) ? t.orderNumber : null;
+function LinkOrderPanel({ payoutId, t, fromOrder, context, onChanged }: {
+  payoutId: string;
+  /** The line on THIS payout (omit when fixing another payout's line via fromOrder). */
+  t?: ReconTxn;
+  /** Find the line on `payoutId` by the order it resolves to today. */
+  fromOrder?: string;
+  context?: React.ReactNode;
+  onChanged?: () => void | Promise<void>;
+}) {
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
-  const [data, setData] = useState<{ amount: number; suggestions: LinkSuggestion[] } | null>(null);
+  const [data, setData] = useState<{ ref: string; amount: number; linkedTo: string | null; currentOrder: string | null; suggestions: LinkSuggestion[] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
 
   const load = async (query = "") => {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({ payoutId, ref: t.ref, ...(query ? { q: query } : {}) });
+      const qs = new URLSearchParams({ payoutId, ...(t ? { ref: t.ref } : {}), ...(fromOrder ? { fromOrder } : {}), ...(query ? { q: query } : {}) });
       const res = await fetch(`/api/reconcile/ref-links?${qs}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -261,7 +272,11 @@ function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: Recon
       setLoading(false);
     }
   };
-  useEffect(() => { if (!linked) void load(); }, [payoutId, t.ref, linked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [payoutId, t?.ref, fromOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ref = data?.ref ?? t?.ref ?? "";
+  const current = data?.currentOrder ?? null;
+  const showPicker = !current || changing;
 
   const link = async (orderNumber: string) => {
     if (!orderNumber.trim()) return;
@@ -270,12 +285,18 @@ function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: Recon
       const res = await fetch("/api/reconcile/ref-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payoutId, ref: t.ref, orderNumber: orderNumber.trim() }),
+        body: JSON.stringify({ payoutId, ref, orderNumber: orderNumber.trim() }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      toast.success(`Line ${t.ref} linked to order #${json.orderNumber}`);
+      toast.success(
+        `Line ${ref} now pays order #${json.to}` +
+          (json.moved ? `. The Zoho booking of #${json.moved.orderNumber} moved to ${json.moved.toPayoutId}.` : "") +
+          " Re-check invoices, then Record or Force book to close it.",
+      );
+      setChanging(false);
       await onChanged?.();
+      await load();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -289,12 +310,13 @@ function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: Recon
       const res = await fetch("/api/reconcile/ref-links", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payoutId, ref: t.ref }),
+        body: JSON.stringify({ payoutId, ref }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      toast.success(`Line ${t.ref} unlinked`);
+      toast.success(`Line ${ref} unlinked`);
       await onChanged?.();
+      await load();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -302,87 +324,81 @@ function LinkOrderPanel({ payoutId, t, onChanged }: { payoutId: string; t: Recon
     }
   };
 
-  if (linked) {
-    return (
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#D5E3D2] bg-[#F5FAF4] px-3 py-2 text-[12.5px] text-[#1F1B16]">
-        <Link2 size={13} className="text-[#4B7A54]" />
-        Line <b className="font-mono">{t.ref}</b> is linked to order <b className="font-mono">#{linked}</b>.
-        <button
-          onClick={unlink}
-          disabled={busy === "unlink"}
-          className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-0.5 text-[11.5px] text-[#A6472F] hover:border-[#A6472F] disabled:opacity-50"
-        >
-          {busy === "unlink" ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />} Unlink
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2 rounded-lg border border-[#EBD3C9] bg-[#FDF6F3] px-3 py-2.5 text-[12.5px]">
-      <p className="leading-relaxed text-[#6F5325]">
-        <b className="font-mono text-[#1F1B16]">{t.ref}</b> isn&apos;t an order number
-        {data ? <> (AED {Math.abs(data.amount).toFixed(2)})</> : null}. Link it to the real order — it then books like any other order.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void load(q); }}
-            placeholder="Search order #, customer or phone"
-            className="h-8 w-60 border-[#D6CCBA] bg-white text-[12px]"
-          />
-          <button onClick={() => load(q)} className="inline-flex h-8 items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 text-[12px] hover:border-[#B08343]">
-            {loading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Search
-          </button>
-        </div>
-        <div className="flex items-center gap-1">
-          <Input
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void link(typed); }}
-            placeholder="or type order #"
-            className="h-8 w-32 border-[#D6CCBA] bg-white text-[12px]"
-          />
-          <button
-            onClick={() => link(typed)}
-            disabled={!typed.trim() || !!busy}
-            className="inline-flex h-8 items-center gap-1 rounded-md bg-[#6F5325] px-2.5 text-[12px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:bg-[#B8B0A0]"
-          >
-            <Link2 size={12} /> Link
-          </button>
-        </div>
-      </div>
+    <div className="mb-3 space-y-2 rounded-xl border border-[#E7DCC8] bg-white px-3.5 py-3 text-[12.5px]">
+      {context && <div className="leading-relaxed text-[#1E3A8A]">{context}</div>}
       {loading && !data ? (
-        <span className="inline-flex items-center gap-1.5 text-[#8A8175]"><Loader2 size={12} className="animate-spin" /> Finding likely orders…</span>
-      ) : data && data.suggestions.length === 0 ? (
-        <p className="text-[#8A8175]">No order with this phone or amount — search or type the order number.</p>
-      ) : data ? (
-        <ul className="divide-y divide-[#EBD3C9] rounded-md border border-[#EBD3C9] bg-white">
-          {data.suggestions.map((o) => (
-            <li key={o.orderNumber} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5">
-              <span className="font-mono font-medium text-[#1F1B16]">#{o.orderNumber}</span>
-              <span className="text-[#6F5325]">{o.customer || "—"}</span>
-              <span className="font-mono text-[11px] text-[#8A8175]">{o.phone}</span>
-              <span className="tabular-nums text-[#1F1B16]">{aed2(o.amount)}</span>
-              {o.date && <span className="text-[#8A8175]">{new Date(o.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
-              <span className="text-[11px] text-[#8A8175]">{o.store} · {o.gateway}</span>
-              {o.reasons.filter((x) => x !== "search").map((x) => (
-                <span key={x} className="rounded-full bg-[#E8F1F3] px-1.5 py-0.5 text-[10.5px] text-[#2E6B7A]">{x}</span>
-              ))}
-              {o.alreadySettled && <span className="rounded-full bg-[#FBF0DB] px-1.5 py-0.5 text-[10.5px] text-[#946E1F]" title="This order is already settled by another payout">already settled</span>}
-              <button
-                onClick={() => link(o.orderNumber)}
-                disabled={!!busy}
-                className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-0.5 text-[11.5px] font-medium hover:border-[#B08343] disabled:opacity-50"
-              >
-                {busy === o.orderNumber ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />} Link
+        <span className="inline-flex items-center gap-1.5 text-[#5E6B85]"><Loader2 size={12} className="animate-spin" /> Reading the payout line…</span>
+      ) : current ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link2 size={13} className="text-[#4B7A54]" aria-hidden />
+          <span>
+            Line <b className="font-mono">{ref}</b>{fromOrder ? <> on <b className="font-mono">{payoutId}</b></> : null} pays order <b className="font-mono">#{current}</b>
+            {data?.linkedTo ? " (linked by hand)" : " (matched by number)"}{data ? <> · AED {Math.abs(data.amount).toFixed(2)}</> : null}
+          </span>
+          <span className="ml-auto flex items-center gap-1.5">
+            <button onClick={() => setChanging((v) => !v)} className="inline-flex items-center gap-1 rounded-full bg-[#0F1B3D] px-2.5 py-1 text-[11.5px] font-medium text-[#F3F6FC] hover:bg-[#35302A]">
+              <Link2 size={11} /> {changing ? "Cancel" : "Change order"}
+            </button>
+            {data?.linkedTo && (
+              <button onClick={unlink} disabled={busy === "unlink"} className="inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[11.5px] text-[#A6472F] hover:border-[#A6472F] disabled:opacity-50">
+                {busy === "unlink" ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />} Unlink
               </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            )}
+          </span>
+        </div>
+      ) : (
+        <p className="leading-relaxed text-[#1E3A8A]">
+          <b className="font-mono text-[#0F1B3D]">{ref}</b> isn&apos;t an order number
+          {data ? <> (AED {Math.abs(data.amount).toFixed(2)})</> : null}. Link it to the real order; it then books like any other order.
+        </p>
+      )}
+      {showPicker && data && (
+        <>
+          {current && (
+            <p className="text-[11.5px] leading-relaxed text-[#5E6B85]">
+              Pick the order this line really paid. If #{current} was already booked in Zoho from here, that booking moves to the payout where #{current} truly appears; if it appears nowhere else, the change is refused.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void load(q); }} placeholder="Search order #, customer or phone" className="h-8 w-60 border-[#C9D5EA] bg-white text-[12px]" />
+              <button onClick={() => load(q)} className="inline-flex h-8 items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 text-[12px] hover:border-[#1D4ED8]">
+                {loading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Search
+              </button>
+            </div>
+            <div className="flex items-center gap-1">
+              <Input value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void link(typed); }} placeholder="or type order #" className="h-8 w-32 border-[#C9D5EA] bg-white text-[12px]" />
+              <button onClick={() => link(typed)} disabled={!typed.trim() || !!busy} className="inline-flex h-8 items-center gap-1 rounded-md bg-[#1E3A8A] px-2.5 text-[12px] font-medium text-[#F3F6FC] hover:bg-[#5A4320] disabled:bg-[#9AA6BD]">
+                <Link2 size={12} /> Link
+              </button>
+            </div>
+          </div>
+          {data.suggestions.length === 0 ? (
+            <p className="text-[#5E6B85]">No order with this phone or amount. Search or type the order number.</p>
+          ) : (
+            <ul className="divide-y divide-[#F0E6D6] rounded-lg border border-[#F0E6D6] bg-[#FFFDF9]">
+              {data.suggestions.map((o) => (
+                <li key={o.orderNumber} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5">
+                  <span className="font-mono font-medium text-[#0F1B3D]">#{o.orderNumber}</span>
+                  <span className="text-[#1E3A8A]">{o.customer || "—"}</span>
+                  <span className="font-mono text-[11px] text-[#5E6B85]">{o.phone}</span>
+                  <span className="tabular-nums text-[#0F1B3D]">{aed2(o.amount)}</span>
+                  {o.date && <span className="text-[#5E6B85]">{new Date(o.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                  <span className="text-[11px] text-[#5E6B85]">{o.store} · {o.gateway}</span>
+                  {o.reasons.filter((x) => x !== "search").map((x) => (
+                    <span key={x} className="rounded-full bg-[#E8F1F3] px-1.5 py-0.5 text-[10.5px] text-[#2E6B7A]">{x}</span>
+                  ))}
+                  {o.alreadySettled && <span className="rounded-full bg-[#EAF1FD] px-1.5 py-0.5 text-[10.5px] text-[#946E1F]" title="This order is already settled by another payout">already settled</span>}
+                  <button onClick={() => link(o.orderNumber)} disabled={!!busy} className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-0.5 text-[11.5px] font-medium hover:border-[#1D4ED8] disabled:opacity-50">
+                    {busy === o.orderNumber ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />} {current ? "Use this order" : "Link"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -550,11 +566,11 @@ function RefundsPanel({
   };
 
   return (
-    <div className="mt-2.5 rounded-lg border border-[#EAE3D6] bg-white px-3 py-2.5 text-[12.5px]">
+    <div className="mt-2.5 rounded-lg border border-[#D8E1F1] bg-white px-3 py-2.5 text-[12.5px]">
       <div className="flex flex-wrap items-center gap-2">
-        <Undo2 size={13} className="text-[#6F5325]" />
-        <span className="font-medium text-[#1F1B16]">Refunds on this payout</span>
-        <span className="text-[#8A8175]">
+        <Undo2 size={13} className="text-[#1E3A8A]" />
+        <span className="font-medium text-[#0F1B3D]">Refunds on this payout</span>
+        <span className="text-[#5E6B85]">
           one full refund from {depositName || "the deposit account"} closes the credit note · returned fee: Dr {depositName || "clearing"} / Cr {accountName(feeRefundAccountId) || "gateway charges"}, same reference · extra charges to {feeName || "gateway charges"}
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-2">
@@ -562,7 +578,7 @@ function RefundsPanel({
             onClick={() => loadLive()}
             disabled={!!busy}
             title="Read every refund's credit note from Zoho now: total, refunds against it, open balance"
-            className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[11.5px] hover:border-[#1D4ED8] disabled:opacity-50"
           >
             {busy === "live" ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} {live ? "Re-check credit notes" : "Check credit notes in Zoho"}
           </button>
@@ -571,14 +587,14 @@ function RefundsPanel({
               <button
                 onClick={() => run(true)}
                 disabled={!!busy || !depositAccountId}
-                className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[11.5px] hover:border-[#1D4ED8] disabled:opacity-50"
               >
                 {busy === "preview" ? <Loader2 size={11} className="animate-spin" /> : <Eye size={11} />} Preview
               </button>
               <button
                 onClick={() => run(false)}
                 disabled={!!busy || !depositAccountId}
-                className="inline-flex items-center gap-1 rounded-md bg-[#6F5325] px-2.5 py-1 text-[11.5px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:bg-[#B8B0A0]"
+                className="inline-flex items-center gap-1 rounded-md bg-[#1E3A8A] px-2.5 py-1 text-[11.5px] font-medium text-[#F3F6FC] hover:bg-[#5A4320] disabled:bg-[#9AA6BD]"
               >
                 {busy === "post" ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
                 Book {pending.length} refund{pending.length === 1 ? "" : "s"}
@@ -596,8 +612,8 @@ function RefundsPanel({
           />
         </div>
       )}
-      {!r.confirmedBy && <p className="mt-1 text-[11.5px] text-[#8A8175]">Confirm the settlement to book refunds.</p>}
-      {liveAt && <p className="mt-1 text-[11px] text-[#8A8175]">Credit notes as Zoho had them at {new Date(liveAt).toLocaleTimeString()}.</p>}
+      {!r.confirmedBy && <p className="mt-1 text-[11.5px] text-[#5E6B85]">Confirm the settlement to book refunds.</p>}
+      {liveAt && <p className="mt-1 text-[11px] text-[#5E6B85]">Credit notes as Zoho had them at {new Date(liveAt).toLocaleTimeString()}.</p>}
       <ul className="mt-1.5 space-y-1.5">
         {rows.map((x) => {
           const res = resultFor(x.ref);
@@ -605,14 +621,14 @@ function RefundsPanel({
           const cnErr = live?.[x.ref] && !cn ? (live[x.ref] as { error: string }).error : null;
           const open = cn ? cn.balance : null;
           return (
-            <li key={x.ref} className="rounded-md border border-transparent px-1 py-0.5 hover:border-[#EAE3D6]">
+            <li key={x.ref} className="rounded-md border border-transparent px-1 py-0.5 hover:border-[#D8E1F1]">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-                <span className="font-mono text-[#1F1B16]">#{x.ref}</span>
-                {x.orderNumber && x.orderNumber !== x.ref && <span className="text-[#8A8175]">→ #{x.orderNumber}</span>}
+                <span className="font-mono text-[#0F1B3D]">#{x.ref}</span>
+                {x.orderNumber && x.orderNumber !== x.ref && <span className="text-[#5E6B85]">→ #{x.orderNumber}</span>}
                 {x.amount >= 0.01 ? (
                   <span className="tabular-nums text-[#A6472F]" title="The full amount refunded to the customer — the credit note">refund −{aed2(x.amount)}</span>
                 ) : (
-                  <span className="text-[11px] text-[#8A8175]">charge only · no credit note</span>
+                  <span className="text-[11px] text-[#5E6B85]">charge only · no credit note</span>
                 )}
                 {Math.abs(x.charge) >= 0.01 && (
                   <span
@@ -643,7 +659,7 @@ function RefundsPanel({
                   <button
                     onClick={() => void restructure(x, true)}
                     title="Check this refund's entries against the house model — one full refund, plus the returned fee as Dr clearing / Cr gateway charges (and Input VAT when the fee carried VAT), same reference — and fix what differs"
-                    className="inline-flex items-center gap-1 rounded-full border border-[#B08343] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#6F5325] hover:bg-[#FBF3E6]"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#1D4ED8] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#1E3A8A] hover:bg-[#EAF1FD]"
                   >
                     <RefreshCw size={10} /> Check / fix entries
                   </button>
@@ -658,14 +674,14 @@ function RefundsPanel({
                 )}
               </div>
               {cn && (
-                <div className="mt-0.5 pl-4 text-[11.5px] text-[#6F6457]">
+                <div className="mt-0.5 pl-4 text-[11.5px] text-[#46546F]">
                   <span className="font-mono">{cn.number}</span> · {cn.date} · {cn.status} · total <b className="tabular-nums">{aed2(cn.total)}</b>
                   {" "}· refunded <b className="tabular-nums">{aed2(cn.total - cn.balance)}</b>
                   {" "}· open <b className={`tabular-nums ${cn.balance > 0.009 ? "text-[#A6472F]" : "text-[#4B7A54]"}`}>{aed2(cn.balance)}</b>
                   {cn.refunds.length > 0 && (
                     <ul className="mt-0.5 space-y-0.5">
                       {cn.refunds.map((f) => (
-                        <li key={f.id} className="text-[11px] text-[#8A8175]">
+                        <li key={f.id} className="text-[11px] text-[#5E6B85]">
                           ↳ {f.date} · <span className="tabular-nums">{aed2(f.amount)}</span> · {f.mode || "refund"}
                           {f.reference ? <> · <span className="font-mono">{f.reference}</span></> : null}
                           {f.description ? <> · {f.description}</> : null}
@@ -676,14 +692,14 @@ function RefundsPanel({
                 </div>
               )}
               {cnErr && <div className="pl-4 text-[11px] text-[#A6472F]">Couldn&apos;t read the credit note: {cnErr}</div>}
-              {x.booked && x.creditNoteReused && !cn && <div className="pl-4 text-[11px] text-[#8A8175]">used an existing open credit note</div>}
+              {x.booked && x.creditNoteReused && !cn && <div className="pl-4 text-[11px] text-[#5E6B85]">used an existing open credit note</div>}
               {(res?.message || (!res && !isDone(x) && x.error)) && (
-                <div className="pl-4 text-[11.5px] text-[#6F5325]">{res?.message ?? x.error}</div>
+                <div className="pl-4 text-[11.5px] text-[#1E3A8A]">{res?.message ?? x.error}</div>
               )}
               {restructuring === x.ref && restructurePlan && (
-                <div className="mt-1.5 ml-4 rounded-lg border border-[#D6CCBA] bg-[#FBF8F1] p-2.5 text-[12px] text-[#1F1B16]">
+                <div className="mt-1.5 ml-4 rounded-lg border border-[#C9D5EA] bg-[#F3F6FC] p-2.5 text-[12px] text-[#0F1B3D]">
                   <div className="font-semibold">Restructure {restructurePlan.creditNote.number} (total {aed2(restructurePlan.creditNote.total)})</div>
-                  <ul className="mt-1 space-y-0.5 text-[11.5px] text-[#6F6457]">
+                  <ul className="mt-1 space-y-0.5 text-[11.5px] text-[#46546F]">
                     {restructurePlan.delete.map((d) => (
                       <li key={d.id}>Delete refund {aed2(d.amount)} · <span className="font-mono">{d.reference}</span></li>
                     ))}
@@ -696,15 +712,15 @@ function RefundsPanel({
                         {" "}/ Cr {accountName(restructurePlan.journal.credit)} <b>{aed2(restructurePlan.journal.charges)}</b>
                         {restructurePlan.journal.vat > 0 ? (
                           <> / Cr Input VAT <b>{aed2(restructurePlan.journal.vat)}</b>
-                            <span className="text-[#8A8175]"> ({restructurePlan.journal.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span></>
-                        ) : <span className="text-[#8A8175]"> · no VAT on this order&apos;s fee</span>}
+                            <span className="text-[#5E6B85]"> ({restructurePlan.journal.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span></>
+                        ) : <span className="text-[#5E6B85]"> · no VAT on this order&apos;s fee</span>}
                       </li>
                     )}
                     {restructurePlan.journalVatFix && (
                       <li>
                         Correct the returned-fee journal in place (same reference): Cr {accountName(feeRefundAccountId) || "gateway charges"} <b>{aed2(restructurePlan.journalVatFix.charges)}</b>
                         {" "}+ Cr Input VAT <b>{aed2(restructurePlan.journalVatFix.vat)}</b> instead of {aed2(restructurePlan.journalVatFix.amount)} to charges
-                        <span className="text-[#8A8175]"> ({restructurePlan.journalVatFix.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span>
+                        <span className="text-[#5E6B85]"> ({restructurePlan.journalVatFix.vatBasis === "original_fee" ? "this order's fee was booked with VAT" : "AED payout, VAT-inclusive fee"})</span>
                       </li>
                     )}
                     {!restructurePlan.refund && !restructurePlan.journal && !restructurePlan.journalVatFix && restructurePlan.delete.length === 0 && (
@@ -714,7 +730,7 @@ function RefundsPanel({
                   </ul>
                   <div className="mt-2 flex justify-end gap-2">
                     <button onClick={() => { setRestructuring(null); setRestructurePlan(null); }} disabled={busy === "restructure"}
-                      className="rounded-md border border-[#D6CCBA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
+                      className="rounded-md border border-[#C9D5EA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
                     <button onClick={() => void restructure(x, false)}
                       disabled={busy === "restructure" || (!restructurePlan.refund && !restructurePlan.journal && !restructurePlan.journalVatFix && restructurePlan.delete.length === 0)}
                       className="inline-flex items-center gap-1 rounded-md bg-[#A6472F] px-2.5 py-1 text-[11.5px] font-medium text-white disabled:opacity-50">
@@ -787,45 +803,45 @@ function CloseCreditNotePanel({ r, row, cn, accounts, depositAccountId, feeRefun
   };
 
   return (
-    <div className="mt-1.5 ml-4 rounded-lg border border-[#D6CCBA] bg-[#FBF8F1] p-2.5 text-[12px]">
-      <div className="mb-1.5 font-semibold text-[#1F1B16]">
+    <div className="mt-1.5 ml-4 rounded-lg border border-[#C9D5EA] bg-[#F3F6FC] p-2.5 text-[12px]">
+      <div className="mb-1.5 font-semibold text-[#0F1B3D]">
         Close {cn.number} · AED {cn.balance.toFixed(2)} open
       </div>
       <div className="space-y-1.5">
         {parts.map((p, i) => (
           <div key={i} className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(180px,1.2fr)_110px_minmax(180px,2fr)_auto] sm:items-end">
             <AccountSelect label={`Part ${i + 1} · refunded from`} value={p.accountId} onChange={(v) => set(i, { accountId: v })} placeholder="Select account…" options={accounts} />
-            <label className="text-[11px] text-[#6F6457]">
+            <label className="text-[11px] text-[#46546F]">
               Amount
               <input value={p.amount} inputMode="decimal" onChange={(e) => set(i, { amount: e.target.value })}
-                className="mt-1 w-full rounded-md border border-[#D6CCBA] bg-white px-2 py-1.5 text-right font-mono text-[12px]" />
+                className="mt-1 w-full rounded-md border border-[#C9D5EA] bg-white px-2 py-1.5 text-right font-mono text-[12px]" />
             </label>
-            <label className="text-[11px] text-[#6F6457]">
+            <label className="text-[11px] text-[#46546F]">
               Description
               <input value={p.description} maxLength={500} onChange={(e) => set(i, { description: e.target.value })}
-                className="mt-1 w-full rounded-md border border-[#D6CCBA] bg-white px-2 py-1.5 text-[12px]" />
+                className="mt-1 w-full rounded-md border border-[#C9D5EA] bg-white px-2 py-1.5 text-[12px]" />
             </label>
-            <button onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))} className="pb-1.5 text-[11px] text-[#8A8175] underline">remove</button>
+            <button onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))} className="pb-1.5 text-[11px] text-[#5E6B85] underline">remove</button>
           </div>
         ))}
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <button
           onClick={() => setParts((ps) => [...ps, { accountId: "", amount: Math.max(0, left).toFixed(2), description: `${r.provider} refund · order ${order}` }])}
-          className="rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px]"
+          className="rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[11.5px]"
         >
           + Add part
         </button>
-        <label className="text-[11px] text-[#6F6457]">
+        <label className="text-[11px] text-[#46546F]">
           Refund date
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ml-1.5 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[12px]" />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="ml-1.5 rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[12px]" />
         </label>
-        <span className="text-[11.5px] text-[#6F5325]">
+        <span className="text-[11.5px] text-[#1E3A8A]">
           Refunding <b className="tabular-nums">{aed2(total)}</b> · leaves <b className={`tabular-nums ${Math.abs(left) < 0.01 ? "text-[#4B7A54]" : "text-[#A6472F]"}`}>{aed2(Math.max(left, 0))}</b> open
         </span>
         <span className="ml-auto flex items-center gap-2">
           {problem && <span className="text-[11.5px] text-[#A6472F]">{problem}</span>}
-          <button onClick={onCancel} disabled={busy} className="rounded-md border border-[#D6CCBA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
+          <button onClick={onCancel} disabled={busy} className="rounded-md border border-[#C9D5EA] bg-white px-2.5 py-1 text-[11.5px]">Cancel</button>
           <button onClick={submit} disabled={busy || !!problem}
             className="inline-flex items-center gap-1 rounded-md bg-[#A6472F] px-2.5 py-1 text-[11.5px] font-medium text-white disabled:opacity-50">
             {busy ? <Loader2 size={11} className="animate-spin" /> : <Gavel size={11} />} Post {parts.length} refund{parts.length === 1 ? "" : "s"} in Zoho
@@ -841,8 +857,10 @@ function CloseCreditNotePanel({ r, row, cn, accounts, depositAccountId, feeRefun
 function ProofRow({
   t, order, missing, open, onToggle, status, originalCurrency, showSelectColumn,
   canSelect, selected, onSelectToggle, onRecordOne, busy, crossBorder, splitFigure, feeFigure,
-  invoiceAmount, colCount, linkPanel, forcePanel, onForce, invoiceNote,
+  invoiceAmount, colCount, linkPanel, linkLabel, forcePanel, onForce, invoiceNote,
 }: {
+  /** Button text for the link control, e.g. "Fix other payout". */
+  linkLabel?: string;
   /** "2 Zoho invoices · 1 open" when the order number carries several. */
   invoiceNote?: string;
   /** Inline "force book this order" panel; shown instead of the products while set. */
@@ -881,9 +899,9 @@ function ProofRow({
   return (
     <>
       <tr
-        className={`border-t border-[#EAE3D6] transition-colors hover:bg-[#FBF3E6] ${
-          open ? "bg-[#FBF3E6]" : ""
-        } ${t.isRefund ? "text-[#8A8175]" : "text-[#1F1B16]"}`}
+        className={`border-t border-[#D8E1F1] transition-colors hover:bg-[#EAF1FD] ${
+          open ? "bg-[#EAF1FD]" : ""
+        } ${t.isRefund ? "text-[#5E6B85]" : "text-[#0F1B3D]"}`}
       >
         {showSelectColumn && (
           <td className="w-8 px-2 py-2" onClick={(e) => e.stopPropagation()}>
@@ -894,7 +912,7 @@ function ProofRow({
           <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px]">
             <ChevronRight
               size={13}
-              className="text-[#8A8175] transition-transform"
+              className="text-[#5E6B85] transition-transform"
               style={{ transform: open ? "rotate(90deg)" : "none" }}
             />
             #{t.ref}
@@ -906,13 +924,13 @@ function ProofRow({
           </span>
         </td>
         {originalCurrency && (
-          <td className="cursor-pointer px-3 py-2 text-right font-mono tabular-nums text-[#8A8175]" onClick={onToggle}>
+          <td className="cursor-pointer px-3 py-2 text-right font-mono tabular-nums text-[#5E6B85]" onClick={onToggle}>
             {t.netOriginal != null ? fmtOriginal(t.netOriginal, originalCurrency) : "—"}
           </td>
         )}
         <td className="cursor-pointer px-3 py-2 text-right font-mono tabular-nums" onClick={onToggle}>{aed2(t.grossShare)}</td>
         <td
-          className="cursor-pointer px-3 py-2 text-right font-mono tabular-nums text-[#6F5325]"
+          className="cursor-pointer px-3 py-2 text-right font-mono tabular-nums text-[#1E3A8A]"
           onClick={onToggle}
           title={
             invoiceAmount == null
@@ -935,7 +953,7 @@ function ProofRow({
         </td>
         <td
           className={`cursor-pointer px-3 py-2 text-right font-mono tabular-nums ${
-            crossBorder && splitFigure != null && splitFigure < 0 ? "text-[#4B7A54]" : "text-[#8A8175]"
+            crossBorder && splitFigure != null && splitFigure < 0 ? "text-[#4B7A54]" : "text-[#5E6B85]"
           }`}
           onClick={onToggle}
           title={crossBorder ? "Invoice − fee − AED received at the bank's rate. Positive = loss." : "VAT on the gateway fee, claimed as input VAT"}
@@ -946,7 +964,7 @@ function ProofRow({
         <td className="px-3 py-2 text-right">
           <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
             {t.isRefund && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE7] px-2 py-0.5 text-[11px] font-medium text-[#8A8175]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF2FA] px-2 py-0.5 text-[11px] font-medium text-[#5E6B85]">
                 <RotateCcw size={10} /> refund
               </span>
             )}
@@ -963,12 +981,13 @@ function ProofRow({
                 <Gavel size={10} /> Force book
               </button>
             )}
-            {linkPanel && !t.orderNumber && !open && (
+            {linkPanel && !open && (
               <button
                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
-                className="inline-flex items-center gap-1 rounded-full border border-[#B08343] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#6F5325] hover:bg-[#FBF3E6]"
+                title={t.orderNumber ? "Change which order this payout line pays" : "Link this line to its order"}
+                className="inline-flex items-center gap-1 rounded-full border border-[#1D4ED8] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#1E3A8A] hover:bg-[#EAF1FD]"
               >
-                <Link2 size={10} /> Link order
+                <Link2 size={10} /> {linkLabel ?? (t.orderNumber ? "Change order" : "Link order")}
               </button>
             )}
             {canSelect && (
@@ -976,7 +995,7 @@ function ProofRow({
                 onClick={(e) => { e.stopPropagation(); onRecordOne(); }}
                 disabled={busy}
                 title="Book this order in Zoho: payment, fee, and any FX difference"
-                className="inline-flex items-center gap-1 rounded-full border border-[#D6CCBA] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-full border border-[#C9D5EA] bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-[#0F1B3D] transition-colors hover:border-[#1D4ED8] hover:text-[#1E3A8A] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <BadgeCheck size={10} /> Record
               </button>
@@ -986,12 +1005,12 @@ function ProofRow({
       </tr>
       {forcePanel && (
         <tr>
-          <td colSpan={colCount} className="border-t border-[#EAE3D6] bg-[#FBF8F1] px-4 py-3">{forcePanel}</td>
+          <td colSpan={colCount} className="border-t border-[#D8E1F1] bg-[#F3F6FC] px-4 py-3">{forcePanel}</td>
         </tr>
       )}
       {open && !forcePanel && (
         <tr>
-          <td colSpan={colCount} className="border-t border-[#EAE3D6] bg-[#FBF8F1] px-4 py-3">
+          <td colSpan={colCount} className="border-t border-[#D8E1F1] bg-[#F3F6FC] px-4 py-3">
             {linkPanel}
             {(!linkPanel || t.orderNumber) && <OrderProducts order={order} missing={missing} />}
           </td>
@@ -1015,12 +1034,12 @@ export function AccountSelect({ label, hint, value, onChange, options, placehold
   const NONE = "__none__";
   return (
     <label className="flex min-w-0 flex-col gap-1">
-      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">
+      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">
         {label}
-        {hint && <span className="ml-1 font-normal normal-case tracking-normal text-[#B8B0A0]">{hint}</span>}
+        {hint && <span className="ml-1 font-normal normal-case tracking-normal text-[#9AA6BD]">{hint}</span>}
       </span>
       <Select value={value || (allowNone ? NONE : "")} onValueChange={(v) => onChange(v === NONE ? "" : v)}>
-        <SelectTrigger className={`h-8 w-full border-[#D6CCBA] text-[12px] ${!value && !allowNone ? "text-[#A6472F]" : ""}`}>
+        <SelectTrigger className={`h-8 w-full border-[#C9D5EA] text-[12px] ${!value && !allowNone ? "text-[#A6472F]" : ""}`}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -1133,7 +1152,9 @@ export function GatewayProof({ r, live, onChanged }: {
   });
   const prefsKey = `omnia.gatewayPosting.${r.provider}.${currency ?? "AED"}`;
 
-  const sum = +txns.reduce((s, t) => s + t.netShare, 0).toFixed(2);
+  // COD vouchers: courier charges come out of the remittance, not out of any order.
+  const deliveryTotal = +(r.payout?.deliveryCharges ?? []).reduce((s, c) => s + c.amount, 0).toFixed(2);
+  const sum = +(txns.reduce((s, t) => s + t.netShare, 0) - deliveryTotal).toFixed(2);
   const foots = Math.abs(sum - net) < 0.01;
   const refunds = txns.filter((t) => t.isRefund).length;
   const netOriginalTotal = txns.reduce((s, t) => s + (t.netOriginal ?? 0), 0);
@@ -1200,7 +1221,7 @@ export function GatewayProof({ r, live, onChanged }: {
         setSetupError(`Couldn't load settlement records: ${(e as Error).message}`);
       });
 
-    const optionsP = fetch("/api/settlements/posting-options")
+    const optionsP = fetch(`/api/settlements/posting-options?bankLineId=${encodeURIComponent(r.id)}`)
       .then(async (x) => {
         const d = await x.json();
         if (!x.ok) throw new Error(d.error || `HTTP ${x.status}`);
@@ -1534,13 +1555,21 @@ export function GatewayProof({ r, live, onChanged }: {
     setRefreshingInvoices(true);
     try {
       const res = await fetch(`/api/reconcile/line/${encodeURIComponent(r.id)}/invoices?refresh=1`);
-      const d = (await res.json()) as { statuses?: Record<string, InvoiceStatus>; fetched?: number; error?: string };
+      const d = (await res.json()) as {
+        statuses?: Record<string, InvoiceStatus>; fetched?: number; error?: string;
+        missingDocs?: { orderNumber: string; kind: "fee" | "fx"; id: string }[];
+      };
       if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
       setInvoiceByRef(d.statuses ?? {});
       setInvoiceMeta({ fetched: d.fetched ?? 0, cached: 0 });
       setInvoicesChecked(true);
       setRefundCheck((n) => n + 1);
       toast.success(`Read ${d.fetched ?? 0} invoice${d.fetched === 1 ? "" : "s"} from Zoho.`);
+      if (d.missingDocs?.length) {
+        const list = d.missingDocs.map((m) => `#${m.orderNumber} ${m.kind === "fee" ? "fee" : "exchange"}`).join(", ");
+        toast.warning(`Deleted in Zoho, now re-bookable: ${list}. Select them and book again.`, { duration: 12000 });
+        onChanged?.();
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -1587,37 +1616,54 @@ export function GatewayProof({ r, live, onChanged }: {
         .filter((x): x is { t: ReconTxn; st: RowStatus } => !!x.st && ATTENTION.has(x.st.kind))
     : [];
   const attentionSelectable = attention.filter((x) => postableSet.has(x.t.ref)).map((x) => x.t.ref);
-  const th = "px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]";
+  const th = "px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]";
 
   return (
-    <div className="mb-3.5 rounded-xl border border-[#EAE3D6] bg-[#FBF8F1] p-3.5">
+    <div className="mb-3.5 rounded-xl border border-[#D8E1F1] bg-[#F3F6FC] p-3.5">
       <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {/* which set of books this payout closes invoices in (multi-org) */}
+        <span className="mr-auto"><ZohoOrgTag connectionId={r.payout?.zohoConnectionId} /></span>
         <button
           onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-2.5 py-1 text-[12px] font-medium text-[#1F1B16] transition-colors hover:border-[#B08343] hover:text-[#6F5325]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-white px-2.5 py-1 text-[12px] font-medium text-[#0F1B3D] transition-colors hover:border-[#1D4ED8] hover:text-[#1E3A8A]"
         >
           <Download size={12} /> Export CSV
         </button>
       </div>
 
-      <p className="mb-2 text-[13px] leading-relaxed text-[#1F1B16]">
-        {foots ? (
-          <>
-            All <b>{txns.length}</b> order{txns.length === 1 ? "" : "s"} in this payout add up to the{" "}
-            <b className="tabular-nums">{aed2(net)}</b> {crossBorder && Math.abs(r.bankAmount - net) >= 0.01 ? "the payout file shows" : "the bank credited"}.
-          </>
-        ) : (
-          <>
-            These orders add up to <b className="tabular-nums">{aed2(sum)}</b>, but the payout file totals{" "}
-            <b className="tabular-nums">{aed2(net)}</b> — a <b className="tabular-nums">{aed2(Math.abs(sum - net))}</b>{" "}
-            gap inside the file itself, worth checking before this is treated as proven.
-          </>
-        )}
-        {refunds > 0 && <> {refunds} refund{refunds === 1 ? " is" : "s are"} included and subtracted.</>}
-      </p>
+      <div className="mb-2 mt-2"><BatchAdvisorPanel r={r} /></div>
+
+      {foots ? (
+        <FactChips
+          className="mb-2"
+          facts={[
+            { label: "Orders", value: String(txns.length - refunds) },
+            ...(refunds > 0 ? [{ label: "Refunds", value: `${refunds} subtracted` }] : []),
+            { label: crossBorder && Math.abs(r.bankAmount - net) >= 0.01 ? "Foots to payout file" : "Foots to bank", value: <>{aed2(net)} ✓</>, emphasis: true },
+          ]}
+        />
+      ) : (
+        <Callout
+          tone="danger"
+          title={<>Rows add up to {aed2(sum)} but the payout file totals {aed2(net)} — {aed2(Math.abs(sum - net))} gap inside the file</>}
+        >
+          The gap is inside the payout file itself, so check the file before this credit is treated as proven.
+          {refunds > 0 && <> {refunds} refund{refunds === 1 ? " is" : "s are"} included and subtracted.</>}
+        </Callout>
+      )}
 
       {currency && (
-        <p className="mb-2.5 text-[13px] leading-relaxed text-[#1F1B16]">
+        <Callout
+          tone="info"
+          title={<>Paid in {currency} at {quotedRate ? `${quotedRate.toFixed(6)} (bank-quoted)` : `${r.payout?.fxRate ?? "—"} (our estimate)`}
+            {Math.abs(bankKeptAed) >= 0.01 ? (bankKeptAed > 0 ? ` · bank kept ${aed2(bankKeptAed)} on the wire, books once to FX` : ` · ${aed2(Math.abs(bankKeptAed))} surplus, books as FX gain`) : ""}</>}
+          facts={[
+            ...(netOriginalTotal > 0 ? [{ label: "Payout", value: fmtOriginal(netOriginalTotal, currency) }] : []),
+            { label: "At quoted rate", value: aed2(r.payout?.net ?? 0) },
+            { label: "Landed", value: aed2(r.bankAmount), emphasis: true },
+            ...(r.fxFeeAed != null && r.fxFeeAed > 0 ? [{ label: `${r.provider} fees${vatOnTop ? " incl. VAT" : ""}`, value: aed2(r.fxFeeAed) }] : []),
+          ]}
+        >
           Paid in <b>{currency}</b>
           {quotedRate ? (
             <>, converted at the <b>{quotedRate.toFixed(6)} AED</b> per {currency} the bank quoted in this
@@ -1647,14 +1693,14 @@ export function GatewayProof({ r, live, onChanged }: {
             <> {r.provider} kept <b className="tabular-nums">{aed2(r.fxFeeAed)}</b> in fees before that
               {vatOnTop ? ", VAT included" : ""} — booked to gateway charges.</>
           )}
-        </p>
+        </Callout>
       )}
 
       {/* Booking bar — confirmed credits only. */}
       {r.confirmedBy && (
-        <div className="mb-2.5 space-y-2.5 rounded-lg border border-[#EAE3D6] bg-white px-3 py-2.5">
+        <div className="mb-2.5 space-y-2.5 rounded-lg border border-[#D8E1F1] bg-white px-3 py-2.5">
           {loadingSetup && !options ? (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-[#8A8175]">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-[#5E6B85]">
               <Loader2 size={12} className="animate-spin" /> Loading Zoho accounts and invoices…
             </span>
           ) : optionsError ? (
@@ -1708,7 +1754,7 @@ export function GatewayProof({ r, live, onChanged }: {
                 />
               </div>
 
-              <p className="text-[12px] leading-relaxed text-[#6F5325]">
+              <Callout tone="info" className="mb-0" title="How this credit books in Zoho">
                 {crossBorder ? (
                   <>Each invoice is closed for its full AED amount into <b>{depositName || "the deposit account"}</b>.{" "}
                     {vatOnTop ? (
@@ -1738,12 +1784,12 @@ export function GatewayProof({ r, live, onChanged }: {
                   <> The <b className="tabular-nums">{aed2(Math.abs(wireResidual.amount))}</b> gap on this credit was force-booked:
                     it posts once to <b>{r.forceBook.accountName || "the account chosen"}</b>, whatever is picked above.</>
                 )}
-              </p>
+              </Callout>
 
               {(r.payout?.deliveryCharges?.length ?? 0) > 0 && (
                 <DeliveryChargesPanel
                   r={r}
-                  expenseAccounts={options?.feeAccounts ?? []}
+                  voucherOptions={options}
                   depositAccountId={depositAccountId}
                   vatTaxId={crossBorder ? "" : vatTaxId}
                   vatName={vatName}
@@ -1752,7 +1798,7 @@ export function GatewayProof({ r, live, onChanged }: {
               )}
 
               {scopeCount > 0 && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-[#FBF3E6] px-2.5 py-1.5 text-[11.5px] text-[#6F5325]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-[#EAF1FD] px-2.5 py-1.5 text-[11.5px] text-[#1E3A8A]">
                   <span className="font-semibold">{selectedCount > 0 ? `${selectedCount} selected` : `${postableRefs.length} to book`}</span>
                   <span>Invoices <b className="tabular-nums">{totals.unknownInvoices === scopeCount ? "from Zoho" : aed2(totals.invoices)}</b>
                     {totals.unknownInvoices > 0 && totals.unknownInvoices < scopeCount && <> + {totals.unknownInvoices} unknown</>}</span>
@@ -1770,7 +1816,7 @@ export function GatewayProof({ r, live, onChanged }: {
               )}
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <label className="flex items-center gap-1.5 text-[12px] text-[#1F1B16]">
+                <label className="flex items-center gap-1.5 text-[12px] text-[#0F1B3D]">
                   <Checkbox checked={useCustomRef} onCheckedChange={(v) => setUseCustomRef(v === true)} />
                   Custom reference
                 </label>
@@ -1779,7 +1825,7 @@ export function GatewayProof({ r, live, onChanged }: {
                     value={customRef}
                     onChange={(e) => setCustomRef(e.target.value)}
                     placeholder={r.reference || "e.g. Batch 42"}
-                    className="h-8 w-40 border-[#D6CCBA] text-[12px]"
+                    className="h-8 w-40 border-[#C9D5EA] text-[12px]"
                   />
                 )}
                 <button
@@ -1792,7 +1838,7 @@ export function GatewayProof({ r, live, onChanged }: {
                         ? "Read every invoice from Zoho again — use this after changing an invoice in Zoho"
                         : "Reads each order's invoice status live from Zoho. One search per order against a ~5,000/day cap, so it runs when you ask rather than every time this panel opens."
                   }
-                  className="inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[11.5px] font-medium text-[#6F5325] hover:border-[#B08343] disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[11.5px] font-medium text-[#1E3A8A] hover:border-[#1D4ED8] disabled:opacity-50"
                 >
                   {refreshingInvoices ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                   {invoicesChecked ? "Re-check invoices" : "Check invoices in Zoho"}
@@ -1801,7 +1847,7 @@ export function GatewayProof({ r, live, onChanged }: {
                   )}
                 </button>
                 <label
-                  className="flex items-center gap-1.5 text-[12px] text-[#1F1B16]"
+                  className="flex items-center gap-1.5 text-[12px] text-[#0F1B3D]"
                   title="Invoices someone already marked paid by hand are skipped by default, because their fee may have been booked by hand too. Tick only if those fees were never booked."
                 >
                   <Checkbox checked={bookExternal} onCheckedChange={(v) => setBookExternal(v === true)} />
@@ -1828,7 +1874,7 @@ export function GatewayProof({ r, live, onChanged }: {
                         onClick={() => run(selectedCount > 0 ? [...selected] : postableRefs, true)}
                         disabled={!!busy || !!missingSetup}
                         title={missingSetup ?? "Check every order against Zoho without posting anything"}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px] font-medium text-[#1F1B16] hover:border-[#B08343] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9D5EA] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0F1B3D] hover:border-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {busy === "preview" ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
                         Preview
@@ -1837,7 +1883,7 @@ export function GatewayProof({ r, live, onChanged }: {
                         onClick={() => run(selectedCount > 0 ? [...selected] : postableRefs, false)}
                         disabled={!!busy || !!missingSetup}
                         title={missingSetup ?? undefined}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#6F5325] px-3 py-1.5 text-[12px] font-medium text-[#FBF8F1] hover:bg-[#5A4320] disabled:cursor-not-allowed disabled:bg-[#B8B0A0]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#1E3A8A] px-3 py-1.5 text-[12px] font-medium text-[#F3F6FC] hover:bg-[#5A4320] disabled:cursor-not-allowed disabled:bg-[#9AA6BD]"
                       >
                         {busy === "post" ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                         {busy === "post" ? `Booking ${scopeCount}…` : `Record ${scopeCount} order${scopeCount === 1 ? "" : "s"}`}
@@ -1863,14 +1909,14 @@ export function GatewayProof({ r, live, onChanged }: {
 
       {attention.length > 0 && (
         <div className="mb-2.5 rounded-lg border border-[#EBD3C9] bg-[#FDF6F3] px-3 py-2 text-[12px]">
-          <div className="flex flex-wrap items-center gap-2 font-medium text-[#1F1B16]">
+          <div className="flex flex-wrap items-center gap-2 font-medium text-[#0F1B3D]">
             <AlertTriangle size={13} className="text-[#A6472F]" />
             {attention.length} order{attention.length === 1 ? "" : "s"} need attention
             {attentionSelectable.length > 0 && (
               <button
                 onClick={() => setSelected(new Set(attentionSelectable))}
                 disabled={!!busy}
-                className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-0.5 text-[11.5px] font-normal hover:border-[#B08343] disabled:opacity-50"
+                className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-0.5 text-[11.5px] font-normal hover:border-[#1D4ED8] disabled:opacity-50"
               >
                 Select these {attentionSelectable.length}
               </button>
@@ -1884,9 +1930,9 @@ export function GatewayProof({ r, live, onChanged }: {
                 ) : (
                   <span className="inline-block w-4" />
                 )}
-                <span className="font-mono text-[#1F1B16]">#{t.ref}</span>
+                <span className="font-mono text-[#0F1B3D]">#{t.ref}</span>
                 <StatusPill s={st} />
-                <span className="text-[#6F5325]">{st.title}</span>
+                <span className="text-[#1E3A8A]">{st.title}</span>
               </li>
             ))}
           </ul>
@@ -1895,10 +1941,10 @@ export function GatewayProof({ r, live, onChanged }: {
 
       {lastRun && (
         <div className={`mb-2.5 rounded-lg border px-3 py-2 text-[12px] ${problems.length ? "border-[#EBD3C9] bg-[#FDF6F3]" : "border-[#D5E3D2] bg-[#F5FAF4]"}`}>
-          <div className="flex flex-wrap items-center gap-2 font-medium text-[#1F1B16]">
+          <div className="flex flex-wrap items-center gap-2 font-medium text-[#0F1B3D]">
             {lastRun.dryRun ? <Eye size={13} /> : <CheckCircle2 size={13} className="text-[#4B7A54]" />}
             {lastRun.dryRun ? "Preview — nothing was posted." : "Booking finished."}
-            <span className="font-normal text-[#6F5325]">
+            <span className="font-normal text-[#1E3A8A]">
               {lastRun.results.filter((x) => x.ok).length} {lastRun.dryRun ? "ready" : "done"}
               {problems.length > 0 && <> · {problems.length} need attention (listed above)</>}
               {lastRun.wire && lastRun.wire.status !== "not_needed" && (
@@ -1917,7 +1963,7 @@ export function GatewayProof({ r, live, onChanged }: {
               <button
                 onClick={() => run(problems.filter((p) => p.status === "failed" || p.status === "busy").map((p) => p.orderNumber), false)}
                 disabled={!!busy}
-                className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#D6CCBA] bg-white px-2 py-0.5 text-[11.5px] hover:border-[#B08343] disabled:opacity-50"
+                className="ml-auto inline-flex items-center gap-1 rounded-md border border-[#C9D5EA] bg-white px-2 py-0.5 text-[11.5px] hover:border-[#1D4ED8] disabled:opacity-50"
               >
                 <RefreshCw size={11} /> Retry failed
               </button>
@@ -1926,10 +1972,10 @@ export function GatewayProof({ r, live, onChanged }: {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-[#EAE3D6] bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[#D8E1F1] bg-white">
         <table className="w-full border-collapse text-[12.5px]">
           <thead>
-            <tr className="bg-[#FBF8F1]">
+            <tr className="bg-[#F3F6FC]">
               {showSelectColumn && (
                 <th className="w-8 px-2 py-2">
                   <Checkbox
@@ -1939,7 +1985,7 @@ export function GatewayProof({ r, live, onChanged }: {
                   />
                 </th>
               )}
-              <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Order</th>
+              <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Order</th>
               {currency && <th className={th}>{currency}</th>}
               <th className={th}>Gross</th>
               <th className={th} title="What the Zoho invoice still owes — the amount the payment closes">Zoho invoice</th>
@@ -1956,11 +2002,25 @@ export function GatewayProof({ r, live, onChanged }: {
                 t={t}
                 order={orderByNumber.get(orderOf(t))}
                 missing={orders != null && missingSet.has(orderOf(t))}
-                linkPanel={
-                  r.payout && !live && (!t.orderNumber || (t.orderNumber !== t.ref && t.orderNumber !== bare(t.ref)))
-                    ? <LinkOrderPanel payoutId={r.payout.id} t={t} onChanged={onChanged} />
-                    : undefined
-                }
+                linkPanel={(() => {
+                  // Every row can be linked — Stripe rows render from the live
+                  // proof, and refunds need an order too — otherwise a row that
+                  // says "use Link order" had no button (#805643, Stripe).
+                  if (!r.payout) return undefined;
+                  const elsewhere = t.orderNumber && !settlementFor(orderOf(t)) ? claimedElsewhere[t.orderNumber] : undefined;
+                  if (elsewhere?.payoutId) {
+                    return (
+                      <LinkOrderPanel
+                        payoutId={elsewhere.payoutId}
+                        fromOrder={t.orderNumber!}
+                        onChanged={onChanged}
+                        context={<>Order <b>#{t.orderNumber}</b> is claimed by payout <b className="font-mono">{elsewhere.payoutId}</b>{elsewhere.published ? ", booked in Zoho from there" : ""}. If that line is really a different order, change it below: #{t.orderNumber}&apos;s booking then moves to this credit.</>}
+                      />
+                    );
+                  }
+                  return <LinkOrderPanel payoutId={r.payout.id} t={t} onChanged={onChanged} />;
+                })()}
+                linkLabel={t.orderNumber && !settlementFor(orderOf(t)) && claimedElsewhere[t.orderNumber]?.payoutId ? "Fix other payout" : undefined}
                 open={openRow === t.ref + i}
                 onToggle={() => setOpenRow(openRow === t.ref + i ? null : t.ref + i)}
                 status={r.confirmedBy ? statusFor(t) : undefined}
@@ -2005,17 +2065,19 @@ export function GatewayProof({ r, live, onChanged }: {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-[#D6CCBA] bg-[#FBF8F1]">
-              <td className="px-3 py-2 font-medium text-[#6F5325]" colSpan={(showSelectColumn ? 2 : 1) + (currency ? 1 : 0)}>Net settled</td>
+            <tr className="border-t-2 border-[#C9D5EA] bg-[#F3F6FC]">
+              <td className="px-3 py-2 font-medium text-[#1E3A8A]" colSpan={(showSelectColumn ? 2 : 1) + (currency ? 1 : 0)}>Net settled</td>
               <td colSpan={4} />
-              <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-[#6F5325]">{aed2(net)}</td>
+              <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-[#1E3A8A]">{aed2(net)}</td>
               <td />
             </tr>
           </tfoot>
         </table>
       </div>
 
-      {r.payout && !live && (
+      {/* Reads the stored refund lines server-side, so it applies to Stripe
+          (rendered from the live proof) as much as to uploaded files. */}
+      {r.payout && (
         <RefundsPanel
           r={r}
           depositAccountId={depositAccountId}
@@ -2036,7 +2098,7 @@ export function GatewayProof({ r, live, onChanged }: {
         />
       )}
 
-      <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-[#8A8175]">
+      <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-[#5E6B85]">
         {loadingOrders ? (
           <><Loader2 size={12} className="animate-spin" /> Loading products…</>
         ) : (

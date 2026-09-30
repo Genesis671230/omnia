@@ -74,25 +74,25 @@ function Tile({ label, value, icon: Icon, tone, note }: {
   label: string; value: string; icon: React.ElementType; tone: string; note?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[#EAE3D6] bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-1.5 text-[11.5px] text-[#8A8175]">
+    <div className="rounded-2xl border border-[#D8E1F1] bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-1.5 text-[11.5px] text-[#5E6B85]">
         <Icon size={13} style={{ color: tone }} /> {label}
       </div>
-      <div className="mt-1.5 font-serif text-[22px] tabular-nums" style={{ color: tone }}>{value}</div>
-      {note && <div className="mt-0.5 text-[11px] text-[#8A8175]">{note}</div>}
+      <div className="mt-1.5 font-normal tracking-[-0.02em] text-[22px] tabular-nums" style={{ color: tone }}>{value}</div>
+      {note && <div className="mt-0.5 text-[11px] text-[#5E6B85]">{note}</div>}
     </div>
   );
 }
 
 // Row of clickable gateway pills, matching the exact style already used in
-// recon-view.tsx's gateway filter (border-[#1F1B16]/bg-[#1F1B16] when
+// recon-view.tsx's gateway filter (border-[#0F1B3D]/bg-[#0F1B3D] when
 // active, muted outline otherwise) — computed entirely client-side from
 // the already-fetched gatewayBreakdown, no new fetch per click.
 function pillClass(active: boolean): string {
   return `rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${
     active
-      ? "border-[#1F1B16] bg-[#1F1B16] text-[#FBF8F1]"
-      : "border-[#EAE3D6] bg-white text-[#8A8175] hover:border-[#D6CCBA] hover:text-[#1F1B16]"
+      ? "border-[#0F1B3D] bg-[#0F1B3D] text-[#F3F6FC]"
+      : "border-[#D8E1F1] bg-white text-[#5E6B85] hover:border-[#C9D5EA] hover:text-[#0F1B3D]"
   }`;
 }
 
@@ -128,12 +128,12 @@ function GatewayBarChart({ rows }: { rows: GatewayRow[] }) {
       <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
         <CartesianGrid horizontal={false} stroke="rgba(0,0,0,.05)" />
         <XAxis type="number" tickFormatter={(v) => compact(v)} tick={{ fontSize: 10, fill: "#9a8b73" }} axisLine={false} tickLine={false} />
-        <YAxis type="category" dataKey="gatewayLabel" width={110} tick={{ fontSize: 11, fill: "#1F1B16" }} axisLine={false} tickLine={false} />
+        <YAxis type="category" dataKey="gatewayLabel" width={110} tick={{ fontSize: 11, fill: "#0F1B3D" }} axisLine={false} tickLine={false} />
         <Tooltip content={<BarTip />} cursor={{ fill: "rgba(124,58,237,.06)" }} />
         <Legend wrapperStyle={{ fontSize: 11.5, paddingTop: 6 }} />
         <Bar dataKey="Gross" name="Gross" fill="#2E6B7A" radius={[0, 3, 3, 0]} />
         <Bar dataKey="Net" name="Net" fill="#4B7A54" radius={[0, 3, 3, 0]} />
-        <Bar dataKey="Fees" name="Fees" fill="#8A8175" radius={[0, 3, 3, 0]} />
+        <Bar dataKey="Fees" name="Fees" fill="#5E6B85" radius={[0, 3, 3, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -162,14 +162,14 @@ export function PaymentsInsightsPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-6 text-[13px] text-[#8A8175]">
+      <div className="flex items-center gap-2 rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-6 text-[13px] text-[#5E6B85]">
         <Loader2 size={16} className="animate-spin" /> Loading payments-sheet analytics…
       </div>
     );
   }
   if (error || !data) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-dashed border-[#D6CCBA] bg-white p-6 text-[13px] text-[#8A8175]">
+      <div className="flex items-center gap-2 rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-6 text-[13px] text-[#5E6B85]">
         <AlertTriangle size={16} className="text-[#B0742E]" />
         {(error as Error)?.message || "Couldn't load payments-sheet analytics."}
       </div>
@@ -180,10 +180,10 @@ export function PaymentsInsightsPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-semibold text-[#1F1B16]">This month, across the payments sheet</h3>
+        <h3 className="text-[13px] font-semibold text-[#0F1B3D]">This month, across the payments sheet</h3>
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {data.months.length === 0 ? (
-            <span className="text-[11px] text-[#8A8175]">no months registered</span>
+            <span className="text-[11px] text-[#5E6B85]">no months registered</span>
           ) : (
             data.months.map((m) => (
               <a
@@ -191,7 +191,7 @@ export function PaymentsInsightsPanel() {
                 href={sheetEditUrl(m.spreadsheetId)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] text-[#8A8175] hover:text-[#1F1B16]"
+                className="flex items-center gap-1 text-[11px] text-[#5E6B85] hover:text-[#0F1B3D]"
                 title={`Open ${m.label} in Google Sheets`}
               >
                 {m.label} <ExternalLink size={11} />
@@ -207,7 +207,7 @@ export function PaymentsInsightsPanel() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Tile label="Gross Sales" value={aed2(m.grossAed)} icon={TrendingUp} tone="#2E6B7A" />
         <Tile label="Net Sales" value={aed2(m.netAed)} icon={Banknote} tone="#4B7A54" />
-        <Tile label="Fees" value={aed2(m.feesAed)} icon={Percent} tone="#8A8175" />
+        <Tile label="Fees" value={aed2(m.feesAed)} icon={Percent} tone="#5E6B85" />
         <Tile
           label="Awaiting Payments"
           value={awaitingLoading ? "…" : awaitingAed == null ? "—" : aed2(awaitingAed)}
@@ -215,13 +215,13 @@ export function PaymentsInsightsPanel() {
           icon={Clock} tone="#B0742E"
         />
         <Tile label="Refunds / Cancellations" value={aed2(m.cancelled.amountAed)} icon={RotateCcw} tone="#A6472F" />
-        <Tile label="Exchanges" value={String(m.exchange.count)} icon={ArrowLeftRight} tone="#6F5325" />
+        <Tile label="Exchanges" value={String(m.exchange.count)} icon={ArrowLeftRight} tone="#1E3A8A" />
       </div>
 
       {(data.feeRanking.best || data.feeRanking.worst) && (
-        <p className="text-[11px] text-[#8A8175]">
-          {data.feeRanking.worst && <>Costliest gateway: <b className="text-[#1F1B16]">{data.feeRanking.worst.gatewayLabel}</b> ({data.feeRanking.worst.feePercent}%)</>}
-          {data.feeRanking.best && <> · Cheapest: <b className="text-[#1F1B16]">{data.feeRanking.best.gatewayLabel}</b> ({data.feeRanking.best.feePercent}%)</>}
+        <p className="text-[11px] text-[#5E6B85]">
+          {data.feeRanking.worst && <>Costliest gateway: <b className="text-[#0F1B3D]">{data.feeRanking.worst.gatewayLabel}</b> ({data.feeRanking.worst.feePercent}%)</>}
+          {data.feeRanking.best && <> · Cheapest: <b className="text-[#0F1B3D]">{data.feeRanking.best.gatewayLabel}</b> ({data.feeRanking.best.feePercent}%)</>}
         </p>
       )}
 
@@ -243,31 +243,31 @@ export function PaymentsInsightsPanel() {
       )}
 
       {data.gatewayBreakdown.length > 0 && (
-        <div className="rounded-2xl border border-[#EAE3D6] bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-[#D8E1F1] bg-white p-4 shadow-sm">
           <GatewayBarChart rows={filteredBreakdown} />
         </div>
       )}
 
       {filteredBreakdown.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-[#EAE3D6] bg-white">
+        <div className="overflow-hidden rounded-xl border border-[#D8E1F1] bg-white">
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
-              <tr className="bg-[#FBF8F1]">
-                <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Gateway</th>
-                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Orders</th>
-                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Gross</th>
-                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Fee</th>
-                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Net payout</th>
-                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#8A8175]">Refunds/Cancelled</th>
+              <tr className="bg-[#F3F6FC]">
+                <th className="px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Gateway</th>
+                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Orders</th>
+                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Gross</th>
+                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Fee</th>
+                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Net payout</th>
+                <th className="px-3 py-2 text-right text-[10.5px] font-semibold uppercase tracking-wider text-[#5E6B85]">Refunds/Cancelled</th>
               </tr>
             </thead>
             <tbody>
               {filteredBreakdown.map((g) => (
-                <tr key={g.gatewayLabel} className="border-t border-[#EAE3D6]">
-                  <td className="px-3 py-2 font-medium text-[#1F1B16]">{g.gatewayLabel}</td>
+                <tr key={g.gatewayLabel} className="border-t border-[#D8E1F1]">
+                  <td className="px-3 py-2 font-medium text-[#0F1B3D]">{g.gatewayLabel}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{g.totalOrders}</td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums">{aed2(g.grossAed)}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[#8A8175]">{aed2(g.feesAed)}</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums text-[#5E6B85]">{aed2(g.feesAed)}</td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums font-medium">{aed2(g.netAed)}</td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums text-[#A6472F]">{aed2(g.cancelled.amountAed)}</td>
                 </tr>

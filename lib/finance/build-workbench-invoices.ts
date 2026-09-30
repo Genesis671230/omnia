@@ -10,6 +10,7 @@ import { deriveGateway } from "@/lib/finance/derive-gateway";
 import { classifyResidual } from "@/lib/finance/classify-invoice";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { WorkbenchInvoice, WorkbenchResponse, ZohoInvoiceStatus } from "@/lib/finance/types";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export function defaultWorkbenchFrom(): string {
   const d = new Date();
@@ -24,7 +25,7 @@ export async function buildWorkbenchInvoices({
   to: string;
   status: ZohoInvoiceStatus | "all";
 }): Promise<WorkbenchResponse> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
 
   // 1. Pull Zoho invoices for the window. perPage 200 is Zoho's max — at
   //    perPage 20 this was firing 25 API calls to page through what 3 calls

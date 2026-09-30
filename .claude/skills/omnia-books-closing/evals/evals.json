@@ -1,0 +1,72 @@
+{
+  "skill_name": "omnia-books-closing",
+  "note": "Real incidents from Sept 2026. Each must be answered by proving the cause before any posting. Expected outcomes describe what a correct agent concludes; the live data may have moved on, so graders check the reasoning and the book/flag decision, not exact current balances.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "tokenless-network-credit",
+      "prompt": "Stripe AED 785.79 awaiting payout, bank ref FT26267TVX45 2026-09-24, narration Inward Telex Payment/NETWORK INTERNATIONAL LLC/...BATCB1muf2v44411/IPPCG1muf4hlma00/...\\HCP. No file uploaded. The reference doesn't say stripe, fetch it from the stripe api.",
+      "expected_output": "Checks both Stripe payouts and Shopify Payments payouts for an exact 785.79 match; finds it is Shopify Payments UAE payout 149110423710, not Stripe. Does not upload or force a Stripe match.",
+      "assertions": [
+        "Considers Shopify Payments as well as Stripe for a Network International credit without a rail token",
+        "Matches on exact amount, not a tolerance window",
+        "Does not book or force-match to a Stripe payout"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "split-charges-one-payout",
+      "prompt": "WA55596 has 1 invoice (MNS-052851, AED 1,024.00) and the drawer says the gateway amount is 341.34. Plug all the stripe payments to that invoice.",
+      "expected_output": "Finds three Stripe charges of 341.34 described WA55596 (via charges search by amount), all in payout po_1UCqGq; recognises the payout rows were stored with one charge; re-syncs the payout so the order row is 1,024.02; dry-runs one payment of 1,024.00 plus fee and 0.02 difference; posts only after the dry run is clean.",
+      "assertions": [
+        "Proves the charges sum to the invoice before booking",
+        "Fixes the stored payout rows (re-sync) rather than forcing a partial amount",
+        "Runs a dry run before posting",
+        "Books a single payment for the full invoice"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "order-across-two-payouts",
+      "prompt": "WA55612 shows 'invoice 2,557 doesn't match gateway 70.00' on one Stripe credit and 'doesn't match 2,487.00' on another. Close it.",
+      "expected_output": "Notes 70 + 2,487 = 2,557 exactly with a single open invoice; applies each part to the same invoice through the force-allocation route dated on its own credit; books each part's fee via publishSettlements.",
+      "assertions": [
+        "Verifies the parts sum exactly to one open invoice",
+        "Uses per-settlement force allocations rather than one combined raw payment",
+        "Books the fees through the normal engine"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "booked-but-deleted-in-zoho",
+      "prompt": "For some shopify orders the fee wasn't booked — ledger shows the customer payment for 3470 (MNS-052927, FT26253GNVQV, 744.00) but no fee. The drawer says booked.",
+      "expected_output": "Reads the stored fee expense id and confirms via Zoho that it no longer exists (404); explains it was deleted in Zoho after posting (not by the revert flow); re-posts the fee through the engine without re-posting the payment.",
+      "assertions": [
+        "Checks the stored Zoho document exists instead of trusting the local booked flag",
+        "Does not post a second customer payment",
+        "Re-posts only the missing fee"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "mismatch-must-flag",
+      "prompt": "Fix WA55563 and close it.",
+      "expected_output": "Finds invoice MNS-052666 3,035.00 vs Stripe 3,058.19 (overpaid 23.19); does not force it; flags the bank credit for review with both amounts and the signed gap.",
+      "assertions": [
+        "Does not post a payment for a real amount mismatch",
+        "Flags the credit with both amounts and the signed gap"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "paid-by-hand-then-refunded",
+      "prompt": "WA55470 — fix it.",
+      "expected_output": "Finds the invoice already paid by hand (4,442.07), the Stripe sale 4,434.18 on one payout and refund 4,244.71 on another with credit note OCN-03558 already refunded; holds it and flags the fee and the 189.47 kept as decisions for the founder.",
+      "assertions": [
+        "Recognises the invoice was paid outside Omnia",
+        "Does not post a payment or refund",
+        "Flags with the specific decisions needed"
+      ]
+    }
+  ]
+}

@@ -46,6 +46,7 @@ import { InvoiceModal } from "@/components/finance/invoice-modal";
 import { ShipModal } from "@/components/finance/ship-modal";
 import { FulfillmentSpine } from "./fulfillment-spine";
 import { GrossSalesStrip } from "./gross-sales-strip";
+import { MissingInZohoBar, OrderStatusTabs, type MissingInZoho, type OrderStatusTab } from "./order-status-tabs";
 
 // ── palette (self-contained; independent of workspace --tokens) ──
 const C = {
@@ -526,12 +527,15 @@ export function OrdersLedger({
   const [coverage, setCoverage] = useState({ ksa: 0, uae: 0, neither: 0 });
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [status, setStatus] = useState<OrderStatusTab>("all");
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<OrderStatusTab, number>>>({});
+  const [missing, setMissing] = useState<{ rows: MissingInZoho; orgs: { label: string; count: number }[]; error: string }>({ rows: [], orgs: [], error: "" });
   
   const locations = ["All locations", ...Object.keys(LOCATION_GROUPS)];
   useEffect(() => { setSelectedUids(new Set()); }, [store, location, days, qDebounced, stateFilter, fulfillableFrom]);
 
   useEffect(() => { const id = setTimeout(() => setQDebounced(q), 300); return () => clearTimeout(id); }, [q]);
-  useEffect(() => { setPage(1); }, [store, location, days, qDebounced, stateFilter]);
+  useEffect(() => { setPage(1); }, [store, location, days, qDebounced, stateFilter, status]);
 
 
 
@@ -544,12 +548,18 @@ export function OrdersLedger({
     if (store !== "All") params.set("store", store);
     if (location !== "All locations") params.set("location", location);
     if (qDebounced) params.set("q", qDebounced);
+    if (status !== "all") params.set("status", status);
     fetch(`/api/orders?${params.toString()}`).then((r) => r.json())
-      .then((d) => { if (off) return; setOrders(d.orders ?? []); setTotal(d.total ?? 0);if (d.coverage) setCoverage(d.coverage); })
+      .then((d) => {
+        if (off) return;
+        setOrders(d.orders ?? []); setTotal(d.total ?? 0); if (d.coverage) setCoverage(d.coverage);
+        if (d.counts) setStatusCounts((c) => ({ ...c, ...d.counts }));
+        if (status === "not_in_zoho") setMissing({ rows: d.missingInZoho ?? [], orgs: d.zohoOrgs ?? [], error: d.error ?? "" });
+      })
       .catch(() => { if (!off) { setOrders([]); setTotal(0);} })
       .finally(() => { if (!off) setLoading(false); });
     return () => { off = true; };
-  }, [page, store, location, days, qDebounced,fulfillableFrom]);
+  }, [page, store, location, days, qDebounced,fulfillableFrom, status]);
 
   const merged = useMemo(() => orders.map((o) => ({ ...o, ...overrides[o.uid] })), [orders, overrides]);
   const rows = useMemo(() => stateFilter ? merged.filter((o) => moneyStateOf(o) === stateFilter) : merged, [merged, stateFilter]);
@@ -621,7 +631,7 @@ const generateDispatch = useCallback(async () => {
   ? new Date(Date.now() - days * 86400_000).toISOString().replace("Z", "")
   : undefined;
   console.log("[orders] days:", days, "from:",from, "now:", new Date().toISOString());
-  if (loading && orders.length === 0)
+  if (loading && orders.length === 0 && Object.keys(statusCounts).length === 0)
     return <div className="empty" style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", padding: 60, color: C.dim }}><Loader2 size={18} className="spin" /> Loading orders…</div>;
 
   return (
@@ -665,6 +675,9 @@ const generateDispatch = useCallback(async () => {
       <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 24, padding: "26px 30px", marginBottom: 22, boxShadow: "0 1px 3px rgba(28,25,19,.05)" }}>
         <Ribbon buckets={buckets} total={ribbonTotal} active={stateFilter} onPick={setStateFilter} />
       </div>
+
+      <OrderStatusTabs value={status} onChange={setStatus} counts={statusCounts} />
+      {status === "not_in_zoho" && <MissingInZohoBar rows={missing.rows} orgs={missing.orgs} loading={loading} error={missing.error} />}
 
       {/* filters — reuse workspace classes so they match the rest of the app */}
       <div className="filters">

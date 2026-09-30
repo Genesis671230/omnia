@@ -21,7 +21,7 @@ import { RevenueArea, GatewayDonut, TopProductsCarousel, CHARTS_CSS } from "./ch
 import { MoneyDrawer } from "./money-drawer";
 import { PaymentsInsightsPanel } from "./payments-insights-panel";
 import { PaymentsFullDashboard } from "./payments-full-dashboard";
-import { GrossSalesPanel } from "./gross-sales-panel";
+import { MoneyOverview } from "./money-overview";
 
 /* ── live pulse (unchanged behavior: poll /api/pulse, toast new orders) ──── */
 
@@ -233,9 +233,9 @@ export function FounderDashboard({ version }: { version: number }) {
 
       {/* <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} /> */}
 
-      {/* Top line first: what the stores sold, straight from orders, before
-          any of the payout and settlement views below it. */}
-      <GrossSalesPanel />
+      {/* Top line first: per day, what the stores sold, how much is already in
+          the bank, what is pending and the approximate gateway fee. */}
+      <MoneyOverview />
 
       <PaymentsInsightsPanel />
 
@@ -301,62 +301,61 @@ export function FounderDashboard({ version }: { version: number }) {
 }
 
 const DASH_CSS = `
-  .dv2 { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; transition: opacity .15s; }
+  .dv2 { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; transition: opacity .15s; font-family: var(--os-font); color: var(--os-ink); }
   .dv2 * { box-sizing: border-box; }
-  .dv2-loading { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 60px; color: #8A8175; font-size: 14px; }
+  .dv2-loading { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 60px; color: #5E6B85; font-size: 14px; }
   .dv2-spin { animation: dv2spin 1s linear infinite; }
   @keyframes dv2spin { to { transform: rotate(360deg); } }
 
-  .dv2-pulse { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 12px; color: #6F5325;
-    background: linear-gradient(120deg, #FBF3E6, #f3e8ff); border: 1px solid #EAE3D6; border-radius: 999px; padding: 7px 14px; }
+  .dv2-pulse { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 12px; color: #1E3A8A;
+    background: linear-gradient(120deg, #EAF1FD, #f3e8ff); border: 1px solid #D8E1F1; border-radius: 999px; padding: 7px 14px; }
   .dv2-pulse-dot { width: 7px; height: 7px; border-radius: 999px; background: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,.5); animation: dv2beat 1.8s infinite; flex-shrink: 0; }
   @keyframes dv2beat { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.45); } 70% { box-shadow: 0 0 0 7px rgba(16,185,129,0); } 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); } }
   .dv2-pulse-text { animation: dv2fade .35s ease-out; font-weight: 500; }
   @keyframes dv2fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
 
-  .dv2-panel { background: #fff; border: 1px solid #EAE3D6; border-radius: 20px; padding: 20px 22px;
-    box-shadow: 0 10px 30px -22px rgba(31,27,22,.25); }
+  .dv2-panel { background: var(--os-card); border: 1px solid var(--os-line); border-radius: 24px; padding: 20px 22px; }
   .dv2-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-  .dv2-panel-head h2 { font-family: Georgia, serif; font-weight: 500; font-size: 17px; margin: 0; color: #1F1B16; }
-  .dv2-panel-head span { font-size: 12px; color: #8A8175; }
-  .dv2-more { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #7c3aed; text-decoration: none; }
+  .dv2-panel-head h2 { font-family: var(--os-font); font-weight: 600; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; margin: 0; color: var(--os-muted); }
+  .dv2-panel-head span { font-size: 12px; color: #5E6B85; }
+  .dv2-more { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #1D4ED8; text-decoration: none; }
   .dv2-more:hover { text-decoration: underline; }
 
   .dv2-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
-  .dv2-legend { display: flex; gap: 14px; font-size: 11.5px; color: #8A8175; margin-top: 6px; }
+  .dv2-legend { display: flex; gap: 14px; font-size: 11.5px; color: #5E6B85; margin-top: 6px; }
   .dv2-legend span { display: inline-flex; align-items: center; gap: 5px; }
   .dv2-legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 
   .dv2-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 999px; font-weight: 500; }
   .dv2-pill.ok { background: #d1fae5; color: #047857; } .dv2-pill.bad { background: #fee2e2; color: #dc2626; }
-  .dv2-pill.warn { background: #fef3c7; color: #b45309; } .dv2-pill.muted { background: #F3EFE7; color: #8A8175; }
-  .dv2-quiet { color: #8A8175; font-size: 13px; margin: 0; }
+  .dv2-pill.warn { background: #fef3c7; color: #b45309; } .dv2-pill.muted { background: #EEF2FA; color: #5E6B85; }
+  .dv2-quiet { color: #5E6B85; font-size: 13px; margin: 0; }
 
   /* spotlight */
   .spot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-  .spot-cell { display: flex; flex-direction: column; gap: 6px; border: 1px solid #EAE3D6; border-radius: 14px; padding: 12px 14px; }
-  .spot-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: #8A8175; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
-  .spot-sub { font-size: 11.5px; color: #8A8175; }
-  .spot-sub a { color: #7c3aed; }
+  .spot-cell { display: flex; flex-direction: column; gap: 6px; border: 1px solid #D8E1F1; border-radius: 14px; padding: 12px 14px; }
+  .spot-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: #5E6B85; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  .spot-sub { font-size: 11.5px; color: #5E6B85; }
+  .spot-sub a { color: #1D4ED8; }
   .spot-link { border: 0; cursor: pointer; font: inherit; width: fit-content; }
   .spot-lower { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
-  .spot-customer { display: flex; flex-direction: column; gap: 6px; border: 1px solid #EAE3D6; border-radius: 14px; padding: 14px; }
-  .spot-customer b { font-family: Georgia, serif; font-size: 15px; font-weight: 500; }
-  .spot-customer span { font-size: 12px; color: #8A8175; display: inline-flex; align-items: center; gap: 6px; }
-  .spot-draft { display: flex; flex-direction: column; gap: 8px; border-radius: 14px; padding: 14px; background: linear-gradient(120deg, #FBF3E6, #f5f3ff); }
-  .spot-draft p { margin: 0; font-size: 12.5px; line-height: 1.6; color: #1F1B16; }
-  .spot-copy { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; border: 1px solid #EAE3D6; background: #fff;
-    border-radius: 9px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; color: #6F5325; }
-  .spot-copy:hover { border-color: #c4b5fd; color: #7c3aed; }
+  .spot-customer { display: flex; flex-direction: column; gap: 6px; border: 1px solid #D8E1F1; border-radius: 14px; padding: 14px; }
+  .spot-customer b { font-size: 15px; font-weight: 500; }
+  .spot-customer span { font-size: 12px; color: #5E6B85; display: inline-flex; align-items: center; gap: 6px; }
+  .spot-draft { display: flex; flex-direction: column; gap: 8px; border-radius: 14px; padding: 14px; background: linear-gradient(120deg, #EAF1FD, #f5f3ff); }
+  .spot-draft p { margin: 0; font-size: 12.5px; line-height: 1.6; color: #0F1B3D; }
+  .spot-copy { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; border: 1px solid #D8E1F1; background: #fff;
+    border-radius: 9px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; color: #1E3A8A; }
+  .spot-copy:hover { border-color: #BFD3F8; color: #1D4ED8; }
 
   /* latest orders */
   .dv2-orders { display: flex; flex-direction: column; gap: 7px; }
-  .dv2-order { display: flex; align-items: center; gap: 12px; border: 1px solid #EAE3D6; border-radius: 12px; padding: 9px 14px; font-size: 12.5px; transition: border-color .15s, transform .15s; }
-  .dv2-order:hover { border-color: #c4b5fd; transform: translateX(2px); }
+  .dv2-order { display: flex; align-items: center; gap: 12px; border: 1px solid #D8E1F1; border-radius: 12px; padding: 9px 14px; font-size: 12.5px; transition: border-color .15s, transform .15s; }
+  .dv2-order:hover { border-color: #BFD3F8; transform: translateX(2px); }
   .dv2-order-store { font-size: 10.5px; font-weight: 800; border-radius: 7px; padding: 3px 8px; }
   .dv2-order-num { font-family: ui-monospace, monospace; font-size: 12px; min-width: 72px; }
   .dv2-order-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dv2-order-gw { display: inline-flex; align-items: center; gap: 6px; color: #8A8175; min-width: 90px; }
+  .dv2-order-gw { display: inline-flex; align-items: center; gap: 6px; color: #5E6B85; min-width: 90px; }
   .dv2-order-gw i { width: 8px; height: 8px; border-radius: 2.5px; }
   .dv2-order b { font-variant-numeric: tabular-nums; min-width: 96px; text-align: right; }
 

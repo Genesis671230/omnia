@@ -52,7 +52,17 @@ export async function POST(request: Request) {
   }
 
   const batchId = `BANK-${new Date().toISOString().slice(0, 10)}-${file.name.slice(0, 40)}`;
-  const result = await BankRepository.insertLines([...credits, ...debits], batchId);
+  let result: Awaited<ReturnType<typeof BankRepository.insertLines>>;
+  try {
+    result = await BankRepository.insertLines([...credits, ...debits], batchId);
+  } catch (e) {
+    // Parsed fine but couldn't be saved — say so in JSON (an unhandled throw
+    // returns an HTML 500 the upload dialog can only show as "Unexpected token").
+    return NextResponse.json(
+      { error: `Read ${credits.length} credits + ${debits.length} debits but couldn't save them: ${(e as Error).message}` },
+      { status: 502 },
+    );
+  }
 
   try {
     await FilesRepository.save({

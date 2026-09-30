@@ -124,36 +124,36 @@ export const CHARTS_CSS = `
   .dv2-tip-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
   .dv2-tip-row span { width: 8px; height: 8px; border-radius: 2.5px; flex-shrink: 0; }
   .dv2-tip-row b { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
-  .dv2-quiet { color: #8A8175; font-size: 13px; line-height: 1.5; margin: 0; }
+  .dv2-quiet { color: #5E6B85; font-size: 13px; line-height: 1.5; margin: 0; }
 
   .dv2-donut { display: flex; align-items: center; gap: 18px; }
   .dv2-donut-chart { position: relative; flex: 1; min-width: 0; }
   .dv2-donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-  .dv2-donut-center b { font-family: Georgia, serif; font-size: 17px; color: #1F1B16; }
-  .dv2-donut-center span { font-size: 10.5px; color: #8A8175; text-transform: uppercase; letter-spacing: .08em; }
+  .dv2-donut-center b { font-family: var(--os-font); font-size: 17px; color: #0F1B3D; }
+  .dv2-donut-center span { font-size: 10.5px; color: #5E6B85; text-transform: uppercase; letter-spacing: .08em; }
   .dv2-donut-legend { display: flex; flex-direction: column; gap: 8px; min-width: 150px; }
   .dv2-donut-legend > div { display: flex; align-items: center; gap: 8px; font-size: 12px; }
   .dv2-donut-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-  .dv2-lg-name { color: #1F1B16; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-  .dv2-donut-legend b { font-variant-numeric: tabular-nums; color: #8A8175; font-weight: 600; }
+  .dv2-lg-name { color: #0F1B3D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .dv2-donut-legend b { font-variant-numeric: tabular-nums; color: #5E6B85; font-weight: 600; }
 
   .dv2-prods { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: thin; }
-  .dv2-prod { position: relative; flex: 0 0 168px; background: #fff; border: 1px solid #EAE3D6; border-radius: 16px; overflow: hidden;
+  .dv2-prod { position: relative; flex: 0 0 168px; background: #fff; border: 1px solid #D8E1F1; border-radius: 16px; overflow: hidden;
     display: flex; flex-direction: column; opacity: 0; transform: translateY(8px); animation: dv2prodin .4s ease forwards;
     transition: transform .18s ease, box-shadow .18s ease; }
   @keyframes dv2prodin { to { opacity: 1; transform: translateY(0); } }
   .dv2-prod:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -14px rgba(76,29,149,.35); }
   .dv2-prod-rank { position: absolute; top: 8px; left: 8px; z-index: 1; font-size: 10px; font-weight: 800; color: #fff;
-    background: linear-gradient(120deg, #7c3aed, #a855f7); border-radius: 999px; padding: 3px 8px; }
-  .dv2-prod img { width: 100%; height: 118px; object-fit: cover; background: #F6F1E7; }
-  .dv2-prod-empty { width: 100%; height: 118px; display: flex; align-items: center; justify-content: center; background: #F6F1E7; color: #C9BFAE; }
+    background: linear-gradient(120deg, #1D4ED8, #a855f7); border-radius: 999px; padding: 3px 8px; }
+  .dv2-prod img { width: 100%; height: 118px; object-fit: cover; background: #F3F6FC; }
+  .dv2-prod-empty { width: 100%; height: 118px; display: flex; align-items: center; justify-content: center; background: #F3F6FC; color: #C8D2E6; }
   .dv2-prod-body { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 12px; }
-  .dv2-prod h4 { margin: 0; font-size: 12px; line-height: 1.35; color: #1F1B16; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
-  .dv2-prod-meter { height: 5px; border-radius: 999px; background: #F6F1E7; overflow: hidden; }
-  .dv2-prod-meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7c3aed, #c084fc); }
+  .dv2-prod h4 { margin: 0; font-size: 12px; line-height: 1.35; color: #0F1B3D; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
+  .dv2-prod-meter { height: 5px; border-radius: 999px; background: #F3F6FC; overflow: hidden; }
+  .dv2-prod-meter i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1D4ED8, #c084fc); }
   .dv2-prod-row { display: flex; justify-content: space-between; align-items: baseline; }
-  .dv2-prod-row b { font-size: 13px; color: #1F1B16; font-variant-numeric: tabular-nums; }
-  .dv2-prod-row span { font-size: 11px; color: #8A8175; }
+  .dv2-prod-row b { font-size: 13px; color: #0F1B3D; font-variant-numeric: tabular-nums; }
+  .dv2-prod-row span { font-size: 11px; color: #5E6B85; }
   .dv2-prod-stores { display: flex; gap: 4px; flex-wrap: wrap; }
   .dv2-prod-stores em { font-style: normal; font-size: 9.5px; font-weight: 700; border: 1px solid; border-radius: 6px; padding: 1px 6px; }
 

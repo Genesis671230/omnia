@@ -48,6 +48,8 @@ export type ReconLine = {
     /** COD courier vouchers: delivery charges / returns netted out of the
      *  remittance that belong to no invoice. */
     deliveryCharges?: { ref: string; amount: number; exVat: number; vat: number; isReturn: boolean; voucherNo: string; status: string }[];
+    /** Zoho organisation whose books this payout closes (absent = main). */
+    zohoConnectionId?: string;
   } | null;
   variance: number;
   resolvedOrders: string[];

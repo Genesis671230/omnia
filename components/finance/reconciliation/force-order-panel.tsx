@@ -151,27 +151,27 @@ export function ForceOrderPanel({
   };
 
   return (
-    <div className="rounded-lg border border-[#D6CCBA] bg-white p-3 text-[12.5px] text-[#1F1B16]">
+    <div className="rounded-lg border border-[#C9D5EA] bg-white p-3 text-[12.5px] text-[#0F1B3D]">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-1.5 font-semibold"><Gavel size={13} /> Force book order #{orderNumber}</div>
-          <div className="mt-0.5 text-[11.5px] text-[#8A8175]">
+          <div className="mt-0.5 text-[11.5px] text-[#5E6B85]">
             Gateway: gross {aed2(gatewayGross)} · fee {aed2(fee)} · net received {aed2(netReceived)}. Tick the invoice(s) this payment closes.
           </div>
         </div>
-        <button onClick={onCancel} aria-label="Close" className="text-[#8A8175]"><X size={14} /></button>
+        <button onClick={onCancel} aria-label="Close" className="text-[#5E6B85]"><X size={14} /></button>
       </div>
 
       {loadError ? (
         <div className="rounded-md bg-[#F9ECE7] px-3 py-2 text-[#A6472F]">Couldn&apos;t read Zoho invoices: {loadError}</div>
       ) : !invoices ? (
-        <div className="flex items-center gap-1.5 text-[#8A8175]"><Loader2 size={12} className="animate-spin" /> Reading Zoho invoices for #{orderNumber}…</div>
+        <div className="flex items-center gap-1.5 text-[#5E6B85]"><Loader2 size={12} className="animate-spin" /> Reading Zoho invoices for #{orderNumber}…</div>
       ) : invoices.length === 0 ? (
         <div className="text-[#A6472F]">Zoho has no invoice for order #{orderNumber} — run the invoice sync.</div>
       ) : (
         <table className="w-full text-[12px]">
           <thead>
-            <tr className="text-left text-[10.5px] uppercase tracking-wide text-[#8A8175]">
+            <tr className="text-left text-[10.5px] uppercase tracking-wide text-[#5E6B85]">
               <th className="w-6 py-1" /><th className="py-1">Invoice</th><th className="py-1">Date</th><th className="py-1">Customer</th>
               <th className="py-1">Status</th><th className="py-1 text-right">Total</th><th className="py-1 text-right">Open</th><th className="py-1 text-right">Apply</th>
             </tr>
@@ -181,7 +181,7 @@ export function ForceOrderPanel({
               const dead = ["void", "draft"].includes(inv.status.toLowerCase()) || inv.balance <= 0.01;
               const on = picked[inv.invoiceId] != null;
               return (
-                <tr key={inv.invoiceId} className={`border-t border-[#EAE3D6] ${dead ? "text-[#B5AC9F]" : ""}`}>
+                <tr key={inv.invoiceId} className={`border-t border-[#D8E1F1] ${dead ? "text-[#B5AC9F]" : ""}`}>
                   <td className="py-1.5"><input type="checkbox" checked={on} disabled={dead || busy} onChange={() => toggle(inv)} /></td>
                   <td className="py-1.5 font-mono">{inv.invoiceNumber}</td>
                   <td className="py-1.5">{inv.date}</td>
@@ -194,7 +194,7 @@ export function ForceOrderPanel({
                       <input
                         value={picked[inv.invoiceId]} inputMode="decimal"
                         onChange={(e) => setPicked((p) => ({ ...p, [inv.invoiceId]: e.target.value }))}
-                        className="w-24 rounded border border-[#D6CCBA] px-1.5 py-0.5 text-right font-mono"
+                        className="w-24 rounded border border-[#C9D5EA] px-1.5 py-0.5 text-right font-mono"
                       />
                     ) : "—"}
                   </td>
@@ -206,7 +206,7 @@ export function ForceOrderPanel({
       )}
 
       {invoices && invoices.length > 0 && (
-        <div className="mt-2 rounded-md bg-[#FBF3E6] px-3 py-2 text-[11.5px] leading-relaxed text-[#6F5325]">
+        <div className="mt-2 rounded-md bg-[#EAF1FD] px-3 py-2 text-[11.5px] leading-relaxed text-[#1E3A8A]">
           One payment of <b>{aed2(applied)}</b> into <b>{depositOptions.find((d) => d.id === depositAccountId)?.name || "the Deposit To account"}</b> is applied to the ticked invoice{Object.keys(picked).length === 1 ? "" : "s"} (an invoice not paid in full stays open for the rest).
           {Math.abs(difference) >= 0.01 && (
             <> Applied − fee − net received = <b>{aed2(difference)}</b>, booked to <b>{differenceName || "the exchange gain / loss account"}</b>
@@ -216,7 +216,7 @@ export function ForceOrderPanel({
       )}
 
       {existingPayment && !existingPayment.startsWith("PENDING:") && (
-        <div className="mt-2 rounded-md bg-[#F3EFE7] px-3 py-1.5 text-[11.5px] text-[#6F5325]">
+        <div className="mt-2 rounded-md bg-[#EEF2FA] px-3 py-1.5 text-[11.5px] text-[#1E3A8A]">
           A force payment ({existingPayment}) was already booked for this order. Booking again adds another payment.
         </div>
       )}
@@ -225,7 +225,7 @@ export function ForceOrderPanel({
         <label className="text-[11.5px] font-medium">
           Deposit to
           <select value={depositAccountId} onChange={(e) => setDepositAccountId(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[#D6CCBA] bg-white px-2 py-1 text-[12px] font-normal">
+            className="mt-1 w-full rounded-md border border-[#C9D5EA] bg-white px-2 py-1 text-[12px] font-normal">
             <option value="">Select clearing account…</option>
             {depositOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
@@ -233,25 +233,25 @@ export function ForceOrderPanel({
         <label className="text-[11.5px] font-medium">
           Payment date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[#D6CCBA] px-2 py-1 text-[12px] font-normal" />
+            className="mt-1 w-full rounded-md border border-[#C9D5EA] px-2 py-1 text-[12px] font-normal" />
         </label>
         <label className="text-[11.5px] font-medium">
           Reference
           <input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100}
-            className="mt-1 w-full rounded-md border border-[#D6CCBA] px-2 py-1 font-mono text-[12px] font-normal" />
+            className="mt-1 w-full rounded-md border border-[#C9D5EA] px-2 py-1 font-mono text-[12px] font-normal" />
         </label>
       </div>
 
       <label className="mt-2 block text-[11.5px] font-medium">
         Description (goes on the Zoho payment)
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={500}
-          className="mt-1 w-full rounded-md border border-[#D6CCBA] px-2 py-1 text-[12px] font-normal" />
+          className="mt-1 w-full rounded-md border border-[#C9D5EA] px-2 py-1 text-[12px] font-normal" />
       </label>
 
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
         {problem && invoices && <span className="mr-auto text-[11.5px] text-[#A6472F]">{problem}</span>}
-        <button onClick={clear} disabled={busy} className="text-[11.5px] text-[#8A8175] underline">Clear override</button>
-        <button onClick={onCancel} disabled={busy} className="rounded-md border border-[#D6CCBA] bg-white px-3 py-1 text-[12px]">Cancel</button>
+        <button onClick={clear} disabled={busy} className="text-[11.5px] text-[#5E6B85] underline">Clear override</button>
+        <button onClick={onCancel} disabled={busy} className="rounded-md border border-[#C9D5EA] bg-white px-3 py-1 text-[12px]">Cancel</button>
         <button onClick={save} disabled={busy || !!problem}
           className="inline-flex items-center gap-1.5 rounded-md bg-[#A6472F] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-50">
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Gavel size={12} />} Book {aed2(applied)} in Zoho

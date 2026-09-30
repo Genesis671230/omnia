@@ -3,6 +3,7 @@
 
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 import type { ZohoPosting } from "@/lib/integrations/zoho-banking";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export type ZohoBooksExpense = {
     account_id: string;              // expense category id (e.g. Bank Fees and Charges)
@@ -24,7 +25,7 @@ export type ZohoBooksExpense = {
   export async function createBooksExpense(
     expense: ZohoBooksExpense,
     accessToken: string,
-    organizationId: string = process.env.ZOHO_ORGANIZATION_ID ?? "",
+    organizationId: string = zohoOrgId(),
   ): Promise<{ expense_id: string }> {
     if (!organizationId) throw new Error("ZOHO_ORGANIZATION_ID not configured");
   

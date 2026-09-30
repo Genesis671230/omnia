@@ -18,6 +18,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
+  /* Corporate Tax penalty pages (static routes, not in the registry). */
+  const ctPaths = [
+    "penalty-checker", "corporate-tax-penalties", "reconsideration",
+    "late-registration-waiver", "services", "contact", "payout-reconciliation",
+  ];
+  landing.push(...ctPaths.map((p) => ({
+    url: absoluteUrl(ramzaPath(p)),
+    lastModified: now,
+    changeFrequency: "monthly" as const,
+    priority: p === "penalty-checker" ? 0.95 : 0.85,
+  })));
+
   /* Commercial-intent pages outrank explainers in priority, matching how we
      actually want crawl budget spent. */
   const priorityFor = (family: string) =>

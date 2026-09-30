@@ -28,8 +28,8 @@ export type CalcResult = {
 const HOURS_PER_WORKING_DAY = 8;
 
 function clamp(n: number, min: number, max: number): number {
-  if (!Number.isFinite(n)) return min;
-  return Math.min(Math.max(n, min), max);
+  if (Number.isNaN(n)) return min;
+  return Math.min(Math.max(n, min), max); // ±Infinity clamps to the nearest bound
 }
 
 export function sanitise(input: Partial<CalcInput>): CalcInput {

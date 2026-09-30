@@ -1,3 +1,4 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import {
@@ -17,7 +18,7 @@ export const maxDuration = 60;
 const GATEWAYS = ["Stripe", "Tabby", "Tamara", "Checkout", "COD", "Telr"];
 
 // GET /api/integrations/zoho/account-config
-export async function GET() {
+async function handleGET() {
   if (!zohoConfigured()) {
     return NextResponse.json(
       { error: "Zoho is not configured — set ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_ORGANIZATION_ID" },
@@ -56,7 +57,7 @@ export async function GET() {
 }
 
 // POST — body: { bankAccountId, feeAccountId, clearingByGateway, defaultIncomeAccountId, expenseAccountByKind, actor? }
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const bankAccountId = String(body.bankAccountId ?? "");
   const feeAccountId = String(body.feeAccountId ?? "");
@@ -102,4 +103,13 @@ export async function POST(request: Request) {
     incomeReadiness: missingIncomeMapping(effective),
     kindReadiness: BANK_LINE_KINDS.map((k) => ({ kind: k, missing: missingExpenseMappingFor(k, effective) })),
   });
+}
+
+// Multi-org: every Zoho call below runs in the organisation named by ?zohoOrg= (default: main) — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<Record<string, string>> }) {
+  return zohoOrgScoped(req, () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
+}
+
+export async function POST(req: Request, ctx: { params: Promise<Record<string, string>> }) {
+  return zohoOrgScoped(req, () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

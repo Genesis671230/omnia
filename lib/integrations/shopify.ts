@@ -3,7 +3,9 @@
 
 import { supabase } from "../supabase";
 
-export type ShopifyStoreCode = "WA" | "UAE" | "KSA" | "MAIN";
+/** Store code as used in orders.store_id ("WA", "UAE", …). Any string: each
+ *  deployment lists its own stores in SHOPIFY_STORE_CODES. */
+export type ShopifyStoreCode = string;
 
 export type ShopifyStoreConfig = {
   code: ShopifyStoreCode;
@@ -11,30 +13,13 @@ export type ShopifyStoreConfig = {
   token: string;
 };
 
+/** Every store in SHOPIFY_STORE_CODES (default: Omnia's WA,UAE,KSA,MAIN) that
+ *  has SHOPIFY_<CODE>_URL and SHOPIFY_<CODE>_TOKEN set. */
 export function getShopifyStores(): ShopifyStoreConfig[] {
-  const defs: { code: ShopifyStoreCode; url?: string; token?: string }[] = [
-    {
-      code: "WA",
-      url: process.env.SHOPIFY_WA_URL,
-      token: process.env.SHOPIFY_WA_TOKEN,
-    },
-    {
-      code: "UAE",
-      url: process.env.SHOPIFY_UAE_URL,
-      token: process.env.SHOPIFY_UAE_TOKEN,
-    },
-    {
-      code: "KSA",
-      url: process.env.SHOPIFY_KSA_URL,
-      token: process.env.SHOPIFY_KSA_TOKEN,
-    },
-    {
-      code: "MAIN",
-      url: process.env.SHOPIFY_MAIN_URL,
-      token: process.env.SHOPIFY_MAIN_TOKEN,
-    },
-  ];
-  return defs
+  const codes = (process.env.SHOPIFY_STORE_CODES || "WA,UAE,KSA,MAIN")
+    .split(",").map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z0-9_]+$/.test(c));
+  return codes
+    .map((code) => ({ code, url: process.env[`SHOPIFY_${code}_URL`], token: process.env[`SHOPIFY_${code}_TOKEN`] }))
     .filter((d): d is ShopifyStoreConfig => Boolean(d.url && d.token))
     .map((d) => ({ ...d, url: d.url.replace(/\/+$/, "") }));
 }

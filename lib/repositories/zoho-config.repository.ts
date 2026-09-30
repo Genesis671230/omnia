@@ -1,7 +1,16 @@
 import { supabase } from "@/lib/supabase";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
+import { ENV_CONNECTION_ID, zohoConnectionId } from "@/lib/integrations/zoho-context";
 
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+
+/** Mapping row for the organisation in scope. The default (env) org keeps the
+ *  original "omnia" row; every other org gets "omnia:<connection>". Account
+ *  ids differ per Zoho organisation, so a mapping must never be shared. */
+export function accountConfigKey(): string {
+  const c = zohoConnectionId();
+  return c === ENV_CONNECTION_ID ? TENANT : `${TENANT}:${c}`;
+}
 
 export type ZohoPostingRow = {
   bank_line_id: string;
@@ -27,7 +36,7 @@ export const ZohoConfigRepository = {
     const { data, error } = await supabase
       .from("zoho_account_config")
       .select("bank_account_id, fee_account_id, clearing_by_gateway, default_income_account_id, expense_account_by_kind")
-      .eq("id", TENANT)
+      .eq("id", accountConfigKey())
       .maybeSingle();
     if (error || !data) return null;
     return {
@@ -42,8 +51,9 @@ export const ZohoConfigRepository = {
   async saveAccountMap(map: ZohoAccountMap, updatedBy: string) {
     const { error } = await supabase.from("zoho_account_config").upsert(
       {
-        id: TENANT,
+        id: accountConfigKey(),
         tenant_id: TENANT,
+        zoho_connection_id: zohoConnectionId() === ENV_CONNECTION_ID ? "" : zohoConnectionId(),
         bank_account_id: map.bankAccountId,
         fee_account_id: map.feeAccountId,
         clearing_by_gateway: map.clearingByGateway,

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { BRAND, brandInitial } from "@/lib/config/brand";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -20,7 +21,7 @@ const links = [
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
-function Brand() { return <Link href="/" className="flex items-center gap-3"><span className="flex size-9 items-center justify-center rounded-full border border-sidebar-primary/50 font-serif text-lg text-sidebar-primary">O</span><span><span className="block font-serif text-xl tracking-[0.18em]">OMNIA</span><span className="block text-[10px] uppercase tracking-[0.28em] text-sidebar-foreground/50">Finance OS</span></span></Link> }
+function Brand() { return <Link href="/" className="flex items-center gap-3"><span className="flex size-9 items-center justify-center rounded-full border border-sidebar-primary/50 font-serif text-lg text-sidebar-primary">{brandInitial}</span><span><span className="block font-serif text-xl uppercase tracking-[0.18em]">{BRAND.name}</span><span className="block text-[10px] uppercase tracking-[0.28em] text-sidebar-foreground/50">{BRAND.product}</span></span></Link> }
 function Nav() {
   const path = usePathname()
   return <nav className="flex flex-col gap-1" aria-label="Finance navigation">{links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground", path === href && "bg-sidebar-accent text-sidebar-primary")}><Icon className="size-4" />{label}</Link>)}</nav>

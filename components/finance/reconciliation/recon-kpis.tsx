@@ -23,7 +23,7 @@ const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en
 function Trend({ now, prev, upIsGood, fmt, prevDay }: { now: number; prev: number; upIsGood: boolean; fmt: (n: number) => string; prevDay: string }) {
   const diff = now - prev;
   if (Math.abs(diff) < 0.005) {
-    return <span className="inline-flex items-center gap-1 text-[11px] text-[#8A8175]"><Minus size={11} aria-hidden /> same as {shortDay(prevDay)}</span>;
+    return <span className="inline-flex items-center gap-1 text-[11px] text-[#5E6B85]"><Minus size={11} aria-hidden /> same as {shortDay(prevDay)}</span>;
   }
   const up = diff > 0;
   const good = up === upIsGood;
@@ -46,13 +46,13 @@ export function ReconKpis({ lines, loading }: { lines: ReconLine[]; loading: boo
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {CARDS.map((c) => (
-        <div key={c.key} className="rounded-xl border border-[#EAE3D6] bg-white px-3.5 py-2.5">
-          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8A8175]">{c.label}</div>
+        <div key={c.key} className="rounded-[20px] border border-[#D8E1F1] bg-[var(--os-card)] px-4 py-3">
+          <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#5E6B85]">{c.label}</div>
           {loading ? (
-            <div className="mt-2 h-5 w-2/3 animate-pulse rounded bg-[#EFE9DD]" />
+            <div className="mt-2 h-5 w-2/3 animate-pulse rounded bg-[#E9EEF8]" />
           ) : (
             <>
-              <div className={`mt-0.5 font-mono text-[18px] font-semibold tabular-nums ${c.key === "exceptions" && total.exceptions > 0 ? "text-[#9B3A24]" : "text-[#1F1B16]"}`}>
+              <div className={`mt-0.5 font-mono text-[18px] font-semibold tabular-nums ${c.key === "exceptions" && total.exceptions > 0 ? "text-[#9B3A24]" : "text-[#0F1B3D]"}`}>
                 {c.fmt(total[c.key])}
               </div>
               <div className="h-4">

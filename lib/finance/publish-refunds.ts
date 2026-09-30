@@ -45,6 +45,7 @@ import {
   refundReferences,
   ROUNDING_TOLERANCE_AED,
 } from "@/lib/finance/settlement-posting";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export type RefundStatus = "booked" | "planned" | "review" | "failed" | "busy" | "unlinked";
 
@@ -224,7 +225,7 @@ async function publishOne(
     // 1. the invoice being refunded
     let candidates;
     try {
-      candidates = await findZohoInvoiceCandidates(r.orderNumber, accessToken, process.env.ZOHO_ORGANIZATION_ID!);
+      candidates = await findZohoInvoiceCandidates(r.orderNumber, accessToken, zohoOrgId());
     } catch (e) {
       throw new ZohoRejection((e as Error).message);
     }

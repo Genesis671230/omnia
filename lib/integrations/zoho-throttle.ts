@@ -19,10 +19,17 @@
 // counting it would waste real quota headroom.
 
 import { supabase } from "@/lib/supabase";
+import { ENV_CONNECTION_ID, currentZohoScope, type ZohoOrgScope } from "./zoho-context";
 
 const MIN_GAP_MS = Number(process.env.ZOHO_MIN_GAP_MS ?? 150);
 const DAILY_BUDGET = Number(process.env.ZOHO_DAILY_BUDGET ?? 7000);
 const MAX_429_RETRIES = Number(process.env.ZOHO_MAX_429_RETRIES ?? 3);
+// A per-minute breach gets "blocked for some time" with Retry-After: 3600.
+// Every Zoho call in the process chains through one queue, so honouring that
+// literally froze invoicing, sync and recon for an hour behind one caller
+// (seen 2026-09-25 on /chartofaccounts/transactions). Longer waits than this
+// hand the 429 back to the caller instead.
+const MAX_RETRY_WAIT_MS = Number(process.env.ZOHO_MAX_RETRY_WAIT_MS ?? 120_000);
 
 export class ZohoQuotaExceededError extends Error {
   readonly used: number;
@@ -51,17 +58,20 @@ let lastCallAt = 0;
 // or throws ZohoQuotaExceededError when the budget is spent. If the DB call
 // itself fails we log and allow the request — a monitoring blip must not
 // wedge invoicing.
-async function reserveDailyQuota(label: string): Promise<number> {
+async function reserveDailyQuota(label: string, scope?: ZohoOrgScope): Promise<number> {
+  // Zoho's cap is per organisation: a second org counts against its own
+  // budget (zoho_api_usage_org). The default org keeps its original counter.
+  const otherOrg = scope && scope.connectionId !== ENV_CONNECTION_ID ? scope : null;
+  const budget = otherOrg ? otherOrg.dailyBudget : DAILY_BUDGET;
   try {
     // The label rides along on the same RPC that reserves the unit, so the
     // per-endpoint counters always sum to the day's total. Before this, the
     // label existed but was only ever printed in a 429 warning — which meant
     // "where did 5,000 calls go?" could only be answered by reading every
     // call site by hand.
-    const { data, error } = await supabase.rpc("zoho_consume_quota", {
-      p_limit: DAILY_BUDGET,
-      p_label: label,
-    });
+    const { data, error } = otherOrg
+      ? await supabase.rpc("zoho_consume_quota_org", { p_org: otherOrg.orgId, p_limit: budget, p_label: label })
+      : await supabase.rpc("zoho_consume_quota", { p_limit: DAILY_BUDGET, p_label: label });
     if (error) {
       console.error("[zoho-throttle] quota rpc failed, allowing call:", error.message);
       return -1;
@@ -69,7 +79,7 @@ async function reserveDailyQuota(label: string): Promise<number> {
     const row = Array.isArray(data) ? data[0] : data;
     const allowed = row?.allowed ?? true;
     const used = Number(row?.used ?? -1);
-    if (!allowed) throw new ZohoQuotaExceededError(used, DAILY_BUDGET);
+    if (!allowed) throw new ZohoQuotaExceededError(used, budget);
     return used;
   } catch (e) {
     if (e instanceof ZohoQuotaExceededError) throw e;
@@ -139,12 +149,14 @@ export async function zohoThrottledFetch(
   init?: RequestInit,
   opts: ZohoFetchOpts = {},
 ): Promise<Response> {
+  // Captured now, not inside run(): run() executes later off the shared queue.
+  const scope = currentZohoScope();
   const run = async (): Promise<Response> => {
     const gap = MIN_GAP_MS - (Date.now() - lastCallAt);
     if (gap > 0) await sleep(gap);
 
     if (!opts.skipQuota) {
-      const used = await reserveDailyQuota(opts.label ?? deriveZohoLabel(input, init));
+      const used = await reserveDailyQuota(opts.label ?? deriveZohoLabel(input, init), scope);
       if (used >= 0 && used % 250 === 0) {
         console.warn(`[zoho-throttle] ${used}/${DAILY_BUDGET} Zoho calls used today`);
       }
@@ -158,6 +170,10 @@ export async function zohoThrottledFetch(
       attempt += 1;
       const retryAfter = Number(res.headers.get("Retry-After"));
       const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 1000;
+      if (waitMs > MAX_RETRY_WAIT_MS) {
+        console.warn(`[zoho-throttle] 429 on ${opts.label ?? String(input)} — Retry-After ${waitMs}ms exceeds cap, returning 429`);
+        return res;
+      }
       console.warn(
         `[zoho-throttle] 429 on ${opts.label ?? String(input)} — retry ${attempt}/${MAX_429_RETRIES} in ${waitMs}ms`,
       );

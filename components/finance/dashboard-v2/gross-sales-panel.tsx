@@ -632,7 +632,7 @@ export const GROSS_SALES_CSS = `
 .gs-month select { min-height: 32px; border: 0; border-radius: 7px; padding: 0 8px; background: rgba(255,255,255,.94); color: #131c38; font-size: 12px; font-weight: 600; cursor: pointer; }
 
 .gs-month-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; }
-.gs-month-head h3 { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 16px; color: #f4f7ff; }
+.gs-month-head h3 { margin: 0; font-family: var(--os-font); font-weight: 500; font-size: 16px; color: #f4f7ff; }
 .gs-month-head span { font-size: 11.5px; color: #8ba4cc; }
 .gs-export { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #e8eefc; font-size: 12px; font-weight: 600; cursor: pointer; }
 .gs-export:hover:not(:disabled) { background: rgba(255,255,255,.12); }

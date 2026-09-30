@@ -1,3 +1,4 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import {
@@ -22,7 +23,7 @@ export const maxDuration = 60;
 //
 // Only refunds this app wrote (our …/RFD, …/RFC, …/RFD/M… references) are
 // deleted; a credit note carrying anyone else's refund is refused untouched.
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   if (!zohoConfigured()) return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   const body = await request.json().catch(() => ({}));
   const bankLineId = String(body.bankLineId ?? "");
@@ -134,4 +135,9 @@ export async function POST(request: Request) {
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
+}
+
+// Multi-org: every Zoho call below runs in the organisation of the bankLineId's payout — lib/integrations/zoho-org.ts.
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForBankLine(String(((await req.clone().json().catch(() => ({}))) as { bankLineId?: unknown }).bankLineId ?? "")), () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

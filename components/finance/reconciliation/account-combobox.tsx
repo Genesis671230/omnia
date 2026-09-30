@@ -64,7 +64,7 @@ export function AccountCombobox({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-[13px] ${
-          selected ? "border-[#D6CCBA] bg-white text-[#1F1B16]" : "border-[#E0A45F] bg-[#FFF7EA] text-[#8A8175]"
+          selected ? "border-[#C9D5EA] bg-white text-[#0F1B3D]" : "border-[#E0A45F] bg-[#FFF7EA] text-[#5E6B85]"
         }`}
       >
         <span className="flex min-w-0 items-center gap-1 truncate">
@@ -76,13 +76,13 @@ export function AccountCombobox({
             </span>
           )}
         </span>
-        <ChevronDown size={14} className="shrink-0 text-[#8A8175]" />
+        <ChevronDown size={14} className="shrink-0 text-[#5E6B85]" />
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 right-0 z-50 mb-1 max-h-64 overflow-hidden rounded-lg border border-[#D6CCBA] bg-white shadow-lg">
-          <div className="flex items-center gap-2 border-b border-[#EAE3D6] px-3 py-2">
-            <Search size={13} className="text-[#8A8175]" />
+        <div className="absolute bottom-full left-0 right-0 z-50 mb-1 max-h-64 overflow-hidden rounded-lg border border-[#C9D5EA] bg-white shadow-lg">
+          <div className="flex items-center gap-2 border-b border-[#D8E1F1] px-3 py-2">
+            <Search size={13} className="text-[#5E6B85]" />
             <input
               ref={inputRef}
               value={query}
@@ -93,21 +93,21 @@ export function AccountCombobox({
           </div>
           <div className="max-h-52 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-center text-[12px] text-[#8A8175]">No accounts match "{query}"</div>
+              <div className="px-3 py-4 text-center text-[12px] text-[#5E6B85]">No accounts match "{query}"</div>
             ) : (
               filtered.map((a) => (
                 <button
                   key={a.account_id}
                   type="button"
                   onClick={() => { onChange(a.account_id); setOpen(false); }}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] hover:bg-[#FBF8F1]"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] hover:bg-[#F3F6FC]"
                 >
                   <span className="flex min-w-0 items-center gap-1 truncate">
                     {a.account_id === defaultAccountId && <span className="shrink-0">⭐</span>}
                     <span className="truncate">{a.account_name}</span>
                     <span className="ml-1 shrink-0 text-[11px] text-[#B4AA9B]">{a.account_type}</span>
                   </span>
-                  {a.account_id === value && <Check size={14} className="shrink-0 text-[#B08343]" />}
+                  {a.account_id === value && <Check size={14} className="shrink-0 text-[#1D4ED8]" />}
                 </button>
               ))
             )}

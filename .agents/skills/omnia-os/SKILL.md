@@ -33,6 +33,16 @@ Typical chains:
 5. Scheduler code is captured at server boot; restart after editing anything it imports.
 6. Plain-language Excel reports to `~/Downloads`, a numbered list of decisions, no jargon.
 
+## Agents
+
+The skills are the knowledge; agents are the workers that use them.
+
+- `omnia-books-specialist` (`.claude/agents/`, built): reconciliation and closing end to
+  end, with its own project memory. Delegate a whole close or a stuck order to it.
+- `references/agent-roster.md`: the full team (controller, reviewer, payables,
+  reporting, UAE / GCC VAT, corporate tax), who may write what, what the tax agents need
+  confirmed before they're built, and how agents improve over time.
+
 ## Maps
 
 - `references/file-map.md`: every code file, table, route, env var by system (Zoho,

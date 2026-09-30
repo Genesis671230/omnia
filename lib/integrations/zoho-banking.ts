@@ -23,6 +23,7 @@
 // banking scopes added before expecting any of this to write.
 
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+import { ENV_CONNECTION_ID, zohoConnectionId, zohoOrgId } from "@/lib/integrations/zoho-context";
 
 const BOOKS_API_BASE = "https://www.zohoapis.com/books/v3";
 
@@ -137,6 +138,9 @@ export function buildPayoutPostings(
 
 /** Reads the account mapping from env. Throws with the missing key named. */
 export function accountMapFromEnv(): ZohoAccountMap {
+  if (zohoConnectionId() !== ENV_CONNECTION_ID) {
+    throw new Error("This Zoho organisation has no account mapping yet — map its accounts in Settings");
+  }
   const bankAccountId = process.env.ZOHO_BANK_ACCOUNT_ID;
   const feeAccountId = process.env.ZOHO_FEE_ACCOUNT_ID;
   if (!bankAccountId) throw new Error("ZOHO_BANK_ACCOUNT_ID is not set");
@@ -155,6 +159,7 @@ export function accountMapFromEnv(): ZohoAccountMap {
 }
 
 export function zohoBankingConfigured(): boolean {
+  if (zohoConnectionId() !== ENV_CONNECTION_ID) return false; // env ids are the main org's
   return Boolean(
     process.env.ZOHO_BANK_ACCOUNT_ID &&
       process.env.ZOHO_FEE_ACCOUNT_ID &&
@@ -187,6 +192,8 @@ export function mergeAccountMaps(
 /** env, but never throwing — for the merge path, where a missing env value is
  *  normal because the database is expected to supply it. */
 export function accountMapFromEnvPartial(): Partial<ZohoAccountMap> {
+  // Env account ids are the main organisation's; another org must not inherit them.
+  if (zohoConnectionId() !== ENV_CONNECTION_ID) return {};
   let clearingByGateway: Record<string, string> = {};
   const raw = process.env.ZOHO_CLEARING_ACCOUNTS;
   if (raw) {
@@ -230,7 +237,7 @@ async function booksFetch(
   accessToken: string,
   init?: RequestInit & { query?: Record<string, string> },
 ): Promise<Record<string, unknown>> {
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const qs = new URLSearchParams({ organization_id: orgId, ...(init?.query ?? {}) });
   const res = await zohoThrottledFetch(`${BOOKS_API_BASE}${path}?${qs}`, {
     ...init,

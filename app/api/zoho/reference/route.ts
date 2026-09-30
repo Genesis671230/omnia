@@ -1,6 +1,8 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
+import { zohoConnectionId, zohoOrgId } from "@/lib/integrations/zoho-context";
 
 /* Reference data for the posting dropdowns: expense accounts, equity accounts,
  * bank accounts and taxes. Four Zoho reads.
@@ -18,7 +20,6 @@ import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 export const maxDuration = 60;
 
 const BOOKS_BASE = process.env.ZOHO_BOOKS_BASE ?? "https://www.zohoapis.com/books/v3";
-const ORG_ID = process.env.ZOHO_ORGANIZATION_ID ?? "";
 const CACHE_TTL_MS = Number(process.env.ZOHO_REFERENCE_TTL_MS ?? 30 * 60 * 1000);
 
 type ReferenceData = {
@@ -34,7 +35,8 @@ type ReferenceData = {
   fetchedAt: string;
 };
 
-let cache: { at: number; data: ReferenceData } | null = null;
+// Keyed by Zoho organisation — one org's accounts must never be served to another.
+const caches = new Map<string, { at: number; data: ReferenceData }>();
 
 /* Throws on a Zoho error rather than returning undefined. The previous version
  * had its status checks commented out, so a failed read became `undefined` and
@@ -42,7 +44,7 @@ let cache: { at: number; data: ReferenceData } | null = null;
  * actual Zoho message. */
 async function fetchZoho(path: string, token: string, query: Record<string, string> = {}) {
   const url = new URL(`${BOOKS_BASE}${path}`);
-  url.searchParams.set("organization_id", ORG_ID);
+  url.searchParams.set("organization_id", zohoOrgId());
   for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
 
   const res = await zohoThrottledFetch(url.toString(), {
@@ -61,10 +63,11 @@ async function fetchZoho(path: string, token: string, query: Record<string, stri
   return json;
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!zohoConfigured()) return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
 
   const refresh = new URL(request.url).searchParams.get("refresh") === "1";
+  const cache = caches.get(zohoConnectionId());
   if (!refresh && cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return NextResponse.json({ ...cache.data, cached: true });
   }
@@ -101,9 +104,14 @@ export async function GET(request: Request) {
       fetchedAt: new Date().toISOString(),
     };
 
-    cache = { at: Date.now(), data };
+    caches.set(zohoConnectionId(), { at: Date.now(), data });
     return NextResponse.json({ ...data, cached: false });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
+}
+
+// Multi-org: every Zoho call below runs in the organisation named by ?zohoOrg= (default: main) — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<Record<string, string>> }) {
+  return zohoOrgScoped(req, () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

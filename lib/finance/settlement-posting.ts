@@ -250,29 +250,126 @@ export type PostingAccounts = {
   deliveryAccountId?: string | null;
 };
 
-/** One VAT-inclusive expense for all the delivery / return charges a courier
- *  netted out of a COD remittance, paid out of the clearing account. */
+/** A courier charge as a Zoho line: which order it was for, and how much. */
+export type DeliveryChargeLine = { description: string; amount: number };
+
+/** One itemized expense for courier delivery / return charges — a line per
+ *  order, so every charge carries its order number in Zoho — paid out of
+ *  `paidThroughAccountId`: the clearing account when the company booking it
+ *  received the remittance, or its intercompany payable when the sister
+ *  company's remittance paid the charge on its behalf. VAT-inclusive when a
+ *  tax is given (the courier bills 5% on top of Del Price). */
 export function buildDeliveryChargesExpenseBody(opts: {
-  total: number;
-  accounts: PostingAccounts;
+  lines: DeliveryChargeLine[];
+  expenseAccountId: string;
+  paidThroughAccountId: string;
+  vatTaxId?: string | null;
   date: string;
   reference: string;
   description: string;
 }) {
-  const withVat = !!opts.accounts.vatTaxId;
+  const withVat = !!opts.vatTaxId;
   return {
-    account_id: opts.accounts.deliveryAccountId as string,
-    paid_through_account_id: opts.accounts.depositAccountId,
+    paid_through_account_id: opts.paidThroughAccountId,
     date: opts.date,
-    amount: round2(opts.total),
     reference_number: opts.reference,
     description: opts.description.slice(0, 500),
     tax_treatment: "vat_registered",
     place_of_supply: "DU",
     is_reverse_charge_applied: false,
     is_inclusive_tax: withVat,
-    ...(withVat ? { tax_id: opts.accounts.vatTaxId as string } : {}),
+    line_items: opts.lines.map((l, i) => ({
+      account_id: opts.expenseAccountId,
+      amount: round2(l.amount),
+      description: l.description.slice(0, 250),
+      item_order: i + 1,
+      ...(withVat ? { tax_id: opts.vatTaxId as string } : {}),
+    })),
   };
+}
+
+/** The voucher company's side of charges it paid for its sister company:
+ *  Dr the intercompany receivable, one line per order, / Cr clearing for the
+ *  total. VAT-inclusive amounts — the sister company claims the input VAT on
+ *  its own expense, so none is booked here. */
+export function buildIntercompanyDeliveryJournalBody(opts: {
+  lines: DeliveryChargeLine[];
+  dueFromAccountId: string;
+  clearingAccountId: string;
+  date: string;
+  reference: string;
+  description: string;
+}) {
+  const total = round2(opts.lines.reduce((s, l) => s + l.amount, 0));
+  return {
+    journal_date: opts.date,
+    reference_number: opts.reference,
+    notes: opts.description.slice(0, 500),
+    line_items: [
+      ...opts.lines.map((l) => ({
+        account_id: opts.dueFromAccountId,
+        debit_or_credit: "debit",
+        amount: round2(l.amount),
+        description: l.description.slice(0, 250),
+      })),
+      {
+        account_id: opts.clearingAccountId,
+        debit_or_credit: "credit",
+        amount: total,
+        description: opts.description.slice(0, 250),
+      },
+    ],
+  };
+}
+
+/** The sister company's side as a journal, for when Zoho won't take its
+ *  intercompany account as an expense's Paid Through (code 11016 — e.g. an
+ *  "other asset" account). Dr the delivery charges account a line per order
+ *  (ex VAT when VAT is claimed), Dr Input VAT for the VAT, Cr the
+ *  intercompany account for the total — the same effect as the expense. */
+export function buildDeliveryChargesJournalBody(opts: {
+  lines: (DeliveryChargeLine & { exVat: number; vat: number })[];
+  expenseAccountId: string;
+  creditAccountId: string;
+  /** Set = claim the VAT: order lines go ex VAT, VAT to this account. */
+  inputVatAccountId?: string | null;
+  date: string;
+  reference: string;
+  description: string;
+}) {
+  const withVat = !!opts.inputVatAccountId;
+  const total = round2(opts.lines.reduce((s, l) => s + l.amount, 0));
+  const vat = round2(opts.lines.reduce((s, l) => s + l.vat, 0));
+  const debits = opts.lines.map((l) => ({
+    account_id: opts.expenseAccountId,
+    debit_or_credit: "debit",
+    amount: round2(withVat ? l.exVat : l.amount),
+    description: l.description.slice(0, 250),
+  }));
+  // Ex-VAT lines are rounded one by one; any cent left over goes on the VAT
+  // line so the journal balances exactly to the voucher's charges.
+  const vatLine = withVat ? round2(total - debits.reduce((s, d) => s + d.amount, 0)) : 0;
+  return {
+    journal_date: opts.date,
+    reference_number: opts.reference,
+    notes: opts.description.slice(0, 500),
+    line_items: [
+      ...debits,
+      ...(withVat && vatLine !== 0
+        ? [{ account_id: opts.inputVatAccountId as string, debit_or_credit: "debit", amount: vatLine, description: `Input VAT on delivery charges (${vat.toFixed(2)})` }]
+        : []),
+      { account_id: opts.creditAccountId, debit_or_credit: "credit", amount: total, description: opts.description.slice(0, 250) },
+    ],
+  };
+}
+
+/** References for a voucher's delivery charges. The company that received
+ *  the remittance books its own charges under `/DLV` (as before); charges
+ *  paid for a sister company book under `/DLV-IC-<org>` on BOTH sides —
+ *  different organisations, so the same reference is safe and ties them. */
+export function deliveryReferences(baseReference: string, counterpartOrg?: string) {
+  const base = baseReference.trim().slice(0, 80);
+  return counterpartOrg ? `${base}/DLV-IC-${counterpartOrg.slice(0, 14)}` : `${base}/DLV`;
 }
 
 /** Stable per-order references, so a retry can find what an earlier attempt

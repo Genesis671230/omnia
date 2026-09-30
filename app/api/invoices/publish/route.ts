@@ -4,6 +4,7 @@ import {
   getZohoInvoiceDetail,
   createZohoCustomerPayment,
 } from "@/lib/integrations/zoho";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "invoiceIds, accountId, date are required" }), { status: 400 });
   }
 
-  const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+  const orgId = zohoOrgId();
   const accessToken = await getAccessToken();
 
   const stream = new ReadableStream({

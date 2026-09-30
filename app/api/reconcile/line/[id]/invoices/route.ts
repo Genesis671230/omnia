@@ -123,7 +123,7 @@
 //     }
 
 //     const accessToken = await getAccessToken();
-//     const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+//     const orgId = zohoOrgId();
 
 //     const looked = await mapWithConcurrency(
 //       refs,
@@ -175,11 +175,15 @@
 //   return null;
 // }
 
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { runReconciliation } from "@/lib/reconciliation/engine";
 import { findZohoInvoiceCandidates, getAccessToken } from "@/lib/integrations/zoho";
 import { SettlementsRepository } from "@/lib/repositories/settlements.repository";
 import { bankScaleFor, isCrossBorderCurrency, pickInvoiceForOrder } from "@/lib/finance/settlement-posting";
+import { zohoDocumentExists } from "@/lib/integrations/zoho-settlement-posting";
+import { isUnsettledZohoId } from "@/lib/repositories/settlements.repository";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export const maxDuration = 60;
 
@@ -284,7 +288,7 @@ async function mapWithConcurrency<T, R>(items: T[], mapper: (item: T) => Promise
 
 const bareRef = (r: string) => r.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
     const line = (await runReconciliation()).find((l) => l.id === id);
@@ -329,13 +333,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // each paced by the throttle and preceded by a quota RPC. Keep it to the
     // orders that can actually carry a payment: refund and unmatched lines have
     // no invoice to close.
+    const settlementRows = await SettlementsRepository.listByBankLineId(id);
     const bookedInvoice = new Map<string, string>();
     const snapshots = new Map<string, InvoiceStatus>();
     // A SAR order on an AED payout is priced at two different rates, so its
     // invoice sits a couple of percent off the gateway's figure. The picker
     // needs to know that or it refuses to choose between two live invoices.
     const orderCurrencies = new Map<string, string | null>();
-    for (const s of await SettlementsRepository.listByBankLineId(id)) {
+    for (const s of settlementRows) {
       orderCurrencies.set(s.order_number, s.order_currency ?? null);
       orderCurrencies.set(bareRef(s.order_number), s.order_currency ?? null);
       if (s.zoho_invoice_id) {
@@ -357,7 +362,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     const accessToken = await getAccessToken();
-    const orgId = process.env.ZOHO_ORGANIZATION_ID!;
+    const orgId = zohoOrgId();
 
     // The throttle serialises Zoho calls anyway; concurrency only overlaps the waits.
     const looked = await mapWithConcurrency(refs, async (ref) => {
@@ -400,9 +405,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         })),
     ).catch(() => { /* a cache write must never fail the read */ });
 
+    // A fee expense or FX journal we stored can be deleted in Zoho afterwards
+    // (five Shopify fees on 2026-09-10 were), leaving the row "booked" with
+    // nothing behind it and nothing selectable to re-post. Re-check each one
+    // and forget ids that no longer exist, so the order becomes bookable again.
+    const docChecks = settlementRows.flatMap((s) => [
+      ...(s.zoho_fee_expense_id && !isUnsettledZohoId(s.zoho_fee_expense_id) ? [{ s, kind: "expenses" as const, docId: s.zoho_fee_expense_id }] : []),
+      ...(s.zoho_fx_journal_id && !isUnsettledZohoId(s.zoho_fx_journal_id) ? [{ s, kind: "journals" as const, docId: s.zoho_fx_journal_id }] : []),
+    ]);
+    const missingDocs: { orderNumber: string; kind: "fee" | "fx"; id: string }[] = [];
+    await mapWithConcurrency(docChecks, async ({ s, kind, docId }) => {
+      const exists = await zohoDocumentExists(kind, docId, accessToken).catch(() => true); // unknown ≠ missing
+      if (exists) return;
+      missingDocs.push({ orderNumber: s.order_number, kind: kind === "expenses" ? "fee" : "fx", id: docId });
+      await SettlementsRepository.updatePosting(s.id, kind === "expenses" ? { zoho_fee_expense_id: null } : { zoho_fx_journal_id: null });
+    }, 5);
+
     return NextResponse.json({
       bankLineId: id,
       statuses,
+      missingDocs,
       fetched: looked.length,
       cached: fellBack,
       unchecked: 0,
@@ -411,4 +433,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     console.error(`invoice-status GET failed for line ${id}:`, e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
+}
+
+// Multi-org: every Zoho call below runs in the organisation of this bank credit's payout — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForBankLine((await ctx.params).id), () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

@@ -67,8 +67,19 @@ function sameOrders(a: string[], b: string[]): boolean {
   return true;
 }
 
+/** Ids the gateway itself issued, unique across its whole account: the same
+ *  id is always the same payout, whatever its order list says this time. */
+const GATEWAY_UNIQUE_ID = /^(STRIPE-po_[A-Za-z0-9]+|SHOPIFY-[A-Z]+-\d+)$/;
+
 export function resolvePayoutId(input: ResolvePayoutIdInput): string {
   const { statementNo, merchantCode, merchantName, orderRefs, existing } = input;
+
+  // The statement-number dance below exists for Tabby, which reuses one
+  // number for every store it pays that day. A Stripe po_… or Shopify payout
+  // id never repeats — re-reading it with a corrected order list (a refund
+  // row, an unreferenced charge) is the SAME payout. Fingerprinting it made
+  // "STRIPE-po_1UCqGq…-33c6b7", a duplicate that could steal its bank credit.
+  if (GATEWAY_UNIQUE_ID.test(statementNo)) return statementNo;
 
   // Merchant code is the tighter discriminator ("OSUAEPL", "ORPL", "AE"); the
   // display name is the fallback when a report omits the code.

@@ -1,3 +1,4 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { fetchZohoBankAccounts, accountMapFromEnv } from "@/lib/integrations/zoho-banking";
@@ -10,7 +11,7 @@ import { fetchZohoBankAccounts, accountMapFromEnv } from "@/lib/integrations/zoh
 // those IDs are already configured, and flags any configured ID that no
 // longer exists in Zoho — a stale mapping would otherwise only surface as a
 // confusing API error at the moment a real payout is being posted.
-export async function GET() {
+async function handleGET() {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
@@ -51,4 +52,9 @@ export async function GET() {
     configError,
     unknownIds,
   });
+}
+
+// Multi-org: every Zoho call below runs in the organisation named by ?zohoOrg= (default: main) — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<Record<string, string>> }) {
+  return zohoOrgScoped(req, () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

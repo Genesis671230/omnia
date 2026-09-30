@@ -1,9 +1,11 @@
+import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { findZohoInvoiceCandidates, getAccessToken, zohoConfigured } from "@/lib/integrations/zoho";
 import { ZohoQuotaExceededError } from "@/lib/integrations/zoho-throttle";
 import { isUnsettledZohoId, SettlementsRepository, type ForceAllocation } from "@/lib/repositories/settlements.repository";
 import { buildCustomerPaymentBody } from "@/lib/integrations/zoho";
 import { createCustomerPayment, customerPaymentExists, ZohoRejection } from "@/lib/integrations/zoho-settlement-posting";
+import { zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export const maxDuration = 60;
 
@@ -21,7 +23,7 @@ export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const orgId = () => process.env.ZOHO_ORGANIZATION_ID!;
+const orgId = () => zohoOrgId();
 
 async function candidatesFor(orderNumber: string) {
   const rows = await findZohoInvoiceCandidates(orderNumber, await getAccessToken(), orgId());
@@ -40,7 +42,7 @@ async function candidatesFor(orderNumber: string) {
 const fail = (e: unknown) =>
   NextResponse.json({ error: (e as Error).message }, { status: e instanceof ZohoQuotaExceededError ? 429 : 500 });
 
-export async function GET(_req: Request, { params }: Ctx) {
+async function handleGET(_req: Request, { params }: Ctx) {
   if (!zohoConfigured()) return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   const { id } = await params;
   try {
@@ -61,7 +63,7 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-export async function POST(request: Request, { params }: Ctx) {
+async function handlePOST(request: Request, { params }: Ctx) {
   if (!zohoConfigured()) return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
@@ -166,7 +168,7 @@ export async function POST(request: Request, { params }: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, { params }: Ctx) {
+async function handleDELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
   try {
     const s = await SettlementsRepository.getById(id);
@@ -178,4 +180,17 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   } catch (e) {
     return fail(e);
   }
+}
+
+// Multi-org: every Zoho call below runs in the organisation of this settlement's payout — lib/integrations/zoho-org.ts.
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForSettlement((await ctx.params).id), () => (handleGET as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
+}
+
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForSettlement((await ctx.params).id), () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
+}
+
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return runInZohoOrgOr400(await zohoOrgForSettlement((await ctx.params).id), () => (handleDELETE as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

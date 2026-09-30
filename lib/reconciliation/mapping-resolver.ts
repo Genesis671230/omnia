@@ -38,6 +38,8 @@ export type DraftPosting = {
   note?: string;
   /** The pre-filled note, before any edit. */
   defaultNote?: string;
+  /** Money in or out of the bank — a debit can also be booked as a supplier payment. */
+  direction?: "credit" | "debit";
 };
 
 const KIND_TO_ZOHO_TYPE: Record<TransactionKind, ZohoTransactionType> = {

@@ -41,6 +41,13 @@ posting happens only for sets the founder named. The loop:
 7. **Read back** every document from Zoho (`scripts/readback.ts`) and build the ledger
    snapshot (`scripts/build-ledger-snapshot.cjs`). Report counts, AED, what was held
    and why, and the next decisions.
+8. **Flag what you held.** Every credit with an item you did not book gets a review
+   flag in the app with a note per order (both amounts, signed gap, the action), so
+   nothing lives only in a chat message. Protocol: `references/exceptions-playbook.md` §12.
+
+The in-app **Reconciliation → Zoho Ledger** tab (month snapshot, per-gateway
+reconciled vs pending, close checklist, AI close plan) is the accountant's view of the
+same close; refresh its snapshot after posting so the checklist reflects what you did.
 
 Commands, arguments and file flow: `references/closing-run.md`.
 
@@ -58,6 +65,12 @@ Commands, arguments and file flow: `references/closing-run.md`.
 | G. Paid by hand | `paid_external` | Leave the invoice; book fee + FX only if the founder says the fee was never booked (`bookFeesOnExternallyPaid`) |
 | H. Part-paid outside | review "already has … paid" | Finish by hand |
 | I. Paid, fee missing | payment `already_done`, fee `would_post` | Safe, but still ask |
+
+**When an order doesn't fit a group** (bank credit with no payout, several charges for
+one order, one order across two payouts, "booked" but missing in Zoho, sale + refund on
+one payout, disputes, duplicate payouts), read `references/exceptions-playbook.md`
+before touching it. Several "mismatches" there are not real: the missing charge was
+never loaded, and the fix is a re-sync, not a force.
 
 Why the fee + net = gross check matters: on Stripe, some charges carry a gross that
 does not equal fee + net (multi-order or previously refunded charges). Forcing those
@@ -113,8 +126,11 @@ LOCAL) before reporting. Columns, keyword rules and known gaps:
   finds no match by provider name, so pass it explicitly.
 - **WA store Stripe orders** are invoiced in AED but charged in SAR/KWD/QAR; small gaps
   are Stripe's conversion. The order row says AED, the Stripe charge says otherwise.
-- **Zoho quota**: ~5k/day org-wide (throttle budget shown by `zohoQuotaStatus()`). A full
-  month dry run ≈ 1,000 calls; check before starting.
+- **Zoho limits**: 15k/day per Zoho's headers, capped lower by our throttle budget
+  (`zohoQuotaStatus()`); a full month dry run ≈ 1,000 calls. Two limits stop runs more
+  often than the daily one: the OAuth token refresh (run a whole job in one script so
+  it fetches one token) and the ledger transactions endpoint (~50/min → blocked 1 h).
+  See `references/exceptions-playbook.md` §11.
 - **Zoho sales returns** endpoint returns 401 for this token; credit notes cover returns.
 - **Scheduler code** is captured at server boot: editing `lib/finance/*` does not change
   a running server's background jobs until restart.

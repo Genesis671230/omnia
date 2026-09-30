@@ -86,30 +86,30 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: "rgba(31,27,22,0.45)" }}
+      style={{ background: "rgba(15,27,61,0.45)" }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl p-6 shadow-2xl"
-        style={{ background: "#FFFFFF", color: "#1F1B16" }}
+        style={{ background: "#FFFFFF", color: "#0F1B3D" }}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-serif text-[22px]" style={{ color: "#1F1B16" }}>
+            <h2 className="font-normal tracking-[-0.02em] text-[22px]" style={{ color: "#0F1B3D" }}>
               Record in Zoho Books
             </h2>
-            <p className="mt-1 text-[13px]" style={{ color: "#8A8175" }}>
+            <p className="mt-1 text-[13px]" style={{ color: "#5E6B85" }}>
               {line.provider} · {line.reference || line.id.slice(0, 8)} · {line.date?.slice(0, 10) ?? "no date"}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: "#8A8175" }} aria-label="Close">
+          <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: "#5E6B85" }} aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2 py-8 text-[13px]" style={{ color: "#8A8175" }}>
+          <div className="flex items-center gap-2 py-8 text-[13px]" style={{ color: "#5E6B85" }}>
             <Loader2 size={15} className="animate-spin" /> Building the postings…
           </div>
         ) : error ? (
@@ -122,7 +122,7 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
           </div>
         ) : (
           <>
-            <p className="mb-4 text-[13px] leading-relaxed" style={{ color: "#1F1B16" }}>
+            <p className="mb-4 text-[13px] leading-relaxed" style={{ color: "#0F1B3D" }}>
               This moves money out of the <b>{line.provider} clearing account</b> — where it has been sitting since
               the customer paid — into your bank account, with the gateway&apos;s fee split off. Nothing is written
               until you confirm.
@@ -133,25 +133,25 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
                 <div
                   key={p.referenceNumber}
                   className="rounded-xl border p-3.5"
-                  style={{ borderColor: "#EAE3D6", background: "#FBF8F1" }}
+                  style={{ borderColor: "#D8E1F1", background: "#F3F6FC" }}
                 >
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <span
                       className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
-                      style={{ background: i === 0 ? "#F0F5EF" : "#FBF2E6", color: i === 0 ? "#4B7A54" : "#B0742E" }}
+                      style={{ background: i === 0 ? "#F0F5EF" : "#EAF1FD", color: i === 0 ? "#4B7A54" : "#B0742E" }}
                     >
                       {i === 0 ? "Net to bank" : "Gateway fee"}
                     </span>
-                    <span className="font-mono text-[16px] font-semibold tabular-nums" style={{ color: "#1F1B16" }}>
+                    <span className="font-mono text-[16px] font-semibold tabular-nums" style={{ color: "#0F1B3D" }}>
                       {aed2(p.amount)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: "#8A8175" }}>
+                  <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: "#5E6B85" }}>
                     <span className="font-mono">{p.from_account_id}</span>
                     <ArrowRight size={12} />
                     <span className="font-mono">{p.to_account_id}</span>
                   </div>
-                  <p className="mt-1.5 text-[12px]" style={{ color: "#8A8175" }}>
+                  <p className="mt-1.5 text-[12px]" style={{ color: "#5E6B85" }}>
                     {p.description} · ref <span className="font-mono">{p.referenceNumber}</span>
                   </p>
                 </div>
@@ -160,7 +160,7 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
 
             <div
               className="mt-3 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[13px]"
-              style={{ background: "#FBF3E6", color: "#6F5325" }}
+              style={{ background: "#EAF1FD", color: "#1E3A8A" }}
             >
               <span>Total leaving the clearing account</span>
               <b className="font-mono tabular-nums">{aed2(total)}</b>
@@ -171,7 +171,7 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
                 onClick={post}
                 disabled={posting}
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-medium disabled:opacity-60"
-                style={{ background: "#B08343", color: "#FFFFFF" }}
+                style={{ background: "#1D4ED8", color: "#FFFFFF" }}
               >
                 {posting ? <Loader2 size={15} className="animate-spin" /> : <BookCheck size={15} />}
                 Post to Zoho Books
@@ -179,7 +179,7 @@ export function ZohoPostDialog({ line, onClose, onPosted }: {
               <button
                 onClick={onClose}
                 className="rounded-lg border px-4 py-2.5 text-[13px] font-medium"
-                style={{ borderColor: "#D6CCBA", background: "#FFFFFF", color: "#1F1B16" }}
+                style={{ borderColor: "#C9D5EA", background: "#FFFFFF", color: "#0F1B3D" }}
               >
                 Cancel
               </button>

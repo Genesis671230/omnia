@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROLES } from "@/lib/auth-config";
+import { brandTitle } from "@/lib/config/brand";
 
 export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
@@ -61,7 +62,7 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
       <CardHeader className="space-y-1">
         {/* Brand mark on mobile, where the left panel is hidden */}
         <div className="mb-2 font-[family-name:var(--font-cormorant)] text-xl lg:hidden">
-          Omnia Finance OS
+          {brandTitle}
         </div>
         <CardTitle className="font-[family-name:var(--font-cormorant)] text-2xl">
           Sign in
