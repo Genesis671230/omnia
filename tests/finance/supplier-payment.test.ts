@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { allocateOldestFirst, checkAllocation, supplierPaymentReference } from "../../lib/finance/supplier-payment";
-import { buildVendorPaymentBody } from "../../lib/integrations/zoho-vendors";
+import { buildVendorPaymentBody, buildApplyAdvanceBody } from "../../lib/integrations/zoho-vendors";
 
 const bills = [
   { bill_id: "b1", balance: 1000 },
@@ -50,4 +50,15 @@ test("buildVendorPaymentBody matches Zoho's create-a-vendor-payment-request", ()
   assert.equal(body.amount, 1200.01);
   const advance = buildVendorPaymentBody({ vendorId: "v1", amount: 50, date: "2026-09-29", paidThroughAccountId: "bank", reference: "r", description: "d", bills: [] });
   assert.equal("bills" in advance, false);
+});
+
+test("applying an advance keeps the bills the payment already pays and adds to them", () => {
+  const body = buildApplyAdvanceBody({
+    payment_id: "P", vendor_id: "V", amount: 1000, balance: 600, date: "2026-09-01", reference_number: "FT1/VP/x",
+    description: "advance", payment_mode: "Bank Transfer", paid_through_account_id: "BANK", exchange_rate: 1,
+    bills: [{ bill_id: "B1", amount_applied: 400 }],
+  }, [{ billId: "B1", amount: 100 }, { billId: "B2", amount: 250.005 }]);
+  assert.equal(body.vendor_id, "V");
+  assert.equal(body.amount, 1000);
+  assert.deepEqual(body.bills, [{ bill_id: "B1", amount_applied: 500 }, { bill_id: "B2", amount_applied: 250.01 }]);
 });

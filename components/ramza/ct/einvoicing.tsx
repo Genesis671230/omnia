@@ -7,10 +7,11 @@
  * get the books and invoice data ready and connect the business to an ASP;
  * the page says so in plain words. No FTA/MoF marks or colours. */
 
-import { motion, useInView, useReducedMotion } from "framer-motion";
-import { Building2, CalendarDays, FileCode2, Landmark, Network, ShieldCheck, Store } from "lucide-react";
-import { useRef } from "react";
-import { rules } from "@/lib/ramza/rules";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
+import { Building2, CalendarDays, Check, FileCode2, Landmark, Network, Pause, Play, ShieldCheck, Store } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { rules, VAT_RATE } from "@/lib/ramza/rules";
+import { CtLeadForm } from "./lead-form";
 import { ct } from "./brand";
 import { Reveal } from "./reveal";
 import { TrackView } from "./tracked";
@@ -71,6 +72,122 @@ function FlowDiagram() {
   );
 }
 
+
+/* ── the film: one invoice's journey, played like a short video ────────── */
+
+const SCENES = [
+  { t: "You raise an invoice", s: "Structured data, not a PDF — straight from books RAMZA keeps reconciled." },
+  { t: "Your ASP validates it", s: "Format, TRN and VAT are checked before anything leaves." },
+  { t: "Sent across the network", s: "Your ASP passes it to your buyer's accredited provider." },
+  { t: "Your buyer receives it", s: "Delivered into their system — no email attachments." },
+  { t: "Tax data is reported", s: "Both providers report the invoice's tax data to the tax authority." },
+] as const;
+const SCENE_MS = 3200;
+const STOPS = [6, 30, 54, 80]; // % across the track: you, your ASP, buyer's ASP, buyer
+
+function InvoiceCard({ checks }: { checks: number }) {
+  const net = 12500;
+  const vat = Math.round(net * VAT_RATE);
+  return (
+    <div className="w-[150px] rounded-2xl bg-white p-3 text-left shadow-[0_18px_40px_-18px_rgba(10,26,74,0.55)] ring-1 ring-[#D9E1F5]">
+      <div className="flex items-center justify-between text-[10px] font-medium text-[#2347D9]"><span>E-INVOICE</span><FileCode2 size={12} /></div>
+      <div className="mt-2 space-y-1">
+        <div className="h-1.5 w-20 rounded-full bg-[#E6ECFA]" /><div className="h-1.5 w-14 rounded-full bg-[#E6ECFA]" />
+      </div>
+      <div className="mt-2 flex justify-between text-[10.5px] text-[#4A5680]"><span>Net</span><span className="tabular-nums">{net.toLocaleString("en-US")}</span></div>
+      <div className="flex justify-between text-[10.5px] text-[#4A5680]"><span>VAT {Math.round(VAT_RATE * 100)}%</span><span className="tabular-nums">{vat.toLocaleString("en-US")}</span></div>
+      <div className="mt-1 flex justify-between border-t border-[#EEF2FA] pt-1 text-[11px] font-medium text-[#0A1A4A]"><span>AED</span><span className="tabular-nums">{(net + vat).toLocaleString("en-US")}</span></div>
+      <div className="mt-2 flex gap-1">
+        {["Format", "TRN", "VAT"].map((c, i) => (
+          <span key={c} className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] transition-colors duration-300 ${i < checks ? "bg-emerald-50 text-emerald-600" : "bg-[#F2F5FD] text-[#9AA6C8]"}`}>
+            {i < checks && <Check size={8} />}{c}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EInvoiceFilm() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { amount: 0.35 });
+  const reduced = useReducedMotion();
+  const [scene, setScene] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const running = playing && inView && !reduced;
+
+  useEffect(() => {
+    if (!running) return;
+    const t = setTimeout(() => setScene((s) => (s + 1) % SCENES.length), SCENE_MS);
+    return () => clearTimeout(t);
+  }, [running, scene]);
+
+  const stop = STOPS[Math.min(scene, 3)];
+  const checks = scene === 0 ? 0 : 3;
+  const nodes = [
+    { icon: Store, t: "Your business" }, { icon: Network, t: "Your ASP" }, { icon: Network, t: "Buyer's ASP" }, { icon: Building2, t: "Your buyer" },
+  ];
+  return (
+    <div ref={ref} className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#050D2B] via-[#0A1A4A] to-[#1B3BB8] text-white" role="region" aria-label="Animation: how an e-invoice travels">
+      <div className="relative h-[300px] px-4 sm:px-8">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(76,123,255,0.35),transparent_60%)]" />
+        {/* track */}
+        <div className="absolute left-[8%] right-[8%] top-[118px] h-[2px] bg-white/15" />
+        <motion.div className="absolute left-[8%] top-[118px] h-[2px] bg-gradient-to-r from-[#8FB0FF] to-[#4C7BFF]"
+          animate={{ width: `${((STOPS[Math.min(scene, 3)] - 6) / 74) * 84}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
+        {nodes.map((n, i) => (
+          <div key={n.t} className="absolute top-[96px] -translate-x-1/2 text-center" style={{ left: `${[8, 36, 64, 92][i]}%` }}>
+            <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl transition-colors duration-500 ${Math.min(scene, 3) >= i ? "bg-[#4C7BFF] text-white" : "bg-white/10 text-white/60"}`}><n.icon size={18} /></span>
+            <span className="mt-1.5 block whitespace-nowrap text-[11px] text-white/70">{n.t}</span>
+          </div>
+        ))}
+        {/* authority, reported in the last scene */}
+        <div className="absolute left-1/2 top-[226px] -translate-x-1/2 text-center">
+          <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl transition-colors duration-500 ${scene === 4 ? "bg-emerald-400 text-[#050D2B]" : "bg-white/10 text-white/50"}`}><Landmark size={17} /></span>
+          <span className="mt-1 block text-[11px] text-white/60">Tax authority</span>
+        </div>
+        {scene === 4 && [36, 64].map((x, i) => (
+          <motion.span key={x} className="absolute h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]"
+            initial={{ left: `${x}%`, top: 120 }} animate={{ left: "50%", top: 232 }} transition={{ duration: 1.1, delay: i * 0.25, repeat: Infinity, repeatDelay: 0.6 }} />
+        ))}
+        {/* the invoice */}
+        <motion.div className="absolute top-[8px]" animate={{ left: `calc(${stop + (stop > 50 ? -4 : 0)}% - 20px)`, rotate: scene === 2 ? -3 : 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}>
+          <motion.div animate={{ y: [0, -4, 0] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}>
+            <InvoiceCard checks={checks} />
+          </motion.div>
+          <AnimatePresence>{scene === 3 && (
+            <motion.span initial={{ scale: 1.6, opacity: 0, rotate: -12 }} animate={{ scale: 1, opacity: 1, rotate: -8 }} exit={{ opacity: 0 }}
+              className="absolute -right-3 -top-2 rounded-lg border-2 border-emerald-400 bg-[#050D2B]/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Received</motion.span>
+          )}</AnimatePresence>
+        </motion.div>
+      </div>
+      {/* caption + player controls */}
+      <div className="flex items-center gap-4 border-t border-white/10 bg-white/[0.04] px-5 py-4 sm:px-8">
+        <button type="button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0A1A4A]">
+          {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div key={scene} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
+              <div className="text-[15px] font-medium">{scene + 1}. {SCENES[scene].t}</div>
+              <div className="truncate text-[12.5px] text-white/60">{SCENES[scene].s}</div>
+            </motion.div>
+          </AnimatePresence>
+          <div className="mt-2 flex gap-1.5">
+            {SCENES.map((_, i) => (
+              <button key={i} type="button" onClick={() => setScene(i)} aria-label={`Scene ${i + 1}`} className="h-1 flex-1 overflow-hidden rounded-full bg-white/15">
+                <motion.span className="block h-full bg-white" initial={false}
+                  animate={{ width: i < scene ? "100%" : i === scene ? (running ? "100%" : "40%") : "0%" }}
+                  transition={i === scene && running ? { duration: SCENE_MS / 1000, ease: "linear" } : { duration: 0.2 }} key={`${i}-${scene}`} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EInvoicingSection() {
   const { large, sme } = rules.einvoicing;
   const tracks = [
@@ -91,7 +208,16 @@ export function EInvoicingSection() {
           <p className={`${ct.lead} mt-4`}>UAE B2B and B2G invoices move to a 5-corner e-invoicing network. Clean books now make the switch a non-event.</p>
         </Reveal>
 
-        <Reveal delay={0.05} className="mt-12 rounded-[28px] bg-white p-4 shadow-[0_24px_60px_-34px_rgba(10,26,74,0.4)] sm:p-8">
+        <div className="mt-12 grid items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
+          <Reveal delay={0.05}><EInvoiceFilm /></Reveal>
+          <Reveal delay={0.1} className="rounded-[28px] bg-white/80 p-6 shadow-[0_24px_60px_-34px_rgba(10,26,74,0.4)] ring-1 ring-white backdrop-blur-xl sm:p-7">
+            <h3 className={ct.h3}>Request e-invoicing setup</h3>
+            <p className={`${ct.body} mt-1 mb-5`}>We clean your invoice data, line up an Accredited Service Provider and test before your go-live.</p>
+            <CtLeadForm placement="einvoicing" cta="Request e-invoicing setup" initialSituation="einvoicing" />
+          </Reveal>
+        </div>
+
+        <Reveal delay={0.05} className="mt-6 rounded-[28px] bg-white p-4 shadow-[0_24px_60px_-34px_rgba(10,26,74,0.4)] sm:p-8">
           <FlowDiagram />
         </Reveal>
 

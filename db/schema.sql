@@ -1194,3 +1194,79 @@ create table if not exists site_roasts (
   snapshot jsonb not null default '{}'::jsonb
 );
 create index if not exists site_roasts_site_idx on site_roasts (tenant_id, site, created_at desc);
+
+-- Statement accounts (2026-10-01): every bank / card statement belongs to ONE
+-- account, and each account books into its own Zoho organisation and its own
+-- Zoho bank or credit-card account. SIB (Omniastores) and RAK (House of Omnia)
+-- and a personal credit card must never mix — not in the list, not in dedupe,
+-- not in which books a posting lands in. lib/finance/statement-accounts.ts.
+create table if not exists statement_accounts (
+  id                 text primary key,
+  tenant_id          text not null default 'omnia',
+  label              text not null,
+  bank               text not null default '',
+  kind               text not null default 'bank',     -- bank | credit_card
+  holder             text not null default '',
+  zoho_connection_id text not null default '',         -- '' = main organisation
+  zoho_account_id    text not null default '',         -- the Zoho bank / credit card account
+  match_hints        text[] not null default '{}',     -- account no. / card mask seen in the file
+  currency           text not null default 'AED',
+  sort               int  not null default 0,
+  created_at         timestamptz not null default now()
+);
+insert into statement_accounts (id, label, bank, kind, holder, zoho_connection_id, zoho_account_id, match_hints, sort) values
+  ('sib-omniastores', 'Omniastores · Sharjah Islamic Bank', 'SIB', 'bank', 'Omniastores LLC', '', '2330082000000236001', '{}', 0),
+  ('rak-house-of-omnia', 'House of Omnia · RAK Bank current', 'RAK', 'bank', 'House of Omnia Accessories LLC', 'house-of-omnia', '', '{0333190982001,546750XXXXXX6886,HOUSE OF OMNIA ACCESSORIES}', 1),
+  ('cc-omnia-mohamed', 'Omnia Mohamed · credit card', '', 'credit_card', 'Omnia Mohamed', '', '', '{}', 2)
+on conflict (id) do nothing;
+-- Every line imported before this existed is the Omniastores SIB export.
+alter table bank_lines add column if not exists statement_account text not null default 'sib-omniastores';
+create index if not exists bank_lines_statement_account_idx on bank_lines (statement_account, statement_date);
+
+-- Zoho entries deleted from the Bank Transactions tab (2026-10-01): what was
+-- removed, for which line, by whom — Zoho's own audit trail lives in Zoho;
+-- this is the app's. lib/finance/zoho-entry-delete.ts.
+create table if not exists zoho_entry_deletions (
+  id                 uuid primary key default gen_random_uuid(),
+  tenant_id          text not null default 'omnia',
+  bank_line_id       text not null,
+  zoho_connection_id text not null default '',
+  zoho_entry_id      text not null,
+  zoho_entry_kind    text not null,          -- banktransaction | expense | vendorpayment
+  zoho_reference     text not null default '',
+  amount             numeric,
+  sibling_line_ids   text[] not null default '{}',
+  deleted_by         text not null default 'founder',
+  deleted_at         timestamptz not null default now()
+);
+create index if not exists zoho_entry_deletions_line_idx on zoho_entry_deletions (bank_line_id);
+
+-- Month sales verification against Zoho (2026-10-01): sales orders, invoices,
+-- credit notes vs counted store sales. Run on demand (Zoho quota); the
+-- dashboard reads the stored result. lib/finance/zoho-sales-verify.ts.
+create table if not exists zoho_sales_verifications (
+  month       text primary key,              -- YYYY-MM
+  tenant_id   text not null default 'omnia',
+  result      jsonb not null,
+  zoho_calls  int not null default 0,
+  orgs        jsonb not null default '[]',
+  checked_at  timestamptz not null default now()
+);
+
+-- Zoho invoices by order number (2026-10-01): the "verified" amount on the
+-- Dispatch page. Refreshed by its button and by the month sales check — the
+-- page itself never calls Zoho. lib/repositories/zoho-invoice-index.ts.
+create table if not exists zoho_invoice_index (
+  invoice_id     text primary key,
+  tenant_id      text not null default 'omnia',
+  org            text not null default '',
+  invoice_number text not null default '',
+  order_number   text not null default '',
+  invoice_date   date,
+  status         text not null default '',
+  total          numeric not null default 0,
+  customer       text not null default '',
+  updated_at     timestamptz not null default now()
+);
+create index if not exists zoho_invoice_index_order_idx on zoho_invoice_index (order_number);
+create index if not exists zoho_invoice_index_date_idx on zoho_invoice_index (invoice_date);

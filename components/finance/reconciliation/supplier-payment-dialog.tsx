@@ -14,9 +14,9 @@
  * /api/bank-lines/:id/supplier-payment, /api/integrations/zoho/post-bank-lines. */
 
 import { useEffect, useMemo, useState } from "react";
-import { Building2, Loader2, Lock, Search, Wallet, X } from "lucide-react";
+import { Building2, Loader2, Lock, Plus, Search, Sparkles, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
-import type { OpenBill, Vendor } from "@/lib/integrations/zoho-vendors";
+import type { OpenBill, Vendor, VendorAdvance } from "@/lib/integrations/zoho-vendors";
 import { allocateOldestFirst, checkAllocation } from "@/lib/finance/supplier-payment";
 import { AccountCombobox } from "./account-combobox";
 import type { BankTxnLine } from "./bank-txn-row";
@@ -26,6 +26,17 @@ type ZohoAccount = { account_id: string; account_name: string; account_type: str
 type Mode = "supplier" | "account";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** The payee a narration names — "Outward Telex Payment/DETO AUTOMATIC DOORS LLC/SW-…" → "DETO AUTOMATIC DOORS LLC". */
+export function payeeFromNarration(narration: string): string {
+  const skip = /payment|debit|credit|transfer|telex|ibk|charges|tof|channel|ibmb|^sw-|^to |ben info/i;
+  for (const raw of narration.split("/")) {
+    const seg = raw.replace(/^Ben Info:\s*[\d,\s]*/i, "").replace(/\\HCP$/i, "").trim();
+    if (seg.length < 4 || skip.test(seg) || /\d{5,}/.test(seg) || !/[a-z]{3}/i.test(seg)) continue;
+    return seg.replace(/[.,]+$/, "");
+  }
+  return "";
+}
 
 export function SupplierPaymentDialog({
   line, bankAccountId, accounts, onClose, onBooked,
@@ -82,6 +93,16 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
   const [paidThrough, setPaidThrough] = useState(bankAccountId);
   const [locked, setLocked] = useState("");
   const [loadingVendors, setLoadingVendors] = useState(false);
+  const [suggested, setSuggested] = useState<Vendor[]>([]);
+  // "bills": apply this payment to bills · "advance": nothing applied, it all
+  // sits on the supplier as unused — a quotation deposit, applied later.
+  const [how, setHow] = useState<"bills" | "advance">("bills");
+  const [advances, setAdvances] = useState<VendorAdvance[] | null>(null);
+  const [applying, setApplying] = useState<VendorAdvance | null>(null);
+  const [creating, setCreating] = useState(false);
+  const payee = useMemo(() => payeeFromNarration(line.description), [line.description]);
+  // `bankLine` makes the server use this line's own books (RAK → House of Omnia).
+  const scope = `bankLine=${encodeURIComponent(line.id)}`;
 
   // Supplier search, debounced.
   useEffect(() => {
@@ -89,25 +110,46 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
     const t = setTimeout(async () => {
       setLoadingVendors(true);
       try {
-        const res = await fetch(`/api/zoho/vendors?q=${encodeURIComponent(q.trim())}`);
+        const res = await fetch(`/api/zoho/vendors?q=${encodeURIComponent(q.trim())}&${scope}`);
         const j = await res.json();
         if (!live) return;
         if (res.status === 403) setLocked(j.error);
         else if (!res.ok) toast.error(j.error || `HTTP ${res.status}`);
-        else setVendors(j.vendors ?? []);
+        else {
+          setVendors(j.vendors ?? []);
+          const s = (j.suggested ?? []) as Vendor[];
+          setSuggested(s);
+          // The supplier the narration names (e.g. "/GUWU/" → GUWUX), picked for you.
+          if (s.length) setVendor((cur) => cur ?? s[0]);
+        }
       } finally {
         if (live) setLoadingVendors(false);
       }
     }, 250);
     return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+
+  // The supplier's unused advances — money paid before a bill existed.
+  useEffect(() => {
+    if (!vendor) return;
+    let live = true;
+    setAdvances(null);
+    setApplying(null);
+    fetch(`/api/zoho/vendors/${encodeURIComponent(vendor.vendor_id)}/advances?${scope}`)
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); return j.advances as VendorAdvance[]; })
+      .then((a) => live && setAdvances(a))
+      .catch(() => live && setAdvances([]));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor]);
 
   // A supplier's open bills, pre-filled oldest first.
   useEffect(() => {
     if (!vendor) return;
     let live = true;
     setBills(null);
-    fetch(`/api/zoho/vendors/${encodeURIComponent(vendor.vendor_id)}/bills`)
+    fetch(`/api/zoho/vendors/${encodeURIComponent(vendor.vendor_id)}/bills?${scope}`)
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); return j.bills as OpenBill[]; })
       .then((b) => { if (!live) return; setBills(b); setApplied(allocateOldestFirst(Number(amount) || 0, b)); })
       .catch((e) => { if (live) { setBills([]); toast.error((e as Error).message); } });
@@ -116,10 +158,50 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendor]);
 
+  // Applying an old advance: its unused balance is the "payment"; the bank debit isn't involved.
+  const effApplied = how === "advance" && !applying ? {} : applied;
   const check = useMemo(
-    () => checkAllocation({ amount: Number(amount), bankAmount: line.amount, bills: bills ?? [], applied }),
-    [amount, line.amount, bills, applied],
+    () => applying
+      ? checkAllocation({ amount: applying.balance, bankAmount: applying.balance, bills: bills ?? [], applied })
+      : checkAllocation({ amount: Number(amount), bankAmount: line.amount, bills: bills ?? [], applied: effApplied }),
+    [amount, line.amount, bills, applied, effApplied, applying],
   );
+
+  const createSupplier = async (name: string) => {
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/zoho/vendors?${scope}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      toast.success(j.existed ? `${j.vendor.name} already exists — picked it.` : `Created supplier ${j.vendor.name} in Zoho.`);
+      setVendors((v) => [j.vendor, ...v.filter((x) => x.vendor_id !== j.vendor.vendor_id)]);
+      setVendor(j.vendor);
+      setHow("advance");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const applyAdvance = async () => {
+    if (!applying) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/zoho/vendorpayments/${encodeURIComponent(applying.payment_id)}/apply?${scope}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ applied }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      toast.success(`Applied ${aed2(check.applied)} of the advance to bills — ${aed2(j.unusedLeft)} still unused.`);
+      // Refresh both lists; the bank debit itself is still waiting to be booked.
+      const v = vendor; setVendor(null); setTimeout(() => setVendor(v), 0);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const book = async () => {
     if (!vendor) return;
@@ -127,7 +209,7 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
     try {
       const res = await fetch(`/api/bank-lines/${encodeURIComponent(line.id)}/supplier-payment`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendorId: vendor.vendor_id, vendorName: vendor.name, amount: Number(amount), applied, paidThroughAccountId: paidThrough }),
+        body: JSON.stringify({ vendorId: vendor.vendor_id, vendorName: vendor.name, amount: Number(amount), applied: effApplied, paidThroughAccountId: paidThrough }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
@@ -165,9 +247,32 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search suppliers…" autoFocus
               className="h-10 w-full rounded-xl border border-[#D8E1F1] pl-9 pr-3 text-[13px] focus:border-[#1D4ED8] focus:outline-none" />
           </div>
+          {suggested.length > 0 && !q && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11.5px] text-[#5E6B85]">
+              <Sparkles size={12} className="text-[#1D4ED8]" /> Named in the bank narration:
+              {suggested.map((v) => (
+                <button key={v.vendor_id} onClick={() => setVendor(v)}
+                  className={`rounded-full px-2.5 py-0.5 ${vendor?.vendor_id === v.vendor_id ? "bg-[#1D4ED8] text-white" : "bg-[#EAF1FD] text-[#1D4ED8] hover:bg-[#DCE7FB]"}`}>
+                  {v.name}{v.outstanding > 0 ? ` · owes ${aed2(v.outstanding)}` : ""}
+                </button>
+              ))}
+            </div>
+          )}
           <ul className="mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-[#E3E9F5]">
             {loadingVendors && vendors.length === 0 && <li className="flex items-center gap-2 px-3 py-3 text-[12.5px] text-[#5E6B85]"><Loader2 size={13} className="animate-spin" /> Loading suppliers…</li>}
             {!loadingVendors && vendors.length === 0 && <li className="px-3 py-3 text-[12.5px] text-[#5E6B85]">No supplier matches.</li>}
+            {(() => {
+              const name = (q.trim() || (suggested.length ? "" : payee)).trim();
+              if (!name || vendors.some((v) => v.name.trim().toLowerCase() === name.toLowerCase())) return null;
+              return (
+                <li className="border-b border-[#EEF2F8]">
+                  <button onClick={() => createSupplier(name)} disabled={creating}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium text-[#1D4ED8] hover:bg-[#F7F9FE] disabled:opacity-50">
+                    {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create supplier &ldquo;{name}&rdquo; in Zoho
+                  </button>
+                </li>
+              );
+            })()}
             {vendors.map((v) => (
               <li key={v.vendor_id}>
                 <button onClick={() => setVendor(v)}
@@ -201,12 +306,43 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
             </div>
           </div>
 
-          <div className="mt-4">
+          {vendor && !applying && (
+            <div className="mt-4 flex gap-1.5 rounded-full bg-[#F3F6FC] p-1 text-[12.5px]">
+              {([["bills", "Apply to bills"], ["advance", "Advance — no bill yet"]] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setHow(k)}
+                  className={`flex-1 rounded-full px-3 py-1.5 ${how === k ? "bg-white font-medium text-[#0F1B3D] shadow-sm" : "text-[#5E6B85]"}`}>{label}</button>
+              ))}
+            </div>
+          )}
+          {vendor && how === "advance" && !applying && (
+            <p className="mt-3 rounded-xl bg-[#EEF7F0] px-3 py-3 text-[12.5px] leading-relaxed text-[#1F5D35]">
+              The whole {aed2(Number(amount) || 0)} is recorded as a payment to {vendor.name} with nothing applied — it shows on the supplier as
+              <b> unused</b>. When the bill arrives, apply it from &ldquo;Unused advances&rdquo; here (or in Zoho). Use this for deposits on a quotation.
+            </p>
+          )}
+          {vendor && advances && advances.length > 0 && (
+            <div className="mt-4 rounded-xl border border-[#E3E9F5] p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-[#5E6B85]">Unused advances to {vendor.name}</div>
+              <ul className="mt-2 space-y-1.5">
+                {advances.map((a) => (
+                  <li key={a.payment_id} className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px] ${applying?.payment_id === a.payment_id ? "bg-[#EAF1FD]" : "bg-[#F7F9FE]"}`}>
+                    <span className="min-w-0 truncate" title={a.description}>{a.date} · {a.payment_number || a.reference_number} · <b className="tabular-nums">{aed2(a.balance)}</b> unused of {aed2(a.amount)}</span>
+                    {applying?.payment_id === a.payment_id
+                      ? <button className="shrink-0 text-[#5E6B85] hover:underline" onClick={() => { setApplying(null); setApplied(allocateOldestFirst(Number(amount) || 0, bills ?? [])); }}>Cancel</button>
+                      : <button className="shrink-0 font-medium text-[#1D4ED8] hover:underline" disabled={!bills?.length}
+                          onClick={() => { setApplying(a); setApplied(allocateOldestFirst(a.balance, bills ?? [])); }}>Apply to bills</button>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={`mt-4 ${how === "advance" && !applying ? "hidden" : ""}`}>
             <div className="flex items-baseline justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#5E6B85]">Open bills</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#5E6B85]">{applying ? `Apply the ${aed2(applying.balance)} advance to` : "Open bills"}</span>
               {bills && bills.length > 0 && (
                 <span className="flex gap-3 text-[11.5px]">
-                  <button className="text-[#1D4ED8] hover:underline" onClick={() => setApplied(allocateOldestFirst(Number(amount) || 0, bills))}>Fill oldest first</button>
+                  <button className="text-[#1D4ED8] hover:underline" onClick={() => setApplied(allocateOldestFirst(applying ? applying.balance : Number(amount) || 0, bills))}>Fill oldest first</button>
                   <button className="text-[#5E6B85] hover:underline" onClick={() => setApplied({})}>Clear</button>
                 </span>
               )}
@@ -243,16 +379,29 @@ function SupplierMode({ line, bankAccountId, accounts, busy, setBusy, onDone }: 
       </div>
 
       <footer className="flex flex-wrap items-center gap-3 border-t border-[#E3E9F5] bg-[#F7F9FE] px-6 py-4 text-[12.5px]">
+        {applying ? (
+          <span className="text-[#5E6B85]">
+            From the advance to bills <b className="tabular-nums text-[#0F1B3D]">{aed2(check.applied)}</b> · stays unused <b className="tabular-nums text-[#0F1B3D]">{aed2(r2(applying.balance - check.applied))}</b>
+          </span>
+        ) : (
         <span className="text-[#5E6B85]">
           To bills <b className="tabular-nums text-[#0F1B3D]">{aed2(check.applied)}</b>
           {check.advance > 0 && <> · advance to supplier <b className="tabular-nums text-[#0F1B3D]">{aed2(check.advance)}</b></>}
           {Number(amount) < line.amount - 0.005 && <> · {aed2(r2(line.amount - Number(amount)))} of the debit left to book</>}
         </span>
+        )}
         {!check.ok && Number(amount) > 0 && <span className="w-full text-[#A6472F]">{check.errors[0]}</span>}
-        <button onClick={book} disabled={busy || !vendor || !check.ok || !paidThrough}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#0F1B3D] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40">
-          {busy && <Loader2 size={13} className="animate-spin" />} Record payment in Zoho
-        </button>
+        {applying ? (
+          <button onClick={applyAdvance} disabled={busy || !check.ok || check.applied <= 0}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#1D4ED8] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40">
+            {busy && <Loader2 size={13} className="animate-spin" />} Apply {aed2(check.applied)} of the advance
+          </button>
+        ) : (
+          <button onClick={book} disabled={busy || !vendor || !check.ok || !paidThrough}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[#0F1B3D] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-40">
+            {busy && <Loader2 size={13} className="animate-spin" />} {how === "advance" ? "Record advance payment in Zoho" : "Record payment in Zoho"}
+          </button>
+        )}
       </footer>
     </>
   );

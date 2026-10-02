@@ -31,7 +31,7 @@ export type LedgerStatus =
   | "awaiting_bank" // payout file uploaded, no bank credit matched to it yet
   | "awaiting_payout" // gateway charged it (fee + net known live), payout not issued yet
   | "no_payout_file" // no uploaded payout file mentions this order
-  | "cod"; // cash on delivery — no gateway payout will ever exist
+  | "cod"; // cash on delivery, the courier's remittance (voucher) not uploaded yet
 
 export type FeeBasis = "measured" | "allocated" | "estimated";
 
@@ -324,7 +324,7 @@ function orderReason(
   const gw = order.gateway || "gateway";
   switch (status) {
     case "cod":
-      return "Cash on delivery — collected by the courier, no gateway payout";
+      return "Cash on delivery — courier's remittance voucher not uploaded yet";
     case "no_payout_file":
       return `${gw} payout file not uploaded yet`;
     case "awaiting_payout":
@@ -465,7 +465,11 @@ export function computeSalesLedger({
       : null;
 
     let status: LedgerStatus;
-    if (isCod(o.gateway)) status = "cod";
+    // COD with the courier's remittance voucher uploaded (OnTrack "CP…" payouts)
+    // follows the same chain as any gateway — fee = the courier's COD charge.
+    // Only COD without a voucher yet is just "cash on delivery". (OS3735 sat
+    // at net 0 in the export although CP17187 carried it, net 756.)
+    if (isCod(o.gateway) && !hit) status = "cod";
     // payout_status="settled" only counts when the payout that stamped it is a
     // real payment for this order, not a partial line sharing its number.
     else if ((o.payout_status === "settled" && !stampedIsPartial) || (r && (r.match_status === "SETTLED" || r.confirmed_by))) status = "received";

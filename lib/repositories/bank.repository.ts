@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedBankLine } from "@/lib/parsers/bank";
-import { dedupeKey, hasStableWireIdentity } from "@/lib/parsers/bank-dedupe";
+import { dedupeKey, hasStableWireIdentity, LEGACY_STATEMENT_ACCOUNT } from "@/lib/parsers/bank-dedupe";
 import { chunkForInFilter } from "./in-filter-chunks";
 
 export { dedupeKey } from "@/lib/parsers/bank-dedupe";
@@ -23,6 +23,7 @@ export type BankLineRow = {
   kind: string | null;
   status: string;
   dedupe_key: string;
+  statement_account: string;
 };
 
 export type BankLineWithZoho = BankLineRow & { zoho_description: string | null };
@@ -51,6 +52,7 @@ function toRows(lines: ParsedBankLine[], batchId: string): BankLineRow[] {
       kind: l.kind ?? null,
       status: "imported",
       dedupe_key,
+      statement_account: l.account || LEGACY_STATEMENT_ACCOUNT,
     });
   }
   return [...byKey.values()];
@@ -116,6 +118,7 @@ async function resolveExisting(
         .from("bank_lines")
         .select("id, statement_date, reference, amount, description")
         .eq("direction", "credit")
+        .eq("statement_account", wireCreditRows[0].statement_account)
         .in("reference", chunk);
       if (res.error) throw new Error(`bank_lines lookup failed: ${res.error.message}`);
       data.push(...(res.data ?? []));
@@ -249,15 +252,16 @@ export const BankRepository = {
     return data ?? [];
   },
 
-  async listAll(opts: { from?: string; to?: string } = {}): Promise<BankLineWithZoho[]> {
+  async listAll(opts: { from?: string; to?: string; account?: string } = {}): Promise<BankLineWithZoho[]> {
     let q = supabase
       .from("bank_lines")
       .select(
-        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key",
+        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key, statement_account",
       )
       .order("statement_date", { ascending: false });
     if (opts.from) q = q.gte("statement_date", opts.from);
     if (opts.to) q = q.lte("statement_date", opts.to);
+    if (opts.account) q = q.eq("statement_account", opts.account);
     const { data, error } = await q;
     if (error) throw new Error(`bank_lines select failed: ${error.message}`);
     return (data ?? []) as BankLineWithZoho[];
@@ -268,7 +272,7 @@ export const BankRepository = {
     const { data, error } = await supabase
       .from("bank_lines")
       .select(
-        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key",
+        "id, batch_id, statement_date, description, zoho_description, reference, amount, currency, direction, gateway_guess, confidence, kind, status, dedupe_key, statement_account",
       )
       .in("id", ids);
     if (error) throw new Error(`bank_lines select failed: ${error.message}`);

@@ -19,7 +19,7 @@ import {
   FileSpreadsheet, Upload, ShieldCheck, ChevronRight, CheckCircle2,
   RefreshCcw, Loader2, LayoutDashboard, PackageSearch, Receipt,
   WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings,
-  Megaphone, Boxes, Users, ArrowLeftRight, Store,
+  Megaphone, Boxes, Users, ArrowLeftRight, Store, Truck,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -39,6 +39,8 @@ import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { OrdersAnalyticsPanel } from "@/components/finance/orders-analytics/orders-analytics";
 import { AdsExplorer } from "@/components/finance/ads/ads-explorer";
+import { DispatchPanel } from "@/components/finance/dispatch/dispatch-panel";
+import { CommandCenter } from "@/components/finance/dashboard-v2/command/command-center";
 import { StorefrontPanel } from "@/components/finance/storefront/storefront-panel";
 import { CustomersPanel } from "@/components/finance/customers-panel";
 import { ReconView } from "@/components/finance/reconciliation/recon-view";
@@ -54,7 +56,7 @@ import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
-  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings";
+  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings" | "dispatch";
 
 /* ── Nav config ─────────────────────────────────────────────────────────── */
 
@@ -89,6 +91,7 @@ const NAV: NavItem[] = [
     ],
   },
   { href: "/documents", view: "documents", label: "Bank actuals", icon: FolderOpen },
+  { href: "/dispatch", view: "dispatch", label: "Dispatch", icon: Truck },
   { href: "/returns", view: "returns", label: "Returns", icon: RotateCcw },
   { href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
   { href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
@@ -101,6 +104,22 @@ const aed = (v: number) =>
   new Intl.NumberFormat("en-AE", { style: "currency", currency: "AED", maximumFractionDigits: 0 }).format(v);
 
 /* ── Upload button ──────────────────────────────────────────────────────── */
+
+/** Which bank / card account the next statement upload belongs to.
+ *  "" = let the statement's own header decide (account no., card mask). */
+function StatementAccountSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [accounts, setAccounts] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/statement-accounts").then((r) => r.json()).then((j) => setAccounts(j.accounts ?? [])).catch(() => {});
+  }, []);
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Statement account"
+      className="h-9 max-w-[230px] rounded-full border border-[#D8E1F1] bg-white px-3 text-[12.5px] text-[#0F1B3D]">
+      <option value="">Auto-detect account</option>
+      {accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+    </select>
+  );
+}
 
 function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = "outline" }: {
   endpoint: string;
@@ -153,7 +172,7 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success(
         json.batchId
-          ? `${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new${json.updated ? `, ${json.updated} corrected` : ""})`
+          ? `${json.accountLabel ? `${json.accountLabel}: ` : ""}${json.credits} credits + ${json.debits} debits parsed (${json.inserted} new${json.updated ? `, ${json.updated} corrected` : ""})`
           : `Payout saved: ${json.payouts?.map((p: { id: string; orderRefs?: string[] }) => `${p.id} · ${p.orderRefs?.length ?? 0} orders`).join(", ")}`,
       );
       await onDone();
@@ -523,6 +542,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
   // reason to poll it every 60s while the user is looking at Marketing or
   // Inventory. Gate the hook's interval to views that actually show recon
   // data.
+  const [statementAccount, setStatementAccount] = useState("");
   const { recon, loading, syncing, dashVersion, fromDate, toDate, onRange, refresh, sync, onConfirm } =
     useReconciliation(showReconContext);
 
@@ -585,10 +605,12 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
 
               {view === "reconciliation" && !isInvoicesTab && (
                 <>
+                  <StatementAccountSelect value={statementAccount} onChange={setStatementAccount} />
                   <UploadButton
                     endpoint="/api/upload/bank"
+                    extraFields={statementAccount ? { account: statementAccount } : undefined}
                     accept=".pdf,.csv,.txt,.xls,.xlsx"
-                    label="Upload bank statement"
+                    label="Upload statement"
                     onDone={refresh}
                   />
                 </>
@@ -720,7 +742,12 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           ) : showReports ? (
             <ReportsPanel version={dashVersion} />
           ) : showMarketing ? (
-            <AdsExplorer />
+            <>
+              <CommandCenter variant="marketing" />
+              <AdsExplorer />
+            </>
+          ) : view === "dispatch" ? (
+            <DispatchPanel />
           ) : view === "storefronts" ? (
             <StorefrontPanel />
           ) : showInventory ? (

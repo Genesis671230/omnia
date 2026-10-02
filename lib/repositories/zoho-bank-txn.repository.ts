@@ -94,7 +94,7 @@ export const ZohoBankTxnRepository = {
 
 export type BankLineZohoStatusRow = {
   bank_line_id: string;
-  state: "in_zoho" | "uncategorized" | "amount_differs" | "not_found";
+  state: "in_zoho" | "uncategorized" | "amount_differs" | "possible_match" | "not_found";
   match_kind: string | null;
   zoho_transaction_ids: string[];
   zoho_reference: string | null;

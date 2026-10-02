@@ -177,3 +177,24 @@ test("a live gateway charge with no payout yet shows its real fee as awaiting pa
   assert.equal(charged.payoutLine?.feeAed, 375.02);
   assert.equal(list.find((o) => o.orderNumber === "OS3696")!.status, "no_payout_file");
 });
+
+test("a COD order whose courier voucher is uploaded shows the voucher's fee, net and bank credit (OS3735 / CP17187)", () => {
+  const payouts: LedgerPayoutInput[] = [{
+    id: "CP17187", gateway: "COD", net_amount: 6949, gross_amount: 7159, fee_amount: 210, source: "17187.pdf",
+    transactions: [{ order_ref: "OS3735", is_refund: false, quality: "clean", gross_aed: 786, fee_aed: 30, net_aed: 756 }],
+  }];
+  const ledger = computeSalesLedger({
+    month: "2026-09",
+    orders: [order({ order_number: "OS3735", gateway: "COD", gross_aed: 786, payout_id: "CP17187" })],
+    payouts,
+    recon: [{ payout_id: "CP17187", bank_line_id: "B", match_status: "SETTLED", confirmed_by: "founder", delta: 0 }],
+    bank: [{ id: "B", statement_date: "2026-09-22T00:00:00", amount: 6949, reference: "FT262652TTF0", description: "" }],
+  });
+  const o = ledger.days.find((x) => x.day === "2026-09-10")!.orderList[0];
+  assert.equal(o.status, "received");
+  assert.equal(o.feeAed, 30);
+  assert.equal(o.payoutNetAed, 756);
+  assert.equal(o.receivedAed, 756);
+  assert.equal(o.payout?.id, "CP17187");
+  assert.equal(o.bank?.reference, "FT262652TTF0");
+});

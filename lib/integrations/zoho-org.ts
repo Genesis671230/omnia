@@ -372,7 +372,12 @@ export async function zohoOrgForBankLine(bankLineId: string | null | undefined):
   const { data: rl } = await supabase.from("recon_lines").select("payout_id").eq("bank_line_id", bankLineId).not("payout_id", "is", null).limit(1).maybeSingle();
   if (rl?.payout_id) return zohoOrgForPayout(rl.payout_id as string);
   const { data: pinned } = await supabase.from("payouts").select("zoho_connection_id").eq("bank_line_id", bankLineId).limit(1).maybeSingle();
-  return (pinned?.zoho_connection_id as string | undefined) ?? "";
+  if (pinned?.zoho_connection_id) return pinned.zoho_connection_id as string;
+  // No payout: the books of the statement the line came from (RAK → House of Omnia).
+  const { data: line } = await supabase.from("bank_lines").select("statement_account").eq("id", bankLineId).maybeSingle();
+  if (!line?.statement_account) return "";
+  const { data: acct } = await supabase.from("statement_accounts").select("zoho_connection_id").eq("id", line.statement_account).maybeSingle();
+  return (acct?.zoho_connection_id as string | undefined) ?? "";
 }
 
 /** The organisation for a settlement record (via its payout, else its bank credit). */

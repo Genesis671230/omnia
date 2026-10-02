@@ -40,12 +40,14 @@ export type LedgerRefreshResult = {
 
 export async function refreshZohoLedgerStatus(opts: {
   from: string; to: string; accountId?: string; force?: boolean;
+  /** statement_accounts.id — only this account's lines are matched. */
+  statementAccount?: string;
 }): Promise<LedgerRefreshResult> {
   if (!zohoConfigured()) throw new Error("Zoho is not configured");
-  const key = `${opts.accountId ?? ""}|${opts.from}|${opts.to}`;
+  const key = `${opts.statementAccount ?? ""}|${opts.accountId ?? ""}|${opts.from}|${opts.to}`;
   const cooling = Date.now() - (lastRun.get(key) ?? 0) < COOLDOWN_MS;
 
-  const lines = await BankRepository.listAll({ from: opts.from, to: opts.to });
+  const lines = await BankRepository.listAll({ from: opts.from, to: opts.to, account: opts.statementAccount });
   if (cooling && !opts.force) {
     return {
       checkedAt: new Date(lastRun.get(key)!).toISOString(), lines: lines.length, zohoTransactions: 0,

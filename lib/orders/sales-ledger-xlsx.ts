@@ -80,7 +80,7 @@ const isOpen = (o: LedgerOrder) => o.status !== "received" && o.status !== "cod"
  *  and what the order nets in its payout: fee (and where the number comes
  *  from), VAT on the fee, and any gap between the order and its payout line. */
 export function deductionNote(o: LedgerOrder): string {
-  if (o.status === "cod") return "No gateway deduction: cash collected by the courier (arrives with the courier's remittance, less their COD charge).";
+  if (o.status === "cod") return "Cash collected by the courier — its remittance voucher isn't uploaded yet, so the COD charge isn't known.";
   const parts: string[] = [];
   const pct = o.grossAed > 0 ? ` (${((o.feeAed / o.grossAed) * 100).toFixed(2)}% of ${aed(o.grossAed)})` : "";
   const src =

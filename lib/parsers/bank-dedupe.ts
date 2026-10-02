@@ -39,7 +39,18 @@ export function hasStableWireIdentity(l: Pick<ParsedBankLine, "reference" | "dir
   return l.reference !== "" && !l.reference.startsWith("INV") && l.direction === "credit";
 }
 
+/** Lines imported before statement accounts existed — all the Omniastores
+ *  SIB export. Their keys stay unprefixed so re-uploads still heal them. */
+export const LEGACY_STATEMENT_ACCOUNT = "sib-omniastores";
+
+// Any other account's keys are prefixed with the account, so the same charge
+// on two banks' statements is two lines, never one.
 export function dedupeKey(l: ParsedBankLine): string {
+  const key = baseKey(l);
+  return l.account && l.account !== LEGACY_STATEMENT_ACCOUNT ? `${l.account}#${key}` : key;
+}
+
+function baseKey(l: ParsedBankLine): string {
   if (hasStableWireIdentity(l)) return [l.date, l.direction, l.reference].join("|");
 
   let scrubbed = l.narration.replace(/\\HCP\b/g, "");

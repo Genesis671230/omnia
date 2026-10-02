@@ -40,6 +40,8 @@ export type ClassifierContext = {
   defaultBankAccountId: string;
   standardVat5Id: string;
   ownerDrawingsAccountId: string;
+  /** The card Omnia Mohamed's transfers pay ("Credit Card - XXX-8436"), '' if none or ambiguous. */
+  creditCardAccountId: string;
   defaultPlaceOfSupply: UAEEmirate;
   payees: ProfitSharePayee[];
 };
@@ -88,14 +90,18 @@ export function autoClassify(group: BankLineGroup, ctx: ClassifierContext): Grou
     };
   }
 
-  // 3. Omnia Mohamed with TOF → owner_drawing (safer default; user can flip to profit_share).
+  // 3. Omnia Mohamed with TOF → a transfer to the credit card — how the
+  //    accountant books them in Zoho (Sep 2026: every one to "Credit Card -
+  //    XXX-8436"). Never drawings by default: that booked 35K–50K transfers
+  //    as Drawings. No single card account known → left for a person.
   if (payeeNorm.includes("omnia mohamed") && OWNER_TRANSFER_HINT.test(desc)) {
+    if (!ctx.creditCardAccountId) return { ...base, reasons: ['Omnia Mohamed "TOF" — pick the credit card account it paid'] };
     return {
       ...base,
-      groupType: "owner_drawing",
-      destinationAccountId: ctx.ownerDrawingsAccountId,
+      groupType: "inter_account",
+      destinationAccountId: ctx.creditCardAccountId,
       autoClassified: true,
-      reasons: ['Omnia Mohamed transfer marked "TOF"'],
+      reasons: ['Omnia Mohamed "TOF" transfer → credit card'],
     };
   }
 

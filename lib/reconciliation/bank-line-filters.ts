@@ -48,7 +48,7 @@ export function matchesPostStatus(
   switch (filter) {
     case "in_zoho": return status === "verified" || status === "posted";
     case "not_in_zoho": return status === "not_in_zoho" || status === "missing_in_zoho";
-    case "needs_review": return status === "amount_differs" || status === "uncategorized";
+    case "needs_review": return status === "amount_differs" || status === "uncategorized" || status === "possible_match";
     case "failed": return status === "failed";
     case "not_checked": return !status;
   }

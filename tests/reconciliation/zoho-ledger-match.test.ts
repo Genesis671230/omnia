@@ -94,11 +94,11 @@ test("a line sitting uncategorized in Zoho's bank feed is not booked", () => {
   assert.equal(out.get("L")?.state, "uncategorized");
 });
 
-test("booked under a different ref: a unique same-amount entry within 3 days matches, flagged amount_date", () => {
+test("booked under a different ref: a unique same-amount entry within 3 days is only a possible match, never in Zoho", () => {
   const zoho: LedgerZohoTxn = { transaction_id: "Z40", date: "2026-09-07", amount: 40000, transaction_type: "transfer_fund",
     status: "manually_added", debit_or_credit: "credit", reference_number: "FT26251PVCVF-Traf to Credit card 40K on 01.09.2026" };
   const out = matchBankLinesToZoho([{ ...line("L", 40000, "debit", "FT26250XYXNL"), date: "2026-09-07T00:00:00" }], [zoho]);
-  assert.equal(out.get("L")?.state, "in_zoho");
+  assert.equal(out.get("L")?.state, "possible_match");
   assert.equal(out.get("L")?.matchKind, "amount_date");
 });
 
@@ -132,6 +132,24 @@ test("a leftover Zoho entry whose ref's own lines are all matched is free for th
     { ...line("L40", 40000, "debit", "FT26250XYXNL"), date: "2026-09-07" },
   ], zoho);
   assert.equal(out.get("L300")?.matchKind, "exact");
-  assert.equal(out.get("L40")?.state, "in_zoho");
+  assert.equal(out.get("L40")?.state, "possible_match");
   assert.equal(out.get("L40")?.matchKind, "amount_date");
+});
+
+test("a deleted booking is not replaced by an unrelated same-amount entry (live 01 Sep 50K)", () => {
+  // FT26244T2HH8's booking was deleted in Zoho; a manual 29 Aug transfer of
+  // the same 50K to the sister company, with no bank ref, is all that's left.
+  const zoho: LedgerZohoTxn = { transaction_id: "2330082000307062804", date: "2026-08-29", amount: 50000, transaction_type: "transfer_fund",
+    status: "manually_added", debit_or_credit: "credit", reference_number: "Transferred to RAK bank  50K",
+    offset_account_name: "House of Omnia Accessories LLC - sis company" };
+  const out = matchBankLinesToZoho([
+    { ...line("L50K", 50000, "debit", "FT26244T2HH8"), date: "2026-09-01T00:00:00" },
+    { ...line("CHG", 1, "debit", "FT26244T2HH8"), date: "2026-09-01T00:00:00" },
+    { ...line("VAT", 0.05, "debit", "FT26244T2HH8"), date: "2026-09-01T00:00:00" },
+  ], [zoho]);
+  assert.notEqual(out.get("L50K")?.state, "in_zoho");
+  assert.equal(out.get("L50K")?.state, "possible_match");
+  assert.equal(out.get("L50K")?.zohoReference, "Transferred to RAK bank  50K");
+  assert.equal(out.get("CHG")?.state, "not_found");
+  assert.equal(out.get("VAT")?.state, "not_found");
 });

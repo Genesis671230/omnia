@@ -124,6 +124,8 @@ export async function insertCtLead(
 
 const SITUATION_LABEL: Record<string, string> = {
   file_return: "Needs the Corporate Tax return filed",
+  einvoicing: "Wants e-invoicing set up (ASP + clean invoice data)",
+  vat: "VAT registration / returns",
   books_behind: "Bookkeeping behind",
   got_penalty: "Received a penalty",
   missed_deadline: "Worried a deadline was missed",

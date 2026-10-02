@@ -4,10 +4,14 @@ import { parseBankStatement } from "@/lib/parsers/bank";
 import { xlsxToCsvText } from "@/lib/parsers/xlsx-to-csv";
 import { BankRepository } from "@/lib/repositories/bank.repository";
 import { FilesRepository } from "@/lib/repositories/files.repository";
+import { detectStatementAccount, LEGACY_ACCOUNT, listStatementAccounts } from "@/lib/finance/statement-accounts";
 
 export const maxDuration = 60;
 
-// POST /api/upload/bank — multipart form with `file` (PDF, CSV, or TXT).
+// POST /api/upload/bank — multipart form with `file` (PDF, CSV, or TXT) and
+// `account` (statement_accounts.id). Without `account`, the statement's own
+// header (account number, card mask, holder) picks it; a statement that names
+// none of them is the Omniastores SIB export, as every upload was before.
 // Bank-agnostic: handles ENBD statements (PDF + CSV export) and any
 // statement with date / description / debit / credit / amount columns.
 export async function POST(request: Request) {
@@ -40,7 +44,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const { credits, debits, format } = parseBankStatement(text, parserFilename);
+  const accounts = await listStatementAccounts().catch(() => []);
+  const asked = String(form.get("account") ?? "").trim();
+  if (asked && !accounts.some((a) => a.id === asked)) {
+    return NextResponse.json({ error: `Unknown statement account "${asked}"` }, { status: 400 });
+  }
+  const detected = detectStatementAccount(text, accounts);
+  if (asked && detected && detected.id !== asked) {
+    return NextResponse.json(
+      { error: `This statement looks like ${detected.label}, but it was uploaded to ${accounts.find((a) => a.id === asked)?.label}. Pick the right account and upload again.` },
+      { status: 409 },
+    );
+  }
+  const account = asked || detected?.id || LEGACY_ACCOUNT;
+  const accountLabel = accounts.find((a) => a.id === account)?.label ?? account;
+
+  const parsed = parseBankStatement(text, parserFilename);
+  const credits = parsed.credits.map((l) => ({ ...l, account }));
+  const debits = parsed.debits.map((l) => ({ ...l, account }));
+  const format = parsed.format;
   if (credits.length === 0 && debits.length === 0) {
     return NextResponse.json(
       {
@@ -51,7 +73,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const batchId = `BANK-${new Date().toISOString().slice(0, 10)}-${file.name.slice(0, 40)}`;
+  const batchId = `BANK-${account === LEGACY_ACCOUNT ? "" : `${account}-`}${new Date().toISOString().slice(0, 10)}-${file.name.slice(0, 40)}`;
   let result: Awaited<ReturnType<typeof BankRepository.insertLines>>;
   try {
     result = await BankRepository.insertLines([...credits, ...debits], batchId);
@@ -70,7 +92,7 @@ export async function POST(request: Request) {
       filename: file.name,
       mime: file.type || undefined,
       content: buf,
-      parseSummary: `${credits.length} credits + ${debits.length} debits (${format}) · ${result.inserted} new lines`,
+      parseSummary: `${accountLabel}: ${credits.length} credits + ${debits.length} debits (${format}) · ${result.inserted} new lines`,
     });
   } catch (e) {
     console.error("uploaded_files archive failed:", (e as Error).message);
@@ -79,6 +101,8 @@ export async function POST(request: Request) {
   await markReconDirty("upload/bank");
   return NextResponse.json({
     batchId,
+    account,
+    accountLabel,
     format,
     credits: credits.length,
     debits: debits.length,

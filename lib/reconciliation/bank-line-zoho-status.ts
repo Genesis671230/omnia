@@ -10,6 +10,7 @@ export type LineZohoStatus =
   | "verified"        // booked in Zoho (on its own, or combined with sibling lines)
   | "uncategorized"   // in Zoho's bank feed, not booked yet
   | "amount_differs"  // the ref is in Zoho but no amount lines up
+  | "possible_match"  // ref not in Zoho; a same-amount entry nearby might be it — not booked
   | "posted"          // this app posted it after the last Refresh
   | "missing_in_zoho" // this app posted it, but the ledger no longer has it
   | "failed"          // this app's post attempt failed
@@ -80,6 +81,7 @@ export function mergeLineZohoStatus(
   }
   if (ledger.state === "uncategorized") return { ...withZoho, status: "uncategorized" };
   if (ledger.state === "amount_differs") return { ...withZoho, status: "amount_differs" };
+  if (ledger.state === "possible_match") return { ...withZoho, status: "possible_match" };
   if (posting?.status === "failed") return { ...base, status: "failed" };
   if (posting) return { ...base, status: "missing_in_zoho" };
   return { ...base, status: "not_in_zoho" };

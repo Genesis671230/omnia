@@ -27,6 +27,11 @@ const SITUATIONS = [
   { k: "books_behind", label: "Catch up my books", icon: ReceiptText },
   { k: "got_penalty", label: "I got a penalty", icon: ShieldAlert },
 ] as const;
+// Asked for from a specific tool (e-invoicing, VAT) — shown as its own chip.
+const EXTRA_SITUATIONS: Record<string, { label: string; icon: typeof FileCheck2 }> = {
+  einvoicing: { label: "Set up e-invoicing", icon: FileCheck2 },
+  vat: { label: "VAT registration", icon: ReceiptText },
+};
 
 const PHONE_RE = /^\+?\d[\d\s().-]{7,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,9 +51,9 @@ function Field({ icon: Icon, error, children }: { icon: typeof User; error?: str
 }
 const inputCls = "h-[52px] w-full rounded-2xl bg-transparent pl-11 pr-4 text-[15px] text-[#0A1A4A] placeholder:text-[#9AA6C8] focus:outline-none";
 
-export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form" }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string }) {
+export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form", initialSituation = "file_return" }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string; initialSituation?: string }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [situation, setSituation] = useState<string>("file_return");
+  const [situation, setSituation] = useState<string>(initialSituation);
   const [v, setV] = useState({ whatsapp: "", company: "", name: "", email: "" });
   const [issuedOn, setIssuedOn] = useState("");
   const [quote, setQuote] = useState<QuoteHandoff | null>(null);
@@ -177,7 +182,7 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
           <motion.div key="s1" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25, ease: EASE }}>
             <span className={ct.label}>What do you need?</span>
             <div className="mb-4 grid grid-cols-2 gap-2">
-              {SITUATIONS.map((s) => {
+              {[...(EXTRA_SITUATIONS[initialSituation] ? [{ k: initialSituation, ...EXTRA_SITUATIONS[initialSituation] }] : []), ...SITUATIONS.slice(0, EXTRA_SITUATIONS[initialSituation] ? 3 : 4)].map((s) => {
                 const on = situation === s.k;
                 return (
                   <motion.button key={s.k} type="button" whileTap={{ scale: 0.97 }} onClick={() => setSituation(s.k)} aria-pressed={on}

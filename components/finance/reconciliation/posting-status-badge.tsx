@@ -4,13 +4,14 @@ import { aed2 } from "./types";
 
 export type PostingStatus =
   | "not_posted" | "posted" | "verified" | "missing_in_zoho" | "failed"
-  | "uncategorized" | "amount_differs" | "not_in_zoho";
+  | "uncategorized" | "amount_differs" | "possible_match" | "not_in_zoho";
 
 const STATUS_STYLE: Record<PostingStatus, { label: string; className: string }> = {
   verified:        { label: "In Zoho ✓",             className: "bg-emerald-100 text-emerald-700" },
   posted:          { label: "Posted · refresh to verify", className: "bg-amber-100 text-amber-700" },
   uncategorized:   { label: "In Zoho feed · not booked", className: "bg-amber-100 text-amber-700" },
   amount_differs:  { label: "Ref in Zoho · amount differs", className: "bg-orange-100 text-orange-700" },
+  possible_match:  { label: "Not in Zoho · check lookalike", className: "bg-orange-100 text-orange-700" },
   missing_in_zoho: { label: "Posted · gone from Zoho", className: "bg-red-100 text-red-700" },
   failed:          { label: "Post failed",           className: "bg-red-100 text-red-700" },
   not_in_zoho:     { label: "Not in Zoho",           className: "bg-[#D8E1F1] text-[#5E6B85]" },
@@ -36,6 +37,12 @@ export function PostingStatusBadge({
       <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
         {s.label}
       </span>
+      {zoho && status === "possible_match" && (
+        <div className="mt-0.5 max-w-[240px] text-[11px] leading-snug text-[#5E6B85]">
+          Bank ref not in Zoho. Same amount on {zoho.date?.slice(0, 10) ?? "—"}: &ldquo;{zoho.reference ?? "no ref"}&rdquo;
+          {zoho.account ? ` · ${zoho.account}` : ""} — confirm it&apos;s this money, or post it.
+        </div>
+      )}
       {zoho && (status === "verified" || status === "amount_differs" || status === "uncategorized") && (
         <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-[#5E6B85]">
           {zoho.amount != null && aed2(zoho.amount)}

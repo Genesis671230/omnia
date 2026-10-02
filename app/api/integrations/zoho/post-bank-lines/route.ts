@@ -9,6 +9,8 @@ import {
 } from "@/lib/integrations/zoho-banking";
 import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 import { postPlainBankExpense } from "@/lib/integrations/zoho-expenses";
+import { accountsForLines, listStatementAccounts } from "@/lib/finance/statement-accounts";
+import { withZohoOrg } from "@/lib/integrations/zoho-org";
 
 export const maxDuration = 120;
 
@@ -88,12 +90,52 @@ function validateDraft(draft: DraftPosting) {
   return null;
 }
 
+// Each line posts into the Zoho books of the statement account it came from
+// (SIB → Omniastores, RAK → House of Omnia…), read from the DB — never from
+// the client — so a RAK debit can't land in Omniastores' books.
 export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}));
+  const drafts = (Array.isArray(body.drafts) ? body.drafts : []) as DraftPosting[];
+  if (drafts.length === 0) return NextResponse.json({ error: "drafts required" }, { status: 400 });
+
+  let lineAccount: Map<string, string>;
+  let orgOf: Map<string, string>;
+  try {
+    lineAccount = await accountsForLines(drafts.map((d) => d.bankLineId).filter(Boolean));
+    orgOf = new Map((await listStatementAccounts()).map((a) => [a.id, a.zohoConnectionId]));
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+  const byOrg = new Map<string, DraftPosting[]>();
+  for (const d of drafts) {
+    const org = orgOf.get(lineAccount.get(d.bankLineId) ?? "") ?? "";
+    byOrg.set(org, [...(byOrg.get(org) ?? []), d]);
+  }
+
+  let dryRun = false;
+  const results: LineResult[] = [];
+  for (const [org, group] of byOrg) {
+    try {
+      const res = await withZohoOrg(org, () => postGroup({ ...body, drafts: group }));
+      const json = await res.json();
+      if (!res.ok) {
+        for (const d of group) results.push({ bankLineId: d.bankLineId, status: "failed", error: json.error ?? `HTTP ${res.status}` });
+        continue;
+      }
+      dryRun = json.dryRun;
+      results.push(...json.results);
+    } catch (e) {
+      for (const d of group) results.push({ bankLineId: d.bankLineId, status: "failed", error: (e as Error).message });
+    }
+  }
+  return NextResponse.json({ dryRun, results });
+}
+
+async function postGroup(body: Record<string, unknown>): Promise<Response> {
   if (!zohoConfigured()) {
     return NextResponse.json({ error: "Zoho is not configured" }, { status: 503 });
   }
 
-  const body = await request.json().catch(() => ({}));
   const drafts = Array.isArray(body.drafts) ? body.drafts : [];
   const dryRun = Boolean(body.dryRun);
   const actor = String(body.actor ?? "founder");

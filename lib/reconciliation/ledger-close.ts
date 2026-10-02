@@ -19,7 +19,7 @@ export type StatementLine = {
   description: string;
   /** Recorded in Zoho — from the app's statement↔Zoho check, else amount ± 3 days. */
   inZoho: boolean;
-  /** That check's state (in_zoho | uncategorized | amount_differs | not_found), null if never checked. */
+  /** That check's state (in_zoho | uncategorized | amount_differs | possible_match | not_found), null if never checked. */
   zohoState: string | null;
 };
 
@@ -109,7 +109,7 @@ export function closeFlags(input: {
       items: [...missing].sort((a, b) => b.amount - a.amount).slice(0, 8).map((s) => ({
         label: `${s.date ?? "—"} · ${s.reference || s.description.slice(0, 40)}`,
         amount: s.direction === "debit" ? -s.amount : s.amount,
-        note: s.zohoState === "uncategorized" ? "in Zoho feed, not categorised" : s.zohoState === "amount_differs" ? "amount differs in Zoho" : undefined,
+        note: s.zohoState === "uncategorized" ? "in Zoho feed, not categorised" : s.zohoState === "amount_differs" ? "amount differs in Zoho" : s.zohoState === "possible_match" ? "ref not in Zoho — a same-amount entry nearby may be it" : undefined,
       })),
     });
   }

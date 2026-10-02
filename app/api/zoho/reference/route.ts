@@ -25,6 +25,9 @@ const CACHE_TTL_MS = Number(process.env.ZOHO_REFERENCE_TTL_MS ?? 30 * 60 * 1000)
 type ReferenceData = {
   expenseAccounts: { account_id: string; account_name: string }[];
   equityAccounts: { account_id: string; account_name: string }[];
+  /** Credit cards kept as liability accounts ("Credit Card - XXX-8436") — a
+   *  transfer to one is a card payment, not an expense or drawings. */
+  cardAccounts: { account_id: string; account_name: string }[];
   bankAccounts: {
     account_id: string;
     account_name: string;
@@ -76,9 +79,10 @@ async function handleGET(request: Request) {
     const token = await getAccessToken();
     // Chart of accounts pulled twice (Expense + Equity filters) so the dropdowns
     // stay tight — otherwise we'd load thousands of irrelevant accounts.
-    const [expenseAccounts, equityAccounts, bankAccounts, taxes] = await Promise.all([
+    const [expenseAccounts, equityAccounts, liabilityAccounts, bankAccounts, taxes] = await Promise.all([
       fetchZoho("/chartofaccounts", token, { filter_by: "AccountType.Expense" }),
       fetchZoho("/chartofaccounts", token, { filter_by: "AccountType.Equity" }),
+      fetchZoho("/chartofaccounts", token, { filter_by: "AccountType.Liability" }),
       fetchZoho("/bankaccounts", token),
       fetchZoho("/settings/taxes", token),
     ]);
@@ -92,6 +96,9 @@ async function handleGET(request: Request) {
       equityAccounts: list<{ account_id: string; account_name: string }>(equityAccounts.chartofaccounts).map((a) => ({
         account_id: a.account_id, account_name: a.account_name,
       })),
+      cardAccounts: list<{ account_id: string; account_name: string; account_type?: string }>(liabilityAccounts.chartofaccounts)
+        .filter((a) => a.account_type === "credit_card" || /credit\s*card/i.test(a.account_name))
+        .map((a) => ({ account_id: a.account_id, account_name: a.account_name })),
       bankAccounts: list<{ account_id: string; account_name: string; account_number?: string; currency_code?: string }>(
         bankAccounts.bankaccounts,
       ).map((a) => ({

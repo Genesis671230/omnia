@@ -20,6 +20,8 @@ export type ParsedBankLine = {
   provider?: Gateway;
   confidence?: Confidence;
   kind?: "salary" | "supplier" | "fee" | "tax" | "transfer" | "other";
+  /** statement_accounts.id — set by the uploader, not the parser. */
+  account?: string;
 };
 
 export type ParsedStatement = {
@@ -156,7 +158,9 @@ function makeLine(
 const COL = {
   date: ["date", "transaction date", "value date", "posting date"],
   description: ["description", "narration", "details", "particulars", "transaction details", "remarks"],
-  reference: ["ref", "reference", "chq", "cheque", "transaction ref"],
+  // RAK's "Transaction ID" (S29015417) is the only thing telling apart three
+  // identical same-day card purchases — without it they dedupe into one.
+  reference: ["ref", "reference", "transaction id", "chq", "cheque", "transaction ref"],
   debit: ["debit", "withdrawal", "debit amount", "money out", "paid out"],
   credit: ["credit", "deposit", "credit amount", "money in", "paid in"],
   amount: ["amount", "transaction amount", "amount (aed)"],

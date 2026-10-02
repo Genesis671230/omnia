@@ -40,7 +40,12 @@ export type LedgerZohoTxn = {
   offset_account_name?: string;
 };
 
-export type LedgerState = "in_zoho" | "uncategorized" | "amount_differs" | "not_found";
+// possible_match: no entry carries the line's bank ref, but one has the same
+// amount and direction within a few days. NOT booked — it may be unrelated
+// money (live 01 Sep: the 50K FT26244T2HH8 booking was deleted, and a manual
+// 29 Aug "Transferred to RAK bank 50K" to the sister company kept the line
+// showing "In Zoho" through every Refresh). Shown so a person can check it.
+export type LedgerState = "in_zoho" | "uncategorized" | "amount_differs" | "possible_match" | "not_found";
 
 export type LedgerStatus = {
   state: LedgerState;
@@ -191,8 +196,9 @@ export function matchBankLinesToZoho(
   }
 
   // 4. The accountant sometimes books under a different ref (07 Sep: bank
-  //    FT26250XYXNL, Zoho "FT26251PVCVF-Traf to Credit card 40K"). Accept a
-  //    same-direction, same-amount entry within a few days — but only when it
+  //    FT26250XYXNL, Zoho "FT26251PVCVF-Traf to Credit card 40K"). Point at a
+  //    same-direction, same-amount entry within a few days as a POSSIBLE
+  //    match — never "in Zoho": only the ref proves it is this money. Only when it
   //    is the ONLY such entry, and its ref belongs to no bank line still
   //    waiting for a booking, so it cannot steal one. (That 40K entry carries
   //    the 08 Sep 300K transfer's ref — a slip in Zoho; the 300K and its
@@ -214,7 +220,7 @@ export function matchBankLinesToZoho(
     // …and no other orphan line could claim the same entry.
     if (orphans.some((o) => o.id !== l.id && out.get(o.id)?.state === "not_found" && near(o, cands[0]))) continue;
     used.add(cands[0].transaction_id);
-    out.set(l.id, statusFrom(cands[0], "amount_date"));
+    out.set(l.id, statusFrom(cands[0], "amount_date", "possible_match"));
   }
 
   return out;

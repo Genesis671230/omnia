@@ -91,8 +91,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from") || undefined;
   const to = searchParams.get("to") || undefined;
+  const account = searchParams.get("account") || undefined;
   try {
-    const lines = await BankRepository.listAll({ from, to });
+    const lines = await BankRepository.listAll({ from, to, account });
     const ids = lines.map((l) => l.id);
     const [ledger, postings, payoutByLine] = await Promise.all([
       BankLineZohoStatusRepository.list(ids),
@@ -124,6 +125,7 @@ export async function GET(request: Request) {
         confidence: l.confidence,
         kind: l.kind,
         batchId: l.batch_id,
+        account: l.statement_account,
         payout: payoutByLine.get(l.id) ?? null,
       })),
       postings: postingsByLine,

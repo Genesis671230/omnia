@@ -69,12 +69,74 @@
       "rate_above": 0.09,
       "legal_basis": "Federal Decree-Law No. 47 of 2022, Cabinet Decision No. 116 of 2023",
       "VERIFY": "compliance-gate: primary source on mof.gov.ae"
+    },
+    "registration": {
+      "rule_before_2024_03_01": "Resident juridical person existing before 1 Mar 2024: deadline by the MONTH of its earliest licence's issue date (any year)",
+      "by_licence_month_due": {
+        "1": "2024-05-31",
+        "2": "2024-05-31",
+        "3": "2024-06-30",
+        "4": "2024-06-30",
+        "5": "2024-07-31",
+        "6": "2024-08-31",
+        "7": "2024-09-30",
+        "8": "2024-10-31",
+        "9": "2024-10-31",
+        "10": "2024-11-30",
+        "11": "2024-11-30",
+        "12": "2024-12-31"
+      },
+      "no_licence_at_2024_03_01_due": "2024-05-31",
+      "decision_effective": "2024-03-01",
+      "months_after_incorporation": 3,
+      "rule_on_or_after_2024_03_01": "Resident juridical person (incl. Free Zone Person) incorporated on/after 1 Mar 2024: within 3 months of incorporation",
+      "legal_basis": "FTA Decision No. 3 of 2024, Article 3 (penalty per Article 6 → Cabinet Decision No. 75 of 2023)",
+      "source": "https://tax.gov.ae/Datafolder/Files/Legislation/FTA%20Decision%20No.%203%20of%202024%20on%20Registration%20Timeline%20for%20Corporate%20Tax%20-%20For%20publishing.pdf",
+      "verified_on": "2026-10-01"
+    },
+    "small_business_relief": {
+      "revenue_lte_aed": 3000000,
+      "periods_start_on_or_after": "2023-06-01",
+      "periods_end_on_or_before": "2029-12-31",
+      "excluded": [
+        "Qualifying Free Zone Person",
+        "member of a Multinational Enterprise Group"
+      ],
+      "must_register_and_file": true,
+      "legal_basis": "Ministerial Decision No. 73 of 2023, end date extended by Ministerial Decision No. 131 (Aug 2026)",
+      "source": "https://mof.gov.ae/en/news/ministry-of-finance-announces-extension-of-small-business-relief-for-corporate-tax-purposes-until-31-december-2029/",
+      "source_exclusions": "https://tax.gov.ae/DataFolder/Files/Guides/CT/Small%20Business%20Relief%20Guide%20-%20EN%20-%2027%2008%202023.pdf",
+      "verified_on": "2026-10-01"
+    },
+    "natural_person": {
+      "turnover_gt_aed": 1000000,
+      "rule": "A natural person's business is subject to CT only when its turnover exceeds AED 1m in a Gregorian calendar year (wages, personal investment and real-estate investment income never count)",
+      "legal_basis": "Cabinet Decision No. 49 of 2023",
+      "source": "https://tax.gov.ae/DataFolder/Files/Legislation/05-06-2023/3/Cabinet%20Decision%20No.%2049%20of%202023%20-%20for%20publishing.pdf",
+      "verified_on": "2026-10-01"
     }
   },
   "vat": {
     "standard_rate": 0.05,
     "legal_basis": "Federal Decree-Law No. 8 of 2017",
-    "VERIFY": "compliance-gate: primary source on tax.gov.ae"
+    "VERIFY": "compliance-gate: primary source on tax.gov.ae",
+    "registration": {
+      "mandatory_over_aed": 375000,
+      "voluntary_over_aed": 187500,
+      "basis": "taxable supplies + imports in the past 12 months, or expected in the next 30 days",
+      "source": "https://tax.gov.ae/en/taxes/Vat/vat.topics/registration.for.vat.aspx",
+      "verified_on": "2026-10-01"
+    },
+    "penalties": {
+      "late_registration_aed": 10000,
+      "late_filing_first_aed": 1000,
+      "late_filing_repeat_24m_aed": 2000,
+      "late_payment_rate_pa": 0.14,
+      "legal_basis": "Cabinet Decision No. 129 of 2025 (effective 14 Apr 2026), amending Cabinet Decision No. 40 of 2017",
+      "source": "https://www.bdo.ae/en-gb/news/news/revision-in-administrative-penalties-for-violation-of-tax-laws-in-the-uae",
+      "verified_on": "2026-10-01",
+      "VERIFY": "compliance-gate: secondary sources only — confirm amounts on tax.gov.ae (Cabinet Decision 129/2025 text) before paid traffic"
+    }
   },
   "einvoicing": {
     "large": {

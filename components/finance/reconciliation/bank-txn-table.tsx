@@ -2,7 +2,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { ArrowUpDown, Pencil } from "lucide-react";
+import { ArrowUpDown, Pencil, PenLine, Send, Trash2 } from "lucide-react";
 import { BankLineNoteEditor } from "./bank-line-note";
 import { PostingStatusBadge, type PostingStatus } from "./posting-status-badge";
 import type { BankTxnLine, BankTxnPostingState } from "./bank-txn-row";
@@ -11,13 +11,17 @@ import { aed2 } from "./types";
 
 type SortKey = "date" | "amount" | "status";
 
+// What a row can do depends on whether Zoho holds a booking for it.
+const BOOKED = new Set<PostingStatus>(["verified", "posted"]);
+const UNBOOKED = new Set<PostingStatus>(["not_posted", "not_in_zoho", "failed", "missing_in_zoho", "possible_match"]);
+
 function resolveStatus(posting?: BankTxnPostingState): PostingStatus {
   if (!posting) return "not_posted";
   return (posting.status as PostingStatus) ?? "not_posted";
 }
 
 export function BankTxnTable({
-  lines, postings, draftsByLineId, selected, onToggleSelect, onDescriptionSaved, onPaySupplier,
+  lines, postings, draftsByLineId, selected, onToggleSelect, onDescriptionSaved, onPaySupplier, onPostOne, onEditZoho, onDeleteZoho,
 }: {
   lines: BankTxnLine[];
   postings: Record<string, BankTxnPostingState>;
@@ -27,6 +31,12 @@ export function BankTxnTable({
   onDescriptionSaved: (id: string, zohoDescription: string) => void;
   /** Debits not yet in Zoho: book as a supplier payment or to an account. */
   onPaySupplier?: (line: BankTxnLine) => void;
+  /** Post just this line (opens the review dialog with it). */
+  onPostOne?: (line: BankTxnLine) => void;
+  /** Lines booked in Zoho: delete and post again with another mapping. */
+  onEditZoho?: (line: BankTxnLine) => void;
+  /** Lines booked in Zoho: delete the booking. */
+  onDeleteZoho?: (line: BankTxnLine) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -107,9 +117,27 @@ export function BankTxnTable({
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <PostingStatusBadge status={status} zoho={posting?.zoho} error={posting?.error} />
-                    {onPaySupplier && l.direction === "debit" && (status === "not_posted" || status === "failed") && (
+                    {UNBOOKED.has(status) && onPostOne && (
+                      <button onClick={(e) => { e.stopPropagation(); onPostOne(l); }} title="Post this line to Zoho"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#C9D5EA] bg-white px-2.5 py-0.5 text-[11.5px] text-[#0F1B3D] hover:border-[#1D4ED8]">
+                        <Send size={11} /> Post
+                      </button>
+                    )}
+                    {onPaySupplier && l.direction === "debit" && UNBOOKED.has(status) && (
                       <button onClick={(e) => { e.stopPropagation(); onPaySupplier(l); }} className="whitespace-nowrap rounded-full border border-[#C9D5EA] bg-white px-2.5 py-0.5 text-[11.5px] text-[#0F1B3D] hover:border-[#1D4ED8]">
                         Pay supplier
+                      </button>
+                    )}
+                    {BOOKED.has(status) && onEditZoho && (
+                      <button onClick={(e) => { e.stopPropagation(); onEditZoho(l); }} title="Edit: delete this booking in Zoho and post it again"
+                        aria-label="Edit booking" className="rounded-full p-1 text-[#5E6B85] hover:bg-[#EAF1FD] hover:text-[#1D4ED8]">
+                        <PenLine size={13} />
+                      </button>
+                    )}
+                    {BOOKED.has(status) && onDeleteZoho && (
+                      <button onClick={(e) => { e.stopPropagation(); onDeleteZoho(l); }} title="Delete this booking from Zoho"
+                        aria-label="Delete from Zoho" className="rounded-full p-1 text-[#5E6B85] hover:bg-[#F9ECE7] hover:text-[#A6472F]">
+                        <Trash2 size={13} />
                       </button>
                     )}
                   </div>

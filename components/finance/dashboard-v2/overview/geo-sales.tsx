@@ -183,7 +183,7 @@ function SalesMap({
   // the base map never changes while zooming — memo it so a frame only moves one <g>
   const land = useMemo(
     () =>
-      visible.map((s,i) => {
+      visible.map((s) => {
         const code = s.id ?? s.properties.name;
         const g = geo.get(code);
         if (!g) return null;
@@ -191,7 +191,7 @@ function SalesMap({
         return (
           <path
             key={code}
-            d={i.toString()}
+            d={g.d}
             fill={sales ? shade(Math.sqrt(sales.soldAed / max)) : LAND}
             stroke="#FFFFFF"
             strokeWidth={0.7}

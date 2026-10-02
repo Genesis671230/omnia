@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { zohoOrgScoped } from "@/lib/integrations/zoho-org";
+import { runInZohoOrgOr400, zohoOrgForBankLine } from "@/lib/integrations/zoho-org";
 import { zohoConfigured } from "@/lib/integrations/zoho";
 import {
   createVendorPayment, findVendorPaymentByReference, listOpenBills, ZohoScopeError, ZohoVendorRejection,
@@ -79,7 +79,9 @@ async function handlePOST(req: Request, bankLineId: string) {
   }
 }
 
+// The books are the bank line's own statement account's (SIB → Omniastores,
+// RAK → House of Omnia) — never whatever the client asked for.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return zohoOrgScoped(req, () => handlePOST(req, id));
+  return runInZohoOrgOr400(await zohoOrgForBankLine(id), () => handlePOST(req, id));
 }

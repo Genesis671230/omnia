@@ -19,6 +19,7 @@ type ZohoTax = { tax_id: string; tax_name: string; tax_percentage: number };
 type ReferenceData = {
   expenseAccounts: ZohoAccount[];
   equityAccounts: ZohoAccount[];
+  cardAccounts?: ZohoAccount[];
   bankAccounts: ZohoAccount[];
   taxes: ZohoTax[];
 };
@@ -80,10 +81,13 @@ export function GroupClassificationPanel({
     );
     const vat5 = reference.taxes.find(t => t.tax_percentage === 5 && /standard/i.test(t.tax_name));
     const ownerDrawings = reference.equityAccounts.find(a => /owner.*draw|drawings/i.test(a.account_name));
+    // Only a single, unambiguous card is used as the default destination.
+    const cards = (reference.cardAccounts ?? []).filter(a => !/charges/i.test(a.account_name));
     return {
       defaultBankAccountId: sib?.account_id ?? "",
       standardVat5Id: vat5?.tax_id ?? "",
       ownerDrawingsAccountId: ownerDrawings?.account_id ?? "",
+      creditCardAccountId: cards.length === 1 ? cards[0].account_id : "",
       defaultPlaceOfSupply: "DU",
       payees,
     };
@@ -127,7 +131,10 @@ export function GroupClassificationPanel({
   );
 
   const selectedReady = readyKeys.filter(k => selected.has(k));
-  const bulkKeys = selectedReady.length ? selectedReady : readyKeys;
+  // Posting is always explicit: ticked groups only, or "Auto-match & post"
+  // after a confirmation listing exactly what goes. ("Post all ready" with
+  // nothing ticked posted 35K–50K owner transfers as Drawings in one click.)
+  const [confirmAuto, setConfirmAuto] = useState(false);
   const allReady = readyKeys.length > 0 && readyKeys.every(k => selected.has(k));
 
   const patch = (key: string, updater: Partial<GroupClassification> | ((c: GroupClassification) => GroupClassification)) => {
@@ -237,13 +244,45 @@ export function GroupClassificationPanel({
               {allReady ? "Deselect all" : `Select ready (${readyKeys.length})`}
             </button>
           )}
-          <button onClick={() => postGroups(bulkKeys)} disabled={posting || !bulkKeys.length}
+          <button onClick={() => postGroups(selectedReady)} disabled={posting || !selectedReady.length}
+            title={selectedReady.length ? undefined : "Tick the groups to post"}
             className="inline-flex items-center gap-1.5 rounded-full bg-[#B08343] px-4 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">
             {posting && <Loader2 size={13} className="animate-spin" />}
-            {selectedReady.length ? `Post ${selectedReady.length} selected` : `Post all ready (${readyKeys.length})`}
+            Post {selectedReady.length} selected
           </button>
+          {readyKeys.length > 0 && (
+            <button onClick={() => setConfirmAuto(true)} disabled={posting}
+              className="rounded-full border border-[#B08343] bg-white px-3 py-1.5 text-[12px] font-medium text-[#B08343] hover:bg-[#FBF3E6] disabled:opacity-50">
+              Auto-match &amp; post…
+            </button>
+          )}
         </div>
       </div>
+
+      {confirmAuto && (
+        <div className="mb-3 rounded-xl border border-[#E0C9A0] bg-[#FFFBF3] p-3 text-[12.5px] text-[#1F1B16]">
+          <div className="mb-2 font-medium">Post these {readyKeys.length} auto-matched group{readyKeys.length === 1 ? "" : "s"} to Zoho?</div>
+          <ul className="max-h-52 space-y-1 overflow-y-auto">
+            {readyKeys.map((k) => {
+              const g = groups.find((x) => x.key === k)!;
+              const c = classifications[k];
+              const dest = [...reference.bankAccounts, ...(reference.cardAccounts ?? []), ...reference.equityAccounts, ...reference.expenseAccounts]
+                .find((a) => a.account_id === (c.destinationAccountId || c.expenseAccountId))?.account_name ?? "—";
+              return (
+                <li key={k} className="flex justify-between gap-3">
+                  <span className="truncate">{g.date?.slice(0, 10)} · {g.payee} · {g.reference}</span>
+                  <span className="shrink-0 tabular-nums">{aed2(Math.abs(g.mainLine.amount))} → {GROUP_LABEL[c.groupType] ?? c.groupType}: {dest}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-3 flex justify-end gap-2">
+            <button onClick={() => setConfirmAuto(false)} className="rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px]">Cancel</button>
+            <button onClick={() => { setConfirmAuto(false); postGroups(readyKeys); }} disabled={posting}
+              className="rounded-full bg-[#B08343] px-3 py-1.5 text-[12px] font-medium text-white">Post {readyKeys.length} to Zoho</button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-3 flex items-center gap-2 rounded-full border border-[#D6CCBA] bg-white px-3 py-1.5 text-[12px]">
         <Search size={13} className="text-[#8A8175]" />
@@ -391,7 +430,7 @@ export function GroupClassificationPanel({
                       onChange={e => patch(g.key, { destinationAccountId: e.target.value })}
                       className="w-full rounded border border-[#D6CCBA] bg-white px-2 py-1 text-[12px]">
                       <option value="">— pick —</option>
-                      {(c.groupType === "inter_account" ? reference.bankAccounts : reference.equityAccounts).map(a => (
+                      {(c.groupType === "inter_account" ? [...reference.bankAccounts, ...(reference.cardAccounts ?? [])] : reference.equityAccounts).map(a => (
                         <option key={a.account_id} value={a.account_id}>{a.account_name}</option>
                       ))}
                     </select>

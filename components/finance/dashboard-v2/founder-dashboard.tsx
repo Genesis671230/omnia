@@ -5,6 +5,7 @@
    spotlight, latest orders. Data spine unchanged: /api/dashboard +
    /api/insights. Every number on screen drills into a drawer or dialog. */
 
+import { CommandCenter } from "./command/command-center";
 import {
   Loader2, Radio, Truck, Download, User, MapPin, Mail, Phone, Copy, CheckCheck,
   BadgeCheck, PackageCheck, PackageX, HelpCircle, Package, ArrowRight,
@@ -235,6 +236,7 @@ export function FounderDashboard({ version }: { version: number }) {
 
       {/* Top line first: per day, what the stores sold, how much is already in
           the bank, what is pending and the approximate gateway fee. */}
+      <CommandCenter />
       <MoneyOverview />
 
       <PaymentsInsightsPanel />

@@ -9,6 +9,7 @@ import { BankTxnFilters, type Direction, type PostStatusFilterValue } from "./ba
 import { BankTxnRow, type BankTxnLine, type BankTxnPostingState } from "./bank-txn-row";
 import { BankTxnPostDialog } from "./bank-txn-post-dialog";
 import { SupplierPaymentDialog } from "./supplier-payment-dialog";
+import { ZohoEntryDeleteDialog } from "./zoho-entry-delete-dialog";
 import { resolveDraftPosting, normalizeAccountMap, type DraftPosting } from "@/lib/reconciliation/mapping-resolver";
 import { defaultBankLineNote, zohoDescriptionFor } from "@/lib/reconciliation/bank-line-description";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
@@ -16,20 +17,73 @@ import { AccountCombobox } from "./account-combobox";
 import { BankTxnTable } from "./bank-txn-table";
 import { BankChargesPanel } from "../../reconciliation/bank-charges-panel";
 import type { BankChargeSettings } from "@/lib/reconciliation/bank-charge-detector";
+import type { StatementAccount } from "@/lib/finance/statement-accounts";
+import { StatementAccountBar, type ZohoOrgOption } from "./statement-account-bar";
+
+const LEGACY_ACCOUNT = "sib-omniastores";
+const SIB_ZOHO_ACCOUNT = "2330082000000236001";
+const ACCOUNT_KEY = "omnia.bankTab.statementAccount";
 export type ZohoAccount = { account_id: string; account_name: string; account_type: string };
 
 export function BankTransactionsTab({
-  fromDate, toDate, onRange, zohoSettings, zohoAccounts,
+  fromDate, toDate, onRange, zohoSettings, zohoAccounts: mainZohoAccounts,
 }: {
   fromDate: string; toDate: string; onRange: (from: string, to: string) => void;
   zohoSettings: Partial<ZohoAccountMap> | undefined; zohoAccounts: ZohoAccount[];
 }) {
-  const settings = normalizeAccountMap(zohoSettings);
+  // Which statement this tab shows: SIB, RAK, a card… each in its own books.
+  const [stmtAccounts, setStmtAccounts] = useState<StatementAccount[]>([]);
+  const [orgs, setOrgs] = useState<ZohoOrgOption[]>([]);
+  const [accountId, setAccountIdState] = useState<string>(() => {
+    try { return localStorage.getItem(ACCOUNT_KEY) || LEGACY_ACCOUNT; } catch { return LEGACY_ACCOUNT; }
+  });
+  const setAccountId = (id: string) => {
+    setAccountIdState(id);
+    setSelected(new Set());
+    try { localStorage.setItem(ACCOUNT_KEY, id); } catch { /* per-viewer convenience only */ }
+  };
+  const loadStmtAccounts = useCallback(async () => {
+    try {
+      const j = await fetch("/api/statement-accounts").then((r) => r.json());
+      if (j.error) throw new Error(j.error);
+      setStmtAccounts(j.accounts);
+      setOrgs(j.orgs);
+    } catch (e) {
+      toast.error(`Statement accounts: ${(e as Error).message}`);
+    }
+  }, []);
+  useEffect(() => { loadStmtAccounts(); }, [loadStmtAccounts]);
+  const account = stmtAccounts.find((a) => a.id === accountId);
+  const isMainOrg = !account || !account.zohoConnectionId || account.zohoConnectionId === "env";
+  const isLegacy = accountId === LEGACY_ACCOUNT;
+
+  // A non-main account (RAK → House of Omnia) posts against its own org's chart.
+  const [orgAccounts, setOrgAccounts] = useState<ZohoAccount[]>([]);
+  useEffect(() => {
+    if (isMainOrg || !account) { setOrgAccounts([]); return; }
+    let live = true;
+    fetch(`/api/integrations/zoho/account-config?zohoOrg=${encodeURIComponent(account.zohoConnectionId)}`)
+      .then((r) => r.json())
+      .then((j) => { if (live) { if (j.error) toast.error(`${account.label}: ${j.error}`); setOrgAccounts(j.allAccounts ?? []); } })
+      .catch((e) => live && toast.error((e as Error).message));
+    return () => { live = false; };
+  }, [isMainOrg, account]);
+  const zohoAccounts = isMainOrg ? mainZohoAccounts : orgAccounts;
+  // The Zoho bank / card account this statement IS.
+  const bankZohoId = account?.zohoAccountId || (isLegacy ? SIB_ZOHO_ACCOUNT : "");
+
+  const baseSettings = normalizeAccountMap(zohoSettings);
+  // Clearing / fee / income ids are Omniastores' chart — meaningless in another org's books.
+  const settings = useMemo(() => isMainOrg
+    ? { ...baseSettings, bankAccountId: bankZohoId }
+    : { bankAccountId: bankZohoId, feeAccountId: "", clearingByGateway: {}, defaultIncomeAccountId: "", expenseAccountByKind: {} },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(baseSettings), bankZohoId, isMainOrg]);
   // Bank-charges settings are on the same config blob but not yet in ZohoAccountMap.
 // Cast until you add these two fields to /api/integrations/zoho/account-config's
 // response type: bankChargesAccountId (Bank Fees and Charges) + vatStandard5Id (VAT 5%).
 const chargeSettings: BankChargeSettings = {
-  bankAccountId: "2330082000000236001",
+  bankAccountId: bankZohoId,
   bankChargesAccountId: (settings as any).bankChargesAccountId ?? "2330082000000000409",
   vatStandard5Id: (settings as any).vatStandard5Id ?? "",
   placeOfSupply: (settings as any).placeOfSupply ?? "DU",
@@ -44,6 +98,7 @@ const chargeSettings: BankChargeSettings = {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [supplierLine, setSupplierLine] = useState<BankTxnLine | null>(null);
+  const [zohoEdit, setZohoEdit] = useState<{ line: BankTxnLine; mode: "delete" | "edit" } | null>(null);
 
   const [syncing, setSyncing] = useState(false);
 const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -67,7 +122,7 @@ const syncWithZoho = async (force = false) => {
     const res = await fetch("/api/reconcile/bank-lines/zoho-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from: fromDate, to: toDate, accountId: settings.bankAccountId ? "2330082000000236001" : undefined, force }),
+      body: JSON.stringify({ from: fromDate, to: toDate, account: accountId, force }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -89,9 +144,10 @@ const syncWithZoho = async (force = false) => {
   }
 };
 
+  // Switching statement resets the fallback from-account to that statement's own account.
   useEffect(() => {
-    if (!defaultFromAccountId && settings.bankAccountId) setDefaultFromAccountId(settings.bankAccountId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setDefaultFromAccountId(settings.bankAccountId || "");
+    setDefaultToAccountId("");
   }, [settings.bankAccountId]);
 
   const load = useCallback(async () => {
@@ -100,7 +156,7 @@ const syncWithZoho = async (force = false) => {
       const params = new URLSearchParams();
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
-      if (settings.bankAccountId) params.set("accountId", "2330082000000236001");
+      params.set("account", accountId);
       const r = await fetch(`/api/reconcile/bank-lines?${params}`).then((x) => x.json());
       if (r.error) throw new Error(r.error);
       setLines(r.lines);
@@ -116,7 +172,7 @@ const syncWithZoho = async (force = false) => {
     // asynchronously after this component mounts — without it in the deps,
     // this closure keeps the empty bankAccountId from the first render
     // forever, and /api/reconcile/bank-lines now 400s without an accountId.
-  }, [fromDate, toDate, settings.bankAccountId]);
+  }, [fromDate, toDate, accountId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -204,6 +260,13 @@ const syncWithZoho = async (force = false) => {
 const deSelectAll = ()=>setSelected(new Set())
   return (
     <>
+      <StatementAccountBar accounts={stmtAccounts} orgs={orgs} selectedId={accountId} onSelect={setAccountId}
+        zohoAccounts={zohoAccounts} onSaved={loadStmtAccounts} />
+      {account && !bankZohoId && (
+        <div className="mb-3 rounded-lg border border-[#E8C9BE] bg-[#F9ECE7] px-3 py-2 text-[12.5px] text-[#A6472F]">
+          Pick which Zoho {account.kind === "credit_card" ? "credit card" : "bank"} account {account.label} is (the settings link above) — until then its lines can be read but not posted.
+        </div>
+      )}
       <BankTxnFilters query={query} onQuery={setQuery} direction={direction} onDirection={setDirection}
         postStatus={postStatus} onPostStatus={setPostStatus} fromDate={fromDate} toDate={toDate}
         onRange={onRange} resultCount={visible.length} totalCount={lines.length} />
@@ -226,12 +289,13 @@ const deSelectAll = ()=>setSelected(new Set())
     Bank lines loaded, but Zoho could not be checked, so the Zoho status column is blank: {zohoError}
   </div>
 )}
-<GroupClassificationPanel
-  lines={lines}
-  postings={postings}
-  onPosted={load}
-/>
-<BankChargesPanel lines={lines} postings={postings}  onPosted={load} />
+{/* These two post through routes that only know Omniastores' books — SIB only. */}
+{isLegacy && (
+  <>
+    <GroupClassificationPanel lines={lines} postings={postings} onPosted={load} />
+    <BankChargesPanel lines={lines} postings={postings} onPosted={load} />
+  </>
+)}
 
 
    <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[#D8E1F1] bg-[#F3F6FC] p-3">
@@ -264,7 +328,7 @@ const deSelectAll = ()=>setSelected(new Set())
         </div>
       ) : lines.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#5E6B85]">
-          No bank lines imported yet. Upload a statement (PDF, CSV, or XLS/XLSX) above.
+          No lines for {account?.label ?? "this account"} in this range. Upload its statement (PDF, CSV, or XLS/XLSX) above and pick this account.
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#C9D5EA] bg-white p-10 text-center text-[14px] leading-relaxed text-[#5E6B85]">
@@ -285,6 +349,9 @@ const deSelectAll = ()=>setSelected(new Set())
               onToggleSelect={toggleSelect}
               onDescriptionSaved={onDescriptionSaved}
               onPaySupplier={setSupplierLine}
+              onPostOne={(l) => { setSelected(new Set([l.id])); setDialogOpen(true); }}
+              onEditZoho={(l) => setZohoEdit({ line: l, mode: "edit" })}
+              onDeleteZoho={(l) => setZohoEdit({ line: l, mode: "delete" })}
             />
       )}
      
@@ -299,6 +366,21 @@ const deSelectAll = ()=>setSelected(new Set())
           </button>
           <button onClick={deSelectAll} className="text-[12px] text-[#5E6B85] underline">Clear</button>
         </div>
+      )}
+
+      {zohoEdit && (
+        <ZohoEntryDeleteDialog
+          line={zohoEdit.line}
+          mode={zohoEdit.mode}
+          onClose={() => setZohoEdit(null)}
+          onDeleted={async () => {
+            const { line, mode } = zohoEdit;
+            setZohoEdit(null);
+            await load();
+            // Edit = delete, then the same line straight back into the posting form.
+            if (mode === "edit") { setSelected(new Set([line.id])); setDialogOpen(true); }
+          }}
+        />
       )}
 
       {supplierLine && (
@@ -319,6 +401,10 @@ const deSelectAll = ()=>setSelected(new Set())
           onClose={() => setDialogOpen(false)}
           onPosted={() => { setSelected(new Set()); load(); }}
           onDescriptionSaved={onDescriptionSaved}
+          onPaySupplier={(id) => {
+            const l = lines.find((x) => x.id === id);
+            if (l) { setDialogOpen(false); setSupplierLine(l); }
+          }}
         />
       )}
     </>

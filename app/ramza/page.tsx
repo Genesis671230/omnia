@@ -6,6 +6,7 @@ import {
 import { EngineShowcase } from "@/components/ramza/ct/engine-showcase";
 import { AiOfficeSection } from "@/components/ramza/ct/ai-office";
 import { EInvoicingSection } from "@/components/ramza/ct/einvoicing";
+import { FreeToolsSection } from "@/components/ramza/ct/free-tools";
 import { GrowthSection } from "@/components/ramza/ct/growth";
 import { PricingCounter } from "@/components/ramza/ct/pricing-counter";
 import { DeadlineTimeline, StakesSection } from "@/components/ramza/ct/editorial";
@@ -35,6 +36,7 @@ export default function RamzaHome() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <HomeHero whatsappHref={wa} />
       <ProofStrip />
+      <FreeToolsSection />
       <DeadlineTimeline />
       <EngineShowcase />
       <AiOfficeSection />

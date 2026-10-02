@@ -1,131 +1,7 @@
-// "use client";
-
-// import { useEffect, useState } from "react";
-// import { AlertTriangle, Loader2, X } from "lucide-react";
-// import { toast } from "sonner";
-// import { aed2 } from "./types";
-
-// export type PostPreviewLine = {
-//   bankLineId: string;
-//   status: "posted" | "failed";
-//   error?: string;
-//   posting?: { transaction_type: string; amount: number; description: string; date: string };
-// };
-
-// export function BankTxnPostDialog({
-//   bankLineIds, onClose, onPosted,
-// }: {
-//   bankLineIds: string[];
-//   onClose: () => void;
-//   onPosted: () => void;
-// }) {
-//   const [preview, setPreview] = useState<PostPreviewLine[] | null>(null);
-//   const [loading, setLoading] = useState(true);
-//   const [posting, setPosting] = useState(false);
-
-//   useEffect(() => {
-//     (async () => {
-//       try {
-//         const res = await fetch("/api/integrations/zoho/post-bank-lines", {
-//           method: "POST",
-//           headers: { "Content-Type": "application/json" },
-//           body: JSON.stringify({ bankLineIds, dryRun: true }),
-//         });
-//         const json = await res.json();
-//         if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-//         setPreview(json.results);
-//       } catch (e) {
-//         toast.error((e as Error).message);
-//         onClose();
-//       } finally {
-//         setLoading(false);
-//       }
-//     })();
-//     // bankLineIds is a fixed snapshot for the lifetime of this dialog
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, []);
-
-//   const confirm = async () => {
-//     setPosting(true);
-//     try {
-//       const res = await fetch("/api/integrations/zoho/post-bank-lines", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ bankLineIds, actor: "founder" }),
-//       });
-//       const json = await res.json();
-//       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-//       const results = json.results as PostPreviewLine[];
-//       const failed = results.filter((r) => r.status === "failed").length;
-//       const ok = results.length - failed;
-//       toast.success(`${ok} posted to Zoho${failed ? `, ${failed} failed` : ""}`);
-//       onPosted();
-//       onClose();
-//     } catch (e) {
-//       toast.error((e as Error).message);
-//     } finally {
-//       setPosting(false);
-//     }
-//   };
-
-//   return (
-//     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-//       <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-//         <div className="mb-4 flex items-center justify-between">
-//           <h3 className="text-[15px] font-semibold text-[#0F1B3D]">Post {bankLineIds.length} to Zoho</h3>
-//           <button onClick={onClose}><X size={16} className="text-[#5E6B85]" /></button>
-//         </div>
-
-//         {loading ? (
-//           <div className="flex items-center gap-2 py-8 text-[13px] text-[#5E6B85]">
-//             <Loader2 size={16} className="animate-spin" /> Building preview…
-//           </div>
-//         ) : (
-//           <div className="space-y-2">
-//             {(preview ?? []).map((r) => (
-//               <div
-//                 key={r.bankLineId}
-//                 className={`rounded-lg border px-3 py-2 text-[12.5px] ${
-//                   r.status === "failed" ? "border-[#A6472F]/30 bg-[#F9ECE7]" : "border-[#D8E1F1] bg-[#F3F6FC]"
-//                 }`}
-//               >
-//                 {r.status === "failed" ? (
-//                   <span className="inline-flex items-center gap-1.5 text-[#A6472F]"><AlertTriangle size={13} /> {r.error}</span>
-//                 ) : (
-//                   <span className="text-[#0F1B3D]">
-//                     {r.posting?.transaction_type} · {aed2(r.posting?.amount ?? 0)} · {r.posting?.description}
-//                   </span>
-//                 )}
-//               </div>
-//             ))}
-//           </div>
-//         )}
-
-//         <div className="mt-5 flex justify-end gap-2">
-//           <button onClick={onClose} className="rounded-lg border border-[#C9D5EA] bg-white px-4 py-2 text-[13px] text-[#0F1B3D]">
-//             Cancel
-//           </button>
-//           <button
-//             onClick={confirm}
-//             disabled={posting || loading || !preview?.some((r) => r.status === "posted")}
-//             className="inline-flex items-center gap-2 rounded-full bg-[#0F1B3D] px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-//           >
-//             {posting ? <Loader2 size={15} className="animate-spin" /> : null} Confirm & post
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
-
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Building2, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DraftPosting, ZohoTransactionType } from "@/lib/reconciliation/mapping-resolver";
 import { guessAccountId } from "@/lib/reconciliation/mapping-resolver";
@@ -134,12 +10,18 @@ import { AccountCombobox } from "./account-combobox";
 import { zohoDescriptionFor } from "@/lib/reconciliation/bank-line-description";
 import { saveBankLineNote } from "./bank-line-note";
 import { aed2 } from "./types";
+import { inferTransactionType } from "@/lib/reconciliation/infer-transaction-type";
 
 type ZohoAccount = { account_id: string; account_name: string; account_type: string };
 
 const TRANSACTION_TYPES: ZohoTransactionType[] = [
   "deposit", "expense", "transfer_fund", "owner_contribution", "owner_drawings", "interest_income", "other_income",
 ];
+
+const TYPE_LABEL: Record<ZohoTransactionType, string> = {
+  deposit: "Deposit", expense: "Expense", transfer_fund: "Transfer between accounts", owner_contribution: "Owner contribution",
+  owner_drawings: "Owner drawings", interest_income: "Interest income", other_income: "Other income",
+};
 
 function withAutoMatch(drafts: DraftPosting[], accounts: ZohoAccount[]): DraftPosting[] {
   return drafts.map((d) => {
@@ -155,7 +37,7 @@ function withAutoMatch(drafts: DraftPosting[], accounts: ZohoAccount[]): DraftPo
 }
 
 export function BankTxnPostDialog({
-  drafts, settings, accounts, onClose, onPosted, onDescriptionSaved,
+  drafts, settings, accounts, onClose, onPosted, onDescriptionSaved, onPaySupplier,
 }: {
   drafts: DraftPosting[];
   settings: ZohoAccountMap;
@@ -163,6 +45,8 @@ export function BankTxnPostDialog({
   onClose: () => void;
   onPosted: () => void;
   onDescriptionSaved?: (id: string, zohoDescription: string) => void;
+  /** A debit that paid a supplier: book it as a vendor payment against their bills instead. */
+  onPaySupplier?: (bankLineId: string) => void;
 }) {
   const suggestedIds = useMemo(() => {
     const map = new Map<string, string>();
@@ -175,6 +59,9 @@ export function BankTxnPostDialog({
 
   const [items, setItems] = useState<DraftPosting[]>(() => withAutoMatch(drafts ?? [], accounts));
   const [posting, setPosting] = useState(false);
+  // Lines whose type someone picked by hand — account changes stop re-deriving it.
+  const [typeOverride, setTypeOverride] = useState<Set<string>>(new Set());
+  const [showType, setShowType] = useState<Set<string>>(new Set());
 
   const canPost = useMemo(
     () => (items ?? []).length > 0 && (items ?? []).every((d) => Boolean(d.fromAccountId) && Boolean(d.toAccountId) && d.amount > 0),
@@ -182,7 +69,17 @@ export function BankTxnPostDialog({
   );
 
   const updateDraft = (bankLineId: string, patch: Partial<DraftPosting>) => {
-    setItems((prev) => prev.map((d) => (d.bankLineId === bankLineId ? { ...d, ...patch } : d)));
+    setItems((prev) => prev.map((d) => {
+      if (d.bankLineId !== bankLineId) return d;
+      const next = { ...d, ...patch };
+      // The account that isn't this statement's own decides the type.
+      if (!typeOverride.has(bankLineId) && (patch.fromAccountId !== undefined || patch.toAccountId !== undefined)) {
+        const otherId = d.direction === "credit" ? next.fromAccountId : next.toAccountId;
+        const inferred = inferTransactionType(d.direction, accounts.find((a) => a.account_id === otherId));
+        if (inferred) next.transactionType = inferred;
+      }
+      return next;
+    }));
   };
   
 
@@ -257,19 +154,21 @@ export function BankTxnPostDialog({
                   </div>
                   <div className="mt-0.5 text-[11.5px] text-[#5E6B85]">{d.reasons[0] || "Manual review"}</div>
                 </div>
-                <div className={`rounded-full px-2.5 py-1 text-[11px] ${d.confidence === "ready" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {d.confidence}
+                <div className="flex shrink-0 items-center gap-2">
+                  {onPaySupplier && d.direction === "debit" && (
+                    <button onClick={() => onPaySupplier(d.bankLineId)}
+                      title="Apply this payment to the supplier's open bills in Zoho, or leave it on the supplier as an advance"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#1D4ED8]/30 bg-white px-2.5 py-1 text-[11px] font-medium text-[#1D4ED8] hover:bg-[#EEF2FA]">
+                      <Building2 size={12} /> Pay supplier / apply to bills
+                    </button>
+                  )}
+                  <div className={`rounded-full px-2.5 py-1 text-[11px] ${d.confidence === "ready" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {d.confidence}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <label className="text-[12px] text-[#0F1B3D]">
-                  Transaction type
-                  <select className="mt-1 w-full rounded-lg border border-[#C9D5EA] bg-white px-3 py-2 text-[13px]"
-                    value={d.transactionType} onChange={(e) => updateDraft(d.bankLineId, { transactionType: e.target.value as ZohoTransactionType })}>
-                    {TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </label>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="text-[12px] text-[#0F1B3D]">
                   From account
                   <div className="mt-1">
@@ -286,6 +185,22 @@ export function BankTxnPostDialog({
                       onChange={(id) => updateDraft(d.bankLineId, { toAccountId: id })} />
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#5E6B85]">
+                Books in Zoho as <span className="rounded-full bg-white px-2 py-0.5 font-medium text-[#0F1B3D]">{TYPE_LABEL[d.transactionType] ?? d.transactionType}</span>
+                {typeOverride.has(d.bankLineId) ? "(set by hand)" : "(from the account picked)"}
+                {showType.has(d.bankLineId) ? (
+                  <select className="rounded-lg border border-[#C9D5EA] bg-white px-2 py-1 text-[12px]" value={d.transactionType} autoFocus
+                    onChange={(e) => {
+                      setTypeOverride((s) => new Set(s).add(d.bankLineId));
+                      updateDraft(d.bankLineId, { transactionType: e.target.value as ZohoTransactionType });
+                    }}>
+                    {TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+                  </select>
+                ) : (
+                  <button className="text-[#1D4ED8] hover:underline" onClick={() => setShowType((s) => new Set(s).add(d.bankLineId))}>change</button>
+                )}
               </div>
 
               <label className="mt-3 block text-[12px] text-[#0F1B3D]">
