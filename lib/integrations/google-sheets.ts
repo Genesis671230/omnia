@@ -221,3 +221,17 @@ export async function updateCells(tabName: string, updates: { row: number; col: 
   const json = await res.json();
   if (!res.ok) throw new Error(`Sheets batch update failed (${tabName}): ${json.error?.message || res.status}`);
 }
+
+// A tab's cells as formulas (=SUM(…)) instead of their values — to explain
+// how a sheet's own totals are built. Read-only.
+export async function readFormulas(tabName: string, spreadsheetId?: string): Promise<string[][]> {
+  const id = resolveSpreadsheetId(spreadsheetId);
+  const token = await getAccessToken();
+  const range = encodeURIComponent(tabName);
+  const res = await fetch(`${SHEETS_API}/${id}/values/${range}?valueRenderOption=FORMULA`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Sheets formula read failed (${tabName}): ${json.error?.message || res.status}`);
+  return (json.values ?? []) as string[][];
+}

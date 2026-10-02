@@ -18,8 +18,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { TW_ORDER, TW_PROBLEMS, type TwRow, type TwStatus, type TwSummary } from "@/lib/dispatch/three-way";
+import type { Bridge } from "@/lib/dispatch/bridge";
 
-type Data = { rows: TwRow[]; summary: TwSummary; sheetErrors: string[]; sheetSources: string[]; sheetReadAt: string; invoicesUpdatedAt: string | null };
+type Data = { rows: TwRow[]; summary: TwSummary; bridge: Bridge; sheetErrors: string[]; sheetSources: string[]; sheetReadAt: string; invoicesUpdatedAt: string | null };
 type RangeKey = "this" | "last" | "7d" | "custom";
 
 const STATUS: Record<TwStatus, { label: string; tone: string; dot: string }> = {
@@ -222,6 +223,8 @@ export function DispatchPanel() {
         </div>
       )}
 
+      {data?.bridge && <BridgeCard b={data.bridge} />}
+
       {/* ── filters ── */}
       <div className="flex flex-wrap items-center gap-2">
         <button onClick={() => setFilter("problems")} className={`rounded-full px-3.5 py-1.5 text-[12.5px] ring-1 ${filter === "problems" ? "bg-[#0F1B3D] text-white ring-[#0F1B3D]" : "bg-white text-slate-700 ring-slate-200"}`}>
@@ -345,6 +348,79 @@ function Detail({ title, lines }: { title: string; lines: [string, string][] }) 
           <div key={i} className="flex justify-between gap-3"><dt className="text-slate-500">{k}</dt><dd className="truncate text-right text-slate-800" title={v}>{v}</dd></div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+/* ── dashboard → sheet "Overall Sales", reason by reason ─────────────────── */
+
+function BridgeCard({ b }: { b: Bridge }) {
+  const [open, setOpen] = useState(false);
+  const max = Math.max(...b.byReason.map((r) => Math.abs(r.diffAed)), 1);
+  return (
+    <div className="rounded-[26px] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_44px_-26px_rgba(15,23,42,0.22)] sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-[20px] font-light tracking-[-0.02em] text-slate-900">Dashboard vs the sheet&apos;s &ldquo;Overall Sales&rdquo;</h3>
+          <p className="mt-1 text-[12.5px] text-slate-500">The sheet counts every row: what&apos;s left + cancelled/refunded, exchanges included. Every dirham of the gap, by reason.</p>
+        </div>
+        <div className="flex items-baseline gap-4 text-[13px] tabular-nums">
+          <span className="text-slate-500">Dashboard <b className="text-[16px] font-medium text-slate-900">{fmt(b.dashboardAed, 2)}</b></span>
+          <span className="text-slate-500">Sheet <b className="text-[16px] font-medium text-slate-900">{fmt(b.sheetAed, 2)}</b></span>
+          <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium ${Math.abs(b.diffPct) < 0.5 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+            {b.diffAed >= 0 ? "+" : "−"}{fmt(Math.abs(b.diffAed), 2)} · {b.diffPct}%
+          </span>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-6 lg:grid-cols-2">
+        <ul className="space-y-2.5">
+          {b.byReason.filter((r) => Math.abs(r.diffAed) >= 0.01).map((r) => (
+            <li key={r.reason}>
+              <div className="flex justify-between gap-3 text-[12.5px]">
+                <span className="text-slate-700">{r.label} <span className="text-slate-400">· {r.orders}</span></span>
+                <span className={`tabular-nums ${r.diffAed >= 0 ? "text-slate-900" : "text-rose-600"}`}>{r.diffAed >= 0 ? "+" : "−"}{fmt(Math.abs(r.diffAed), 2)}</span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <motion.div className={`h-full rounded-full ${r.diffAed >= 0 ? "bg-[#2347D9]" : "bg-rose-400"}`} initial={{ width: 0 }} animate={{ width: `${(Math.abs(r.diffAed) / max) * 100}%` }} transition={{ duration: 0.8 }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+        <table className="w-full text-[12.5px]">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-slate-400">
+            <tr><th className="pb-2 font-medium">Gateway</th><th className="pb-2 text-right font-medium">Dashboard</th><th className="pb-2 text-right font-medium">Sheet</th><th className="pb-2 text-right font-medium">Diff</th><th className="pb-2 text-right font-medium">%</th></tr>
+          </thead>
+          <tbody>
+            {b.byGateway.map((g) => (
+              <tr key={g.gateway} className="border-t border-slate-100" title={g.topReason ? `Mostly: ${g.topReason.replace(/_/g, " ")}` : undefined}>
+                <td className="py-1.5 text-slate-800">{g.gateway}</td>
+                <td className="py-1.5 text-right tabular-nums text-slate-700">{fmt(g.dashboardAed)}</td>
+                <td className="py-1.5 text-right tabular-nums text-slate-700">{fmt(g.sheetAed)}</td>
+                <td className={`py-1.5 text-right tabular-nums ${g.diffAed < 0 ? "text-rose-600" : "text-slate-900"}`}>{g.diffAed >= 0 ? "+" : "−"}{fmt(Math.abs(g.diffAed))}</td>
+                <td className="py-1.5 text-right tabular-nums text-slate-500">{g.diffPct == null ? "—" : `${g.diffPct}%`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="mt-4 text-[12.5px] font-medium text-[#2347D9] hover:underline">{open ? "Hide" : "Show"} the {b.lines.length} orders behind it</button>
+      {open && (
+        <div className="mt-3 max-h-80 overflow-y-auto rounded-2xl ring-1 ring-slate-100">
+          <table className="w-full text-[12px]">
+            <tbody>
+              {b.lines.map((l, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <td className="px-3 py-1.5 font-medium text-slate-800">{l.order}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{l.gateway}</td>
+                  <td className="px-3 py-1.5 text-slate-600">{l.reason.replace(/_/g, " ")}</td>
+                  <td className={`px-3 py-1.5 text-right tabular-nums ${l.diffAed < 0 ? "text-rose-600" : "text-slate-900"}`}>{l.diffAed >= 0 ? "+" : "−"}{fmt(Math.abs(l.diffAed), 2)}</td>
+                  <td className="max-w-[280px] truncate px-3 py-1.5 text-slate-400" title={l.note}>{l.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

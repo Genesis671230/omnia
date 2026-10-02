@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   try {
     const data = await buildThreeWay(from, to, sp.get("fresh") === "1");
     if (sp.get("format") === "xlsx") {
-      const buf = await threeWayXlsx(data.rows, data.summary, `${from} to ${to}`, data.sheetSources);
+      const buf = await threeWayXlsx(data.rows, data.summary, `${from} to ${to}`, data.sheetSources, data.bridge);
       return new NextResponse(new Uint8Array(buf), {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

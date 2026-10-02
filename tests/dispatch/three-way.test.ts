@@ -102,3 +102,28 @@ test("store totals are the dashboard's: an earlier month's order in this sheet i
   const st = Object.fromEntries(rows.map((r) => [r.order, r.status]));
   assert.deepEqual(st, { OS3701: "ok", "804647": "other_month", "804671": "exchange" });
 });
+
+test("bridge: dashboard + every reason = the sheet's overall sales", async () => {
+  const { buildBridge } = await import("../../lib/dispatch/bridge");
+  const { rows } = compareThreeWay({
+    fromDay: "2026-09-01", toDay: "2026-09-30",
+    orders: [o("OS3701", 1000), o("OS3702", 500, { country: "AE" }), o("SA3708", 1817.19, { currency: "SAR" }), o("WA55822", 1888.5, { financial_status: "pending", gateway: "COD", store_id: "WA" })],
+    invoices: new Map([inv("OS3701", 1000), inv("SA3708", 1817.19)]),
+    sheet: [
+      s("OS3701", 1000), s("OS3701", 1000, { row: 99 }),                                    // duplicate +1000
+      s("SA3708", 1840, { currency: "SAR", amountOriginal: 1877.55, exchangeRate: 0.98 }),  // fx +22.81
+      s("WA55822", 0, { kind: "cancelled", grossAed: 0, comments: "Cancelled Before Dispatch" }), // −1888.50
+      s("804671", 30, { kind: "exchange", saleType: "Exchange/COD" }),                      // +30
+    ],
+  });
+  const b = buildBridge(rows, "2026-09-01", "2026-09-30");
+  assert.equal(b.dashboardAed, 5205.69);
+  const sumReasons = b.byReason.reduce((t, r) => t + r.diffAed, 0);
+  assert.ok(Math.abs(b.dashboardAed + sumReasons - b.sheetAed) < 0.01);
+  const by = Object.fromEntries(b.byReason.map((r) => [r.reason, r.diffAed]));
+  assert.equal(by.missing_in_sheet, -500);
+  assert.equal(by.duplicate_rows, 1000);
+  assert.equal(by.fx_rate, 22.81);
+  assert.equal(by.cancelled_in_sheet, -1888.5);
+  assert.equal(by.exchange_rows, 30);
+});

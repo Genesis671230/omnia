@@ -5,6 +5,7 @@
 
 import ExcelJS from "exceljs";
 import type { TwRow, TwStatus, TwSummary } from "./three-way";
+import type { Bridge } from "./bridge";
 import { TW_ORDER } from "./three-way";
 
 export const STATUS_LABEL: Record<TwStatus, string> = {
@@ -65,7 +66,26 @@ function addRows(ws: ExcelJS.Worksheet, rows: TwRow[]) {
   ws.autoFilter = { from: "A1", to: { row: 1, column: COLS.length } };
 }
 
-export async function threeWayXlsx(rows: TwRow[], summary: TwSummary, label: string, sources: string[] = []): Promise<Buffer> {
+function addBridge(wb: ExcelJS.Workbook, b: Bridge) {
+  const ws = wb.addWorksheet("Bridge to sheet total");
+  ws.columns = [{ width: 54 }, { width: 10 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 10 }, { width: 44 }];
+  ws.addRow(["Dashboard sales → dispatch sheet \"Overall Sales\" (left + cancelled/refunded, every row)"]).font = { bold: true, size: 13 };
+  ws.addRow(["Dashboard (counted sales)", "", b.dashboardAed]);
+  ws.addRow(["Dispatch sheet overall", "", b.sheetAed]);
+  ws.addRow(["Difference", "", b.diffAed, "", "", `${b.diffPct}%`]).font = { bold: true };
+  ws.addRow([]);
+  ws.addRow(["Reason", "Orders", "AED"]).font = { bold: true };
+  for (const r of b.byReason) ws.addRow([r.label, r.orders, r.diffAed]);
+  ws.addRow([]);
+  ws.addRow(["Gateway", "", "Dashboard AED", "Sheet AED", "Difference", "%", "Main reason"]).font = { bold: true };
+  for (const g of b.byGateway) ws.addRow([g.gateway, "", g.dashboardAed, g.sheetAed, g.diffAed, g.diffPct == null ? "" : `${g.diffPct}%`, g.topReason ?? ""]);
+  ws.addRow([]);
+  ws.addRow(["Order", "Gateway", "Dashboard AED", "Sheet AED", "Difference", "", "Reason · note"]).font = { bold: true };
+  for (const l of b.lines) ws.addRow([`${l.order} (${l.store || "—"})`, l.gateway, l.dashboardAed, l.sheetAed, l.diffAed, "", `${l.reason} · ${l.note}`]);
+  for (const c of [3, 4, 5]) ws.getColumn(c).numFmt = "#,##0.00";
+}
+
+export async function threeWayXlsx(rows: TwRow[], summary: TwSummary, label: string, sources: string[] = [], bridge?: Bridge): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const sum = wb.addWorksheet("Summary");
   sum.columns = [{ width: 34 }, { width: 12 }, { width: 18 }, { width: 18 }];
@@ -92,6 +112,7 @@ export async function threeWayXlsx(rows: TwRow[], summary: TwSummary, label: str
   sum.getColumn(3).numFmt = "#,##0.00";
   sum.getColumn(4).numFmt = "#,##0.00";
 
+  if (bridge) addBridge(wb, bridge);
   addRows(wb.addWorksheet("All orders"), rows);
   for (const st of TW_ORDER.filter((s) => s !== "ok")) {
     const list = rows.filter((r) => r.status === st);

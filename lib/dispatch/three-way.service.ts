@@ -6,6 +6,7 @@ import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { ZohoInvoiceIndexRepository } from "@/lib/repositories/zoho-invoice-index";
 import { readDispatchSheets } from "@/lib/integrations/dispatch-sheet-read";
 import { compareThreeWay, norm, type TwOrder } from "./three-way";
+import { buildBridge } from "./bridge";
 
 export async function buildThreeWay(fromDay: string, toDay: string, fresh = false) {
   // A week either side: an order logged the next day (or the next month's
@@ -16,5 +17,5 @@ export async function buildThreeWay(fromDay: string, toDay: string, fresh = fals
   ]);
   const invoices = await ZohoInvoiceIndexRepository.forOrders([...orders.map((o) => o.order_number), ...sheet.rows.map((r) => norm(r.order))]);
   const result = compareThreeWay({ fromDay, toDay, orders: orders as unknown as TwOrder[], invoices, sheet: sheet.rows });
-  return { ...result, sheetErrors: sheet.errors, sheetSources: sheet.sources, sheetReadAt: sheet.readAt, invoicesUpdatedAt: await ZohoInvoiceIndexRepository.lastUpdated() };
+  return { ...result, bridge: buildBridge(result.rows, fromDay, toDay), sheetErrors: sheet.errors, sheetSources: sheet.sources, sheetReadAt: sheet.readAt, invoicesUpdatedAt: await ZohoInvoiceIndexRepository.lastUpdated() };
 }
