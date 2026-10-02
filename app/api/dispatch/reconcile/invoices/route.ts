@@ -6,7 +6,7 @@ import { zohoConfigured } from "@/lib/integrations/zoho";
 
 export const maxDuration = 120;
 
-// POST /api/dispatch/reconcile/invoices?from=&to= — re-reads Zoho INVOICES
+// POST /api/dispatch/reconcile/invoices?from=&to= — re-reads Zoho INVOICES + CREDIT NOTES
 // (both orgs, a few days either side) into zoho_invoice_index. ~5–10 calls a month.
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -17,7 +17,8 @@ export async function POST(req: Request) {
   const to = sp.get("to") ?? "";
   if (!DAY.test(from) || !DAY.test(to)) return NextResponse.json({ error: "from and to (YYYY-MM-DD) are required" }, { status: 400 });
   try {
-    const z = await fetchSalesDocs(addDubaiDays(from, -3), addDubaiDays(to, 7), ["invoice"]);
+    // Invoices + credit notes (refunds / exchanges) — a few calls a month.
+    const z = await fetchSalesDocs(addDubaiDays(from, -3), addDubaiDays(to, 45), ["invoice", "creditnote"]);
     const failed = z.orgs.filter((o) => o.error);
     if (failed.length === z.orgs.length && failed.length) return NextResponse.json({ error: failed.map((o) => `${o.label}: ${o.error}`).join(" · ") }, { status: 502 });
     const n = await ZohoInvoiceIndexRepository.upsertFromDocs(z.docs);

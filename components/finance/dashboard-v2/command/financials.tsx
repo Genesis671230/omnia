@@ -12,12 +12,11 @@
  * reads Zoho (~130 calls, ~4 min), so it only runs on the button. */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ChevronLeft, ChevronRight, Copy, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Copy, Download, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { sumDays, toDayMoney } from "@/lib/orders/day-money";
 import type { Flag, SalesVerification } from "@/lib/finance/zoho-sales-verify";
-import type { LedgerDay } from "../day-sales-drawer";
+import type { ManagementReport } from "@/lib/reports/management-report";
 import { compact, fmt, pct } from "../overview/kit";
 import { DARK_CARD } from "./funnel";
 
@@ -39,25 +38,26 @@ type Stored = { verification: SalesVerification | null; checkedAt: string | null
 
 export function MonthFinancials() {
   const [month, setMonth] = useState(defaultMonth);
-  const [days, setDays] = useState<LedgerDay[] | null>(null);
+  const [mr, setMr] = useState<ManagementReport | null>(null);
+  const [mrError, setMrError] = useState("");
   const [stored, setStored] = useState<Stored | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [open, setOpen] = useState(false);
   const thisMonth = new Date(Date.now() + 4 * 3600_000).toISOString().slice(0, 7);
 
   const load = useCallback(async () => {
-    setDays(null);
+    setMr(null);
+    setMrError("");
     setStored(null);
-    const [ledger, zv] = await Promise.all([
-      fetch(`/api/orders/sales-ledger?month=${month}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+    const [report, zv] = await Promise.all([
+      fetch(`/api/reports/management?month=${month}`, { cache: "no-store" }).then((r) => r.json()).catch((e) => ({ error: (e as Error).message })),
       fetch(`/api/finance/zoho-sales-verify?month=${month}`, { cache: "no-store" }).then((r) => r.json()).catch(() => null),
     ]);
-    setDays(ledger?.days ?? []);
+    if (report?.error) setMrError(report.error); else setMr(report);
     setStored(zv && !zv.error ? zv : { verification: null, checkedAt: null });
   }, [month]);
   useEffect(() => { load(); }, [load]);
 
-  const totals = useMemo(() => (days ? sumDays(days.filter((d) => d.orders > 0).map(toDayMoney)) : null), [days]);
   const v = stored?.verification ?? null;
 
   const verify = async () => {
@@ -75,80 +75,35 @@ export function MonthFinancials() {
     }
   };
 
-  const refunds = v?.refunds.totalAed ?? 0;
-  const net = totals ? totals.soldAed - refunds - totals.feeAed : 0;
-  const bars = totals ? [
-    { label: "Sold", value: totals.soldAed, color: "linear-gradient(180deg,#8B9CFF,#5B3DF5)" },
-    { label: "Refunds", value: -refunds, color: "linear-gradient(180deg,#F59E9E,#F2705E)" },
-    { label: "Gateway fees", value: -totals.feeAed, color: "linear-gradient(180deg,#FDBA74,#F59E0B)" },
-    { label: "Net", value: net, color: "linear-gradient(180deg,#6EE7B7,#10B981)" },
-  ] : [];
-  const scale = totals?.soldAed || 1;
-
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-      {/* ── sales report ── */}
+      {/* ── sales report (management definitions) ── */}
       <div className={`${DARK_CARD} px-7 pb-6 pt-6 xl:col-span-8`}>
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_100%_0%,rgba(59,91,253,0.5),transparent_60%),radial-gradient(50%_70%_at_0%_100%,rgba(16,185,129,0.22),transparent_60%)]" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-[26px] font-light tracking-[-0.02em]">Sales report</h3>
-            <p className="mt-1 text-[12.5px] text-white/50">Counted store sales · refunds from Zoho credit notes · {monthName(month)}</p>
+            <p className="mt-1 text-[12.5px] text-white/50">Refunds against the order&apos;s month · refund = money the gateway returned · exchanges aren&apos;t sales · {monthName(month)}</p>
           </div>
-          <div className="flex items-center gap-1 rounded-full bg-white/10 p-1">
-            <button aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10"><ChevronLeft size={15} /></button>
-            <span className="px-2 text-[12.5px]">{monthName(month)}</span>
-            <button aria-label="Next month" disabled={month >= thisMonth} onClick={() => setMonth(shiftMonth(month, 1))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10 disabled:opacity-30"><ChevronRight size={15} /></button>
+          <div className="flex items-center gap-2">
+            <a href={`/api/reports/management?month=${month}&format=xlsx`} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-medium text-[#13111D] hover:bg-white/90">
+              <Download size={13} /> Management report
+            </a>
+            <div className="flex items-center gap-1 rounded-full bg-white/10 p-1">
+              <button aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10"><ChevronLeft size={15} /></button>
+              <span className="px-2 text-[12.5px]">{monthName(month)}</span>
+              <button aria-label="Next month" disabled={month >= thisMonth} onClick={() => setMonth(shiftMonth(month, 1))} className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10 disabled:opacity-30"><ChevronRight size={15} /></button>
+            </div>
           </div>
         </div>
 
-        {!totals ? (
-          <div className="relative mt-10 flex items-center gap-2 text-[13px] text-white/50"><Loader2 size={14} className="animate-spin" /> Reading the month…</div>
+        {mrError ? (
+          <div className="relative mt-8 text-[13px] text-rose-200">{mrError}</div>
+        ) : !mr ? (
+          <div className="relative mt-10 flex items-center gap-2 text-[13px] text-white/50"><Loader2 size={14} className="animate-spin" /> Building the month — orders, refunds, exchanges, receivables…</div>
         ) : (
-          <div className="relative mt-6 grid grid-cols-1 gap-6 md:grid-cols-[1fr_1.2fr]">
-            <div>
-              <div className="text-[13px] text-white/55">Sold</div>
-              <div className="mt-1 text-[48px] font-light leading-none tabular-nums tracking-[-0.04em]" title={`AED ${fmt(totals.soldAed, 2)}`}>
-                <span className="mr-2 text-[16px] text-white/50">AED</span>{compact(totals.soldAed)}
-              </div>
-              <div className="mt-2 text-[12.5px] text-white/55">{fmt(totals.orders)} orders · AOV AED {fmt(totals.orders ? totals.soldAed / totals.orders : 0)}</div>
-              <div className="mt-6 space-y-3">
-                {[
-                  { k: "In the bank", v: totals.receivedAed, c: "#10B981" },
-                  { k: "Pending", v: totals.pendingAed, c: "#8B9CFF" },
-                  { k: "of which COD with the courier", v: totals.codAed, c: "#F2705E" },
-                ].map((r) => (
-                  <div key={r.k}>
-                    <div className="flex justify-between text-[12.5px]"><span className="text-white/60">{r.k}</span><span className="tabular-nums">AED {compact(r.v)} · {pct(totals.soldAed ? r.v / totals.soldAed : 0)}</span></div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <motion.div className="h-full rounded-full" style={{ background: r.c }} initial={{ width: 0 }} animate={{ width: `${totals.soldAed ? (r.v / totals.soldAed) * 100 : 0}%` }} transition={{ duration: 0.9 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* waterfall: sold → refunds → fees → net */}
-            <div className="flex h-[230px] items-end gap-4">
-              {bars.map((b, i) => {
-                const h = (Math.abs(b.value) / scale) * 100;
-                const offset = i === 1 ? 100 - h : i === 2 ? ((totals.soldAed - refunds) / scale) * 100 - h : 0;
-                return (
-                  <div key={b.label} className="flex h-full flex-1 flex-col justify-end">
-                    <div className="mb-1.5 text-center text-[12px] tabular-nums text-white/80">{b.value < 0 ? "−" : ""}{compact(Math.abs(b.value))}</div>
-                    <div className="relative flex-1">
-                      <motion.div className="absolute inset-x-0 rounded-[10px]" style={{ background: b.color, bottom: `${Math.max(offset, 0)}%` }}
-                        initial={{ height: 0 }} animate={{ height: `${Math.max(h, 1.5)}%` }} transition={{ duration: 0.8, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }} />
-                    </div>
-                    <div className="mt-2 text-center text-[11.5px] text-white/55">{b.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <MgmtBody r={mr} />
         )}
-        {totals && !v && <p className="relative mt-4 text-[11.5px] text-white/40">Refunds appear once this month is verified with Zoho.</p>}
-        {totals && totals.feeEstimatedShare > 0.05 && <p className="relative mt-2 text-[11.5px] text-white/40">{pct(totals.feeEstimatedShare)} of the fees are estimates until those payout files are uploaded.</p>}
       </div>
 
       {/* ── zoho check ── */}
@@ -174,6 +129,8 @@ export function MonthFinancials() {
           <ZohoSummary v={v} onOpen={() => setOpen(true)} />
         )}
       </div>
+
+      {mr && <MgmtGateways r={mr} />}
 
       <AnimatePresence>{open && v && <ZohoDrawer v={v} month={month} onClose={() => setOpen(false)} />}</AnimatePresence>
     </div>
@@ -294,5 +251,121 @@ function ZohoDrawer({ v, month, onClose }: { v: SalesVerification; month: string
         </div>
       </motion.aside>
     </motion.div>
+  );
+}
+
+/* ── management body: waterfall, cash, refunds, exchanges ─────────────── */
+
+function MgmtBody({ r }: { r: ManagementReport }) {
+  const w = r.waterfall;
+  const steps = [
+    { k: "Orders placed", v: w.placed.aed, n: w.placed.orders, sign: "" },
+    { k: "Failed / unpaid", v: w.failedUnpaid.aed, n: w.failedUnpaid.orders, sign: "−" },
+    { k: `Cancelled${w.cancelled.bySheetOnly ? ` (${w.cancelled.bySheetOnly} only in sheet)` : ""}`, v: w.cancelled.aed, n: w.cancelled.orders, sign: "−" },
+    { k: "Gross sales", v: w.grossSales.aed, n: w.grossSales.orders, sign: "=", strong: true },
+    { k: "Refunds", v: w.refunds.aed, n: w.refunds.orders, sign: "−" },
+    { k: "Net sales", v: w.netSales.aed, n: w.netSales.orders, sign: "=", strong: true },
+  ];
+  const max = w.placed.aed || 1;
+  const recvShare = w.netSales.aed ? r.cash.receivedAed / w.netSales.aed : 0;
+  return (
+    <div className="relative mt-5 space-y-6">
+      <p className="text-[12px] text-white/55">
+        Dashboard {fmt(r.fromDashboard.dashboard.aed, 2)} − cancelled in the sheet only {fmt(r.fromDashboard.sheetCancelled.aed, 2)} + refunded in the store {fmt(r.fromDashboard.refundedInStore.aed, 2)} = gross sales <b className="text-white">{fmt(r.fromDashboard.grossSales.aed, 2)}</b>
+      </p>
+      <div className="grid gap-6 md:grid-cols-[1.15fr_1fr]">
+        <ul className="space-y-2">
+          {steps.map((st, i) => (
+            <li key={st.k}>
+              <div className={`flex justify-between text-[12.5px] ${st.strong ? "font-medium text-white" : "text-white/70"}`}>
+                <span>{st.sign} {st.k} <span className="text-white/40">· {fmt(st.n)}</span></span>
+                <span className="tabular-nums">AED {compact(st.v)}</span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <motion.div className="h-full rounded-full" style={{ background: st.sign === "−" ? "#F2705E" : st.strong ? "linear-gradient(90deg,#8B9CFF,#10B981)" : "#8B9CFF" }}
+                  initial={{ width: 0 }} animate={{ width: `${(st.v / max) * 100}%` }} transition={{ duration: 0.8, delay: i * 0.06 }} />
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div>
+          <div className="text-[13px] text-white/55">Received in the bank</div>
+          <div className="mt-1 text-[34px] font-light leading-none tabular-nums tracking-[-0.03em]">AED {compact(r.cash.receivedAed)}</div>
+          <div className="mt-1 text-[12px] text-white/50" title={`Net sales = received ${fmt(r.cash.tie.receivedAed, 2)} + fees ${fmt(r.cash.tie.feesOnReceivedAed, 2)} + FX/other ${fmt(r.cash.tie.fxOtherAed, 2)} − refunds on received ${fmt(r.cash.tie.refundsOnReceivedAed, 2)} + receivable ${fmt(r.cash.tie.receivableAed, 2)}`}>
+            {pct(recvShare)} of net sales · fees AED {compact(r.cash.tie.feesOnReceivedAed)} · refunds returned AED {compact(r.cash.tie.refundsOnReceivedAed)}
+          </div>
+          <div className="mt-4 text-[13px] text-white/55">Receivable — still to come in</div>
+          <div className="mt-1 text-[24px] font-light tabular-nums">AED {compact(r.cash.receivableAed)}</div>
+          <ul className="mt-2 space-y-1 text-[12px]">
+            {r.cash.receivableByBucket.map((b) => (
+              <li key={b.bucket} className="flex justify-between gap-2 text-white/70">
+                <span className="truncate">{b.label} · {b.orders}</span>
+                <span className="shrink-0 tabular-nums">{compact(b.aed)}{b.oldestDays > 14 ? <span className="ml-1 text-amber-300">· {b.oldestDays}d</span> : null}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { k: "Refunds by payout month", v: r.refundsByPaidMonth.filter((p) => p.month !== "unknown").map((p) => `${p.month.slice(5)}: ${compact(p.aed)}`).join(" · ") || "—" },
+          { k: `All refunds paid in ${r.month.slice(5)}`, v: `AED ${compact(r.refundsPaidThisMonth.aed)}`, s: `${r.refundsPaidThisMonth.ofEarlierMonths} for earlier months' orders` },
+          { k: "Exchanges (not sales)", v: `${fmt(r.exchanges.orders)} orders`, s: `extra collected AED ${compact(r.exchanges.extraCollectedAed)}` },
+          { k: "Exchanges re-invoiced in Zoho", v: fmt(r.exchanges.reinvoicedInZoho), s: "sale counted twice in Zoho" },
+        ].map((t) => (
+          <div key={t.k} className="rounded-2xl bg-white/[0.06] px-3.5 py-3">
+            <div className="text-[11px] text-white/50">{t.k}</div>
+            <div className="mt-1 text-[14px] tabular-nums">{t.v}</div>
+            {t.s && <div className="text-[10.5px] text-white/40">{t.s}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MgmtGateways({ r }: { r: ManagementReport }) {
+  return (
+    <div className="rounded-[30px] bg-white px-6 pb-5 pt-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_44px_-26px_rgba(15,23,42,0.22)] xl:col-span-12">
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="overflow-x-auto">
+          <h3 className="text-[20px] font-light tracking-[-0.02em] text-slate-900">By gateway</h3>
+          <table className="mt-3 w-full min-w-[720px] text-[12.5px]">
+            <thead className="text-left text-[10.5px] uppercase tracking-wide text-slate-400">
+              <tr>{["Gateway", "Sales", "Gross", "Cancelled", "Refunds", "Refund %", "Exch.", "Net", "Received", "Receivable"].map((h, i) => <th key={h} className={`pb-2 font-medium ${i ? "text-right" : ""}`}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {r.byGateway.map((g) => (
+                <tr key={g.gateway} className="border-t border-slate-100 tabular-nums">
+                  <td className="py-1.5 text-slate-800">{g.gateway}</td>
+                  <td className="py-1.5 text-right">{fmt(g.orders)}</td>
+                  <td className="py-1.5 text-right">{compact(g.grossAed)}</td>
+                  <td className="py-1.5 text-right text-slate-500">{g.cancelled.orders ? `${g.cancelled.orders} · ${compact(g.cancelled.aed)}` : "—"}</td>
+                  <td className="py-1.5 text-right text-rose-600">{g.refunds.orders ? `${g.refunds.orders} · ${compact(g.refunds.aed)}` : "—"}</td>
+                  <td className="py-1.5 text-right text-slate-500">{g.refundRatePct == null ? "—" : `${g.refundRatePct}%`}</td>
+                  <td className="py-1.5 text-right text-slate-500">{g.exchanges || "—"}</td>
+                  <td className="py-1.5 text-right font-medium text-slate-900">{compact(g.netSalesAed)}</td>
+                  <td className="py-1.5 text-right">{compact(g.receivedAed)}</td>
+                  <td className="py-1.5 text-right text-amber-700">{g.receivableAed ? compact(g.receivableAed) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3 className="text-[20px] font-light tracking-[-0.02em] text-slate-900">To fix before reporting</h3>
+          <ul className="mt-3 space-y-1.5">
+            {r.issues.map((i) => (
+              <li key={i.key} className="flex items-start justify-between gap-3 text-[12.5px]" title={i.orders.slice(0, 30).join(", ")}>
+                <span className="flex items-start gap-1.5 text-slate-700"><AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-500" />{i.label}</span>
+                <span className="shrink-0 tabular-nums text-slate-500">{i.orders.length}</span>
+              </li>
+            ))}
+            {!r.issues.length && <li className="text-[12.5px] text-slate-500">Nothing to fix.</li>}
+          </ul>
+          <p className="mt-3 text-[11.5px] text-slate-400">Every order behind these is in the Management report download (&ldquo;Issues to fix&rdquo;).</p>
+        </div>
+      </div>
+    </div>
   );
 }

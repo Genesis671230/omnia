@@ -9,9 +9,19 @@ import type { InvoiceIndex } from "@/lib/dispatch/three-way";
 const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
 const norm = (s: string) => s.trim().replace(/^#/, "").toUpperCase();
 
+export type CreditNoteRow = { number: string; order: string; date: string; status: string; total: number; reference: string; org: string };
+
 export const ZohoInvoiceIndexRepository = {
-  /** Upsert every invoice in `docs` (other kinds ignored). Void ones are kept with their status. */
+  /** Upsert every invoice AND credit note in `docs` (sales orders ignored). Returns invoices written. */
   async upsertFromDocs(docs: ZohoDoc[]): Promise<number> {
+    const cns = docs.filter((d) => d.kind === "creditnote").map((d) => ({
+      creditnote_id: d.id, tenant_id: TENANT, org: d.org, creditnote_number: d.number, order_number: orderNumberOf(d),
+      creditnote_date: d.date || null, status: d.status, total: d.total, reference: d.reference, customer: d.customer, updated_at: new Date().toISOString(),
+    }));
+    for (let i = 0; i < cns.length; i += 500) {
+      const { error } = await supabase.from("zoho_creditnote_index").upsert(cns.slice(i, i + 500), { onConflict: "creditnote_id" });
+      if (error) throw new Error(`zoho_creditnote_index write failed: ${error.message}`);
+    }
     const rows = docs.filter((d) => d.kind === "invoice").map((d) => ({
       invoice_id: d.id, tenant_id: TENANT, org: d.org, invoice_number: d.number, order_number: orderNumberOf(d),
       invoice_date: d.date || null, status: d.status, total: d.total, customer: d.customer, updated_at: new Date().toISOString(),
@@ -41,6 +51,29 @@ export const ZohoInvoiceIndexRepository = {
       }
     }
     return out;
+  },
+
+  /** Non-void credit notes for these order numbers. */
+  async creditNotesFor(orderNumbers: string[]): Promise<Map<string, CreditNoteRow[]>> {
+    const out = new Map<string, CreditNoteRow[]>();
+    const keys = [...new Set(orderNumbers.map(norm).filter(Boolean))];
+    for (let i = 0; i < keys.length; i += 300) {
+      const { data, error } = await supabase.from("zoho_creditnote_index")
+        .select("creditnote_number, order_number, creditnote_date, status, total, reference, org").in("order_number", keys.slice(i, i + 300));
+      if (error) throw new Error(`zoho_creditnote_index read failed: ${error.message}`);
+      for (const r of data ?? []) {
+        if (r.status === "void") continue;
+        const k = norm(r.order_number);
+        out.set(k, [...(out.get(k) ?? []), { number: r.creditnote_number, order: k, date: String(r.creditnote_date ?? ""), status: r.status, total: Number(r.total) || 0, reference: r.reference, org: r.org }]);
+      }
+    }
+    return out;
+  },
+
+  /** How many live invoices each order has — 2+ with an exchange = sold twice in Zoho. */
+  async invoiceCounts(orderNumbers: string[]): Promise<Map<string, number>> {
+    const idx = await this.forOrders(orderNumbers);
+    return new Map([...idx].map(([k, v]) => [k, v.numbers.length]));
   },
 
   async lastUpdated(): Promise<string | null> {

@@ -1270,3 +1270,21 @@ create table if not exists zoho_invoice_index (
 );
 create index if not exists zoho_invoice_index_order_idx on zoho_invoice_index (order_number);
 create index if not exists zoho_invoice_index_date_idx on zoho_invoice_index (invoice_date);
+
+-- Zoho credit notes by order number (2026-10-02): valued = refund, zero-value
+-- = exchange (items back at 0). Feeds the management report; refreshed with
+-- the invoice index. lib/repositories/zoho-invoice-index.ts.
+create table if not exists zoho_creditnote_index (
+  creditnote_id     text primary key,
+  tenant_id         text not null default 'omnia',
+  org               text not null default '',
+  creditnote_number text not null default '',
+  order_number      text not null default '',
+  creditnote_date   date,
+  status            text not null default '',
+  total             numeric not null default 0,
+  reference         text not null default '',
+  customer          text not null default '',
+  updated_at        timestamptz not null default now()
+);
+create index if not exists zoho_creditnote_index_order_idx on zoho_creditnote_index (order_number);

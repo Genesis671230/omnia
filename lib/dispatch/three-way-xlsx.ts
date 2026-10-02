@@ -6,6 +6,8 @@
 import ExcelJS from "exceljs";
 import type { TwRow, TwStatus, TwSummary } from "./three-way";
 import type { Bridge } from "./bridge";
+import type { ManagementReport } from "@/lib/reports/management-report";
+import { addManagementSheets } from "@/lib/reports/management-report-xlsx";
 import { TW_ORDER } from "./three-way";
 
 export const STATUS_LABEL: Record<TwStatus, string> = {
@@ -85,8 +87,10 @@ function addBridge(wb: ExcelJS.Workbook, b: Bridge) {
   for (const c of [3, 4, 5]) ws.getColumn(c).numFmt = "#,##0.00";
 }
 
-export async function threeWayXlsx(rows: TwRow[], summary: TwSummary, label: string, sources: string[] = [], bridge?: Bridge): Promise<Buffer> {
+export async function threeWayXlsx(rows: TwRow[], summary: TwSummary, label: string, sources: string[] = [], bridge?: Bridge, management?: ManagementReport): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
+  // The management view first: receivables, refunds, cancellations, exchanges.
+  if (management) addManagementSheets(wb, management);
   const sum = wb.addWorksheet("Summary");
   sum.columns = [{ width: 34 }, { width: 12 }, { width: 18 }, { width: 18 }];
   sum.addRow([`Dispatch reconciliation · ${label}`]).font = { bold: true, size: 14 };

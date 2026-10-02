@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildThreeWay } from "@/lib/dispatch/three-way.service";
 import { threeWayXlsx } from "@/lib/dispatch/three-way-xlsx";
+import { buildMonthManagementReport } from "@/lib/reports/management-report.service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,7 +19,10 @@ export async function GET(req: Request) {
   try {
     const data = await buildThreeWay(from, to, sp.get("fresh") === "1");
     if (sp.get("format") === "xlsx") {
-      const buf = await threeWayXlsx(data.rows, data.summary, `${from} to ${to}`, data.sheetSources, data.bridge);
+      // A single calendar month also gets the management sheets.
+      const oneMonth = from.slice(0, 7) === to.slice(0, 7) && from.endsWith("-01");
+      const management = oneMonth ? await buildMonthManagementReport(from.slice(0, 7)).catch(() => undefined) : undefined;
+      const buf = await threeWayXlsx(data.rows, data.summary, `${from} to ${to}`, data.sheetSources, data.bridge, management);
       return new NextResponse(new Uint8Array(buf), {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
