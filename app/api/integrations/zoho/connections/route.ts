@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/auth/session-role";
 import { discoverZohoOrgs, listZohoConnections, saveZohoConnection } from "@/lib/integrations/zoho-org";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireRole("admin");
+  if ("denied" in auth) return auth.denied;
   const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const creds = { clientId: str(b.clientId), clientSecret: str(b.clientSecret), refreshToken: str(b.refreshToken), accountsUrl: str(b.accountsUrl) || undefined };
   if (!creds.clientId || !creds.clientSecret || !creds.refreshToken) {
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
     if (b.action === "save") {
       const orgId = str(b.orgId);
       if (!/^\d{5,}$/.test(orgId)) return NextResponse.json({ error: "Pick the organisation to connect" }, { status: 400 });
-      const connection = await saveZohoConnection({ ...creds, orgId, label: str(b.label), loginEmail: str(b.loginEmail), createdBy: str(b.by) || "settings" });
+      const connection = await saveZohoConnection({ ...creds, orgId, label: str(b.label), loginEmail: str(b.loginEmail), createdBy: auth.session.username });
       return NextResponse.json({ connection });
     }
     return NextResponse.json({ error: 'action must be "discover" or "save"' }, { status: 400 });

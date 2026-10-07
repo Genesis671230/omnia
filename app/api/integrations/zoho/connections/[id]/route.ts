@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/auth/session-role";
 import { deleteZohoConnection, testZohoConnection, updateZohoConnection } from "@/lib/integrations/zoho-org";
 
 export const dynamic = "force-dynamic";
@@ -6,15 +7,20 @@ export const dynamic = "force-dynamic";
 // POST   /api/integrations/zoho/connections/:id        → test: refresh token + read the org
 // PATCH  /api/integrations/zoho/connections/:id        { label?, status?: "active"|"disabled", dailyBudget?, defaultForProviders?: ["COD"] }
 // DELETE /api/integrations/zoho/connections/:id        refused while payouts settle into it
+// All three are admin-only: they change which books money is posted to.
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(_req: Request, { params }: Ctx) {
+  const auth = await requireRole("admin");
+  if ("denied" in auth) return auth.denied;
   const { id } = await params;
   return NextResponse.json(await testZohoConnection(id));
 }
 
 export async function PATCH(request: Request, { params }: Ctx) {
+  const auth = await requireRole("admin");
+  if ("denied" in auth) return auth.denied;
   const { id } = await params;
   const b = (await request.json().catch(() => ({}))) as { label?: string; status?: string; dailyBudget?: number; defaultForProviders?: unknown };
   const providers = Array.isArray(b.defaultForProviders) ? b.defaultForProviders.map(String) : undefined;
@@ -28,6 +34,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
+  const auth = await requireRole("admin");
+  if ("denied" in auth) return auth.denied;
   const { id } = await params;
   try {
     await deleteZohoConnection(id);
