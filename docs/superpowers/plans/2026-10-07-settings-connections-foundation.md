@@ -142,7 +142,7 @@ create index if not exists connections_tenant_provider on connections (tenant_id
 create table if not exists workspace_settings (
   tenant_id   text not null default 'omnia',
   key         text not null,
-  value       jsonb not null,
+  value       jsonb,                      -- NULL = explicitly "use the built-in default"
   updated_by  text not null default '',
   updated_at  timestamptz not null default now(),
   primary key (tenant_id, key)
@@ -486,7 +486,7 @@ export const SETTINGS: SettingDef<any>[] = [
 
   // ── advanced ────────────────────────────────────────────────────────
   { key: "shopify.api_version", group: "advanced", label: "Shopify Admin API version", kind: "text", schema: z.string().regex(/^\d{4}-\d{2}$/), default: "2024-04", legacyEnv: "SHOPIFY_API_VERSION" },
-  { key: "shopify.analytics_api_version", group: "advanced", label: "Shopify analytics API version", kind: "text", schema: z.string().regex(/^(\d{4}-\d{2}|unstable)$/), default: "unstable", legacyEnv: "SHOPIFY_ANALYTICS_API_VERSION" },
+  { key: "shopify.analytics_api_version", group: "advanced", label: "Shopify analytics API version", kind: "text", schema: z.string().regex(/^(\d{4}-\d{2}|unstable)$/), default: "2025-10", legacyEnv: "SHOPIFY_ANALYTICS_API_VERSION" },
   { key: "orders.wa_count_cod_as_paid", group: "advanced", label: "Count WhatsApp COD orders as paid", kind: "toggle", schema: z.boolean(), default: false, legacyEnv: "ORDERS_WA_COUNT_COD_AS_PAID", parseEnv: bool },
   { key: "inventory.stock_write_mode", group: "advanced", label: "Stock write mode", kind: "select", options: ["off", "shadow", "live"], schema: z.enum(["off", "shadow", "live"]), default: "off", legacyEnv: "STOCK_WRITE_MODE" },
   { key: "orders.woo_sync", group: "advanced", label: "WooCommerce order sync", kind: "toggle", schema: z.boolean(), default: true, legacyEnv: "WOO_ORDER_SYNC", parseEnv: (r) => r.trim().toLowerCase() !== "off" },
@@ -3680,6 +3680,7 @@ For each file below, replace the expression and make the enclosing function `asy
 | `lib/payout-sync.ts:123` | `for (const store of getShopifyStores())` | `for (const store of await listShopifyStores())` |
 | `lib/channel-adapters/shopify.ts:74` | `getShopifyStores().find((s) => s.code === storeCode)` | `await shopifyStore(storeCode)` |
 | `lib/integrations/ads/tracking-check.ts:46` | `getShopifyStores().map(` | `(await listShopifyStores()).map(` |
+| `lib/lookup-sku.ts:6`, `lib/channel-adapters/shopify.ts:8` (own `API_VERSION` consts) | `process.env.SHOPIFY_API_VERSION \|\| "2024-04"` | `peekSetting<string>("shopify.api_version")` read at call time |
 | `lib/integrations/shopify-analytics.ts:66,114` | `getShopifyStores().find((s) => s.code === code)` | `await shopifyStore(code)` |
 | `lib/sync/order-webhook-ingest.ts:23` | `getShopifyStores().find((s) => s.code === storeCode)` | `await shopifyStore(storeCode)` |
 | `lib/sync/order-sync.service.ts:27` | `for (const store of getShopifyStores())` | `for (const store of await listShopifyStores())` |

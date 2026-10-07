@@ -1316,11 +1316,12 @@ create index if not exists connections_tenant_provider on connections (tenant_id
 create table if not exists workspace_settings (
   tenant_id   text not null default 'omnia',
   key         text not null,
-  value       jsonb not null,
+  value       jsonb,                      -- NULL = explicitly "use the built-in default"
   updated_by  text not null default '',
   updated_at  timestamptz not null default now(),
   primary key (tenant_id, key)
 );
+alter table workspace_settings alter column value drop not null;
 
 create table if not exists oauth_states (
   state            text primary key,
