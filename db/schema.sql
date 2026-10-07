@@ -1288,3 +1288,62 @@ create table if not exists zoho_creditnote_index (
   updated_at        timestamptz not null default now()
 );
 create index if not exists zoho_creditnote_index_order_idx on zoho_creditnote_index (order_number);
+
+-- ── Settings & connections foundation (2026-10-07) ─────────────────────────
+-- docs/superpowers/specs/2026-10-07-settings-connections-foundation-design.md
+create table if not exists connections (
+  id               text primary key,
+  tenant_id        text not null default 'omnia',
+  provider         text not null,
+  auth_mode        text not null,
+  grant_type       text not null default 'authorization_code',
+  account_ref      text not null,
+  label            text not null,
+  config           jsonb not null default '{}',
+  secrets_enc      text not null default '',
+  scopes           text not null default '',
+  status           text not null default 'active',
+  last_checked_at  timestamptz,
+  last_synced_at   timestamptz,
+  last_error       text not null default '',
+  connected_by     text not null default '',
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  unique (tenant_id, provider, account_ref)
+);
+create index if not exists connections_tenant_provider on connections (tenant_id, provider);
+
+create table if not exists workspace_settings (
+  tenant_id   text not null default 'omnia',
+  key         text not null,
+  value       jsonb not null,
+  updated_by  text not null default '',
+  updated_at  timestamptz not null default now(),
+  primary key (tenant_id, key)
+);
+
+create table if not exists oauth_states (
+  state            text primary key,
+  tenant_id        text not null,
+  provider         text not null,
+  auth_mode        text not null,
+  pkce_verifier    text not null default '',
+  pending_app_enc  text not null default '',
+  params           jsonb not null default '{}',
+  created_by       text not null,
+  created_at       timestamptz not null default now(),
+  expires_at       timestamptz not null,
+  used_at          timestamptz
+);
+
+create table if not exists pending_grants (
+  id          text primary key,
+  tenant_id   text not null,
+  provider    text not null,
+  auth_mode   text not null,
+  grant_enc   text not null,
+  accounts    jsonb not null default '[]',
+  params      jsonb not null default '{}',
+  created_by  text not null,
+  expires_at  timestamptz not null
+);
