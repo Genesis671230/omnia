@@ -3092,6 +3092,8 @@ export async function runBootImport(): Promise<void> {
     if (r.created.length || r.settings.length) console.log(`[connections] imported ${r.created.length} connections, ${r.settings.length} settings`, r);
     if (r.skipped.length) console.log(`[connections] import skipped: ${r.skipped.join("; ")}`);
     await loadSettings(true);
+    const { purgeExpiredOAuthRows } = await import("./oauth");
+    await purgeExpiredOAuthRows().catch((e) => console.error(`[connections] oauth purge: ${(e as Error).message}`));
   } catch (e) {
     console.error(`[connections] boot import failed: ${(e as Error).message}`);
   }
