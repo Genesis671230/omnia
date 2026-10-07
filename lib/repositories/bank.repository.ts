@@ -1,3 +1,4 @@
+import { currentTenant } from "@/lib/tenant";
 import { randomUUID } from "node:crypto";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedBankLine } from "@/lib/parsers/bank";
@@ -6,7 +7,7 @@ import { chunkForInFilter } from "./in-filter-chunks";
 
 export { dedupeKey } from "@/lib/parsers/bank-dedupe";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type BankLineRow = {
   id: string;

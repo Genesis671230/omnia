@@ -1,8 +1,9 @@
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { ZohoAccountMap } from "@/lib/integrations/zoho-banking";
 import { ENV_CONNECTION_ID, zohoConnectionId } from "@/lib/integrations/zoho-context";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 /** Mapping row for the organisation in scope. The default (env) org keeps the
  *  original "omnia" row; every other org gets "omnia:<connection>". Account

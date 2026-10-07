@@ -1,4 +1,5 @@
 // app/api/webhooks/woo/[topic]/route.ts
+import { currentTenant } from "@/lib/tenant";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { normalizeSku } from "@/lib/sku";
@@ -95,7 +96,7 @@ async function handleWooProductUpdate(payload: any) {
 
     if (it.qty != null) {
       await supabase.from("store_inventory").upsert({
-        id: `WOO|${it.sku}`, tenant_id: process.env.DEFAULT_TENANT_ID || "omnia",
+        id: `WOO|${it.sku}`, tenant_id: currentTenant(),
         store_id: "WOO", sku: it.sku, quantity: it.qty,
         product_title: payload.name ?? "", product_status: it.status,
         synced_at: new Date().toISOString(),

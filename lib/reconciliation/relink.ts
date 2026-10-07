@@ -19,10 +19,11 @@
 //       the booked payment would be orphaned — reverse it in Zoho first.
 //   - The new order must not already be booked from another payout.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import { markReconDirty } from "@/lib/reconciliation/snapshot";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const bare = (s: string) => s.replace(/^#/, "").replace(/^(WA|UAE|KSA|WOO|SA)/i, "");
 const isBooked = (id: string | null | undefined) => !!id && !/^(CLAIMED|PENDING):/.test(id);
 

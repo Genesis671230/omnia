@@ -8,6 +8,7 @@
 // campaign. Each report is stored (ad_analyst_reports) so the next one can
 // say what changed since.
 
+import { currentTenant } from "@/lib/tenant";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 // The SDK helper is built on zod v4; the project pins zod 3.25, which ships v4 at this path.
@@ -18,7 +19,7 @@ import type { loadSalesContext } from "@/lib/orders/sales-context.server";
 import type { trackingCheck } from "@/lib/integrations/ads/tracking-check";
 
 const MODEL = "claude-opus-5";
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 const Item = z.object({
   level: z.enum(["campaign", "adset", "ad"]),

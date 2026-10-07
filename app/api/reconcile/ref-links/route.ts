@@ -1,9 +1,10 @@
+import { currentTenant } from "@/lib/tenant";
 import { NextResponse } from "next/server";
 import { markReconDirty } from "@/lib/reconciliation/snapshot";
 import { supabase } from "@/lib/supabase";
 import { changeLineOrder, refForOrderOnPayout, RelinkError } from "@/lib/reconciliation/relink";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 // Manual links for payout lines whose reference isn't an order number —
 // Tamara payment links often carry the customer's phone ("0655572535").

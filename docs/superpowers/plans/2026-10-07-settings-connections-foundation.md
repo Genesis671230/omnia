@@ -24,6 +24,7 @@
 - Schema changes go in `db/schema.sql` **and** `db/bootstrap.sql`, then `node db/apply-schema.mjs` (editing the file alone does not touch the live DB).
 - Follow existing UI style: blue page, white cards, ink figures, colour only for status (hex values as in `components/finance/zoho/zoho-orgs-panel.tsx`).
 - Tests: `node:test` + `node:assert/strict`, files under `tests/**`, run with `npm test` or `npx tsx --test <file>`.
+- **Tests compile as CommonJS — top-level `await` is a transform error.** Where a test below shows `const x = await import("…")`, write a static `import` instead and set env vars at module top after the imports (every module in this plan reads env lazily, at call time). Module-level constants that read env at import are the exception: set those vars in the npm script / a `--import` preload, or restructure the constant into a getter.
 
 **Spec deviations (forced by the codebase, apply everywhere):**
 1. OAuth routes live at `/api/connections/oauth/[provider]/start|callback` (not `/api/connections/[provider]/…`) because Next.js forbids sibling dynamic segments `[provider]` and `[id]` under `/api/connections`. Redirect URI = `${app.public_url}/api/connections/oauth/${provider}/callback`.

@@ -1,10 +1,11 @@
+import { currentTenant } from "@/lib/tenant";
 import { randomUUID } from "node:crypto";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import type { ParsedPayout, PayoutTransactionShare } from "@/lib/parsers/payouts";
 import type { CodDeliveryCharge } from "@/lib/parsers/ontrack-voucher";
 import { resolvePayoutId, type ExistingPayoutIdentity } from "@/lib/finance/payout-identity";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 // Factory (not just a plain method) so the delete-order contract —
 // payout_transactions before payouts, both scoped to id — is testable

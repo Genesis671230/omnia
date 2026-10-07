@@ -16,10 +16,11 @@
 //
 // This module must not import engine.ts statically — engine imports it.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { ReconLine, UnmatchedPayoutRow } from "@/lib/reconciliation/engine";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const STALE_MS = Number(process.env.RECON_SNAPSHOT_STALE_MS ?? 120_000);
 
 export type ReconExtras = { unmatchedPayouts: UnmatchedPayoutRow[]; payoutGateways: string[] };

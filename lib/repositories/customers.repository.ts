@@ -1,8 +1,9 @@
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
 import { aggregateCustomers } from "@/lib/customers/aggregate";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const CHUNK = 500;
 
 export const CustomersRepository = {

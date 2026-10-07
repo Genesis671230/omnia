@@ -9,13 +9,14 @@
 // several lines together (charge + VAT as one 1.05) clears all of them, and
 // the plan names them so the confirmation can say so.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import { getAccessToken } from "@/lib/integrations/zoho";
 import { zohoBooksBase, zohoOrgId, currentZohoScope } from "@/lib/integrations/zoho-context";
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
 import { BankLineZohoStatusRepository, ZohoBankTxnRepository } from "@/lib/repositories/zoho-bank-txn.repository";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type EntryKind = "banktransaction" | "expense" | "vendorpayment";
 

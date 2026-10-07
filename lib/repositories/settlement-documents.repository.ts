@@ -2,10 +2,11 @@
 // cover many orders (a whole payout statement) — confirming the document
 // cascades evidence_confirmed=true to every linked settlement_records row.
 
+import { currentTenant } from "@/lib/tenant";
 import crypto from "node:crypto";
 import { supabase } from "@/lib/supabase";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type SettlementDocument = {
   id: string;

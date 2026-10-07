@@ -1,9 +1,10 @@
 // Raw uploaded documents (bank statements + payout files). Whatever the
 // parsers ingested, the founder can list and re-download byte-for-byte.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type StoredFileMeta = {
   id: string;

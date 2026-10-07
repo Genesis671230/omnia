@@ -3,10 +3,11 @@
 // Books — at, independent of whatever the live orders/payouts tables say
 // later. Written by the reconciliation engine, never by hand.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { OrderSettlementInfo } from "@/lib/orders-finance-status";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type SettlementRecord = {
   id: string;

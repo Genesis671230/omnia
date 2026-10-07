@@ -1,7 +1,8 @@
+import { currentTenant } from "@/lib/tenant";
 import { selectAllPages, supabase } from "@/lib/supabase";
 import type { NormalizedInsight } from "@/lib/integrations/ads/types";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type AdInsightRow = {
   campaign_id: string;

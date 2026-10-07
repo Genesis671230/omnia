@@ -1,20 +1,21 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-/* Symmetric encryption for third-party secrets we must store (Zoho client
- * secrets and refresh tokens). AES-256-GCM, random 12-byte IV per value,
+/* Symmetric encryption for third-party secrets we must store (connection
+ * client secrets and tokens). AES-256-GCM, random 12-byte IV per value,
  * auth tag checked on decrypt so a tampered row fails loudly.
  *
  * Stored format:  v1:<iv b64>:<tag b64>:<ciphertext b64>
- * Key:            ZOHO_CREDENTIALS_KEY — 32 bytes, base64
+ * Key:            CONNECTIONS_KEY — 32 bytes, base64 (legacy name
+ *                 ZOHO_CREDENTIALS_KEY is still accepted)
  *                 (generate: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
  * Losing the key makes stored credentials unreadable (re-add the connection);
  * it is never written to the database. */
 
 function key(): Buffer {
-  const raw = process.env.ZOHO_CREDENTIALS_KEY;
-  if (!raw) throw new Error("ZOHO_CREDENTIALS_KEY is not set — required to store or read Zoho connection secrets");
+  const raw = process.env.CONNECTIONS_KEY || process.env.ZOHO_CREDENTIALS_KEY;
+  if (!raw) throw new Error("CONNECTIONS_KEY is not set — required to store or read connection secrets");
   const k = Buffer.from(raw, "base64");
-  if (k.length !== 32) throw new Error("ZOHO_CREDENTIALS_KEY must be 32 bytes, base64-encoded");
+  if (k.length !== 32) throw new Error("CONNECTIONS_KEY must be 32 bytes, base64-encoded");
   return k;
 }
 
@@ -37,4 +38,13 @@ export function decryptSecret(stored: string): string {
 export function maskSecret(plain: string): string {
   if (plain.length <= 10) return "••••";
   return `${plain.slice(0, 7)}…${plain.slice(-2)}`;
+}
+
+/** Encrypt a whole JSON value (a connection's secrets blob). */
+export function encryptJson(value: unknown): string {
+  return encryptSecret(JSON.stringify(value));
+}
+
+export function decryptJson<T>(stored: string): T {
+  return JSON.parse(decryptSecret(stored)) as T;
 }

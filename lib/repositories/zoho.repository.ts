@@ -1,7 +1,8 @@
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { ZohoItem, ZohoSalesOrder } from "@/lib/integrations/zoho";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export const ZohoRepository = {
   async upsertItems(items: ZohoItem[]): Promise<number> {

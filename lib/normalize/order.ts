@@ -2,6 +2,7 @@
 // table. financial_status is the store's CLAIM — settlement only comes from
 // the reconciler stamping payout_id / payout_status.
 
+import { currentTenant } from "@/lib/tenant";
 import { toAed } from "@/lib/fx";
 import { classifyOrderGateway } from "@/lib/gateways";
 import { customerIdentityKey } from "@/lib/customer-identity";
@@ -9,7 +10,7 @@ import { resolveFinancialStatus } from "@/lib/orders/store-payment-policy";
 import type { ShopifyRawOrder, ShopifyStoreCode } from "@/lib/integrations/shopify";
 import { telrRefsFromMeta, type WooRawOrder } from "@/lib/integrations/woo";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type OrderRow = {
   id: string;

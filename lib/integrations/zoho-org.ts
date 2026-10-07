@@ -14,12 +14,13 @@
  *           refresh token AES-GCM encrypted (lib/crypto/secret-box.ts)
  */
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { zohoThrottledFetch } from "./zoho-throttle";
 import { ENV_CONNECTION_ID, currentZohoScope, runInZohoScope, type ZohoOrgScope } from "./zoho-context";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const DEFAULT_ACCOUNTS_URL = "https://accounts.zoho.com";
 const DEFAULT_API_DOMAIN = "https://www.zohoapis.com";
 const ENV_BUDGET = Number(process.env.ZOHO_DAILY_BUDGET ?? 7000);

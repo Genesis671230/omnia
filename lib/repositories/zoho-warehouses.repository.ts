@@ -1,7 +1,8 @@
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { ZohoWarehouse, ZohoItemDetail, ZohoItemWarehouseEntry } from "@/lib/integrations/zoho-warehouses";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const UPSERT_BATCH = 500;
 
 /* ── warehouse metadata ────────────────────────────────────────────────── */

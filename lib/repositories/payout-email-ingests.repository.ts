@@ -1,7 +1,8 @@
+import { currentTenant } from "@/lib/tenant";
 import { randomUUID } from "node:crypto";
 import { supabase } from "@/lib/supabase";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type PayoutEmailIngestRow = {
   messageId: string;

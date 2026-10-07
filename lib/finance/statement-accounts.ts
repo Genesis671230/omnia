@@ -3,9 +3,10 @@
 // statement are separate accounts: separate lists, separate dedupe, separate
 // Zoho organisations. Table: statement_accounts (db/schema.sql).
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 /** Lines imported before accounts existed are all the Omniastores SIB export. */
 export const LEGACY_ACCOUNT = "sib-omniastores";

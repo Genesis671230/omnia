@@ -2,11 +2,12 @@
 // "verified" amount. Written from a Zoho read (refresh button, month check);
 // read by every page load.
 
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import { orderNumberOf, type ZohoDoc } from "@/lib/finance/zoho-sales-verify";
 import type { InvoiceIndex } from "@/lib/dispatch/three-way";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const norm = (s: string) => s.trim().replace(/^#/, "").toUpperCase();
 
 export type CreditNoteRow = { number: string; order: string; date: string; status: string; total: number; reference: string; org: string };

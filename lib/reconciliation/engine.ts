@@ -11,6 +11,7 @@
 // An order NEVER claims it settled itself. It waits to be claimed by a
 // bank-confirmed payout. Anything a payout can't explain is an exception.
 
+import { currentTenant } from "@/lib/tenant";
 import type { CodDeliveryCharge } from "@/lib/parsers/ontrack-voucher";
 import { supabase, selectAllPages } from "@/lib/supabase";
 import { BankRepository } from "@/lib/repositories/bank.repository";
@@ -21,7 +22,7 @@ import { FX_TO_AED } from "@/lib/fx";
 import { stripeConfigured, payoutOrderRefs } from "@/lib/integrations/stripe";
 import { saveReconSnapshot, markReconDirty } from "@/lib/reconciliation/snapshot";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 const TOLERANCE_AED = 1.0;
 
 export type ReconState = "AWAITING_PAYOUT" | "PAYOUT_VARIANCE" | "ORDERS_UNRESOLVED" | "SETTLED";

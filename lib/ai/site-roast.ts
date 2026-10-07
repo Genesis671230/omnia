@@ -6,6 +6,7 @@
 // Every figure it may use is in the input; it recommends, it never edits the
 // store. Each roast is stored (site_roasts) so the next one can say what changed.
 
+import { currentTenant } from "@/lib/tenant";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 // The SDK helper is built on zod v4; the project pins zod 3.25, which ships v4 at this path.
@@ -15,7 +16,7 @@ import type { PageAudit } from "@/lib/storefront/page-audit";
 import type { FunnelStep, ProductLeak } from "@/lib/storefront/funnel-leaks";
 
 const MODEL = "claude-opus-5-5";
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 const Fix = z.object({
   title: z.string().describe("The change, in a few words."),

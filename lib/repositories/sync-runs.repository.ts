@@ -1,7 +1,8 @@
+import { currentTenant } from "@/lib/tenant";
 import { supabase } from "@/lib/supabase";
 import type { GatewaySyncResult } from "@/lib/payout-sync";
 
-const TENANT = process.env.DEFAULT_TENANT_ID || "omnia";
+const TENANT = currentTenant();
 
 export type ReconSummary = {
   total: number;
