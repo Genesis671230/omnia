@@ -31,7 +31,7 @@
 **Spec deviations (forced by the codebase, apply everywhere):**
 1. OAuth routes live at `/api/connections/oauth/[provider]/start|callback` (not `/api/connections/[provider]/…`) because Next.js forbids sibling dynamic segments `[provider]` and `[id]` under `/api/connections`. Redirect URI = `${app.public_url}/api/connections/oauth/${provider}/callback`.
 2. `db/provision-client.mjs` never wrote `.env`; Task 17 instead makes it seed `app.public_url` + tenant into `workspace_settings` from CLI flags.
-3. Importer/verify scripts are TypeScript run with `npx tsx db/<name>.ts` (they import `lib/`).
+3. Importer/verify scripts are TypeScript run with `npx tsx db/<name>.mts` (they import `lib/`; `.mts` because `.ts` compiles as CommonJS and the scripts use top-level await).
 4. `ConnectorDef` gains two optional members not in the spec: `verifyCallback` (Shopify HMAC) and `references` (delete guard).
 
 ## Review Focus
@@ -3103,7 +3103,7 @@ export async function runBootImport(): Promise<void> {
 Unused imports (`getSetting`, `getConnection`) — remove them when lint flags them.
 
 ```ts
-// db/import-connections.ts — npx tsx db/import-connections.ts [--dry-run]
+// db/import-connections.ts — npx tsx db/import-connections.mts [--dry-run]
 import "dotenv/config";
 import { importFromEnv, readLegacyZohoRows } from "@/lib/connectors/importer";
 
@@ -3113,7 +3113,7 @@ console.log(JSON.stringify({ dryRun, ...report }, null, 2));
 ```
 
 ```ts
-// db/verify-connections.ts — npx tsx db/verify-connections.ts
+// db/verify-connections.ts — npx tsx db/verify-connections.mts
 // Release-1 gate: what the env-based code resolves must equal what the DB resolves.
 import "dotenv/config";
 import { listConnections } from "@/lib/connectors";
@@ -3164,7 +3164,7 @@ Expected: PASS (3 tests)
 
 - [ ] **Step 5: Dry-run against Omnia's real env (read-only)**
 
-Run: `npx tsx db/import-connections.ts --dry-run`
+Run: `npx tsx db/import-connections.mts --dry-run`
 Expected: JSON listing `env`, `house-of-omnia` (and any other existing Zoho org), `shopify-wa`, `shopify-uae`, `shopify-ksa`, `shopify-main`, Gmail mailboxes, and the settings keys present in env. Nothing written. Paste the output in the task report.
 
 - [ ] **Step 6: Commit**
@@ -4519,12 +4519,12 @@ git commit -m "feat(settings): Settings UI — connections, drawer with live ord
 
 - [ ] **Step 1: Run the importer for real**
 
-Run: `npx tsx db/import-connections.ts`
+Run: `npx tsx db/import-connections.mts`
 Expected: same IDs as the Task 11 dry run, now `created`.
 
 - [ ] **Step 2: Verify DB matches env**
 
-Run: `npx tsx db/verify-connections.ts`
+Run: `npx tsx db/verify-connections.mts`
 Expected: `✓ DB matches env for N connections`. Any `setting … still from env` line: open Settings → the group → Save (moves it to the DB), rerun.
 
 - [ ] **Step 3: Exercise each path through the DB**
@@ -4688,7 +4688,7 @@ Expected: allowlist tests PASS; full suite, lint and tsc clean (or only pre-exis
 
 - [ ] **Step 5: Apply the drop and re-verify**
 
-Run: `node db/apply-schema.mjs && npx tsx db/verify-connections.ts`
+Run: `node db/apply-schema.mjs && npx tsx db/verify-connections.mts`
 Expected: `✓ DB matches env …` is no longer meaningful for removed env names — the script still checks connection health; expect no `error`/`needs_reauth` lines. Restart the dev server and repeat Task 17 Step 3.
 
 - [ ] **Step 6: Commit**
