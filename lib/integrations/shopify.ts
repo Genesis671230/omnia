@@ -64,7 +64,7 @@ function throttleDelayMs(json: any, attempt: number): number {
 }
 
 // Everything the finance OS needs from an order, in one page-sized query.
-const ORDERS_QUERY = /* GraphQL */ `
+export const ORDERS_QUERY = /* GraphQL */ `
   query FinanceOrders($first: Int!, $after: String, $query: String) {
     orders(
       first: $first
