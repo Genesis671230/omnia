@@ -30,7 +30,7 @@ const SITES = [
   { code: "ae", label: "omniastores.ae", flag: "🇦🇪" },
   { code: "sa", label: "sa.omniastores.ae", flag: "🇸🇦" },
 ];
-const RANGES = [["7d", "7 days"], ["14d", "14 days"], ["30d", "30 days"], ["mtd", "Month to date"]] as const;
+const RANGES = [["1d", "1 day"],["7d", "7 days"], ["14d", "14 days"], ["30d", "30 days"], ["mtd", "Month to date"]] as const;
 
 const n0 = (v: number) => new Intl.NumberFormat("en-AE").format(Math.round(v));
 const pc = (v: number) => `${(v * 100).toFixed(v > 0 && v < 0.1 ? 1 : 0)}%`;

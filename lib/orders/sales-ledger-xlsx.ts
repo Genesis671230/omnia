@@ -20,7 +20,7 @@
 // in Excel without cleanup. Pure: hand it a ledger, get a buffer.
 
 import ExcelJS from "exceljs";
-import type { LedgerDay, LedgerOrder, LedgerStatus, SalesLedger } from "./sales-ledger";
+import type { LedgerCancelledOrder, LedgerDay, LedgerOrder, LedgerStatus, SalesLedger } from "./sales-ledger";
 
 const STATUS_LABEL: Record<LedgerStatus, string> = {
   received: "Received in bank",
@@ -29,6 +29,7 @@ const STATUS_LABEL: Record<LedgerStatus, string> = {
   awaiting_payout: "Charged — payout not issued yet",
   no_payout_file: "Payout file not uploaded",
   cod: "Cash on delivery",
+  adjusted: "Returned / refunded (credit note)",
 };
 const BASIS_LABEL = {
   measured: "Payout file (this order's line)",
@@ -159,6 +160,13 @@ const ORDER_COLS: Col[] = [
   { header: "Bank reference", key: "bankRef", width: 16, group: "bank" },
   { header: "Net received in bank (AED)", key: "recv", width: 14, group: "bank", money: true },
   { header: "Reason / what's missing", key: "reason", width: 60, group: "bank" },
+  // ADJUSTMENT (cancel / return / refund / exchange from the app)
+  { header: "Adjustment", key: "adjKind", width: 12, group: "check" },
+  { header: "Credit note", key: "adjCn", width: 14, group: "check" },
+  { header: "Credited (AED)", key: "adjCredit", width: 12, group: "check", money: true },
+  { header: "Damage / kept (AED)", key: "adjDeduct", width: 12, group: "check", money: true },
+  { header: "Exchange invoice", key: "adjEx", width: 14, group: "check" },
+  { header: "Net sale (AED)", key: "net", width: 13, group: "check", money: true },
 ];
 
 function orderRow(o: LedgerOrder): Record<string, string | number | null> {
@@ -190,8 +198,17 @@ function orderRow(o: LedgerOrder): Record<string, string | number | null> {
     bankRef: o.bank?.reference ?? "",
     recv: o.status === "received" ? o.receivedAed : null,
     reason: o.reason,
+    adjKind: o.adjustment ? o.adjustment.kind : "",
+    adjCn: o.adjustment?.creditNote ?? "",
+    adjCredit: o.adjustment ? o.adjustment.creditAed : null,
+    adjDeduct: o.adjustment?.deductAed || null,
+    adjEx: o.adjustment?.exchangeInvoice ?? "",
+    net: r2(o.grossAed - creditOf(o)),
   };
 }
+
+/** The part of a sale credited back (returns / refunds; an exchange is not a refund). */
+const creditOf = (o: LedgerOrder) => (o.adjustment && (o.adjustment.kind === "returned" || o.adjustment.kind === "refunded") ? o.adjustment.creditAed : 0);
 
 function ordersSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
   const s = wb.addWorksheet("Orders", { views: [{ state: "frozen", ySplit: 1, xSplit: 4 }] });
@@ -217,6 +234,8 @@ function ordersSheet(wb: ExcelJS.Workbook, orders: LedgerOrder[]) {
     vat: sum((o) => o.vatAed),
     pnet: sum((o) => (o.status === "cod" ? 0 : o.payoutNetAed)),
     recv: sum((o) => (o.status === "received" ? o.receivedAed : 0)),
+    adjCredit: sum((o) => creditOf(o)),
+    net: sum((o) => o.grossAed - creditOf(o)),
   });
 
   // Column bands: header tinted by group so ORDER → PAYOUT → CHECK → BANK reads left to right.
@@ -472,6 +491,31 @@ function howToSheet(wb: ExcelJS.Workbook) {
 /* ── workbooks ──────────────────────────────────────────────────────────── */
 
 /** The day drawer's report. */
+/** Cancelled from the app — not sales (not in any total), listed so the file accounts for every order. */
+function cancelledSheet(wb: ExcelJS.Workbook, list: LedgerCancelledOrder[]) {
+  const s = wb.addWorksheet("Cancelled", { views: [{ state: "frozen", ySplit: 1 }] });
+  s.columns = [
+    { header: "Date", key: "date", width: 11 },
+    { header: "Time", key: "time", width: 7 },
+    { header: "Order", key: "order", width: 12 },
+    { header: "Store", key: "store", width: 8 },
+    { header: "Customer", key: "customer", width: 22 },
+    { header: "Gateway", key: "gateway", width: 16 },
+    { header: "Order amount (AED)", key: "gross", width: 14 },
+    { header: "Credit note", key: "cn", width: 14 },
+    { header: "Cancelled on", key: "on", width: 12 },
+  ];
+  for (const c of list) {
+    const { date, time } = dubaiDateTime(c.orderDate);
+    s.addRow({ date, time, order: c.orderNumber, store: c.store, customer: c.customerName, gateway: c.gateway, gross: c.grossAed,
+      cn: c.adjustment?.creditNote || "", on: c.adjustment?.date || "" });
+  }
+  if (list.length) totalsRow(s, { date: "Total", order: `${list.length} orders`, gross: r2(list.reduce((a, c) => a + c.grossAed, 0)) });
+  else s.addRow({ date: "No cancelled orders." });
+  s.getColumn("gross").numFmt = MONEY;
+  styleHeader(s);
+}
+
 export async function buildDayWorkbook(day: LedgerDay): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
@@ -479,6 +523,7 @@ export async function buildDayWorkbook(day: LedgerDay): Promise<Buffer> {
   gatewaysSheet(wb, day.orderList);
   ordersSheet(wb, day.orderList);
   payoutsSheet(wb, day.orderList);
+  cancelledSheet(wb, day.cancelled.list);
   howToSheet(wb);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -500,16 +545,19 @@ export async function buildMonthWorkbook(ledger: SalesLedger): Promise<Buffer> {
     { header: "Net payout (AED)", key: "pnet", width: 13 },
     { header: "Net received in bank (AED)", key: "net", width: 15 },
     { header: "Not in bank yet (AED)", key: "pending", width: 14 },
+    { header: "Cancelled orders", key: "cn", width: 10 },
+    { header: "Cancelled amount — not sales (AED)", key: "cv", width: 15 },
     ...ledger.stores.map((s) => ({ header: `${s} (AED)`, key: `store_${s}`, width: 12 })),
     { header: "Status", key: "reason", width: 80 },
   ];
   for (const day of ledger.days) {
-    if (day.orders === 0) continue;
+    if (day.orders === 0 && day.cancelled.orders === 0) continue;
     d.addRow({
       day: day.day, orders: day.orders, gross: day.grossAed, fee: day.feeAed,
       pnet: r2(day.orderList.reduce((a, o) => a + (o.status === "cod" ? 0 : o.payoutNetAed), 0)),
       net: day.receivedAed,
       pending: r2(Math.max(day.grossAed - day.receivedGrossAed, 0)),
+      cn: day.cancelled.orders, cv: day.cancelled.grossAed,
       ...Object.fromEntries(ledger.stores.map((s) => [`store_${s}`, day.byStore[s] ?? 0])),
       reason: day.reason,
     });
@@ -519,12 +567,14 @@ export async function buildMonthWorkbook(ledger: SalesLedger): Promise<Buffer> {
     pnet: r2(orders.reduce((a, o) => a + (o.status === "cod" ? 0 : o.payoutNetAed), 0)),
     net: ledger.totals.receivedAed,
     pending: r2(Math.max(ledger.totals.grossAed - ledger.totals.receivedGrossAed, 0)),
+    cn: ledger.totals.cancelled.orders, cv: ledger.totals.cancelled.grossAed,
   });
-  for (const k of ["gross", "fee", "pnet", "net", "pending", ...ledger.stores.map((s) => `store_${s}`)]) d.getColumn(k).numFmt = MONEY;
+  for (const k of ["gross", "fee", "pnet", "net", "pending", "cv", ...ledger.stores.map((s) => `store_${s}`)]) d.getColumn(k).numFmt = MONEY;
   styleHeader(d);
 
   ordersSheet(wb, orders);
   payoutsSheet(wb, orders);
+  cancelledSheet(wb, ledger.days.flatMap((x) => x.cancelled.list));
 
   if (ledger.missingPayoutFiles.length > 0) {
     const m = wb.addWorksheet("Missing payout files");

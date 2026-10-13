@@ -23,6 +23,9 @@ export async function register() {
     const { startCfoDigestScheduler } = await import("@/lib/scheduler/cfo-digest-scheduler");
     startCfoDigestScheduler();
 
+    const { startOverdueFollowupScheduler } = await import("@/lib/scheduler/overdue-followup-scheduler");
+    startOverdueFollowupScheduler();
+
     const { startGroupSummaryScheduler } = await import("@/lib/scheduler/group-summary-scheduler");
     startGroupSummaryScheduler();
 

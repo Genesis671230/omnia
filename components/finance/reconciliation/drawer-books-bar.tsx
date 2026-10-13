@@ -7,7 +7,10 @@
  * clearing / fee accounts and taxes). Switching saves onto the payout
  * (PUT /api/payouts/:id/zoho-org) and remounts the booking panels so every
  * account list, invoice lookup and posting below uses the new organisation.
- * Locked once any settlement on the payout is booked. */
+ * Switchable at any time: orders already in Zoho are pinned to the books they
+ * were booked in (server side), and each order row has its own picker for
+ * payouts that mix House of Omnia and Omniastores orders. Only booked COD
+ * delivery-charge documents (payout-level) still hold the payout in place. */
 
 import { Building2, Check, Loader2, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -15,7 +18,7 @@ import { toast } from "sonner";
 import { useZohoOrgs } from "@/components/finance/zoho/org-picker";
 import type { ReconLine } from "./types";
 
-type State = { zohoConnectionId: string; booked: boolean; bookedCount: number };
+type State = { zohoConnectionId: string; booked: boolean; bookedCount: number; bookedOrders?: number; deliveryDocs?: number; locked?: boolean; ordersInOtherOrgs?: number };
 type Loaded = { deposit: number; fee: number; taxes: number } | "error" | null;
 
 export function DrawerBooksBar({ line, onSwitched }: { line: ReconLine; onSwitched: () => void }) {
@@ -81,7 +84,7 @@ export function DrawerBooksBar({ line, onSwitched }: { line: ReconLine; onSwitch
           <select
             value={state.zohoConnectionId}
             onChange={(e) => void switchTo(e.target.value)}
-            disabled={saving || state.booked || usable.length < 2}
+            disabled={saving || !!state.locked || usable.length < 2}
             aria-label="Zoho organisation this payout closes invoices in"
             className="h-8 rounded-lg border-0 bg-white px-2.5 text-[13px] font-medium text-[#0F1B3D] ring-1 ring-inset ring-[#C9D5EA] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] disabled:opacity-80"
           >
@@ -89,13 +92,19 @@ export function DrawerBooksBar({ line, onSwitched }: { line: ReconLine; onSwitch
             {!current && <option value={state.zohoConnectionId}>{state.zohoConnectionId}</option>}
           </select>
           {saving && <Loader2 size={14} className="animate-spin text-[#1D4ED8]" />}
-          {state.booked ? (
-            <span className="inline-flex items-center gap-1 text-[12px] text-[#5E6B85]" title="Moving a booked payout would book the same money twice">
-              <Lock size={12} /> {state.bookedCount} booked here — locked
+          {state.locked ? (
+            <span className="inline-flex items-center gap-1 text-[12px] text-[#5E6B85]" title="COD delivery-charge documents are booked in this organisation">
+              <Lock size={12} /> delivery charges booked here — pick the books per order below
             </span>
           ) : usable.length < 2 ? (
             <span className="text-[12px] text-[#5E6B85]">Connect another organisation in Settings to switch.</span>
-          ) : null}
+          ) : (
+            <span className="text-[12px] text-[#5E6B85]">
+              {state.bookedOrders ? `${state.bookedOrders} booked order${state.bookedOrders === 1 ? "" : "s"} stay where booked · ` : ""}
+              {state.ordersInOtherOrgs ? <b className="font-medium text-[#8A5A00]">{state.ordersInOtherOrgs} order{state.ordersInOtherOrgs === 1 ? "" : "s"} in another organisation · </b> : null}
+              change any order&apos;s books on its row
+            </span>
+          )}
           <span className="ml-auto text-[12px] text-[#5E6B85]">
             {loaded === null ? <span className="inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> loading its accounts…</span>
               : loaded === "error" ? <span className="text-[#A6472F]">couldn’t load its accounts</span>

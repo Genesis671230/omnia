@@ -175,7 +175,7 @@
 //   return null;
 // }
 
-import { runInZohoOrgOr400, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
+import { runInZohoOrgOr400, withZohoOrg, zohoOrgForBankLine, zohoOrgForSettlement, zohoOrgScoped } from "@/lib/integrations/zoho-org";
 import { NextResponse } from "next/server";
 import { runReconciliation } from "@/lib/reconciliation/engine";
 import { findZohoInvoiceCandidates, getAccessToken } from "@/lib/integrations/zoho";
@@ -183,7 +183,7 @@ import { SettlementsRepository } from "@/lib/repositories/settlements.repository
 import { bankScaleFor, isCrossBorderCurrency, pickInvoiceForOrder } from "@/lib/finance/settlement-posting";
 import { zohoDocumentExists } from "@/lib/integrations/zoho-settlement-posting";
 import { isUnsettledZohoId } from "@/lib/repositories/settlements.repository";
-import { zohoOrgId } from "@/lib/integrations/zoho-context";
+import { zohoConnectionId, zohoOrgId } from "@/lib/integrations/zoho-context";
 
 export const maxDuration = 60;
 
@@ -361,6 +361,19 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
       snapshots.set(bareRef(s.order_number), snap);
     }
 
+    // Orders picked into another company's books (settlement_records.
+    // zoho_connection_id) are looked up — and their stored documents
+    // re-checked — in THAT organisation, never the payout's: a miss there would
+    // wrongly forget a fee / FX document that exists in the other books.
+    const scopeOrg = zohoConnectionId();
+    const orgByRef = new Map<string, string>();
+    for (const s of settlementRows) {
+      const o = s.zoho_connection_id || scopeOrg;
+      orgByRef.set(s.order_number, o);
+      orgByRef.set(bareRef(s.order_number), o);
+    }
+    const inOrgOf = <T,>(org: string, fn: () => Promise<T>) => (org === scopeOrg ? fn() : withZohoOrg(org, fn));
+
     const accessToken = await getAccessToken();
     const orgId = zohoOrgId();
 
@@ -369,12 +382,16 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
       const tx = line.transactions.find((t) => t.ref === ref || bareRef(t.ref) === bareRef(ref));
       // A manually linked line looks its invoice up by the order it points at.
       const lookup = tx?.orderNumber ?? ref;
-      const status = await checkInvoice(lookup, accessToken, orgId, {
+      const org = orgByRef.get(lookup) ?? orgByRef.get(bareRef(lookup)) ?? scopeOrg;
+      const opts = {
         expectedAmount: (tx?.grossShare ?? 0) * bankScale,
         crossBorder,
         orderCurrency: orderCurrencies.get(lookup) ?? orderCurrencies.get(bareRef(lookup)) ?? null,
         preferredInvoiceId: bookedInvoice.get(lookup) ?? bookedInvoice.get(bareRef(lookup)) ?? null,
-      });
+      };
+      const status = org === scopeOrg
+        ? await checkInvoice(lookup, accessToken, orgId, opts)
+        : await withZohoOrg(org, async () => checkInvoice(lookup, await getAccessToken(), zohoOrgId(), opts));
       return [ref, lookup, status] as const;
     }, 5);
 
@@ -415,7 +432,8 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
     ]);
     const missingDocs: { orderNumber: string; kind: "fee" | "fx"; id: string }[] = [];
     await mapWithConcurrency(docChecks, async ({ s, kind, docId }) => {
-      const exists = await zohoDocumentExists(kind, docId, accessToken).catch(() => true); // unknown ≠ missing
+      const org = s.zoho_connection_id || scopeOrg;
+      const exists = await inOrgOf(org, async () => zohoDocumentExists(kind, docId, org === scopeOrg ? accessToken : await getAccessToken())).catch(() => true); // unknown ≠ missing
       if (exists) return;
       missingDocs.push({ orderNumber: s.order_number, kind: kind === "expenses" ? "fee" : "fx", id: docId });
       await SettlementsRepository.updatePosting(s.id, kind === "expenses" ? { zoho_fee_expense_id: null } : { zoho_fx_journal_id: null });

@@ -39,7 +39,7 @@ function rowsOf(ws: ExcelJS.Worksheet): Record<string, unknown>[] {
 
 test("day export: each order is verifiable — order amount, payout line, fee, net, bank", async () => {
   const wb = await load(await buildDayWorkbook(ledger.days.find((d) => d.day === "2026-09-10")!));
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Summary", "By gateway", "Orders", "Payouts", "How to verify"]);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Summary", "By gateway", "Orders", "Payouts", "Cancelled", "How to verify"]);
   const rows = rowsOf(wb.getWorksheet("Orders")!);
 
   const uae = rows.find((r) => r["Order #"] === "3439")!;
@@ -75,7 +75,7 @@ test("month export adds Days and Missing payout files sheets", async () => {
   const wb = await load(await buildMonthWorkbook(ledger));
   assert.deepEqual(
     wb.worksheets.map((w) => w.name),
-    ["Summary", "By gateway", "Days", "Orders", "Payouts", "Missing payout files", "How to verify"],
+    ["Summary", "By gateway", "Days", "Orders", "Payouts", "Cancelled", "Missing payout files", "How to verify"],
   );
   assert.equal(rowsOf(wb.getWorksheet("Missing payout files")!)[0]["Gateway"], "Tabby");
 });

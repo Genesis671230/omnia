@@ -20,6 +20,7 @@ import {
   RefreshCcw, Loader2, LayoutDashboard, PackageSearch, Receipt,
   WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings,
   Megaphone, Boxes, Users, ArrowLeftRight, Store, Truck,
+  PackageCheck,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -35,11 +36,13 @@ import { FounderDashboard } from "@/components/finance/dashboard-v2/founder-dash
 import { StoreChat } from "@/components/finance/store-chat";
 import { DocumentsPanel } from "@/components/finance/documents-panel";
 import { ReportsPanel } from "@/components/finance/reports-panel";
+import { CodInvoicesReport } from "@/components/finance/cod-invoices-report";
 import { InventoryPanel } from "@/components/finance/inventory-panel";
 import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { OrdersAnalyticsPanel } from "@/components/finance/orders-analytics/orders-analytics";
 import { AdsExplorer } from "@/components/finance/ads/ads-explorer";
 import { DispatchPanel } from "@/components/finance/dispatch/dispatch-panel";
+import { SalesOrdersPanel } from "@/components/finance/sales-orders/sales-orders-panel";
 import { CommandCenter } from "@/components/finance/dashboard-v2/command/command-center";
 import { StorefrontPanel } from "@/components/finance/storefront/storefront-panel";
 import { CustomersPanel } from "@/components/finance/customers-panel";
@@ -56,7 +59,7 @@ import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
-  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings" | "dispatch";
+  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings" | "dispatch" | "salesorders";
 
 /* ── Nav config ─────────────────────────────────────────────────────────── */
 
@@ -92,6 +95,7 @@ const NAV: NavItem[] = [
   },
   { href: "/documents", view: "documents", label: "Bank actuals", icon: FolderOpen },
   { href: "/dispatch", view: "dispatch", label: "Dispatch", icon: Truck },
+  { href: "/sales-orders", view: "salesorders", label: "Sales orders", icon: PackageCheck },
   { href: "/returns", view: "returns", label: "Returns", icon: RotateCcw },
   { href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
   { href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
@@ -740,7 +744,10 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
           ) : showDocuments ? (
             <DocumentsPanel version={dashVersion} onDone={refresh} />
           ) : showReports ? (
-            <ReportsPanel version={dashVersion} />
+            <>
+              <CodInvoicesReport />
+              <ReportsPanel version={dashVersion} />
+            </>
           ) : showMarketing ? (
             <>
               <CommandCenter variant="marketing" />
@@ -748,6 +755,8 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
             </>
           ) : view === "dispatch" ? (
             <DispatchPanel />
+          ) : view === "salesorders" ? (
+            <SalesOrdersPanel />
           ) : view === "storefronts" ? (
             <StorefrontPanel />
           ) : showInventory ? (

@@ -72,11 +72,18 @@ export async function saveStatementAccount(a: Partial<StatementAccount> & { id?:
 }
 
 /** The account a statement's own header names (account number, card mask,
- *  holder) — or null when nothing in it matches, so the uploader must pick. */
+ *  holder) — or null when nothing in it matches, so the uploader must pick.
+ *  A hint can also turn up in a transaction narration: the 8 Oct 2026 SIB
+ *  export carried "Outward Telex Payment/HOUSE OF OMNIA ACCESSORIES LLC" and
+ *  was filed under RAK House of Omnia, duplicating 77 SIB lines. So when
+ *  several accounts match, the one named first — the header — wins. */
 export function detectStatementAccount(text: string, accounts: StatementAccount[]): StatementAccount | null {
   const head = text.slice(0, 6000).toUpperCase().replace(/\s+/g, " ");
-  const hits = accounts.filter((a) => a.matchHints.some((h) => h && head.includes(h.toUpperCase().replace(/\s+/g, " "))));
-  return hits.length === 1 ? hits[0] : null;
+  const hits = accounts
+    .map((a) => ({ a, at: Math.min(...a.matchHints.filter(Boolean).map((h) => head.indexOf(h.toUpperCase().replace(/\s+/g, " "))).filter((i) => i >= 0)) }))
+    .filter((h) => Number.isFinite(h.at))
+    .sort((x, y) => x.at - y.at);
+  return hits[0]?.a ?? null;
 }
 
 /** Map bank-line ids → their statement account. */

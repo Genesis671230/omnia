@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Flag, SalesVerification } from "@/lib/finance/zoho-sales-verify";
 import type { ManagementReport } from "@/lib/reports/management-report";
-import { compact, fmt, pct } from "../overview/kit";
+import { fmt, pct } from "../overview/kit";
 import { DARK_CARD } from "./funnel";
 
 const WHITE_CARD = "rounded-[30px] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_44px_-26px_rgba(15,23,42,0.22)]";
@@ -165,20 +165,20 @@ function ZohoSummary({ v, onOpen }: { v: SalesVerification; onOpen: () => void }
       <div className="mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-slate-50 px-4 py-3">
           <div className="text-[11.5px] text-slate-500">Store sales</div>
-          <div className="mt-0.5 text-[18px] tabular-nums text-slate-900">AED {compact(v.ours.salesAed)}</div>
+          <div className="mt-0.5 text-[18px] tabular-nums text-slate-900">AED {fmt(v.ours.salesAed)}</div>
           <div className="text-[11px] text-slate-400">{fmt(v.ours.orders)} orders</div>
         </div>
         <div className="rounded-2xl bg-slate-50 px-4 py-3">
           <div className="text-[11.5px] text-slate-500">Zoho invoiced</div>
-          <div className="mt-0.5 text-[18px] tabular-nums text-slate-900">AED {compact(v.zoho.invoicedAed)}</div>
-          <div className="text-[11px] text-slate-400">{fmt(v.zoho.invoices)} invoices · {v.differenceAed >= 0 ? "+" : "−"}{compact(Math.abs(v.differenceAed))}</div>
+          <div className="mt-0.5 text-[18px] tabular-nums text-slate-900">AED {fmt(v.zoho.invoicedAed)}</div>
+          <div className="text-[11px] text-slate-400">{fmt(v.zoho.invoices)} invoices · {v.differenceAed >= 0 ? "+" : "−"}{fmt(Math.abs(v.differenceAed))}</div>
         </div>
       </div>
       <div className="mt-3 flex items-center gap-2 text-[12.5px] text-slate-600">
         <ShieldCheck size={14} className="text-emerald-600" /> {pct(matchedShare)} of orders found in Zoho
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        {[["Refunds", `${v.refunds.count}`, `AED ${compact(v.refunds.totalAed)}`], ["Exchanges", `${v.exchanges.count}`, "zero credit notes"], ["Cancelled", `${v.cancellations.count}`, `AED ${compact(v.cancellations.totalAed)}`]].map(([k, n, s]) => (
+        {[["Refunds", `${v.refunds.count}`, `AED ${fmt(v.refunds.totalAed)}`], ["Exchanges", `${v.exchanges.count}`, "zero credit notes"], ["Cancelled", `${v.cancellations.count}`, `AED ${fmt(v.cancellations.totalAed)}`]].map(([k, n, s]) => (
           <div key={k} className="rounded-2xl bg-slate-50 px-2 py-2.5">
             <div className="text-[18px] tabular-nums text-slate-900">{n}</div>
             <div className="text-[11px] text-slate-500">{k}</div>
@@ -190,7 +190,7 @@ function ZohoSummary({ v, onOpen }: { v: SalesVerification; onOpen: () => void }
         {groups.map(({ key, flags }) => (
           <li key={key} className="flex items-center justify-between gap-2 rounded-xl px-1 text-[12.5px]" title={FLAG_META[key].hint}>
             <span className="flex items-center gap-1.5 text-slate-700"><AlertTriangle size={12} className="text-amber-500" />{FLAG_META[key].label}</span>
-            <span className="tabular-nums text-slate-500">{flags.length} · AED {compact(flags.reduce((s, f) => s + flagAmount(f), 0))}</span>
+            <span className="tabular-nums text-slate-500">{flags.length} · AED {fmt(flags.reduce((s, f) => s + flagAmount(f), 0))}</span>
           </li>
         ))}
       </ul>
@@ -262,7 +262,7 @@ function MgmtBody({ r }: { r: ManagementReport }) {
     { k: "Orders placed", v: w.placed.aed, n: w.placed.orders, sign: "" },
     { k: "Failed / unpaid", v: w.failedUnpaid.aed, n: w.failedUnpaid.orders, sign: "−" },
     { k: `Cancelled${w.cancelled.bySheetOnly ? ` (${w.cancelled.bySheetOnly} only in sheet)` : ""}`, v: w.cancelled.aed, n: w.cancelled.orders, sign: "−" },
-    { k: "Gross sales", v: w.grossSales.aed, n: w.grossSales.orders, sign: "=", strong: true },
+    { k: "Sales", v: w.grossSales.aed, n: w.grossSales.orders, sign: "=", strong: true },
     { k: "Refunds", v: w.refunds.aed, n: w.refunds.orders, sign: "−" },
     { k: "Net sales", v: w.netSales.aed, n: w.netSales.orders, sign: "=", strong: true },
   ];
@@ -279,7 +279,7 @@ function MgmtBody({ r }: { r: ManagementReport }) {
             <li key={st.k}>
               <div className={`flex justify-between text-[12.5px] ${st.strong ? "font-medium text-white" : "text-white/70"}`}>
                 <span>{st.sign} {st.k} <span className="text-white/40">· {fmt(st.n)}</span></span>
-                <span className="tabular-nums">AED {compact(st.v)}</span>
+                <span className="tabular-nums">AED {fmt(st.v)}</span>
               </div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <motion.div className="h-full rounded-full" style={{ background: st.sign === "−" ? "#F2705E" : st.strong ? "linear-gradient(90deg,#8B9CFF,#10B981)" : "#8B9CFF" }}
@@ -289,18 +289,18 @@ function MgmtBody({ r }: { r: ManagementReport }) {
           ))}
         </ul>
         <div>
-          <div className="text-[13px] text-white/55">Received in the bank</div>
-          <div className="mt-1 text-[34px] font-light leading-none tabular-nums tracking-[-0.03em]">AED {compact(r.cash.receivedAed)}</div>
+          <div className="text-[13px] text-white/55">Cash in bank · after fees</div>
+          <div className="mt-1 text-[34px] font-light leading-none tabular-nums tracking-[-0.03em]">AED {fmt(r.cash.receivedAed)}</div>
           <div className="mt-1 text-[12px] text-white/50" title={`Net sales = received ${fmt(r.cash.tie.receivedAed, 2)} + fees ${fmt(r.cash.tie.feesOnReceivedAed, 2)} + FX/other ${fmt(r.cash.tie.fxOtherAed, 2)} − refunds on received ${fmt(r.cash.tie.refundsOnReceivedAed, 2)} + receivable ${fmt(r.cash.tie.receivableAed, 2)}`}>
-            {pct(recvShare)} of net sales · fees AED {compact(r.cash.tie.feesOnReceivedAed)} · refunds returned AED {compact(r.cash.tie.refundsOnReceivedAed)}
+            {pct(recvShare)} of net sales · fees AED {fmt(r.cash.tie.feesOnReceivedAed)} · refunds returned AED {fmt(r.cash.tie.refundsOnReceivedAed)}
           </div>
-          <div className="mt-4 text-[13px] text-white/55">Receivable — still to come in</div>
-          <div className="mt-1 text-[24px] font-light tabular-nums">AED {compact(r.cash.receivableAed)}</div>
+          <div className="mt-4 text-[13px] text-white/55">Still to come</div>
+          <div className="mt-1 text-[24px] font-light tabular-nums">AED {fmt(r.cash.receivableAed)}</div>
           <ul className="mt-2 space-y-1 text-[12px]">
             {r.cash.receivableByBucket.map((b) => (
               <li key={b.bucket} className="flex justify-between gap-2 text-white/70">
                 <span className="truncate">{b.label} · {b.orders}</span>
-                <span className="shrink-0 tabular-nums">{compact(b.aed)}{b.oldestDays > 14 ? <span className="ml-1 text-amber-300">· {b.oldestDays}d</span> : null}</span>
+                <span className="shrink-0 tabular-nums">{fmt(b.aed)}{b.oldestDays > 14 ? <span className="ml-1 text-amber-300">· {b.oldestDays}d</span> : null}</span>
               </li>
             ))}
           </ul>
@@ -308,9 +308,9 @@ function MgmtBody({ r }: { r: ManagementReport }) {
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { k: "Refunds by payout month", v: r.refundsByPaidMonth.filter((p) => p.month !== "unknown").map((p) => `${p.month.slice(5)}: ${compact(p.aed)}`).join(" · ") || "—" },
-          { k: `All refunds paid in ${r.month.slice(5)}`, v: `AED ${compact(r.refundsPaidThisMonth.aed)}`, s: `${r.refundsPaidThisMonth.ofEarlierMonths} for earlier months' orders` },
-          { k: "Exchanges (not sales)", v: `${fmt(r.exchanges.orders)} orders`, s: `extra collected AED ${compact(r.exchanges.extraCollectedAed)}` },
+          { k: "Refunds by payout month", v: r.refundsByPaidMonth.filter((p) => p.month !== "unknown").map((p) => `${p.month.slice(5)}: ${fmt(p.aed)}`).join(" · ") || "—" },
+          { k: `All refunds paid in ${r.month.slice(5)}`, v: `AED ${fmt(r.refundsPaidThisMonth.aed)}`, s: `${r.refundsPaidThisMonth.ofEarlierMonths} for earlier months' orders` },
+          { k: "Exchanges (not sales)", v: `${fmt(r.exchanges.orders)} orders`, s: `extra collected AED ${fmt(r.exchanges.extraCollectedAed)}` },
           { k: "Exchanges re-invoiced in Zoho", v: fmt(r.exchanges.reinvoicedInZoho), s: "sale counted twice in Zoho" },
         ].map((t) => (
           <div key={t.k} className="rounded-2xl bg-white/[0.06] px-3.5 py-3">
@@ -319,6 +319,36 @@ function MgmtBody({ r }: { r: ManagementReport }) {
             {t.s && <div className="text-[10.5px] text-white/40">{t.s}</div>}
           </div>
         ))}
+      </div>
+      {r.cod && r.cod.orders > 0 && <CodOrgs r={r} />}
+    </div>
+  );
+}
+
+/* COD sits in two sets of books: House of Omnia's invoice (the amount) and
+   Omniastores' intercompany copy. Both shown; amounts come from the COD org. */
+function CodOrgs({ r }: { r: ManagementReport }) {
+  const c = r.cod;
+  const amountRow = c.byOrg.find((o) => o.org === c.amountOrg);
+  return (
+    <div className="rounded-2xl bg-white/[0.06] px-4 py-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="text-[12.5px] font-medium text-white">COD across both organisations</div>
+        <div className="text-[11px] text-white/45">amount from {c.amountOrg} · store {fmt(c.orders)} orders · AED {fmt(c.grossAed)}</div>
+      </div>
+      <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {c.byOrg.map((o) => (
+          <div key={o.org} className={`rounded-xl px-3 py-2 ${o.org === c.amountOrg ? "bg-emerald-400/10 ring-1 ring-emerald-300/30" : "bg-white/[0.04]"}`}>
+            <div className="text-[11px] text-white/55">{o.org}{o.org === c.amountOrg ? " · COD amount" : " · intercompany copy"}</div>
+            <div className="mt-0.5 text-[15px] tabular-nums text-white">AED {fmt(o.invoicedAed, 2)}</div>
+            <div className="text-[10.5px] text-white/40">{fmt(o.orders)} orders invoiced</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 text-[11px] leading-relaxed text-white/50">
+        {amountRow ? `Store vs ${c.amountOrg}: AED ${fmt(c.grossAed - amountRow.invoicedAed, 2)} difference. ` : ""}
+        {c.notInAmountOrg.length ? <span className="text-amber-300">{c.notInAmountOrg.length} COD order{c.notInAmountOrg.length === 1 ? "" : "s"} not invoiced in {c.amountOrg}: {c.notInAmountOrg.slice(0, 12).join(", ")}{c.notInAmountOrg.length > 12 ? "…" : ""}. </span> : null}
+        {c.mismatches.length ? <span>{c.mismatches.length} amount{c.mismatches.length === 1 ? "" : "s"} differ from the store (e.g. {c.mismatches.slice(0, 3).map((m) => `${m.order} ${fmt(m.storeAed)}→${fmt(m.zohoAed)}`).join(", ")}).</span> : null}
       </div>
     </div>
   );
@@ -339,14 +369,14 @@ function MgmtGateways({ r }: { r: ManagementReport }) {
                 <tr key={g.gateway} className="border-t border-slate-100 tabular-nums">
                   <td className="py-1.5 text-slate-800">{g.gateway}</td>
                   <td className="py-1.5 text-right">{fmt(g.orders)}</td>
-                  <td className="py-1.5 text-right">{compact(g.grossAed)}</td>
-                  <td className="py-1.5 text-right text-slate-500">{g.cancelled.orders ? `${g.cancelled.orders} · ${compact(g.cancelled.aed)}` : "—"}</td>
-                  <td className="py-1.5 text-right text-rose-600">{g.refunds.orders ? `${g.refunds.orders} · ${compact(g.refunds.aed)}` : "—"}</td>
+                  <td className="py-1.5 text-right">{fmt(g.grossAed)}</td>
+                  <td className="py-1.5 text-right text-slate-500">{g.cancelled.orders ? `${g.cancelled.orders} · ${fmt(g.cancelled.aed)}` : "—"}</td>
+                  <td className="py-1.5 text-right text-rose-600">{g.refunds.orders ? `${g.refunds.orders} · ${fmt(g.refunds.aed)}` : "—"}</td>
                   <td className="py-1.5 text-right text-slate-500">{g.refundRatePct == null ? "—" : `${g.refundRatePct}%`}</td>
                   <td className="py-1.5 text-right text-slate-500">{g.exchanges || "—"}</td>
-                  <td className="py-1.5 text-right font-medium text-slate-900">{compact(g.netSalesAed)}</td>
-                  <td className="py-1.5 text-right">{compact(g.receivedAed)}</td>
-                  <td className="py-1.5 text-right text-amber-700">{g.receivableAed ? compact(g.receivableAed) : "—"}</td>
+                  <td className="py-1.5 text-right font-medium text-slate-900">{fmt(g.netSalesAed)}</td>
+                  <td className="py-1.5 text-right">{fmt(g.receivedAed)}</td>
+                  <td className="py-1.5 text-right text-amber-700">{g.receivableAed ? fmt(g.receivableAed) : "—"}</td>
                 </tr>
               ))}
             </tbody>

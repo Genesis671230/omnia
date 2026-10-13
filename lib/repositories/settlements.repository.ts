@@ -41,6 +41,8 @@ export type SettlementRecord = {
   evidence_document_id: string | null;
   zoho_payment_id: string | null;
   zoho_published_at: string | null;
+  /** Per-order Zoho organisation; null/"" = the payout's. */
+  zoho_connection_id?: string | null;
   // Gateway fee / VAT / FX booking — see lib/finance/settlement-posting.ts.
   // The three id columns hold a Zoho id, or PENDING:<attempt> mid-write.
   zoho_claimed_at?: string | null;
@@ -118,6 +120,8 @@ export type ExistingSettlementRecord = Pick<
   // Which bank credit this record belongs to. Needed to tell a record that is
   // still live from one orphaned by a payout reassignment — see persistResults.
   | "bank_line_id"
+  // Which payout: records of different payouts are a split payment, not a conflict.
+  | "payout_id"
 >;
 
 export const SettlementsRepository = {
@@ -183,7 +187,7 @@ export const SettlementsRepository = {
       const { data, error } = await supabase
         .from("settlement_records")
         .select(
-          "id, order_uid, bank_line_id, evidence_type, evidence_confirmed, evidence_confirmed_by, evidence_confirmed_at, evidence_document_id, zoho_payment_id, zoho_published_at",
+          "id, order_uid, bank_line_id, payout_id, evidence_type, evidence_confirmed, evidence_confirmed_by, evidence_confirmed_at, evidence_document_id, zoho_payment_id, zoho_published_at",
         )
         .in("order_uid", orderUids.slice(i, i + 200));
       if (error) throw new Error(`settlement_records existing select failed: ${error.message}`);

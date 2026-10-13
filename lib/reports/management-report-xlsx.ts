@@ -110,6 +110,8 @@ const ORDER_COLS: Partial<ExcelJS.Column>[] = [
   { header: "Exchanges", key: "exch", width: 9 }, { header: "Exchange credit notes", key: "exchNotes", width: 18 }, { header: "Exchange extra collected", key: "exchExtra", width: 13 },
   { header: "Net sales AED", key: "net", width: 13 }, { header: "Gateway fee", key: "fee", width: 11 }, { header: "Received (bank)", key: "received", width: 13 },
   { header: "Receivable", key: "receivable", width: 12 }, { header: "Receivable — where", key: "bucket", width: 34 }, { header: "Age (days)", key: "age", width: 9 },
+  { header: "Zoho amount", key: "zohoAmt", width: 12 }, { header: "Zoho amount from", key: "zohoOrg", width: 16 },
+  { header: "Zoho invoices by organisation", key: "zohoByOrg", width: 48 },
   { header: "Issues", key: "issues", width: 60 },
 ];
 function orders(ws: ExcelJS.Worksheet, list: MrOrderLine[]) {
@@ -124,11 +126,36 @@ function orders(ws: ExcelJS.Worksheet, list: MrOrderLine[]) {
       gwRefund: l.refund.gatewayAed || null, gwDates: l.refund.gatewayDates.join(", "), zohoRefund: l.refund.zohoAed || null, zohoNotes: l.refund.zohoNotes.join(", "),
       sheetRefund: l.refund.sheetAed || null, sheetNote: l.refund.sheetNote, exch: l.exchange.count || null, exchNotes: l.exchange.zohoNotes.join(", "),
       exchExtra: l.exchange.extraAed || null, net: l.netSalesAed, fee: l.feeAed || null, received: l.receivedAed || null, receivable: l.receivableAed || null,
-      bucket: l.receivableBucket ? BUCKET_LABEL[l.receivableBucket] : "", age: l.ageDays, issues: l.issues.map((i) => i.text).join(" · "),
+      bucket: l.receivableBucket ? BUCKET_LABEL[l.receivableBucket] : "", age: l.ageDays,
+      zohoAmt: l.zoho?.amountAed ?? null, zohoOrg: l.zoho?.amountOrg ?? "",
+      zohoByOrg: (l.zoho?.byOrg ?? []).map((x) => `${x.org}: ${x.numbers.join("/")} = ${x.totalAed.toFixed(2)}`).join(" · "),
+      issues: l.issues.map((i) => i.text).join(" · "),
     });
   }
-  for (const k of ["gross", "refund", "gwRefund", "zohoRefund", "sheetRefund", "exchExtra", "net", "fee", "received", "receivable"]) ws.getColumn(k).numFmt = money;
+  for (const k of ["gross", "refund", "gwRefund", "zohoRefund", "sheetRefund", "exchExtra", "net", "fee", "received", "receivable", "zohoAmt"]) ws.getColumn(k).numFmt = money;
   ws.autoFilter = { from: "A1", to: { row: 1, column: ORDER_COLS.length } };
+}
+
+/** COD in both organisations: the summary, then one row per COD sale. */
+function codSheet(wb: ExcelJS.Workbook, r: ManagementReport) {
+  if (!r.cod?.orders) return;
+  const ws = wb.addWorksheet("COD by organisation");
+  ws.addRow([`COD sales — amount taken from ${r.cod.amountOrg}`]).font = { bold: true, size: 13 };
+  ws.addRow(["Store COD sales", r.cod.orders, r.cod.grossAed]);
+  ws.addRow([]);
+  ws.addRow(["Organisation", "Orders invoiced", "Invoiced AED", "Role"]).font = { bold: true };
+  for (const o of r.cod.byOrg) ws.addRow([o.org, o.orders, o.invoicedAed, o.org === r.cod.amountOrg ? "COD amount" : "intercompany copy"]);
+  ws.addRow([]);
+  if (r.cod.notInAmountOrg.length) ws.addRow([`Not invoiced in ${r.cod.amountOrg}`, r.cod.notInAmountOrg.join(", ")]);
+  ws.addRow([]);
+  const orgs = r.cod.byOrg.map((o) => o.org);
+  ws.addRow(["Order", "Day", "Store AED", ...orgs.map((o) => `${o} invoice`), ...orgs.map((o) => `${o} AED`), `Store − ${r.cod.amountOrg}`, "Ledger status"]).font = { bold: true };
+  for (const l of r.lines.filter((x) => x.stage === "sale" && x.gateway.trim().toUpperCase() === "COD")) {
+    const by = (o: string) => l.zoho.byOrg.find((x) => x.org === o);
+    const amt = by(r.cod.amountOrg)?.totalAed;
+    ws.addRow([l.order, l.day, l.grossAed, ...orgs.map((o) => by(o)?.numbers.join(", ") ?? ""), ...orgs.map((o) => by(o)?.totalAed ?? null), amt == null ? null : Math.round((l.grossAed - amt) * 100) / 100, l.ledgerStatus ?? ""]);
+  }
+  ws.columns.forEach((c, i) => { c.width = i === 0 ? 14 : 18; });
 }
 
 export function addManagementSheets(wb: ExcelJS.Workbook, r: ManagementReport) {
@@ -139,6 +166,7 @@ export function addManagementSheets(wb: ExcelJS.Workbook, r: ManagementReport) {
   orders(wb.addWorksheet("Cancellations"), r.lines.filter((l) => l.stage === "cancelled"));
   orders(wb.addWorksheet("Exchanges"), r.lines.filter((l) => l.exchange.count > 0));
   orders(wb.addWorksheet("Issues to fix"), r.lines.filter((l) => l.issues.length));
+  codSheet(wb, r);
   orders(wb.addWorksheet("All orders (management)"), r.lines);
 }
 

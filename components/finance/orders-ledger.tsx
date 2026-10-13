@@ -36,7 +36,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Check, ChevronDown, Loader2, MapPin, Package, PackageCheck, PackageOpen,
   Phone, Plus, Printer, Search, Truck, ArrowUpRight, BadgeCheck, RotateCw,
-  ExternalLink, ShieldCheck, XCircle, AlertTriangle,
+  ExternalLink, ShieldCheck, XCircle, AlertTriangle, ScanLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { OrderRow } from "@/lib/types/orders";
@@ -47,6 +47,8 @@ import { ShipModal } from "@/components/finance/ship-modal";
 import { FulfillmentSpine } from "./fulfillment-spine";
 import { GrossSalesStrip } from "./gross-sales-strip";
 import { MissingInZohoBar, OrderStatusTabs, type MissingInZoho, type OrderStatusTab } from "./order-status-tabs";
+import { broadcastBox, scanBeep, useBarcodeScanner } from "@/lib/hooks/use-barcode-scanner";
+import { boxSkuFor, normalizeScan } from "@/lib/scan/scan-code";
 
 // ── palette (self-contained; independent of workspace --tokens) ──
 const C = {
@@ -265,12 +267,14 @@ function ActionBar({
 
 // ── expanded body ───────────────────────────────────────────
 function ExpandedOrder({
-  order, onStageChanged, onFinanceChanged, onInvoice, onShip,
+  order, onStageChanged, onFinanceChanged, onInvoice, onShip, autoPack,
 }: {
   order: OrderRow;
   onStageChanged: (stage: string) => void;
   onFinanceChanged: (fs: FinanceStatus) => void;
   onInvoice: () => void; onShip: () => void;
+  /** Opened by a barcode scan: the Omniastores LLC pack panel opens and takes box scans. */
+  autoPack?: boolean;
 }) {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -376,17 +380,43 @@ function ExpandedOrder({
           onInvoice={onInvoice}
           onShip={onShip}
           wrap={wrap}
+          autoPack={autoPack}
         />
       </div>
     </motion.div>
   );
 }
 
+/** What the customer paid, the rate behind the AED above, and — for foreign
+ *  orders — the AED at Zoho's fixed rate when that differs. */
+function PaidLine({ order, fixedRate }: { order: OrderRow; fixedRate?: number }) {
+  const cur = (order.currency || "AED").toUpperCase();
+  const paid = Number(order.gross_original);
+  const aed = Number(order.gross_aed);
+  if (!Number.isFinite(paid) || paid <= 0) return null;
+  const rate = aed / paid;
+  const zohoAed = fixedRate != null ? Math.round(paid * fixedRate * 100) / 100 : null;
+  return (
+    <div style={{ marginTop: 3, fontSize: 11, color: C.dim, fontFeatureSettings: "'tnum'" }}>
+      Paid {cur} {money2(paid)}
+      {cur !== "AED" && <> · ×{rate.toFixed(4)} = AED {money2(aed)}</>}
+      {cur !== "AED" && fixedRate != null && Math.abs(fixedRate - rate) >= 0.00005 && (
+        <div title="Rate the Zoho sales order is closed at (Settings → fixed rates)">Zoho ×{fixedRate} = AED {money2(zohoAed!)}</div>
+      )}
+    </div>
+  );
+}
+
 // ── statement line ──────────────────────────────────────────
 const OrderCard = React.memo(function OrderCard({
-  order, isOpen, onToggleExpand, onStageChanged, onFinanceChanged, onInvoice, onShip, index,
+  order, isOpen, onToggleExpand, onStageChanged, onFinanceChanged, onInvoice, onShip, index, fixedRate, autoPack, scanned,
 }: {
   order: OrderRow; isOpen: boolean;
+  autoPack?: boolean;
+  /** Just scanned: highlighted so the packer sees which row the scanner picked. */
+  scanned?: boolean;
+  /** Zoho's fixed AED rate for this order's currency (Settings → salesorders.fixed_rates). */
+  fixedRate?: number;
   onToggleExpand: (uid: string) => void;
   onStageChanged: (stage: string) => void;
   onFinanceChanged: (fs: FinanceStatus) => void;
@@ -397,8 +427,9 @@ const OrderCard = React.memo(function OrderCard({
   const group = locationGroupFor(order.city);
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 8) * 0.04, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      style={{ position: "relative", background: C.card, borderRadius: 20, overflow: "hidden",
-        border: `1px solid ${isOpen ? s.edge : C.line}`, boxShadow: isOpen ? "0 18px 44px rgba(28,25,19,.10)" : "0 1px 2px rgba(28,25,19,.04)", transition: "border-color .25s, box-shadow .25s" }}>
+      id={`order-${order.uid}`}
+      style={{ position: "relative", background: C.card, borderRadius: 20, overflow: "hidden", scrollMarginTop: 90,
+        border: `1px solid ${scanned ? C.gild : isOpen ? s.edge : C.line}`, boxShadow: scanned ? "0 0 0 3px rgba(154,117,38,.22), 0 18px 44px rgba(28,25,19,.10)" : isOpen ? "0 18px 44px rgba(28,25,19,.10)" : "0 1px 2px rgba(28,25,19,.04)", transition: "border-color .25s, box-shadow .25s" }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: s.color, opacity: isOpen ? 1 : 0.55 }} />
       <button onClick={() => onToggleExpand(order.uid)}
         style={{ width: "100%", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 20, padding: "18px 24px 18px 22px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
@@ -423,6 +454,7 @@ const OrderCard = React.memo(function OrderCard({
             <span style={{ fontFamily: "'Newsreader',serif", fontStyle: "italic", fontSize: 14, color: C.faint }}>AED</span>
             <span style={{ fontFamily: "'Newsreader',serif", fontSize: 33, color: isOpen ? s.color : C.ink, letterSpacing: "-.01em", fontFeatureSettings: "'tnum'", transition: "color .25s" }}>{money2(Number(order.gross_aed))}</span>
           </div>
+          <PaidLine order={order} fixedRate={fixedRate} />
           <div style={{ marginTop: 4, fontSize: 11, color: C.dim, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
             {STAGES.find((x) => x.key === order.fulfillment_stage)?.label ?? "Processing"}
             <motion.span animate={{ rotate: isOpen ? 45 : 0 }} transition={{ duration: 0.25 }} style={{ display: "grid", placeItems: "center" }}><Plus size={13} color={C.faint} /></motion.span>
@@ -431,13 +463,13 @@ const OrderCard = React.memo(function OrderCard({
       </button>
       <AnimatePresence initial={false}>
         {isOpen && (
-          <ExpandedOrder order={order} onStageChanged={onStageChanged} onFinanceChanged={onFinanceChanged} onInvoice={onInvoice} onShip={onShip} />
+          <ExpandedOrder order={order} onStageChanged={onStageChanged} onFinanceChanged={onFinanceChanged} onInvoice={onInvoice} onShip={onShip} autoPack={autoPack} />
         )}
       </AnimatePresence>
     </motion.div>
   );
 }, (p, n) =>
-  p.order === n.order && p.isOpen === n.isOpen && p.index === n.index &&
+  p.order === n.order && p.isOpen === n.isOpen && p.index === n.index && p.autoPack === n.autoPack && p.scanned === n.scanned &&
   p.onInvoice === n.onInvoice && p.onShip === n.onShip);
 
 // ── liquidity ribbon ────────────────────────────────────────
@@ -523,6 +555,10 @@ export function OrdersLedger({
   const [shipFor, setShipFor] = useState<OrderRow | null>(null);
   const [stateFilter, setStateFilter] = useState<MoneyState | null>(null);
   const [overrides, setOverrides] = useState<Record<string, Partial<OrderRow>>>({});
+  const [fixedRates, setFixedRates] = useState<Record<string, number>>({});
+  useEffect(() => {
+    fetch("/api/sales-orders/rates").then((r) => r.json()).then((d) => setFixedRates(d.rates ?? {})).catch(() => {});
+  }, []);
   const [fulfillableFrom, setFulfillableFrom] = useState<"KSA" | "UAE" | null>(null);
   const [coverage, setCoverage] = useState({ ksa: 0, uae: 0, neither: 0 });
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
@@ -620,6 +656,52 @@ const generateDispatch = useCallback(async () => {
     setGenerating(false);
   }
 }, [selectedUids]);
+  // ── barcode scanner: scan an order → it opens; scan a box → +1 in its pack panel ──
+  const [scannedOrder, setScannedOrder] = useState<OrderRow | null>(null);
+  const [lastScan, setLastScan] = useState<{ code: string; ok: boolean; message: string; at: number } | null>(null);
+  const [manualCode, setManualCode] = useState("");
+  const scanBusy = React.useRef(false);
+  const handleScan = useCallback(async (raw: string) => {
+    const code = normalizeScan(raw);
+    if (!code) return;
+    const report = (ok: boolean, message: string) => {
+      scanBeep(ok);
+      setLastScan({ code, ok, message, at: Date.now() });
+      if (ok) toast.success(message, { duration: 1500 }); else toast.error(message);
+    };
+    const box = (sku: string) => {
+      const r = broadcastBox(sku);
+      if (!r.handled) report(false, `${sku}: scan an order first, then its boxes`);
+      else report(!/already invoiced|can't/i.test(r.message ?? ""), r.message ?? `+1 ${sku}`);
+    };
+    // Packaging boxes are known locally — instant, no round trip.
+    const local = boxSkuFor(code);
+    if (local) { box(local); return; }
+    if (scanBusy.current) return;
+    scanBusy.current = true;
+    try {
+      const res = await fetch(`/api/orders/scan?code=${encodeURIComponent(code)}`);
+      const d = await res.json().catch(() => ({ kind: "none" }));
+      if (d.kind === "box") box(d.sku);
+      else if (d.kind === "order") {
+        // Same row the list shows (finance state, payout…), read through the list API.
+        const hit = d.order as OrderRow;
+        const full = await fetch(`/api/orders?q=${encodeURIComponent(hit.order_number)}&days=0&limit=10`).then((r) => r.json()).catch(() => null);
+        const o = ((full?.orders ?? []) as OrderRow[]).find((x) => x.uid === hit.uid) ?? hit;
+        setScannedOrder(o);
+        setExpanded(o.uid);
+        report(true, `#${o.order_number} opened — scan its boxes`);
+        setTimeout(() => document.getElementById(`order-${o.uid}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+      } else if (d.kind === "many") report(false, `${code} matches ${d.orders.map((o: OrderRow) => o.order_number).join(", ")} — scan the full order number`);
+      else report(false, `Nothing matches "${code}"${d.error ? ` (${d.error})` : ""}`);
+    } catch (e) {
+      report(false, `Scan lookup failed: ${(e as Error).message}`);
+    } finally {
+      scanBusy.current = false;
+    }
+  }, []);
+  useBarcodeScanner(handleScan, !invoiceFor && !shipFor);
+
   const patch = useCallback((uid: string, fields: Partial<OrderRow>) =>
     setOverrides((p) => ({ ...p, [uid]: { ...p[uid], ...fields } })), []);
 
@@ -639,6 +721,7 @@ const generateDispatch = useCallback(async () => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap');
         .spin{animation:vspin 1s linear infinite;}@keyframes vspin{to{transform:rotate(360deg)}}
+        .scan-pulse{animation:vpulse 1.4s ease-in-out infinite}@keyframes vpulse{0%,100%{opacity:1}50%{opacity:.25}}
         @media(prefers-reduced-motion:reduce){.spin{animation-duration:.01ms}}
 
         /* The filter row referenced .filters/.tabs/.tab/.search as "workspace
@@ -781,6 +864,41 @@ const generateDispatch = useCallback(async () => {
             </button>
           </div>
         )}
+      {/* scanner */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10, padding: "8px 12px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, fontSize: 12, color: C.body }}>
+        <ScanLine size={15} color={C.mint} />
+        <span><b style={{ color: C.ink }}>Scanner ready</b> — scan an order (number / AWB), then each box (set box, bag, bangle box…).</span>
+        <span className="scan-pulse" style={{ width: 7, height: 7, borderRadius: 4, background: C.mint }} />
+        {lastScan && (
+          <span style={{ color: lastScan.ok ? C.mint : C.coral }}>
+            Last: <b style={{ fontFamily: "monospace" }}>{lastScan.code}</b> · {lastScan.message}
+          </span>
+        )}
+        <form data-scan-input onSubmit={(e) => { e.preventDefault(); if (manualCode.trim()) { handleScan(manualCode); setManualCode(""); } }} style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <input data-scan-input value={manualCode} onChange={(e) => setManualCode(e.target.value)} placeholder="Scan or type a code + Enter"
+            style={{ height: 30, width: 210, borderRadius: 8, border: `1px solid ${C.line2}`, padding: "0 10px", fontSize: 12, background: C.raise }} />
+        </form>
+      </div>
+
+      {/* the scanned order, when it isn't on this page of the list */}
+      {scannedOrder && !rows.some((r) => r.uid === scannedOrder.uid) && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ ...lbl, marginBottom: 8, display: "flex", justifyContent: "space-between" }}>
+            <span>Scanned order</span>
+            <button onClick={() => { setScannedOrder(null); setExpanded(null); }} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 11 }}>Close</button>
+          </div>
+          <OrderCard
+            order={{ ...scannedOrder, ...overrides[scannedOrder.uid] }} index={0} fixedRate={fixedRates[(scannedOrder.currency || "AED").toUpperCase()]}
+            isOpen={expanded === scannedOrder.uid} scanned autoPack
+            onToggleExpand={(uid) => setExpanded(expanded === uid ? null : uid)}
+            onStageChanged={(stage) => patch(scannedOrder.uid, { fulfillment_stage: stage })}
+            onFinanceChanged={(fs) => patch(scannedOrder.uid, { finance_status: fs })}
+            onInvoice={() => onInvoice(scannedOrder)}
+            onShip={() => onShip(scannedOrder)}
+          />
+        </div>
+      )}
+
       {/* ledger */}
       {!loading && rows.length === 0 ? (
         <div className="empty" style={{ marginTop: 14, padding: "56px 20px", textAlign: "center", color: C.dim, border: `1px dashed ${C.line2}`, borderRadius: 18, background: C.card }}>
@@ -813,8 +931,9 @@ const generateDispatch = useCallback(async () => {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <OrderCard
-                  order={o} index={i}
+                  order={o} index={i} fixedRate={fixedRates[(o.currency || "AED").toUpperCase()]}
                   isOpen={expanded === o.uid}
+                  scanned={scannedOrder?.uid === o.uid} autoPack={scannedOrder?.uid === o.uid}
                   onToggleExpand={(uid) => setExpanded(expanded === uid ? null : uid)}
                   onStageChanged={(stage) => patch(o.uid, { fulfillment_stage: stage })}
                   onFinanceChanged={(fs) => patch(o.uid, { finance_status: fs })}

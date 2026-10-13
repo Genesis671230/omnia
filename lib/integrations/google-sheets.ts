@@ -133,6 +133,19 @@ export async function readAllValues(tabName: string, spreadsheetId?: string): Pr
   return (json.values ?? []) as string[][];
 }
 
+// Several tabs in one call (values:batchGet), picked by title — the packing
+// sheet has 31 day tabs and reading them one by one trips the per-minute quota.
+export async function readTabsValues(spreadsheetId: string, pick: (title: string) => boolean): Promise<{ title: string; values: string[][] }[]> {
+  const titles = (await listTabNames(spreadsheetId)).filter(pick);
+  if (!titles.length) return [];
+  const token = await getAccessToken();
+  const qs = titles.map((t) => `ranges=${encodeURIComponent(`'${t.replace(/'/g, "''")}'!A1:F1200`)}`).join("&");
+  const res = await fetch(`${SHEETS_API}/${spreadsheetId}/values:batchGet?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Sheets batch read failed: ${json.error?.message || res.status}`);
+  return ((json.valueRanges ?? []) as { values?: string[][] }[]).map((r, i) => ({ title: titles[i], values: r.values ?? [] }));
+}
+
 // Numeric sheetId (gid) by title — needed for structural operations
 // (batchUpdate) that the values API's tab-name-in-range addressing can't do.
 async function getSheetId(tabName: string, spreadsheetId?: string): Promise<number> {
@@ -186,6 +199,52 @@ export async function appendRow(tabName: string, row: (string | number)[], sprea
   });
   const json = await res.json();
   if (!res.ok) throw new Error(`Sheets append failed (${tabName}): ${json.error?.message || res.status}`);
+}
+
+// Rows written at an explicit position (1-based start row), values kept
+// exactly as given (RAW: "10-Oct-26" stays text, not a re-formatted date).
+// Use this instead of append on tabs with blank separator rows: append's
+// table detection can pick an earlier block and overwrite the rows below it.
+export async function writeRows(tabName: string, startRow: number, rows: (string | number)[][], spreadsheetId?: string): Promise<void> {
+  if (rows.length === 0) return;
+  const id = resolveSpreadsheetId(spreadsheetId);
+  const token = await getAccessToken();
+  const range = encodeURIComponent(`'${tabName.replace(/'/g, "''")}'!A${startRow}`);
+  const res = await fetch(`${SHEETS_API}/${id}/values/${range}?valueInputOption=RAW`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ values: rows }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Sheets write failed (${tabName}): ${json.error?.message || res.status}`);
+}
+
+// Delete `count` whole rows starting at 1-based `startRow` (rows below move up).
+export async function deleteRows(tabName: string, startRow: number, count: number, spreadsheetId?: string): Promise<void> {
+  if (count <= 0) return;
+  const id = resolveSpreadsheetId(spreadsheetId);
+  const sheetId = await getSheetId(tabName, id);
+  const token = await getAccessToken();
+  const res = await fetch(`${SHEETS_API}/${id}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: startRow - 1, endIndex: startRow - 1 + count } } }] }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Sheets delete rows failed (${tabName}): ${json.error?.message || res.status}`);
+}
+
+// A new tab at `index` (0 = first). Fails if the title exists.
+export async function addTab(title: string, spreadsheetId?: string, index = 0): Promise<void> {
+  const id = resolveSpreadsheetId(spreadsheetId);
+  const token = await getAccessToken();
+  const res = await fetch(`${SHEETS_API}/${id}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title, index } } }] }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Sheets add tab failed (${title}): ${json.error?.message || res.status}`);
 }
 
 // 0-indexed column -> spreadsheet letter (0 -> A, 25 -> Z, 26 -> AA, ...).

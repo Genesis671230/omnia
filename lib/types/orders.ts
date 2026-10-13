@@ -47,6 +47,9 @@ export type OrderRow = {
   // before the bank credit for that payout has been reconciled. Real evidence,
   // but weaker than SETTLED, which means money actually landed in the bank.
   finance_status: "SETTLED" | "STRIPE_SETTLED" | "AWAITING_BANK" | "MISSING_PAYOUT" | "COD_PENDING";
+  /** Cancelled / returned / refunded / exchanged from the app (order_adjustments). */
+  ops_status?: string | null;
+  ops_credit_aed?: number | null;
 };
 
 // MISSING_PAYOUT reads as "Processing" here deliberately — most rows in this

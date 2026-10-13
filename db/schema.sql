@@ -1289,6 +1289,67 @@ create table if not exists zoho_creditnote_index (
 );
 create index if not exists zoho_creditnote_index_order_idx on zoho_creditnote_index (order_number);
 
+-- Order adjustments (2026-10-02): the founder marks an order cancelled /
+-- returned / refunded / exchanged from the app and its Zoho credit note
+-- (and, for an exchange, the replacement invoice) is raised on the spot.
+-- orders.ops_status carries the outcome so every sales view honours it
+-- (sale-rule: ops 'cancelled' is not a sale). Store syncs never write these
+-- columns. lib/orders/order-adjustment*.ts.
+alter table orders add column if not exists ops_status     text;
+alter table orders add column if not exists ops_credit_aed numeric;
+
+create table if not exists order_adjustments (
+  id                     uuid primary key default gen_random_uuid(),
+  tenant_id              text not null default 'omnia',
+  order_uid              text not null,
+  order_number           text not null,
+  store_id               text not null default '',
+  kind                   text not null,            -- cancelled | returned | refunded | exchanged
+  adjustment_date        date not null,
+  zoho_connection_id     text not null default 'env',
+  zoho_invoice_id        text,
+  zoho_invoice_number    text not null default '',
+  invoice_total          numeric not null default 0,
+  returned_lines         jsonb not null default '[]',
+  damage_aed             numeric not null default 0,
+  credit_aed             numeric not null default 0,
+  zoho_creditnote_id     text,                      -- PENDING:<uuid> while the write is in flight
+  zoho_creditnote_number text not null default '',
+  applied_to_invoice_aed numeric not null default 0,
+  exchange_lines         jsonb not null default '[]',
+  exchange_total         numeric not null default 0,
+  zoho_exchange_invoice_id     text,
+  zoho_exchange_invoice_number text not null default '',
+  applied_to_exchange_aed numeric not null default 0,
+  customer_owes_aed      numeric not null default 0,
+  refund_due_aed         numeric not null default 0,
+  mark_only              boolean not null default false,
+  note                   text not null default '',
+  status                 text not null default 'draft', -- draft | posted | error
+  error                  text,
+  created_by             text not null default '',
+  created_at             timestamptz not null default now(),
+  posted_at              timestamptz
+);
+create index if not exists order_adjustments_order_idx on order_adjustments (order_number);
+create index if not exists order_adjustments_uid_idx on order_adjustments (order_uid);
+
+-- "Received — close invoice" (2026-10-02): money for the order came in another
+-- way (paid with another order, by hand, bank transfer). One customer payment
+-- (reference MAN/<order>/PAY) closes the invoice; ops_status = 'received'.
+alter table order_adjustments add column if not exists received_aed       numeric not null default 0;
+alter table order_adjustments add column if not exists received_via       text not null default '';
+alter table order_adjustments add column if not exists deposit_account_id   text not null default '';
+alter table order_adjustments add column if not exists deposit_account_name text not null default '';
+alter table order_adjustments add column if not exists zoho_payment_id    text;
+
+-- Per-order Zoho organisation. A payout can carry orders from two companies
+-- (House of Omnia + Omniastores): each settlement row may close its invoice in
+-- its own books. Null = follow the payout's zoho_connection_id. Set when the
+-- founder picks an org on the order row, and pinned to the payout's org when an
+-- order is booked before the payout itself is switched (so it never moves).
+alter table settlement_records add column if not exists zoho_connection_id text;
+
 -- ── Settings & connections foundation (2026-10-07) ─────────────────────────
 -- docs/superpowers/specs/2026-10-07-settings-connections-foundation-design.md
 create table if not exists connections (
@@ -1348,3 +1409,53 @@ create table if not exists pending_grants (
   created_by  text not null,
   expires_at  timestamptz not null
 );
+
+-- KSA dispatch: an order (or the part of a split order) shipped from SMSA
+-- Fulfillment KSA — the packaging picked, the rows written to the KSA
+-- dispatch sheet, and the Zoho sales-order close. One row per order.
+create table if not exists order_ksa_dispatch (
+  order_uid        text primary key,
+  order_number     text not null,
+  ksa_skus         jsonb not null default '[]',
+  packaging        jsonb not null default '[]',
+  split            boolean not null default false,
+  ship_date        date not null,
+  sheet_tab        text,
+  sheet_start_row  integer,
+  sheet_rows       integer,
+  sheet_written_at timestamptz,
+  sheet_error      text,
+  zoho_outcome     text,
+  zoho_steps       jsonb not null default '[]',
+  zoho_issues      jsonb not null default '[]',
+  zoho_invoice     text,
+  zoho_error       text,
+  created_by       text not null,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+create index if not exists order_ksa_dispatch_ship_date_idx on order_ksa_dispatch (ship_date);
+alter table order_ksa_dispatch add column if not exists rate_override numeric;
+alter table order_ksa_dispatch add column if not exists match_order_total boolean not null default false;
+alter table order_ksa_dispatch add column if not exists uae_packaging jsonb not null default '[]';
+
+-- order_uae_pack: an order packed from Omniastores LLC (UAE warehouse) on the
+-- order page — boxes picked or scanned there, then the Zoho sales order closed
+-- from that warehouse. Its boxes win over the UAE packing sheet on /sales-orders.
+create table if not exists order_uae_pack (
+  order_uid         text primary key,
+  order_number      text not null,
+  packaging         jsonb not null default '[]',
+  pack_date         date not null,
+  rate_override     numeric,
+  match_order_total boolean not null default false,
+  zoho_outcome      text,
+  zoho_steps        jsonb not null default '[]',
+  zoho_issues       jsonb not null default '[]',
+  zoho_invoice      text,
+  zoho_error        text,
+  created_by        text not null,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+create index if not exists order_uae_pack_pack_date_idx on order_uae_pack (pack_date);

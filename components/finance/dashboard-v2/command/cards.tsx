@@ -8,7 +8,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, ImageOff, Loader2, Plane, Truck 
 import { useState } from "react";
 import type { LaneStats } from "@/lib/dashboard/command-center";
 import type { SkuRow } from "@/lib/orders/orders-analytics";
-import { compact, fmt, pct } from "../overview/kit";
+import { fmt, pct } from "../overview/kit";
 import { DARK_CARD } from "./funnel";
 
 const WHITE_CARD = "rounded-[30px] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_44px_-26px_rgba(15,23,42,0.22)]";
@@ -55,7 +55,7 @@ export function TopProducts({ skus, label }: { skus: SkuRow[] | null; label: str
                   <div className="text-[30px] font-light leading-none tabular-nums tracking-[-0.02em]">{fmt(cur.units)} <span className="text-[15px] text-white/60">sold</span></div>
                   <div className="mt-1.5 line-clamp-2 text-[12.5px] leading-snug text-white/70" title={cur.title}>{cur.title}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11.5px]">
-                    <span className="rounded-full bg-white px-2 py-0.5 font-medium text-[#1B1640]">AED {compact(cur.revenue)}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 font-medium text-[#1B1640]">AED {fmt(cur.revenue)}</span>
                     <span className={`rounded-full px-2 py-0.5 ${TREND[cur.trend].cls}`}>{TREND[cur.trend].label}</span>
                     {cur.stock != null && <span className="text-white/50">{fmt(cur.stock)} in stock</span>}
                   </div>
@@ -97,7 +97,7 @@ export function TopAds({ data, label }: { data: { ads: TopAd[]; totalValue?: num
           <h3 className="text-[22px] font-light tracking-[-0.02em] text-slate-900">Ads driving revenue</h3>
           <p className="mt-1 text-[12.5px] text-slate-500">Meta ads by purchase value the pixel attributes to them · {label}</p>
         </div>
-        {data?.totalValue ? <span className="text-[12.5px] text-slate-500">All ads: AED {compact(data.totalValue)} attributed</span> : null}
+        {data?.totalValue ? <span className="text-[12.5px] text-slate-500">All ads: AED {fmt(data.totalValue)} attributed</span> : null}
       </div>
       {!data ? (
         <div className="mt-6 flex items-center gap-2 text-[13px] text-slate-500"><Loader2 size={14} className="animate-spin" /> Reading Meta (first load takes ~20 s)…</div>
@@ -119,13 +119,13 @@ export function TopAds({ data, label }: { data: { ads: TopAd[]; totalValue?: num
                 <div className="truncate text-[13px] font-medium text-slate-900" title={a.name}>{a.name}</div>
                 <div className="truncate text-[11px] text-slate-500" title={a.campaign}>{a.campaign}</div>
                 <div className="mt-2 flex items-baseline justify-between text-[12px]">
-                  <span className="text-[16px] font-light tabular-nums text-slate-900">AED {compact(a.value)}</span>
+                  <span className="text-[16px] font-light tabular-nums text-slate-900">AED {fmt(a.value)}</span>
                   <span className="text-slate-500">{fmt(a.purchases)} buys</span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
                   <motion.div className="h-full rounded-full bg-gradient-to-r from-[#5B3DF5] to-[#F2705E]" initial={{ width: 0 }} animate={{ width: `${(a.value / maxValue) * 100}%` }} transition={{ duration: 0.9, delay: 0.2 + k * 0.05 }} />
                 </div>
-                <div className="mt-1 text-[11px] text-slate-400">Spend AED {compact(a.spend)}</div>
+                <div className="mt-1 text-[11px] text-slate-400">Spend AED {fmt(a.spend)}</div>
               </div>
             </motion.div>
           ))}
@@ -183,7 +183,7 @@ function LaneRow({ s, share, delay }: { s: LaneStats; share: number; delay: numb
       <div className="mt-4 grid grid-cols-3 gap-3 text-[12px]">
         <div>
           <div className="text-slate-500">Sales shipped</div>
-          <div className="mt-0.5 text-[15px] tabular-nums text-slate-900">AED {compact(s.salesAed)}</div>
+          <div className="mt-0.5 text-[15px] tabular-nums text-slate-900">AED {fmt(s.salesAed)}</div>
         </div>
         <div>
           <div className="text-slate-500">Courier fees</div>
@@ -193,7 +193,7 @@ function LaneRow({ s, share, delay }: { s: LaneStats; share: number; delay: numb
             </div>
           ) : (
             <div className="mt-0.5 text-[15px] tabular-nums text-slate-900" title={`From OnTrack COD vouchers covering ${s.feeOrders} orders`}>
-              AED {compact(s.feesAed)} <span className="text-[11.5px] text-slate-500">≈ {perOrder?.toFixed(0)}/order · {s.feeOrders} vouchered</span>
+              AED {fmt(s.feesAed)} <span className="text-[11.5px] text-slate-500">≈ {perOrder?.toFixed(0)}/order · {s.feeOrders} vouchered</span>
             </div>
           )}
         </div>
@@ -235,14 +235,14 @@ export function CourierLanes({ lanes, label }: { lanes: LaneStats[] | null; labe
 export function AdClicks({ ads, label }: { ads: { spend: number; value: number; impressions: number; clicks: number; landingPageViews: number; addToCart: number; checkout: number; purchases: number } | null; label: string }) {
   const per = (a: number, b: number) => (b ? a / b : null);
   const tiles = ads ? [
-    { k: "Spend", v: `AED ${compact(ads.spend)}`, s: `${compact(ads.impressions)} impressions` },
-    { k: "Clicks", v: compact(ads.clicks), s: `CTR ${((per(ads.clicks, ads.impressions) ?? 0) * 100).toFixed(2)}%` },
+    { k: "Spend", v: `AED ${fmt(ads.spend)}`, s: `${fmt(ads.impressions)} impressions` },
+    { k: "Clicks", v: fmt(ads.clicks), s: `CTR ${((per(ads.clicks, ads.impressions) ?? 0) * 100).toFixed(2)}%` },
     { k: "Cost per click", v: per(ads.spend, ads.clicks) == null ? "—" : `AED ${per(ads.spend, ads.clicks)!.toFixed(2)}`, s: `CPM AED ${((per(ads.spend, ads.impressions) ?? 0) * 1000).toFixed(0)}` },
-    { k: "Landing views", v: compact(ads.landingPageViews), s: `${pct(per(ads.landingPageViews, ads.clicks) ?? 0)} of clicks land` },
-    { k: "Add to cart", v: compact(ads.addToCart), s: `${pct(per(ads.addToCart, ads.landingPageViews) ?? 0)} of landings` },
-    { k: "Checkouts", v: compact(ads.checkout), s: `${pct(per(ads.checkout, ads.addToCart) ?? 0)} of carts` },
+    { k: "Landing views", v: fmt(ads.landingPageViews), s: `${pct(per(ads.landingPageViews, ads.clicks) ?? 0)} of clicks land` },
+    { k: "Add to cart", v: fmt(ads.addToCart), s: `${pct(per(ads.addToCart, ads.landingPageViews) ?? 0)} of landings` },
+    { k: "Checkouts", v: fmt(ads.checkout), s: `${pct(per(ads.checkout, ads.addToCart) ?? 0)} of carts` },
     { k: "Purchases", v: fmt(ads.purchases), s: `CPA AED ${per(ads.spend, ads.purchases)?.toFixed(0) ?? "—"}` },
-    { k: "Pixel value", v: `AED ${compact(ads.value)}`, s: `ROAS ${per(ads.value, ads.spend)?.toFixed(2) ?? "—"}×` },
+    { k: "Pixel value", v: `AED ${fmt(ads.value)}`, s: `ROAS ${per(ads.value, ads.spend)?.toFixed(2) ?? "—"}×` },
   ] : [];
   return (
     <div className={`${WHITE_CARD} h-full px-6 pb-6 pt-6`}>

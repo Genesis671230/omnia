@@ -63,10 +63,11 @@ async function handlePOST(request: Request) {
   if (!line) return NextResponse.json({ error: `No reconciliation line ${bankLineId}` }, { status: 404 });
   // Defence in depth: the org this request runs in (resolved from recon_lines)
   // must be the one on the freshly computed line's payout.
+  // Orders may carry their own org (mixed-company payout); the rest follow the
+  // payout's. This request books only the orders whose org is the one in scope.
   const lineOrg = line.payout?.zohoConnectionId || ENV_CONNECTION_ID;
-  if (lineOrg !== zohoConnectionId()) {
-    return NextResponse.json({ error: "This payout's Zoho organisation just changed — reopen the drawer and book again." }, { status: 409 });
-  }
+  const scopeOrg = zohoConnectionId();
+  const orgOf = (s: { zoho_connection_id?: string | null }) => s.zoho_connection_id || lineOrg;
   if (!line.confirmedBy) {
     return NextResponse.json({ error: "Confirm this settlement before recording payments." }, { status: 409 });
   }
@@ -78,7 +79,18 @@ async function handlePOST(request: Request) {
 
   const all = await SettlementsRepository.listByBankLineId(line.id);
   const wanted = settlementIds.length > 0 ? new Set(settlementIds) : null;
-  const settlements = deliveryOnly ? [] : all.filter((s) => !wanted || wanted.has(s.id));
+  const requested = deliveryOnly ? [] : all.filter((s) => !wanted || wanted.has(s.id));
+  const otherOrg = requested.filter((s) => orgOf(s) !== scopeOrg);
+  if (wanted && otherOrg.length) {
+    return NextResponse.json({
+      error: `${otherOrg.map((s) => s.order_number).join(", ")} close${otherOrg.length === 1 ? "s" : ""} in another organisation — book ${otherOrg.length === 1 ? "it" : "them"} with that organisation selected (or reopen the drawer if it just changed).`,
+    }, { status: 409 });
+  }
+  // "Book all" in one org leaves the other org's orders for their own run.
+  const settlements = requested.filter((s) => orgOf(s) === scopeOrg);
+  if ((deliveryOnly || settlementIds.length === 0) && lineOrg !== scopeOrg && settlements.length === 0) {
+    return NextResponse.json({ error: "Nothing on this payout closes in this organisation." }, { status: 409 });
+  }
   if (settlements.length === 0 && !deliveryOnly) {
     return NextResponse.json(
       { error: "No settlement records for this credit — run reconciliation again after the payout file upload." },
@@ -92,12 +104,14 @@ async function handlePOST(request: Request) {
       line,
       settlements,
       accounts,
+      inPayoutOrg: lineOrg === scopeOrg,
       referenceOverride: str(body.referenceNumberOverride) || undefined,
       dryRun,
       accessToken: await getAccessToken(),
       bookFeesOnExternallyPaid: body.bookFeesOnExternallyPaid === true,
-      // A single-order Record never books the voucher's delivery charges.
-      includeDelivery: deliveryOnly || settlementIds.length === 0,
+      // A single-order Record never books the voucher's delivery charges, and
+      // they belong to the payout's own org.
+      includeDelivery: (deliveryOnly || settlementIds.length === 0) && lineOrg === scopeOrg,
       deliveryIntercompany,
     });
     if (runId) {
@@ -119,6 +133,7 @@ async function handlePOST(request: Request) {
       wire,
       delivery,
       settlements: await SettlementsRepository.listByBankLineId(line.id),
+      skippedOtherOrg: otherOrg.map((s) => s.order_number),
     });
   } catch (e) {
     if (runId) await ZohoPublishRunsRepository.finish(runId, [], (e as Error).message).catch(() => {});
@@ -144,7 +159,11 @@ function parseIntercompany(v: unknown): DeliveryIntercompanyAccounts {
   return out;
 }
 
-// Multi-org: every Zoho call below runs in the organisation of the bankLineId's payout — lib/integrations/zoho-org.ts.
+// Multi-org: every Zoho call below runs in one organisation — `zohoOrg` when the
+// drawer books orders picked into another company's books, else the payout's
+// (lib/integrations/zoho-org.ts). handlePOST books only the orders in that org.
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  return runInZohoOrgOr400(await zohoOrgForBankLine(String(((await req.clone().json().catch(() => ({}))) as { bankLineId?: unknown }).bankLineId ?? "")), () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
+  const b = (await req.clone().json().catch(() => ({}))) as { bankLineId?: unknown; zohoOrg?: unknown };
+  const org = typeof b.zohoOrg === "string" && b.zohoOrg.trim() ? b.zohoOrg.trim() : await zohoOrgForBankLine(String(b.bankLineId ?? ""));
+  return runInZohoOrgOr400(org, () => (handlePOST as (r: Request, c: unknown) => Promise<Response>)(req, ctx));
 }

@@ -730,51 +730,26 @@ async function persistResults(lines: ReconLine[], orders: Awaited<ReturnType<typ
     );
     const existingById = new Map(existing.map((e) => [e.id, e]));
 
-    // An order must never hold two settlement records — that would mean two
-    // publishable Zoho Customer Payments for one sale. But "a record exists
-    // under a different id" has two very different causes:
-    //
-    //  * The other record is LIVE — its bank credit still claims this order.
-    //    A genuine conflict; leave both alone and keep the newer row out.
-    //  * The other record is ORPHANED — its bank credit no longer claims the
-    //    order, because payout assignment moved it to the credit that really
-    //    paid it. Its id embeds the old bank_line_id, so it can never be
-    //    reached again, and while it sits there it blocks the correct record
-    //    from ever being written. 37 of 53 settled credits had no settlement
-    //    record at all for exactly this reason.
-    //
-    // Orphans are superseded: the stale row is deleted and the correct one
-    // written, carrying the evidence forward. A row already published to Zoho
-    // is never touched — a booked payment is history.
-    const liveLineIds = new Set(lines.map((l) => l.id));
-    const foreign = new Set<string>();
-    const orphanedIds: string[] = [];
-    const evidenceByUid = new Map<string, (typeof existing)[number]>();
-    for (const e of existing) {
-      const candidate = settlementRows.find((r) => r.order_uid === e.order_uid);
-      if (!candidate || e.id === candidate.id) continue;
-      const stillLive = liveLineIds.has(e.bank_line_id) && e.bank_line_id !== candidate.bank_line_id
-        ? lines.some((l) => l.id === e.bank_line_id && l.resolvedOrders.includes(candidate.order_number))
-        : false;
-      if (e.zoho_payment_id || stillLive) {
-        foreign.add(e.order_uid);
-      } else {
-        orphanedIds.push(e.id);
-        evidenceByUid.set(e.order_uid, e); // carry the confirmation across
-      }
-    }
+    // Which existing records conflict with the ones computed now — see
+    // resolveSettlementConflicts(): one record per order PER PAYOUT, so an
+    // order paid half by Tabby and half by Stripe keeps a record on each.
+    const claims = (bankLineId: string, orderNumber: string) =>
+      lines.some((l) => l.id === bankLineId && l.resolvedOrders.includes(orderNumber));
+    const { blocked, orphanedIds, carryFrom } = resolveSettlementConflicts(settlementRows, existing, claims);
     if (orphanedIds.length > 0) {
       const removed = await SettlementsRepository.deleteOrphanedByIds(orphanedIds);
       if (removed > 0) {
         console.log(`[recon] superseded ${removed} settlement record(s) orphaned by payout reassignment`);
       }
     }
+    const existingByIdAll = new Map(existing.map((e) => [e.id, e]));
     const rows = settlementRows
-      .filter((r) => !foreign.has(r.order_uid))
+      .filter((r) => !blocked.has(r.id))
       .map((r) => {
         // Either this row's own prior state, or the state of the orphan it
         // supersedes — a founder's confirmation survives the move.
-        const prior = existingById.get(r.id) ?? evidenceByUid.get(r.order_uid);
+        const carried = carryFrom.get(r.id);
+        const prior = existingById.get(r.id) ?? (carried ? existingByIdAll.get(carried) : undefined);
         return prior
           ? {
               ...r,
@@ -976,4 +951,48 @@ export async function flagLine(bankLineId: string, flagged: boolean, note: strin
   if (error) throw new Error(`flag failed: ${error.message}`);
   await markReconDirty("flag");
   return { bankLineId, flagged };
+}
+
+
+/* ── settlement record conflicts ──────────────────────────────────────────
+ *
+ * One settlement record per order PER PAYOUT. An order paid half through one
+ * gateway and half through another (Tabby 534 + a Stripe top-up of 313.50 on
+ * an exchange) legitimately carries a record on each payout; each one books
+ * only what its gateway paid, against what is still open on the invoice.
+ *
+ * Against a record of the SAME payout (the same money) the old rules hold:
+ *   - it is LIVE (its bank credit still claims the order) or already booked in
+ *     Zoho → the new row is blocked, so one payment can never be booked twice;
+ *   - otherwise it is ORPHANED (payout reassignment moved the order to the
+ *     credit that really paid it) → deleted and superseded, its evidence and
+ *     confirmation carried to the new row.
+ * A record of a DIFFERENT payout is left alone while its credit still claims
+ * the order or it is booked; a stale, unbooked one is cleaned up, carrying
+ * nothing across (it was other money).
+ */
+export function resolveSettlementConflicts(
+  candidates: { id: string; order_uid: string; order_number: string; bank_line_id: string; payout_id: string | null }[],
+  existing: { id: string; order_uid: string; bank_line_id: string; payout_id?: string | null; zoho_payment_id: string | null }[],
+  claims: (bankLineId: string, orderNumber: string) => boolean,
+): { blocked: Set<string>; orphanedIds: string[]; carryFrom: Map<string, string> } {
+  const blocked = new Set<string>();
+  const orphaned = new Set<string>();
+  const carryFrom = new Map<string, string>();
+  const candidateIds = new Set(candidates.map((c) => c.id));
+  for (const c of candidates) {
+    for (const e of existing) {
+      if (e.order_uid !== c.order_uid || e.id === c.id || candidateIds.has(e.id)) continue;
+      const samePayout = !e.payout_id || !c.payout_id || e.payout_id === c.payout_id;
+      const live = e.bank_line_id !== c.bank_line_id && claims(e.bank_line_id, c.order_number);
+      const booked = !!e.zoho_payment_id;
+      if (samePayout) {
+        if (booked || live) blocked.add(c.id);
+        else { orphaned.add(e.id); if (!carryFrom.has(c.id)) carryFrom.set(c.id, e.id); }
+      } else if (!booked && !claims(e.bank_line_id, c.order_number)) {
+        orphaned.add(e.id);
+      }
+    }
+  }
+  return { blocked, orphanedIds: [...orphaned], carryFrom };
 }

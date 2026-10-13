@@ -13,11 +13,11 @@ import { GatewayDonut } from "./gateway-donut";
 import { FILL, ProgressRing, aed, compact, gatewayColor, pct } from "./kit";
 
 const STATUS_COLOR: Record<LedgerStatus, string> = {
-  received: "#10B981", in_review: "#F59E0B", awaiting_bank: "#3B82F6", awaiting_payout: "#06B6D4", no_payout_file: "#F43F5E", cod: "#A855F7",
+  received: "#10B981", in_review: "#F59E0B", awaiting_bank: "#3B82F6", awaiting_payout: "#06B6D4", no_payout_file: "#F43F5E", cod: "#A855F7", adjusted: "#94A3B8",
 };
 const STATUS_LABEL: Record<LedgerStatus, string> = {
   received: "Received in bank", in_review: "Needs confirming", awaiting_bank: "Awaiting bank credit",
-  awaiting_payout: "Charged · payout pending", no_payout_file: "Payout file not uploaded", cod: "Cash on delivery",
+  awaiting_payout: "Charged · payout pending", no_payout_file: "Payout file not uploaded", cod: "Cash on delivery", adjusted: "Returned / refunded",
 };
 
 export function DayCharts({ day, onFilter }: { day: LedgerDay; onFilter: (s: LedgerStatus, gateway?: string) => void }) {

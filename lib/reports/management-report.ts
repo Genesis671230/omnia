@@ -26,7 +26,9 @@ export type MrStoreOrder = SaleRuleOrder & {
 /** The sales ledger's reconciliation of a counted order. */
 export type MrLedger = { status: string; feeAed: number; receivedAed: number; payoutId: string | null; bankDate: string | null };
 export type MrGatewayRefund = { order: string; amountAed: number; date: string | null; payoutId: string; gateway: string };
-export type MrCreditNote = { number: string; date: string; total: number; reference: string };
+export type MrCreditNote = { number: string; date: string; total: number; reference: string; org?: string };
+/** A posted app adjustment (order_adjustments). */
+export type MrAdjustment = { kind: "cancelled" | "returned" | "refunded" | "exchanged" | "received"; creditAed: number; creditNote: string; exchangeTotalAed: number; date: string };
 
 export type ReceivableBucket = "cod_courier" | "no_payout_file" | "awaiting_payout" | "awaiting_bank" | "in_review";
 export const BUCKET_LABEL: Record<ReceivableBucket, string> = {
@@ -64,12 +66,20 @@ export type MrOrderLine = {
   dashboardSale: boolean;
   stage: "failed_unpaid" | "cancelled" | "sale";
   grossAed: number;
-  cancelledBy: "store" | "sheet" | null;
+  cancelledBy: "store" | "sheet" | "app" | null;
+  /** Cancelled / returned / refunded / exchanged from the app. */
+  adjustment: MrAdjustment | null;
+  /** The sales ledger's status for the order (null when not a counted sale). */
+  ledgerStatus: string | null;
   refund: {
-    officialAed: number; source: "gateway" | "zoho" | "sheet" | null; paidMonth: string | null;
+    officialAed: number; source: "gateway" | "zoho" | "sheet" | "app" | null; paidMonth: string | null;
     gatewayAed: number; gatewayDates: string[]; zohoAed: number; zohoNotes: string[]; sheetAed: number; sheetNote: string;
   };
-  exchange: { count: number; zohoNotes: string[]; sheetRows: number; extraAed: number };
+  exchange: { count: number; zohoNotes: string[]; sheetRows: number; extraAed: number; /** Valued credit note applied to the replacement invoice — not a refund. */ creditAed?: number };
+  /** Zoho invoices per organisation. COD orders live in two sets of books
+   *  (House of Omnia's real invoice + Omniastores' intercompany copy), so the
+   *  report shows both and takes the amount from the COD organisation. */
+  zoho: { byOrg: MrOrgInvoices[]; amountAed: number | null; amountOrg: string | null };
   netSalesAed: number;
   feeAed: number;
   receivedAed: number;
@@ -80,6 +90,17 @@ export type MrOrderLine = {
 };
 
 type Money = { orders: number; aed: number };
+export type MrOrgInvoices = { org: string; numbers: string[]; totalAed: number };
+export type CodByOrg = {
+  /** The organisation COD amounts are taken from (House of Omnia). */
+  amountOrg: string;
+  orders: number; grossAed: number;
+  byOrg: { org: string; orders: number; invoicedAed: number }[];
+  /** COD sales with no invoice in the COD organisation. */
+  notInAmountOrg: string[];
+  /** Store amount vs the COD organisation's invoice, where they differ by > AED 1. */
+  mismatches: { order: string; storeAed: number; zohoAed: number }[];
+};
 export type GatewayLine = {
   gateway: string; orders: number; grossAed: number; cancelled: Money; refunds: Money; exchanges: number; netSalesAed: number;
   receivedAed: number; receivableAed: number; feeAed: number; refundRatePct: number | null;
@@ -100,6 +121,8 @@ export type ManagementReport = {
   refundsPaidThisMonth: { orders: number; aed: number; ofEarlierMonths: number };
   exchanges: { orders: number; events: number; valueOfOrdersAed: number; extraCollectedAed: number; reinvoicedInZoho: number };
   byGateway: GatewayLine[];
+  /** COD orders across both organisations (amounts from the COD org). */
+  cod: CodByOrg;
   issues: { key: IssueKey; label: string; orders: string[] }[];
   lines: MrOrderLine[];
 };
@@ -120,7 +143,11 @@ export function buildManagementReport(input: {
   sheet: SheetRow[];                    // dispatch rows for these orders, any month
   refundsPaidInMonth: MrGatewayRefund[]; // all gateway refunds whose money went out this month (any order month)
   orderMonthOf: Map<string, string>;    // order → its month, for refundsPaidInMonth
+  adjustments?: Map<string, MrAdjustment>; // posted app adjustments by order number
+  invoicesByOrg?: Map<string, MrOrgInvoices[]>; // order → live Zoho invoices per organisation
+  codOrg?: string;                      // organisation COD amounts come from (default "House of Omnia")
 }): ManagementReport {
+  const codOrg = input.codOrg ?? "House of Omnia";
   const sheetBy = new Map<string, SheetRow[]>();
   for (const s of input.sheet) sheetBy.set(norm(s.order), [...(sheetBy.get(norm(s.order)) ?? []), s]);
   const refundsBy = new Map<string, MrGatewayRefund[]>();
@@ -136,7 +163,15 @@ export function buildManagementReport(input: {
     const rows = sheetBy.get(k) ?? [];
     const saleRows = rows.filter((r) => r.kind === "sale" || r.kind === "refunded" || r.kind === "partial_refund" || r.kind === "cancelled");
     const exchRows = rows.filter((r) => r.kind === "exchange" || r.kind === "repair");
-    const cns = input.creditNotes.get(k) ?? [];
+    const adj = input.adjustments?.get(k) ?? null;
+    // An exchange's credit note is the returned item going onto the new
+    // invoice — never a refund.
+    const isCodOrder = (o.gateway || "").trim().toUpperCase() === "COD";
+    const allCns = (input.creditNotes.get(k) ?? []).filter((c) => !(adj?.kind === "exchanged" && adj.creditNote && c.number === adj.creditNote));
+    // COD returns are credited in the COD org; the other org's copy is intercompany.
+    const cns = isCodOrder && allCns.some((c) => c.org === codOrg) ? allCns.filter((c) => c.org === codOrg) : allCns;
+    const orgInvoices = input.invoicesByOrg?.get(k) ?? [];
+    const amountInv = isCodOrder ? orgInvoices.find((x) => x.org === codOrg) ?? null : orgInvoices[0] ?? null;
     const issues: Issue[] = [];
     const flag = (key: IssueKey, text = ISSUE_LABEL[key]) => issues.push({ key, text });
 
@@ -144,6 +179,7 @@ export function buildManagementReport(input: {
     let stage: MrOrderLine["stage"];
     let cancelledBy: MrOrderLine["cancelledBy"] = null;
     if (fs === "cancelled" || fs === "voided") { stage = "cancelled"; cancelledBy = "store"; }
+    else if (adj?.kind === "cancelled" || (o.ops_status || "").toLowerCase() === "cancelled") { stage = "cancelled"; cancelledBy = "app"; }
     else if (!isCountedSale(o)) stage = fs === "refunded" ? "sale" : "failed_unpaid";
     else if (saleRows.some((r) => r.kind === "cancelled")) { stage = "cancelled"; cancelledBy = "sheet"; flag("cancelled_in_sheet_only"); }
     else stage = "sale";
@@ -158,10 +194,22 @@ export function buildManagementReport(input: {
     const sheetRefundRow = saleRows.find((r) => r.kind === "refunded" || r.kind === "partial_refund");
     const sheetAed = r2(saleRows.reduce((s, r) => s + (r.kind === "refunded" || r.kind === "partial_refund" ? r.cancelledRefundedAed ?? 0 : 0), 0));
     let official = 0;
+    let exchangeCreditAed = 0;
     let source: MrOrderLine["refund"]["source"] = null;
     let paidMonth: string | null = null;
     if (stage === "sale") {
       if (gatewayAed > 0) { official = gatewayAed; source = "gateway"; paidMonth = gw.map((g) => g.date).filter(Boolean).sort()[0]?.slice(0, 7) ?? null; }
+      else if (adj && (adj.kind === "returned" || adj.kind === "refunded") && adj.creditAed > 0) {
+        // Raised from the app with the founder's amount (COD return, damage
+        // deducted…) — no gateway money moves for it, so it is the official refund.
+        official = adj.creditAed; source = "app"; paidMonth = adj.date.slice(0, 7);
+      }
+      // A valued credit note with no gateway refund on an EXCHANGE (the sheet
+      // logs an exchange shipment, or the order has a replacement invoice in the
+      // same books) is the returned item credited onto the new invoice — no
+      // money went back, so it is not a refund. 15 of September's 19
+      // "Zoho-only refunds" (AED 17,668) were exactly this.
+      else if (zohoAed > 0 && sheetAed === 0 && (exchRows.length > 0 || Math.max(0, ...orgInvoices.map((x) => x.numbers.length)) > 1 || (input.invoiceCounts.get(k) ?? 0) > 1)) { exchangeCreditAed = zohoAed; }
       else if (zohoAed > 0) { official = zohoAed; source = "zoho"; paidMonth = valuedCn.map((c) => c.date).sort()[0]?.slice(0, 7) ?? null; flag("refund_no_gateway"); }
       else if (sheetAed > 0) { official = sheetAed; source = "sheet"; flag("refund_sheet_only"); }
       else if (fs === "refunded" || fs === "partially_refunded") flag("store_refunded_no_amount", `Store says ${fs}, no refund amount anywhere`);
@@ -171,14 +219,19 @@ export function buildManagementReport(input: {
         if (zohoAed === 0) flag("no_credit_note");
         if (sheetAed > 0 && !near(sheetAed, gatewayAed)) flag("sheet_ne_gateway", `Sheet refund ${sheetAed} ≠ gateway refund ${gatewayAed}`);
       }
-      if (official > 0 && (fs === "paid" || fs === "pending")) flag("store_not_updated", `Refunded, but the store still says ${fs}`);
+      if (official > 0 && source !== "app" && (fs === "paid" || fs === "pending")) flag("store_not_updated", `Refunded, but the store still says ${fs}`);
     }
 
     // exchanges
     const zeroCn = cns.filter((c) => c.total <= 0.005);
-    const exchCount = Math.max(zeroCn.length, exchRows.length);
-    const extraAed = r2(exchRows.reduce((s, r) => s + (r.amountAed ?? 0), 0));
-    if (exchCount && (input.invoiceCounts.get(k) ?? 0) > 1) flag("exchange_reinvoiced");
+    const appExchange = adj?.kind === "exchanged";
+    const exchCount = Math.max(zeroCn.length, exchRows.length, appExchange ? 1 : 0);
+    const extraAed = r2(exchRows.reduce((s, r) => s + (r.amountAed ?? 0), 0) + (appExchange ? Math.max(0, adj!.exchangeTotalAed - adj!.creditAed) : 0));
+    // The app's exchange invoice carries the returned item's credit note, so Zoho does not count the sale twice.
+    // Twice in ONE organisation is a re-invoice; a COD order's House of Omnia
+    // invoice + Omniastores intercompany copy is not.
+    const perOrgMax = orgInvoices.length ? Math.max(...orgInvoices.map((x) => x.numbers.length)) : input.invoiceCounts.get(k) ?? 0;
+    if (exchCount && !appExchange && perOrgMax > 1) flag("exchange_reinvoiced");
 
     const isSale = stage === "sale";
     const net = isSale ? r2(gross - official) : 0;
@@ -191,8 +244,10 @@ export function buildManagementReport(input: {
     lines.push({
       order: o.order_number, day, store: o.store_id, gateway: o.gateway || "Unknown", customer: o.customer_name ?? "", country: (o.country ?? "").toUpperCase(),
       currency: (o.currency ?? "AED").toUpperCase(), storeStatus: fs, dashboardSale: isCountedSale(o), stage, grossAed: gross, cancelledBy,
+      adjustment: adj, ledgerStatus: l?.status ?? null,
       refund: { officialAed: r2(official), source, paidMonth, gatewayAed, gatewayDates: gw.map((g) => g.date ?? "").filter(Boolean), zohoAed, zohoNotes: valuedCn.map((c) => c.number), sheetAed, sheetNote: sheetRefundRow?.comments ?? "" },
-      exchange: { count: exchCount, zohoNotes: zeroCn.map((c) => c.number), sheetRows: exchRows.length, extraAed },
+      exchange: { count: Math.max(exchCount, exchangeCreditAed > 0 ? 1 : 0), zohoNotes: [...zeroCn.map((c) => c.number), ...(exchangeCreditAed > 0 ? valuedCn.map((c) => c.number) : [])], sheetRows: exchRows.length, extraAed, creditAed: exchangeCreditAed },
+      zoho: { byOrg: orgInvoices, amountAed: amountInv ? r2(amountInv.totalAed) : null, amountOrg: amountInv?.org ?? (isCodOrder ? codOrg : null) },
       netSalesAed: net, feeAed: fee, receivedAed: received, receivableAed: r2(receivable), receivableBucket: bucket,
       ageDays: bucket ? daysBetween(day, input.today) : null, issues,
     });
@@ -250,7 +305,25 @@ export function buildManagementReport(input: {
   const issues = [...issueMap].map(([key, orders]) => ({ key, label: ISSUE_LABEL[key], orders })).sort((a, b) => b.orders.length - a.orders.length);
 
   const m = (p: (l: MrOrderLine) => boolean): Money => ({ orders: cnt(p), aed: sum((l) => l.grossAed, p) });
+  const codSales = lines.filter((l) => sale(l) && l.gateway.trim().toUpperCase() === "COD");
+  const codOrgMap = new Map<string, { org: string; orders: number; invoicedAed: number }>();
+  for (const l of codSales) for (const x of l.zoho.byOrg) {
+    const c = codOrgMap.get(x.org) ?? { org: x.org, orders: 0, invoicedAed: 0 };
+    c.orders += 1; c.invoicedAed = r2(c.invoicedAed + x.totalAed);
+    codOrgMap.set(x.org, c);
+  }
+  const cod: CodByOrg = {
+    amountOrg: codOrg,
+    orders: codSales.length,
+    grossAed: r2(codSales.reduce((t, l) => t + l.grossAed, 0)),
+    byOrg: [...codOrgMap.values()].sort((a, b) => (a.org === codOrg ? -1 : b.org === codOrg ? 1 : b.invoicedAed - a.invoicedAed)),
+    notInAmountOrg: codSales.filter((l) => !l.zoho.byOrg.some((x) => x.org === codOrg)).map((l) => l.order),
+    mismatches: codSales
+      .filter((l) => l.zoho.amountAed != null && l.zoho.amountOrg === codOrg && Math.abs(l.zoho.amountAed - l.grossAed) > 1)
+      .map((l) => ({ order: l.order, storeAed: l.grossAed, zohoAed: l.zoho.amountAed! })),
+  };
   return {
+    cod,
     month: input.month, asOf: input.today,
     fromDashboard: {
       dashboard: m((l) => l.dashboardSale),
@@ -272,12 +345,13 @@ export function buildManagementReport(input: {
         const got = (l: MrOrderLine) => sale(l) && !l.receivableBucket;
         const received = sum((l) => l.receivedAed, got);
         const fees = sum((l) => l.feeAed, got);
-        const refundsOnReceived = sum((l) => l.refund.officialAed, got);
+        // A sale returned before any money moved ("adjusted") has no cash on either side.
+        const refundsOnReceived = sum((l) => l.refund.officialAed, (l) => got(l) && l.ledgerStatus !== "adjusted");
         const receivable = sum((l) => l.receivableAed);
         const net = sum((l) => l.netSalesAed, sale);
         return {
           receivedAed: received, feesOnReceivedAed: fees, refundsOnReceivedAed: refundsOnReceived, receivableAed: receivable, netSalesAed: net,
-          fxOtherAed: r2(net - received - fees + refundsOnReceived - receivable),
+          fxOtherAed: r2(net - received - fees + refundsOnReceived - receivable - sum((l) => l.netSalesAed, (l) => got(l) && l.ledgerStatus === "adjusted")),
           expectedFeesOnReceivableAed: sum((l) => l.feeAed, (l) => Boolean(l.receivableBucket)),
         };
       })(),

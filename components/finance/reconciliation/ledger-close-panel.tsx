@@ -87,6 +87,13 @@ export function LedgerClosePanel({ month, gateways, flags, totals, onFocus }: {
   const recTotal = gateways.reduce((t, g) => t + g.reconciled, 0);
   const pendTotal = gateways.reduce((t, g) => t + g.pending, 0);
   const pct = recTotal + pendTotal > 0 ? Math.round((recTotal / (recTotal + pendTotal)) * 1000) / 10 : 100;
+  // What still has to move before the ledger closes: every clearing account
+  // must end at zero, so the remaining amount is the sum of their balances
+  // (either sign — money parked or over-cleared). Pending is this month's part.
+  const leftOf = (g: GatewayRecon) => Math.abs(g.balance ?? g.pending);
+  const remaining = Math.round(gateways.reduce((t, g) => t + leftOf(g), 0) * 100) / 100;
+  const blockingAed = flags.filter((f) => f.severity === "critical").reduce((t, f) => t + Math.abs(f.amount), 0);
+  const openAccounts = gateways.filter((g) => leftOf(g) >= 1).sort((a, b) => leftOf(b) - leftOf(a));
 
   const askAi = async () => {
     setAsking(true); setPlanErr(null);
@@ -117,6 +124,28 @@ export function LedgerClosePanel({ month, gateways, flags, totals, onFocus }: {
   };
 
   return (
+    <div className="space-y-4">
+    {/* ── Remaining to close ── */}
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-[#D8E1F1] bg-white px-5 py-4 shadow-sm">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#5E6B85]">Remaining to close the ledger</div>
+        <div className={`mt-0.5 font-mono text-[26px] tabular-nums tracking-[-0.02em] ${remaining >= 1 ? "text-[#8A5A14]" : "text-[#4B7A54]"}`}>{remaining >= 1 ? aed2(remaining) : "AED 0.00 — closed"}</div>
+        <div className="text-[12px] text-[#5E6B85]">
+          sum of clearing balances still to reach zero · {aed2(pendTotal)} pending this month{critical ? ` · ${critical} blocking item${critical === 1 ? "" : "s"} (${aed2(blockingAed)})` : ""}
+        </div>
+      </div>
+      {openAccounts.length > 0 && (
+        <ul className="flex flex-1 flex-wrap gap-2">
+          {openAccounts.map((g) => (
+            <li key={g.accountId} className="inline-flex items-center gap-2 rounded-full bg-[#F3F6FC] px-3 py-1.5 text-[12px] ring-1 ring-inset ring-[#D8E1F1]">
+              <i className="h-2 w-2 rounded-full" style={{ background: gatewayColor(g.gateway) }} aria-hidden />
+              <span className="text-[#0F1B3D]">{g.name}</span>
+              <span className="font-mono tabular-nums text-[#8A5A14]">{aed2(leftOf(g))}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       {/* ── Gateways ── */}
       <div className="overflow-hidden rounded-2xl border border-[#D8E1F1] bg-white shadow-sm">
@@ -139,6 +168,7 @@ export function LedgerClosePanel({ month, gateways, flags, totals, onFocus }: {
                 <th className={`${th} text-right`}>Pending</th>
                 <th className={`${th} text-left`}>Progress</th>
                 <th className={`${th} text-right`}>Balance now</th>
+                <th className={`${th} text-right`}>Left to close</th>
                 <th className={`${th} text-left`}>Status</th>
               </tr>
             </thead>
@@ -161,6 +191,7 @@ export function LedgerClosePanel({ month, gateways, flags, totals, onFocus }: {
                     </div>
                   </td>
                   <td className={`${num} ${Math.abs(g.balance ?? 0) >= 1 ? "text-[#8A5A14]" : "text-[#0F1B3D]"}`}>{g.balance != null ? aed2(g.balance) : "—"}</td>
+                  <td className={`${num} font-medium ${leftOf(g) >= 1 ? "text-[#8A5A14]" : "text-[#4B7A54]"}`}>{leftOf(g) >= 1 ? aed2(leftOf(g)) : "✓"}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${STATUS[g.status].cls}`}>{STATUS[g.status].label}</span>
                   </td>
@@ -232,6 +263,7 @@ export function LedgerClosePanel({ month, gateways, flags, totals, onFocus }: {
           </ul>
         )}
       </div>
+    </div>
     </div>
   );
 }

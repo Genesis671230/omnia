@@ -32,6 +32,7 @@ const json = (raw: string) => JSON.parse(raw);
 const minutes = z.number().int().positive().nullable();
 const hour = z.number().int().min(0).max(23).nullable();
 const CURRENCIES = ["AED", "SAR", "KWD", "QAR", "BHD", "OMR", "USD"] as const;
+const UAE_TREATMENTS = ["vat_registered", "vat_not_registered", "gcc_vat_registered", "gcc_vat_not_registered", "non_gcc", "dz_vat_registered", "dz_vat_not_registered"] as const;
 const INDUSTRIES = ["ecommerce", "wholesale", "construction", "logistics", "services"] as const;
 
 export const SETTINGS: SettingDef<any>[] = [
@@ -54,6 +55,28 @@ export const SETTINGS: SettingDef<any>[] = [
   { key: "zoho.expense_accounts_by_kind", group: "accounting", label: "Expense accounts by kind", kind: "json", schema: z.record(z.string()), default: {}, legacyEnv: "ZOHO_EXPENSE_ACCOUNTS_BY_KIND", parseEnv: json },
   { key: "zoho.default_income_account_id", group: "accounting", label: "Default income account id", kind: "text", schema: z.string(), default: "", legacyEnv: "ZOHO_DEFAULT_INCOME_ACCOUNT_ID" },
   { key: "zoho.daily_budget", group: "accounting", label: "Zoho daily API budget (default org)", kind: "number", schema: z.number().int().positive(), default: 7000, legacyEnv: "ZOHO_DAILY_BUDGET", parseEnv: intOr(7000) },
+
+  // ── sales orders (daily close from the packing sheet) ───────────────
+  { key: "salesorders.fixed_rates", group: "accounting", label: "Sales orders: fixed AED rates", help: "Foreign orders are entered in AED at these rates.", kind: "json", schema: z.record(z.number().positive()), default: { AED: 1, SAR: 0.98, KWD: 11.99, QAR: 1, OMR: 9.54, USD: 3.67 } },
+  { key: "salesorders.uae_tax_treatment", group: "accounting", label: "Sales orders: UAE tax treatment", kind: "select", options: [...UAE_TREATMENTS], schema: z.enum(UAE_TREATMENTS), default: "vat_not_registered" },
+  { key: "salesorders.uae_tax_name", group: "accounting", label: "Sales orders: UAE tax (Zoho tax name)", kind: "text", schema: z.string().min(1), default: "Standard Rate" },
+  { key: "salesorders.gcc_tax_treatment", group: "accounting", label: "Sales orders: GCC tax treatment", kind: "select", options: [...UAE_TREATMENTS], schema: z.enum(UAE_TREATMENTS), default: "gcc_vat_not_registered" },
+  { key: "salesorders.gcc_tax_name", group: "accounting", label: "Sales orders: GCC tax (Zoho tax name)", kind: "text", schema: z.string().min(1), default: "Zero Rate" },
+  { key: "salesorders.intl_tax_treatment", group: "accounting", label: "Sales orders: outside-GCC tax treatment", kind: "select", options: [...UAE_TREATMENTS], schema: z.enum(UAE_TREATMENTS), default: "non_gcc" },
+  { key: "salesorders.intl_tax_name", group: "accounting", label: "Sales orders: outside-GCC tax (Zoho tax name)", kind: "text", schema: z.string().min(1), default: "Zero Rate" },
+  { key: "salesorders.invoice_date_source", group: "accounting", label: "Sales orders: invoice date", help: "order = the store order's Dubai date; dispatch = the packing-sheet day; salesorder = the SO's own date.", kind: "select", options: ["order", "dispatch", "salesorder"], schema: z.enum(["order", "dispatch", "salesorder"]), default: "order" },
+  { key: "salesorders.mark_sent", group: "accounting", label: "Sales orders: mark invoice as sent", kind: "toggle", schema: z.boolean(), default: true },
+  { key: "salesorders.warehouse_id", group: "accounting", label: "Sales orders: default warehouse id", help: "Used for packaging when the SO has no warehouse on its lines.", kind: "text", schema: z.string().min(1), default: "2330082000000980131" },
+  { key: "salesorders.max_per_run", group: "accounting", label: "Sales orders: max closed per run", kind: "number", schema: z.number().int().min(1).max(25), default: 10 },
+  { key: "salesorders.amount_tolerance_pct", group: "accounting", label: "Sales orders: amount tolerance (%)", help: "SO vs order at the fixed rate; never below AED 1.", kind: "number", schema: z.number().min(0).max(5), default: 0.2 },
+  { key: "salesorders.sku_aliases", group: "accounting", label: "Sales orders: packing-sheet SKU → Zoho SKU", help: "e.g. {\"LEDR199\": \"LEDR2\"}", kind: "json", schema: z.record(z.string().min(1)), default: {} },
+  { key: "packaging.barcodes", group: "accounting", label: "Packaging: printed barcode → box SKU", help: "For box barcodes that aren't the SKU itself, e.g. {\"6291100000017\": \"PAP999\"}. Scanning SET101 etc. works without this.", kind: "json", schema: z.record(z.string().min(1)), default: {} },
+  { key: "payments.expected_days", group: "accounting", label: "Payments: usual days order → bank, per gateway", help: "Money older than this (+ grace) is flagged overdue on the Admin dashboard and chased on Telegram.", kind: "json", schema: z.record(z.number().int().min(0).max(120)), default: { Stripe: 7, "Shopify Payments": 5, Tabby: 7, Tamara: 10, Telr: 7, Checkout: 7, COD: 10 } },
+  { key: "payments.overdue_grace_days", group: "accounting", label: "Payments: grace days before overdue", kind: "number", schema: z.number().int().min(0).max(30), default: 2 },
+  { key: "alerts.overdue_followups", group: "advanced", label: "Telegram: chase overdue payments", help: "The CFO bot posts overdue gateway money at 10:00 and 16:00 Dubai.", kind: "toggle", schema: z.boolean(), default: true },
+  { key: "alerts.overdue_call_to", group: "advanced", label: "Daily overdue call: phone number", help: "E.164, e.g. +9715XXXXXXXX. Needs TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM. Empty = no call.", kind: "text", schema: z.string().regex(/^(\+\d{8,15})?$/, "Use +countrycode…"), default: "" },
+  { key: "alerts.overdue_call_min_aed", group: "advanced", label: "Daily overdue call: only when overdue above (AED)", kind: "number", schema: z.number().min(0), default: 5000 },
+  { key: "salesorders.packing_sheets", group: "accounting", label: "Sales orders: packing sheet per month", help: "{\"2026-10\": \"<sheet id or link>\"}", kind: "json", schema: z.record(z.string().min(1)), default: { "2026-10": "1krsLLGY9OgEF89l5ac71B8PjPobcuM2yXwas9fcTai4" } },
 
   // ── sync & schedules ────────────────────────────────────────────────
   { key: "sync.order_interval_minutes", group: "sync", label: "Order sync every (minutes)", kind: "number", schema: minutes, default: null, legacyEnv: "ORDER_SYNC_INTERVAL_MINUTES", parseEnv: int },

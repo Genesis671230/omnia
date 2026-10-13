@@ -65,7 +65,7 @@ export type SheetRow = {
 
 const MON: Record<string, string> = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12" };
 
-/** "2026-09-01 6:57" | "02.Sep.2026" | "21 Sep.2026" | "01.July.2026" | ISO → Dubai day + time. Pure. */
+/** "2026-09-01 6:57" | "02.Sep.2026" | "21 Sep.2026" | "01.July.2026" | "01.10.2026" | ISO → Dubai day + time. Pure. */
 export function parseSheetDate(raw: string): { day: string | null; time: string | null } {
   const s = (raw || "").trim();
   let m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s);
@@ -77,6 +77,9 @@ export function parseSheetDate(raw: string): { day: string | null; time: string 
   if (m) return { day: `${m[1]}-${m[2]}-${m[3]}`, time: m[4] ? `${m[4].padStart(2, "0")}:${m[5]}` : null };
   m = /^(\d{1,2})[.\-/ ]+([A-Za-z]{3})[A-Za-z]*[.\-/ ]+(\d{4})/.exec(s);
   if (m && MON[m[2].toLowerCase()]) return { day: `${m[3]}-${MON[m[2].toLowerCase()]}-${m[1].padStart(2, "0")}`, time: null };
+  // October 2026 sheet: "01.10.2026" — day.month.year, numeric (UAE order, never US).
+  m = /^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/.exec(s);
+  if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= 31) return { day: `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`, time: null };
   return { day: null, time: null };
 }
 

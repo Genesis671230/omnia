@@ -383,7 +383,9 @@ export async function zohoOrgForBankLine(bankLineId: string | null | undefined):
 
 /** The organisation for a settlement record (via its payout, else its bank credit). */
 export async function zohoOrgForSettlement(settlementId: string): Promise<string> {
-  const { data } = await supabase.from("settlement_records").select("payout_id, bank_line_id").eq("id", settlementId).maybeSingle();
+  const { data } = await supabase.from("settlement_records").select("payout_id, bank_line_id, zoho_connection_id").eq("id", settlementId).maybeSingle();
   if (!data) return "";
+  // An order picked into its own books (mixed-company payout) wins.
+  if (data.zoho_connection_id) return data.zoho_connection_id as string;
   return (await zohoOrgForPayout(data.payout_id as string | null)) || zohoOrgForBankLine(data.bank_line_id as string);
 }

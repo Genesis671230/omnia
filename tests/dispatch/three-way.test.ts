@@ -127,3 +127,9 @@ test("bridge: dashboard + every reason = the sheet's overall sales", async () =>
   assert.equal(by.cancelled_in_sheet, -1888.5);
   assert.equal(by.exchange_rows, 30);
 });
+
+test("October 2026 sheet dates: numeric day.month.year", () => {
+  assert.deepEqual(parseSheetDate("01.10.2026"), { day: "2026-10-01", time: null });
+  assert.deepEqual(parseSheetDate("11.10.2026"), { day: "2026-10-11", time: null });
+  assert.deepEqual(parseSheetDate("31.13.2026"), { day: null, time: null });
+});
