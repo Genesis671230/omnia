@@ -16,9 +16,8 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } f
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Area, CartesianGrid, Cell, ComposedChart, LabelList, Line, Pie, PieChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { Download, Loader2, RefreshCw, X, CheckCircle2, AlertTriangle, Clock, ChevronRight, FileText, Landmark, Upload, List } from "lucide-react";
+import { Download, Loader2, RefreshCw, X, CheckCircle2, AlertTriangle, Clock, ChevronRight, Landmark, Upload, List } from "lucide-react";
 import { toast } from "sonner";
-import { GATEWAY_COLOR } from "../types";
 
 /* ── shapes (mirror lib/dashboard/admin-money) ─────────────────────────── */
 
@@ -50,13 +49,13 @@ type UploadEvent = { kind: "bank" | "payout"; provider: string | null; filename:
 
 /* ── palette (the reference: violet rail, electric blue, lilac, sky) ───── */
 
-const C = { ink: "#1E1B4B", violet: "#5B2EBB", lilac: "#C77DFF", blue: "#1D5BFF", sky: "#1FB5FF", amber: "#F5A524", red: "#EF4444", line: "#E7E4F3", muted: "#6B6890", faint: "#A6A3C2" };
+const C = { ink: "#16133A", violet: "#4C24A8", lilac: "#B86BF5", blue: "#1D5BFF", sky: "#1FB5FF", amber: "#F5A524", red: "#EF4444", line: "#E2DFF1", muted: "#2A2752", faint: "#4A4770" };
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
 const n2 = (v: number) => new Intl.NumberFormat("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 const n0 = (v: number) => new Intl.NumberFormat("en-AE", { maximumFractionDigits: 0 }).format(v || 0);
-const canc = (c?: Cancelled) => (c && c.orders ? `${c.orders} · ${n2(c.amount)}` : "—");
+const canc = (c?: Cancelled): ReactNode => (c && c.orders ? <>{n2(c.amount)}<i>{c.orders} {c.orders === 1 ? "order" : "orders"}</i></> : "—");
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const dayLabel = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const dayShort = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -66,7 +65,22 @@ const ago = (iso: string) => {
   const h = (Date.now() - Date.parse(iso)) / 3_600_000;
   return h < 1 ? `${Math.max(1, Math.round(h * 60))} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`;
 };
-const gwColor = (g: string) => GATEWAY_COLOR[g] ?? "#94a3b8";
+
+/** The gateways' own logos (public/gateways); a plain name chip for anything else. */
+const LOGOS: Record<string, string> = {
+  stripe: "/gateways/stripe.png", tabby: "/gateways/tabby.png", tamara: "/gateways/tamara.png", telr: "/gateways/telr.png",
+  "shopify payments": "/gateways/shopify.svg", shopify: "/gateways/shopify.svg", checkout: "/gateways/checkout.svg", cod: "/gateways/cod.svg",
+};
+const WIDE = new Set(["tamara", "telr", "checkout"]);
+function GwLogo({ name, size = 22 }: { name: string; size?: number }) {
+  const key = (name || "").trim().toLowerCase();
+  const src = LOGOS[key];
+  if (!src) return <span className="gwl none" style={{ height: size, minWidth: size }}>{(name || "?").slice(0, 1)}</span>;
+  return <span className={`gwl${WIDE.has(key) ? " wide" : ""}`} style={{ height: size, width: WIDE.has(key) ? size * 2.6 : size }}><img src={src} alt={name} /></span>;
+}
+function Gw({ name, size }: { name: string; size?: number }) {
+  return <span className="gwn"><GwLogo name={name} size={size} /><span>{name}</span></span>;
+}
 const addDays = (d: string, k: number) => new Date(Date.parse(`${d}T00:00:00Z`) + k * 86_400_000).toISOString().slice(0, 10);
 /** Fee + VAT + FX — everything the gateways and the bank kept. */
 const kept = (t: Totals) => t.deductions + t.fx;
@@ -264,7 +278,7 @@ export function AdminMoney() {
 
           {/* daily table — 1st of the range first, each day opens into its gateways */}
           <section className="adm-card">
-            <header><h2>Daily sales</h2><span>click a day for its gateways · <List size={11} style={{ verticalAlign: -1 }} /> for its orders</span></header>
+            <header><h2>Daily sales</h2><span>Click a day to see its gateways · the list button opens its orders</span></header>
             <div className="adm-scroll">
               <table className="adm-t">
                 <thead>
@@ -301,7 +315,7 @@ export function AdminMoney() {
                             cancelled: view.cancelled.filter((c) => c.day === d.day && c.gateway === g.gateway),
                             exportQs: `from=${d.day}&to=${d.day}&gateway=${encodeURIComponent(g.gateway)}`, exportName: `omnia-${g.gateway.replace(/\W+/g, "-")}-${d.day}.xlsx`,
                           })}>
-                            <td className="l"><i className="dot" style={{ background: gwColor(g.gateway) }} />{g.gateway}</td>
+                            <td className="l"><Gw name={g.gateway} size={20} /></td>
                             <td>{g.orders}</td>
                             <td className="b">{n2(g.sale)}</td>
                             <td>{n2(g.fee)}</td>
@@ -315,6 +329,11 @@ export function AdminMoney() {
                             <td />
                           </tr>
                         ))}
+                        {open && (
+                          <tr className="words-row">
+                            <td colSpan={12}><InWords t={d} scope={dayLabel(d.day)} cancelled={d.cancelled} title={`${dayLabel(d.day)} in words`} /></td>
+                          </tr>
+                        )}
                       </Fragment>
                     );
                   })}
@@ -331,6 +350,7 @@ export function AdminMoney() {
               </table>
             </div>
             <MoneySummary t={t} />
+            <InWords t={t} scope={view.from === view.to ? dayLabel(view.from) : `${dayLabel(view.from)} → ${dayLabel(view.to)}`} cancelled={t.cancelled} />
             {t.cancelled.orders > 0 && <p className="adm-note">Cancelled orders aren&apos;t sales — they&apos;re not in gross sales, only counted in the Cancelled column.</p>}
           </section>
 
@@ -399,6 +419,42 @@ function MoneySummary({ t }: { t: Totals }) {
   );
 }
 
+/* ── the same numbers, in sentences ────────────────────────────────────── */
+
+/** Plain sentences under a total: what was sold, what is in the bank, what is
+ *  still on its way and what the gateways kept — for a range, a day, a gateway. */
+function inWords(t: Totals, opts: { scope: string; cancelled?: Cancelled; payer?: string }): string[] {
+  const payer = opts.payer ?? "the gateway";
+  const share = (v: number) => (t.sale > 0 ? `${((v / t.sale) * 100).toFixed(1)}%` : "0%");
+  const pending = Math.max(t.awaiting - t.inPayout, 0);
+  if (!t.orders) return [`${opts.scope}: no sales.`];
+  const out = [
+    `${opts.scope}: ${t.orders} ${t.orders === 1 ? "order" : "orders"} brought in AED ${n2(t.sale)} in gross sales.`,
+    t.netReceived > 0
+      ? `AED ${n2(t.netReceived)} (${share(t.netReceived)}) has reached the bank${t.avgDaysToBank != null ? `, ${t.avgDaysToBank} days after the order on average` : ""}.`
+      : "Nothing has reached the bank yet.",
+  ];
+  if (t.inPayout > 0) out.push(`AED ${n2(t.inPayout)} (${share(t.inPayout)}) has been paid out by ${payer} but isn't matched in the bank yet.`);
+  if (pending > 0) out.push(`AED ${n2(pending)} (${share(pending)}) is still pending — ${payer} hasn't paid it out yet${t.overdue > 0 ? `; AED ${n2(t.overdue)} of it (${t.overdueOrders} orders) is overdue` : ""}.`);
+  if (t.refunds > 0) out.push(`AED ${n2(t.refunds)} was refunded or returned before payout.`);
+  const k = kept(t);
+  out.push(k > 0
+    ? `The gateways${t.fx ? " and the bank" : ""} kept AED ${n2(k)} so far — fee ${n2(t.fee)}, VAT ${n2(t.vat)}${t.fx ? `, FX ${n2(t.fx)}` : ""} — that is ${(keptRate(t) * 100).toFixed(2)}% of gross sales.`
+    : "No deductions are known yet.");
+  if (t.awaiting > 0.004) out.push(`The fee is only final once the full net amount is in the bank: ${share(t.awaiting)} of these sales hasn't arrived, so this % can still change.`);
+  if (opts.cancelled?.orders) out.push(`${opts.cancelled.orders} cancelled ${opts.cancelled.orders === 1 ? "order" : "orders"} (AED ${n2(opts.cancelled.amount)}) are not counted as sales.`);
+  return out;
+}
+
+function InWords({ t, scope, cancelled, title = "In words" }: { t: Totals; scope: string; cancelled?: Cancelled; title?: string }) {
+  return (
+    <div className="adm-words">
+      <h3>{title}</h3>
+      <ul>{inWords(t, { scope, cancelled }).map((line, i) => <li key={i}>{line}</li>)}</ul>
+    </div>
+  );
+}
+
 /* ── charts ────────────────────────────────────────────────────────────── */
 
 function SalesCurve({ days }: { days: DayRow[] }) {
@@ -410,32 +466,32 @@ function SalesCurve({ days }: { days: DayRow[] }) {
     if (!value) return null;
     if (index === lastIdx) {
       const text = n0(value);
-      const w = text.length * 7 + 18;
+      const w = text.length * 8 + 20;
       return (
         <g>
-          <rect x={x - w / 2} y={y - 36} width={w} height={22} rx={6} fill={C.ink} />
+          <rect x={x - w / 2} y={y - 38} width={w} height={25} rx={6} fill={C.ink} />
           <path d={`M${x - 5} ${y - 14} L${x} ${y - 8} L${x + 5} ${y - 14} Z`} fill={C.ink} />
-          <text x={x} y={y - 21} textAnchor="middle" fontSize={11.5} fontWeight={700} fill="#fff">{text}</text>
+          <text x={x} y={y - 21} textAnchor="middle" fontSize={13} fontWeight={800} fill="#fff">{text}</text>
         </g>
       );
     }
     if (index % step) return null;
-    return <text x={x} y={y - 10} textAnchor="middle" fontSize={10} fontWeight={600} fill={C.violet}>{n0(value)}</text>;
+    return <text x={x} y={y - 10} textAnchor="middle" fontSize={12} fontWeight={700} fill={C.violet}>{n0(value)}</text>;
   };
   const Tick = (p: { x?: number; y?: number; payload?: { value: string; index: number } }) => {
     const { x = 0, y = 0, payload } = p;
     const d = data.find((r) => r.label === payload?.value);
     return (
       <g transform={`translate(${x},${y})`}>
-        <text y={12} textAnchor="middle" fontSize={10.5} fill={C.muted}>{payload?.value}</text>
-        {d && <text y={25} textAnchor="middle" fontSize={9.5} fill={C.faint}>{d.orders} ord</text>}
+        <text y={14} textAnchor="middle" fontSize={12.5} fontWeight={600} fill={C.muted}>{payload?.value}</text>
+        {d && <text y={30} textAnchor="middle" fontSize={11.5} fill={C.faint}>{d.orders} ord</text>}
       </g>
     );
   };
   if (!data.length) return null;
   return (
     <>
-      <ResponsiveContainer width="100%" height={290}>
+      <ResponsiveContainer width="100%" height={330}>
         <ComposedChart data={data} margin={{ top: 40, right: 24, left: 4, bottom: 8 }}>
           <defs>
             <linearGradient id="admBank" x1="0" y1="0" x2="0" y2="1">
@@ -444,13 +500,13 @@ function SalesCurve({ days }: { days: DayRow[] }) {
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} stroke={C.line} strokeDasharray="2 6" />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={<Tick />} height={36} interval={data.length > 16 ? 1 : 0} />
-          <YAxis tickLine={false} axisLine={false} fontSize={10.5} stroke={C.faint} width={56} tickFormatter={(v: number) => n0(v)} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={<Tick />} height={42} interval={data.length > 16 ? 1 : 0} />
+          <YAxis tickLine={false} axisLine={false} fontSize={12.5} stroke={C.faint} width={64} tickFormatter={(v: number) => n0(v)} />
           <Area type="monotone" dataKey="bank" stroke={C.blue} strokeWidth={2.5} fill="url(#admBank)" dot={false} isAnimationActive={false}>
             <LabelList dataKey="bank" content={(p) => {
               const { x = 0, y = 0, value = 0, index = 0 } = p as { x?: number; y?: number; value?: number; index?: number };
               if (!value || index % step || index === lastIdx) return null;
-              return <text x={Number(x)} y={Number(y) + 16} textAnchor="middle" fontSize={9.5} fill={C.blue}>{n0(Number(value))}</text>;
+              return <text x={Number(x)} y={Number(y) + 16} textAnchor="middle" fontSize={11.5} fontWeight={700} fill={C.blue}>{n0(Number(value))}</text>;
             }} />
           </Area>
           <Line type="monotone" dataKey="sale" stroke={C.lilac} strokeWidth={2.5} dot={{ r: 2.5, fill: C.lilac, strokeWidth: 0 }} isAnimationActive={false}>
@@ -539,7 +595,7 @@ function UploadsCard() {
             )}
             {u.latestPayouts.map((p) => (
               <div key={p.gateway} className="adm-up">
-                <div className="adm-up-ic" style={{ background: `${gwColor(p.gateway)}22`, color: gwColor(p.gateway) }}>{p.viaApi ? <RefreshCw size={15} /> : <FileText size={15} />}</div>
+                <div className="adm-up-logo"><GwLogo name={p.gateway} size={32} /></div>
                 <div className="adm-up-body">
                   <b>{p.gateway}{p.store ? <em> · {p.store}</em> : null}</b>
                   <span className="fn" title={p.source}>{p.viaApi ? `synced by API · ${p.payoutId}` : p.source}</span>
@@ -561,7 +617,7 @@ function UploadsCard() {
                         <tr key={i}>
                           <td className="l">{stamp(e.uploadedAt)}</td>
                           <td className="l">{e.kind === "bank" ? "Bank statement" : "Payout file"}</td>
-                          <td className="l">{e.provider ? <><i className="dot" style={{ background: gwColor(e.provider) }} />{e.provider}</> : "—"}</td>
+                          <td className="l">{e.provider ? <Gw name={e.provider} size={18} /> : "—"}</td>
                           <td className="l name" title={e.filename}>{e.filename}</td>
                           <td className="l mut">{e.summary || "—"}</td>
                         </tr>
@@ -616,11 +672,7 @@ function GatewaysSection({ today, onOpen, exporting, exportXlsx }: {
               <tbody>
                 {view.gateways.map((g) => (
                   <tr key={g.gateway} className="click" onClick={() => open(g)}>
-                    <td className="l"><i className="dot" style={{ background: gwColor(g.gateway) }} />{g.gateway}
-                      <button className="adm-icon sm" title={`Excel: ${g.gateway}`} onClick={(e) => { e.stopPropagation(); exportXlsx(g.gateway, `from=${view.from}&to=${view.to}&gateway=${encodeURIComponent(g.gateway)}`, `omnia-${g.gateway.replace(/\W+/g, "-")}-${view.from}_${view.to}.xlsx`); }}>
-                        {exporting === g.gateway ? <Loader2 size={12} className="adm-spin" /> : <Download size={12} />}
-                      </button>
-                    </td>
+                    <td className="l"><Gw name={g.gateway} size={22} /></td>
                     <td>{g.orders}</td>
                     <td className="b">{n2(g.sale)}</td>
                     <td>{n2(kept(g))}</td>
@@ -643,6 +695,19 @@ function GatewaysSection({ today, onOpen, exporting, exportXlsx }: {
               </tfoot>
             </table>
           </div>
+          <div className="adm-words-grid">
+            {view.gateways.filter((g) => g.orders > 0 || g.cancelled.orders > 0).map((g) => (
+              <div key={g.gateway} className="adm-words gw">
+                <h3>
+                  <Gw name={g.gateway} size={22} />
+                  <button className="adm-btn ghost" onClick={() => exportXlsx(g.gateway, `from=${view.from}&to=${view.to}&gateway=${encodeURIComponent(g.gateway)}`, `omnia-${g.gateway.replace(/\W+/g, "-")}-${view.from}_${view.to}.xlsx`)}>
+                    {exporting === g.gateway ? <Loader2 size={13} className="adm-spin" /> : <Download size={13} />} Excel
+                  </button>
+                </h3>
+                <ul>{inWords(g, { scope: `${g.gateway}, ${dayLabel(view.from)} → ${dayLabel(view.to)}`, cancelled: g.cancelled, payer: g.gateway === "COD" ? "the courier" : undefined }).map((line, i) => <li key={i}>{line}</li>)}</ul>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -663,7 +728,7 @@ function GatewayCards({ rows, onPick }: { rows: GwGroup[]; onPick?: (gateway: st
         return (
           <button key={r.gateway} className="adm-gw" onClick={() => onPick?.(r.gateway)} disabled={!onPick}>
             <div className="adm-gw-head">
-              <i className="dot" style={{ background: gwColor(r.gateway) }} />
+              <GwLogo name={r.gateway} size={28} />
               <b>{r.gateway}</b>
               <em>{total > 0 ? ((r.sale / total) * 100).toFixed(1) : "0"}% of sales</em>
             </div>
@@ -701,8 +766,8 @@ function Ring({ segs, total, label, sub }: { segs: { v: number; c: string }[]; t
         off += len;
         return el;
       })}
-      <text x={44} y={45} textAnchor="middle" fontSize={16} fontWeight={800} fill={C.ink}>{label}</text>
-      <text x={44} y={59} textAnchor="middle" fontSize={9} fill={C.muted}>{sub}</text>
+      <text x={44} y={45} textAnchor="middle" fontSize={18} fontWeight={800} fill={C.ink}>{label}</text>
+      <text x={44} y={59} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={C.muted}>{sub}</text>
     </svg>
   );
 }
@@ -833,7 +898,7 @@ function OrdersDrawer({ state, onClose, onExport, exporting }: {
                   <button className={gw === "All" ? "on" : ""} onClick={() => setGw("All")}>All · {all.length}</button>
                   {groups.map((g) => (
                     <button key={g.gateway} className={gw === g.gateway ? "on" : ""} onClick={() => setGw(g.gateway)}>
-                      <i className="dot" style={{ background: gwColor(g.gateway) }} />{g.gateway} · {g.orders}
+                      <GwLogo name={g.gateway} size={18} />{g.gateway} · {g.orders}
                     </button>
                   ))}
                 </div>
@@ -853,7 +918,7 @@ function OrdersDrawer({ state, onClose, onExport, exporting }: {
                         <td className="l mono">{o.orderNumber}<i>{o.store}</i></td>
                         <td className="l">{dayLabel(o.day)}</td>
                         <td className="l name" dir="auto">{o.customer || "—"}</td>
-                        <td className="l"><i className="dot" style={{ background: gwColor(o.gateway) }} />{o.gateway}</td>
+                        <td className="l"><Gw name={o.gateway} size={18} /></td>
                         <td className="l">
                           <span className={`adm-pill ${o.inPayout > 0 && o.status !== "overdue" ? "vio" : STATUS[o.status].cls}`}>{o.inPayout > 0 && o.status !== "overdue" ? "Paid out" : STATUS[o.status].label}</span>
                           <i>{o.status === "received" ? (o.receivedOn ? `${o.receivedOn.slice(5)} · ${o.ageDays}d` : "") : o.status === "refunded" ? "" : `${o.ageDays}d${o.overdueDays ? ` · ${o.overdueDays}d late` : ""}`}</i>
@@ -878,6 +943,8 @@ function OrdersDrawer({ state, onClose, onExport, exporting }: {
                   </tfoot>
                 </table>
               </div>
+              <InWords t={t} scope={gw === "All" ? state.title : `${state.title} · ${gw}`}
+                cancelled={{ orders: state.cancelled.filter((c) => gw === "All" || c.gateway === gw).length, amount: state.cancelled.filter((c) => gw === "All" || c.gateway === gw).reduce((a, c) => a + c.amount, 0) }} />
               {(state.cancelled?.length ?? 0) > 0 && (
                 <div className="adm-scroll">
                   <table className="adm-t">
@@ -888,7 +955,7 @@ function OrdersDrawer({ state, onClose, onExport, exporting }: {
                           <td className="l mono">{c.orderNumber}<i>{c.store}</i></td>
                           <td className="l">{dayLabel(c.day)}</td>
                           <td className="l name" dir="auto">{c.customer || "—"}</td>
-                          <td className="l"><i className="dot" style={{ background: gwColor(c.gateway) }} />{c.gateway}</td>
+                          <td className="l"><Gw name={c.gateway} size={18} /></td>
                           <td className="l">{c.creditNote || "—"}</td>
                           <td>{n2(c.amount)}</td>
                         </tr>
@@ -909,150 +976,166 @@ function OrdersDrawer({ state, onClose, onExport, exporting }: {
 }
 
 const CSS = `
-  .adm, .admd { font-family: var(--os-font, ui-sans-serif, system-ui, sans-serif); color: #1E1B4B; }
-  .adm { display: flex; flex-direction: column; gap: 18px; }
+  .adm, .admd { font-family: var(--os-font, ui-sans-serif, system-ui, sans-serif); color: #16133A; font-size: 15px; }
+  .adm { display: flex; flex-direction: column; gap: 24px; }
   .adm *, .admd * { box-sizing: border-box; }
   .adm-spin { animation: admspin 1s linear infinite; } @keyframes admspin { to { transform: rotate(360deg); } }
-  .adm-title { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
-  .adm-title h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: #1E1B4B; line-height: 1.1; }
-  .adm-title > div > span { font-size: 13px; color: #6B6890; }
-  .adm-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .adm-presets { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #fff; border: 1px solid #E7E4F3; border-radius: 12px; box-shadow: 0 4px 14px -10px rgba(46,22,96,.25); }
-  .adm-presets button { border: 0; background: none; border-radius: 9px; padding: 6px 12px; font: inherit; font-size: 12.5px; font-weight: 600; color: #6B6890; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .adm-title { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .adm-title h1 { margin: 0; font-size: 38px; font-weight: 800; letter-spacing: -.02em; color: #16133A; line-height: 1.1; }
+  .adm-title > div > span { font-size: 15px; color: #3F3C66; }
+  .adm-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .adm-presets { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #fff; border: 1px solid #DAD6EE; border-radius: 12px; }
+  .adm-presets button { border: 0; background: none; border-radius: 9px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 600; color: #3F3C66; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
   .adm-presets button.on { background: #1D5BFF; color: #fff; }
   .adm-presets.chips { align-self: flex-start; }
-  .adm-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #6B6890; }
-  .adm-dates input { min-width: 0; max-width: 140px; border: 1px solid #E7E4F3; border-radius: 10px; padding: 6px 8px; font: inherit; font-size: 12.5px; color: #1E1B4B; background: #fff; }
-  .adm-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: #1D5BFF; border-radius: 10px; padding: 8px 14px; font: inherit; font-size: 12.5px; font-weight: 600; color: #fff; cursor: pointer; box-shadow: 0 8px 18px -10px rgba(29,91,255,.8); }
+  .adm-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: #3F3C66; }
+  .adm-dates input { min-width: 0; max-width: 160px; border: 1px solid #DAD6EE; border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 14px; color: #16133A; background: #fff; }
+  .adm-btn { display: inline-flex; align-items: center; gap: 7px; border: 0; background: #1D5BFF; border-radius: 10px; padding: 10px 16px; font: inherit; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; }
   .adm-btn:disabled, .adm-icon:disabled { opacity: .5; cursor: default; }
-  .adm-icon { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #E7E4F3; background: #fff; border-radius: 10px; width: 32px; height: 32px; cursor: pointer; color: #5B2EBB; }
-  .adm-icon.sm { width: 24px; height: 24px; border-radius: 7px; margin-left: 8px; vertical-align: middle; }
-  .adm-link { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; border: 0; background: none; padding: 10px 0 4px; font: inherit; font-size: 12.5px; font-weight: 600; color: #1D5BFF; cursor: pointer; }
-  .adm-err { display: flex; gap: 8px; align-items: center; background: #fee2e2; color: #b91c1c; border-radius: 12px; padding: 10px 14px; font-size: 13px; }
-  .adm-loading { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 50px; color: #6B6890; font-size: 14px; }
+  .adm-icon { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #DAD6EE; background: #fff; border-radius: 10px; width: 38px; height: 38px; cursor: pointer; color: #3B1D72; }
+  .adm-icon.sm { width: 28px; height: 28px; border-radius: 8px; margin-left: 10px; vertical-align: middle; }
+  .adm-link { align-self: flex-start; display: inline-flex; gap: 7px; align-items: center; border: 0; background: none; padding: 14px 0 4px; font: inherit; font-size: 14px; font-weight: 700; color: #1D5BFF; cursor: pointer; }
+  .adm-err { display: flex; gap: 8px; align-items: center; background: #FEE2E2; color: #991B1B; border-radius: 12px; padding: 12px 16px; font-size: 14px; }
+  .adm-loading { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 50px; color: #3F3C66; font-size: 15px; }
 
-  .adm-card { min-width: 0; background: #fff; border: 1px solid #ECEAF6; border-radius: 20px; padding: 20px 22px; box-shadow: 0 18px 40px -32px rgba(46,22,96,.45); display: flex; flex-direction: column; }
-  .adm-card > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-  .adm-card h2 { margin: 0; font-size: 18px; font-weight: 700; color: #1E1B4B; letter-spacing: -.01em; }
-  .adm-card > header span { font-size: 12px; color: #A6A3C2; }
+  .adm-card { min-width: 0; background: #fff; border: 1px solid #E2DFF1; border-radius: 18px; padding: 26px 28px; display: flex; flex-direction: column; }
+  .adm-card > header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .adm-card h2 { margin: 0; font-size: 21px; font-weight: 800; color: #16133A; letter-spacing: -.01em; }
+  .adm-card > header span { font-size: 14px; color: #4A4770; }
 
-  .adm-hero-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 18px; }
-  .adm-legend { display: flex; gap: 14px; font-size: 11.5px; color: #6B6890; flex-wrap: wrap; }
-  .adm-legend span { display: inline-flex; align-items: center; gap: 6px; } .adm-legend i { width: 9px; height: 9px; border-radius: 99px; }
+  .adm-hero-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 24px; }
+  .adm-legend { display: flex; gap: 18px; font-size: 14px; color: #3F3C66; flex-wrap: wrap; font-weight: 600; }
+  .adm-legend span { display: inline-flex; align-items: center; gap: 7px; } .adm-legend i { width: 11px; height: 11px; border-radius: 99px; }
 
-  .adm-donut { display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: center; }
+  .adm-donut { display: flex; flex-direction: column; gap: 14px; flex: 1; justify-content: center; }
   .adm-donut-ring { position: relative; }
   .adm-donut-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-  .adm-donut-mid b { font-size: 30px; font-weight: 800; color: #1E1B4B; line-height: 1; }
-  .adm-donut-mid span { font-size: 12px; color: #6B6890; margin-top: 4px; }
-  .adm-donut-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-  .adm-donut-legend li { display: grid; grid-template-columns: 10px 1fr auto 52px; gap: 8px; align-items: center; font-size: 12.5px; }
-  .adm-donut-legend i { width: 9px; height: 9px; border-radius: 99px; }
-  .adm-donut-legend span { color: #6B6890; }
-  .adm-donut-legend b { font-variant-numeric: tabular-nums; font-weight: 700; }
-  .adm-donut-legend em { font-style: normal; text-align: right; color: #A6A3C2; font-variant-numeric: tabular-nums; }
+  .adm-donut-mid b { font-size: 34px; font-weight: 800; color: #16133A; line-height: 1; }
+  .adm-donut-mid span { font-size: 14px; color: #3F3C66; margin-top: 6px; font-weight: 600; }
+  .adm-donut-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .adm-donut-legend li { display: grid; grid-template-columns: 12px 1fr auto 58px; gap: 10px; align-items: center; font-size: 14.5px; }
+  .adm-donut-legend i { width: 11px; height: 11px; border-radius: 99px; }
+  .adm-donut-legend span { color: #2A2752; font-weight: 600; }
+  .adm-donut-legend b { font-variant-numeric: tabular-nums; font-weight: 800; }
+  .adm-donut-legend em { font-style: normal; text-align: right; color: #3F3C66; font-variant-numeric: tabular-nums; font-weight: 600; }
 
-  .adm-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-  .adm-grad { position: relative; overflow: hidden; border-radius: 16px; padding: 18px 20px; color: #fff; display: flex; flex-direction: column; gap: 6px; min-height: 120px; box-shadow: 0 18px 34px -22px rgba(46,22,96,.75); }
-  .adm-grad::after { content: ""; position: absolute; right: -40px; bottom: -60px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,.12); }
-  .adm-grad::before { content: ""; position: absolute; left: 35%; top: -70px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.07); }
-  .adm-grad.lilac { background: linear-gradient(135deg, #9B4DE0, #C77DFF); }
-  .adm-grad.blue { background: linear-gradient(135deg, #0B47E6, #1D5BFF 60%, #3B82F6); }
-  .adm-grad.deep { background: linear-gradient(135deg, #24114D, #3B1D72 60%, #5B2EBB); }
-  .adm-grad.violet { background: linear-gradient(135deg, #5B2EBB, #7B5CFA); }
-  .adm-grad span { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.85); position: relative; z-index: 1; }
-  .adm-grad b { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; position: relative; z-index: 1; }
-  .adm-grad small { font-size: 11.5px; color: rgba(255,255,255,.75); position: relative; z-index: 1; }
+  .adm-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .adm-grad { border-radius: 16px; padding: 22px 24px; color: #fff; display: flex; flex-direction: column; gap: 8px; min-height: 132px; }
+  .adm-grad.lilac { background: linear-gradient(135deg, #8E3FD6, #B86BF5); }
+  .adm-grad.blue { background: linear-gradient(135deg, #0B47E6, #1D5BFF); }
+  .adm-grad.deep { background: linear-gradient(135deg, #24114D, #3B1D72); }
+  .adm-grad.violet { background: linear-gradient(135deg, #4C24A8, #6A45E8); }
+  .adm-grad span { font-size: 15px; font-weight: 700; color: #fff; }
+  .adm-grad b { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .adm-grad small { font-size: 14px; color: #fff; font-weight: 500; line-height: 1.45; }
 
-  .adm-overdue { display: flex; gap: 8px; align-items: center; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 14px; padding: 10px 14px; font-size: 12.5px; }
-  .adm-overdue b { font-weight: 600; }
+  .adm-overdue { display: flex; gap: 10px; align-items: center; background: #FFF4E5; border: 1px solid #F5C98A; color: #7A3A00; border-radius: 14px; padding: 14px 18px; font-size: 14.5px; }
+  .adm-overdue b { font-weight: 700; }
 
-  .adm-ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
-  .adm-up { display: flex; gap: 12px; align-items: center; border: 1px solid #ECEAF6; border-radius: 14px; padding: 12px; background: #FBFAFE; min-width: 0; }
-  .adm-up.bank { background: linear-gradient(135deg, #F4EEFF, #EEF3FF); border-color: #DCD3F7; }
-  .adm-up-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #EDE6FF; color: #5B2EBB; flex-shrink: 0; }
-  .adm-up-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .adm-up-body b { font-size: 13px; } .adm-up-body b em { font-style: normal; font-weight: 500; color: #A6A3C2; }
-  .adm-up-body .fn { font-size: 11.5px; color: #6B6890; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .adm-up-body small { font-size: 11px; color: #A6A3C2; }
-  .adm-up-when { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; }
-  .adm-up-when b { font-size: 12px; font-variant-numeric: tabular-nums; } .adm-up-when small { font-size: 11px; color: #A6A3C2; }
+  .adm-ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 14px; }
+  .adm-up { display: flex; gap: 14px; align-items: center; border: 1px solid #E2DFF1; border-radius: 14px; padding: 16px; background: #fff; min-width: 0; }
+  .adm-up.bank { background: #F5F1FF; border-color: #CFC3F3; }
+  .adm-up-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #3B1D72; color: #fff; flex-shrink: 0; }
+  .adm-up-logo { width: 84px; flex-shrink: 0; display: flex; justify-content: center; }
+  .adm-up-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .adm-up-body b { font-size: 15px; } .adm-up-body b em { font-style: normal; font-weight: 600; color: #3F3C66; }
+  .adm-up-body .fn { font-size: 13.5px; color: #2A2752; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .adm-up-body small { font-size: 13px; color: #3F3C66; }
+  .adm-up-when { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+  .adm-up-when b { font-size: 14.5px; font-variant-numeric: tabular-nums; } .adm-up-when small { font-size: 13px; color: #3F3C66; }
+
+  .gwl { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; overflow: hidden; background: #fff; flex-shrink: 0; border: 1px solid #E2DFF1; vertical-align: middle; }
+  .gwl img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .gwl.wide { padding: 2px 4px; }
+  .gwl.none { background: #3B1D72; color: #fff; font-size: 12px; font-weight: 800; border: 0; padding: 0 4px; }
+  .gwn { display: inline-flex; align-items: center; gap: 10px; vertical-align: middle; font-weight: 600; }
 
   .adm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .adm-t { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .adm-t th { text-align: right; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #6B6890; font-weight: 700; padding: 9px 10px; border-bottom: 1px solid #ECEAF6; background: #F8F7FD; position: sticky; top: 0; z-index: 1; }
-  .adm-t th:first-child { text-align: left; border-radius: 10px 0 0 0; } .adm-t th:last-child { border-radius: 0 10px 0 0; }
-  .adm-t td { text-align: right; padding: 9px 10px; border-bottom: 1px solid #F3F1FA; }
+  .adm-t { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; color: #16133A; }
+  .adm-t th { text-align: right; font-size: 13px; letter-spacing: .01em; color: #16133A; font-weight: 800; padding: 12px 8px; white-space: normal; line-height: 1.25; vertical-align: bottom; border-bottom: 2px solid #DAD6EE; background: #F4F2FC; position: sticky; top: 0; z-index: 1; }
+  .adm-t th:first-child { text-align: left; }
+  .adm-t td { text-align: right; padding: 12px 8px; border-bottom: 1px solid #ECEAF6; }
   .adm-t td.l, .adm-t th.l { text-align: left; }
-  .adm-t td.b { font-weight: 700; }
-  .adm-t td.ok { color: #1D5BFF; font-weight: 600; } .adm-t td.warn { color: #B26A00; } .adm-t td.bad { color: #dc2626; font-weight: 600; } .adm-t td.vio { color: #0B8AC9; }
-  .adm-t td i { display: block; font-style: normal; font-size: 10.5px; color: #A6A3C2; font-weight: 500; }
-  .adm-t td.l i { display: inline; margin-left: 6px; }
+  .adm-t td.b { font-weight: 800; }
+  .adm-t td.ok { color: #0B47E6; font-weight: 700; } .adm-t td.warn { color: #8A4B00; font-weight: 600; } .adm-t td.bad { color: #B91C1C; font-weight: 700; } .adm-t td.vio { color: #075E8C; font-weight: 600; }
+  .adm-t td i { display: block; font-style: normal; font-size: 12.5px; color: #4A4770; font-weight: 600; margin-top: 2px; }
+  .adm-t td.l i { display: inline; margin-left: 8px; }
   .adm-t td.mono { font-family: ui-monospace, monospace; }
-  .adm-t td.name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-  .adm-t tr.click { cursor: pointer; } .adm-t tr.click:hover td { background: #F6F3FF; }
-  .adm-t tr.open td { background: #F6F3FF; font-weight: 600; }
-  .adm-t tr.sub td { background: #FCFBFF; font-size: 12px; border-bottom-color: #F6F4FC; }
-  .adm-t tr.sub td:first-child { padding-left: 34px; }
-  .adm-chev { display: inline-block; margin-right: 6px; vertical-align: -1px; color: #5B2EBB; transition: transform .15s; }
-  .adm-t tr.empty td { color: #CFCCE3; }
-  .adm-t td.mut, .adm-t tr.mutrow td { color: #A6A3C2; }
-  .adm-t tfoot td { font-weight: 700; border-top: 2px solid #ECEAF6; border-bottom: 0; background: #F8F7FD; }
-  .adm-t td i.dot, .adm-presets .dot, .adm-gw .dot { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 7px; vertical-align: 0; }
-  .adm-pill { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-  .adm-pill.ok { background: #E3EBFF; color: #1D5BFF; } .adm-pill.warn { background: #FEF3C7; color: #B26A00; }
-  .adm-pill.bad { background: #fee2e2; color: #dc2626; } .adm-pill.muted { background: #F1EFF8; color: #6B6890; } .adm-pill.vio { background: #E0F4FF; color: #0B8AC9; }
-  .adm-note { margin: 10px 0 0; font-size: 11.5px; color: #A6A3C2; }
-  .adm-check { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; margin: 0; }
-  .adm-check.ok { color: #1D5BFF; } .adm-check.bad { color: #b91c1c; } .adm-check .muted { color: #A6A3C2; }
+  .adm-t td.name { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+  .adm-t tr.click { cursor: pointer; } .adm-t tr.click:hover td { background: #F4F0FF; }
+  .adm-t tr.open td { background: #EFEAFE; font-weight: 700; }
+  .adm-t tr.sub td { background: #FBFAFF; font-size: 14px; }
+  .adm-t tr.sub td:first-child { padding-left: 30px; }
+  .adm-t td:first-child, .adm-t th:first-child { padding-left: 14px; }
+  .adm-t tr.words-row td { background: #FBFAFF; padding: 14px 14px 18px 38px; white-space: normal; text-align: left; }
+  .adm-chev { display: inline-block; margin-right: 8px; vertical-align: -1px; color: #3B1D72; transition: transform .15s; }
+  .adm-t tr.empty td { color: #8F8CAE; }
+  .adm-t td.mut, .adm-t tr.mutrow td { color: #4A4770; }
+  .adm-t tfoot td { font-weight: 800; border-top: 2px solid #DAD6EE; border-bottom: 0; background: #F4F2FC; font-size: 15px; }
+  .adm-pill { display: inline-flex; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .adm-pill.ok { background: #DCE6FF; color: #0B3FCC; } .adm-pill.warn { background: #FDECC8; color: #7A3A00; }
+  .adm-pill.bad { background: #FEE2E2; color: #991B1B; } .adm-pill.muted { background: #ECEAF6; color: #2A2752; } .adm-pill.vio { background: #D8F0FF; color: #075E8C; }
+  .adm-note { margin: 14px 0 0; font-size: 14px; color: #3F3C66; }
+  .adm-check { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; margin: 0; font-weight: 600; }
+  .adm-check.ok { color: #0B47E6; } .adm-check.bad { color: #991B1B; } .adm-check .muted { color: #3F3C66; font-weight: 500; }
 
-  .adm-sum { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; margin-top: 16px; }
-  .adm-sum-lines { border: 1px solid #ECEAF6; border-radius: 14px; padding: 6px 16px; background: #FBFAFE; }
-  .adm-sum-line { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed #E7E4F3; font-size: 13px; }
+  .adm-sum { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; margin-top: 22px; }
+  .adm-sum-lines { border: 1px solid #E2DFF1; border-radius: 14px; padding: 8px 20px; background: #fff; }
+  .adm-sum-line { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid #ECEAF6; font-size: 15px; }
   .adm-sum-line:last-child { border-bottom: 0; }
-  .adm-sum-line span { flex: 1; display: flex; flex-direction: column; color: #1E1B4B; }
-  .adm-sum-line > em { font-style: normal; width: 14px; flex-shrink: 0; text-align: center; color: #A6A3C2; font-weight: 800; font-size: 15px; }
-  .adm-sum-line small { font-size: 11px; color: #A6A3C2; }
-  .adm-sum-line b { font-variant-numeric: tabular-nums; font-size: 14px; }
-  .adm-sum-line b.ok { color: #1D5BFF; } .adm-sum-line b.warn { color: #B26A00; } .adm-sum-line b.vio { color: #0B8AC9; }
-  .adm-sum-line.total { border-top: 2px solid #E7E4F3; border-bottom: 0; }
-  .adm-sum-line.total b { font-size: 16px; color: #5B2EBB; }
-  .adm-sum-rate { border-radius: 14px; padding: 18px; color: #fff; background: linear-gradient(150deg, #24114D, #3B1D72 55%, #5B2EBB); display: flex; flex-direction: column; gap: 6px; justify-content: center; }
-  .adm-sum-rate span { font-size: 12px; color: rgba(255,255,255,.75); font-weight: 600; }
-  .adm-sum-rate b { font-size: 38px; font-weight: 800; line-height: 1; color: #fff; }
-  .adm-sum-rate small { font-size: 11px; color: rgba(255,255,255,.65); line-height: 1.5; }
+  .adm-sum-line span { flex: 1; display: flex; flex-direction: column; gap: 2px; color: #16133A; font-weight: 600; }
+  .adm-sum-line > em { font-style: normal; width: 16px; flex-shrink: 0; text-align: center; color: #3B1D72; font-weight: 800; font-size: 17px; }
+  .adm-sum-line small { font-size: 13px; color: #4A4770; font-weight: 500; }
+  .adm-sum-line b { font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 800; }
+  .adm-sum-line b.ok { color: #0B47E6; } .adm-sum-line b.warn { color: #8A4B00; } .adm-sum-line b.vio { color: #075E8C; }
+  .adm-sum-line.total { border-top: 2px solid #DAD6EE; }
+  .adm-sum-line.total b { font-size: 19px; color: #3B1D72; }
+  .adm-sum-rate { border-radius: 14px; padding: 24px; color: #fff; background: linear-gradient(150deg, #24114D, #3B1D72); display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+  .adm-sum-rate span { font-size: 15px; color: #fff; font-weight: 700; }
+  .adm-sum-rate b { font-size: 44px; font-weight: 800; line-height: 1; color: #fff; }
+  .adm-sum-rate small { font-size: 13.5px; color: #fff; line-height: 1.6; }
 
-  .adm-gws { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-  .adm-gw { text-align: left; font: inherit; color: inherit; border: 1px solid #ECEAF6; border-radius: 16px; background: #fff; padding: 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+  .adm-words { margin-top: 20px; border: 1px solid #DAD6EE; border-left: 4px solid #3B1D72; border-radius: 12px; padding: 16px 20px; background: #fff; }
+  .adm-words h3 { margin: 0 0 10px; font-size: 16px; font-weight: 800; color: #16133A; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .adm-btn.ghost { background: #fff; color: #1D5BFF; border: 1px solid #C9D6FF; padding: 6px 12px; font-size: 13px; }
+  .adm-words ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; }
+  .adm-words li { font-size: 15px; line-height: 1.55; color: #16133A; }
+  .adm-t .adm-words { margin-top: 0; }
+  .adm-words-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-top: 20px; }
+  .adm-words-grid .adm-words { margin-top: 0; }
+
+  .adm-gws { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+  .adm-gw { text-align: left; font: inherit; color: inherit; border: 1px solid #E2DFF1; border-radius: 16px; background: #fff; padding: 18px; display: flex; flex-direction: column; gap: 14px; cursor: pointer; transition: border-color .15s; }
   .adm-gw:disabled { cursor: default; }
-  .adm-gw:not(:disabled):hover { box-shadow: 0 14px 30px -20px rgba(46,22,96,.5); transform: translateY(-1px); }
-  .adm-gw-head { display: flex; align-items: center; gap: 2px; }
-  .adm-gw-head b { font-size: 14px; flex: 1; }
-  .adm-gw-head em { font-style: normal; font-size: 11px; color: #5B2EBB; background: #F1EBFF; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
-  .adm-gw-main { display: flex; gap: 12px; align-items: center; }
+  .adm-gw:not(:disabled):hover { border-color: #3B1D72; }
+  .adm-gw-head { display: flex; align-items: center; gap: 10px; }
+  .adm-gw-head b { font-size: 16px; flex: 1; }
+  .adm-gw-head em { font-style: normal; font-size: 13px; color: #3B1D72; background: #EFEAFE; padding: 3px 10px; border-radius: 99px; font-weight: 700; }
+  .adm-gw-main { display: flex; gap: 16px; align-items: center; }
   .adm-ring { flex-shrink: 0; }
-  .adm-gw dl { margin: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .adm-gw dl > div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
-  .adm-gw dt { color: #6B6890; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-  .adm-gw dt i { width: 7px; height: 7px; border-radius: 99px; }
-  .adm-gw dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-  .adm-gw dd.b { font-weight: 800; } .adm-gw dd.bad { color: #dc2626; }
-  .adm-gw dd .rate { font-size: 10.5px; color: #5B2EBB; background: #F1EBFF; border-radius: 6px; padding: 1px 5px; margin-left: 3px; }
-  .adm-gw-foot { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #A6A3C2; border-top: 1px solid #F3F1FA; padding-top: 8px; }
-  .adm-gw-foot .bad { color: #dc2626; font-weight: 600; }
+  .adm-gw dl { margin: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .adm-gw dl > div { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+  .adm-gw dt { color: #2A2752; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; }
+  .adm-gw dt i { width: 9px; height: 9px; border-radius: 99px; }
+  .adm-gw dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .adm-gw dd.b { font-weight: 800; } .adm-gw dd.bad { color: #B91C1C; }
+  .adm-gw dd .rate { font-size: 12.5px; color: #3B1D72; background: #EFEAFE; border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .adm-gw-foot { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13.5px; color: #3F3C66; border-top: 1px solid #ECEAF6; padding-top: 12px; font-weight: 500; }
+  .adm-gw-foot .bad { color: #B91C1C; font-weight: 700; }
 
-  .adm-chase { width: min(640px, calc(100vw - 32px)); background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(30,27,75,.3); }
-  .adm-pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: 13px; line-height: 1.55; background: #F8F7FD; border: 1px solid #ECEAF6; border-radius: 12px; padding: 12px 14px; max-height: 50vh; overflow: auto; }
-  .admd-back { position: fixed; inset: 0; background: rgba(36,17,77,.4); z-index: 1000; }
-  .admd { position: fixed; left: 0; right: 0; bottom: 0; height: 86vh; background: #F3F2FA; border-radius: 22px 22px 0 0; z-index: 1001; display: flex; flex-direction: column; box-shadow: 0 -20px 50px rgba(36,17,77,.3); }
-  .admd-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 22px; background: #fff; border-bottom: 1px solid #ECEAF6; border-radius: 22px 22px 0 0; }
-  .admd-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
-  .admd-head span { font-size: 12px; color: #6B6890; }
-  .admd-actions { display: flex; gap: 8px; }
-  .admd-body { flex: 1; overflow-y: auto; padding: 16px 22px 28px; display: flex; flex-direction: column; gap: 14px; }
-  .admd-panel { background: #fff; border: 1px solid #ECEAF6; border-radius: 16px; padding: 14px; }
+  .adm-chase { width: min(660px, calc(100vw - 32px)); background: #fff; border-radius: 18px; border: 1px solid #DAD6EE; }
+  .adm-pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: 14.5px; line-height: 1.6; background: #F7F5FD; border: 1px solid #E2DFF1; border-radius: 12px; padding: 14px 16px; max-height: 50vh; overflow: auto; }
+  .admd-back { position: fixed; inset: 0; background: rgba(22,19,58,.45); z-index: 1000; }
+  .admd { position: fixed; left: 0; right: 0; bottom: 0; height: 88vh; background: #F3F2FA; border-radius: 20px 20px 0 0; z-index: 1001; display: flex; flex-direction: column; }
+  .admd-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 28px; background: #fff; border-bottom: 1px solid #E2DFF1; border-radius: 20px 20px 0 0; }
+  .admd-head h2 { margin: 0; font-size: 21px; font-weight: 800; }
+  .admd-head span { font-size: 14px; color: #3F3C66; }
+  .admd-actions { display: flex; gap: 10px; }
+  .admd-body { flex: 1; overflow-y: auto; padding: 22px 28px 36px; display: flex; flex-direction: column; gap: 18px; }
+  .admd-panel { background: #fff; border: 1px solid #E2DFF1; border-radius: 16px; padding: 18px; }
   .admd-body > * { flex-shrink: 0; }
-  .admd-body .adm-scroll { background: #fff; border: 1px solid #ECEAF6; border-radius: 16px; overflow-y: visible; }
+  .admd-body .adm-scroll { background: #fff; border: 1px solid #E2DFF1; border-radius: 16px; overflow-y: visible; }
+  .admd-body .adm-words { margin-top: 0; }
 
   @media (max-width: 1100px) {
     .adm-hero-grid { grid-template-columns: 1fr; }
@@ -1060,12 +1143,13 @@ const CSS = `
   }
   @media (max-width: 760px) {
     .adm-sum { grid-template-columns: 1fr; }
+    .adm-words-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 620px) {
     .adm-cards { grid-template-columns: 1fr; }
-    .adm-title h1 { font-size: 28px; }
-    .adm-grad b { font-size: 21px; }
-    .adm-card { padding: 16px; }
+    .adm-title h1 { font-size: 30px; }
+    .adm-grad b { font-size: 24px; }
+    .adm-card { padding: 18px; }
     .adm-ups, .adm-gws { grid-template-columns: 1fr; }
     .admd { height: 92vh; }
     .admd-head, .admd-body { padding-left: 16px; padding-right: 16px; }
