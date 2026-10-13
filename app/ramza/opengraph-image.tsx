@@ -8,9 +8,9 @@ export const contentType = "image/png";
    ImageResponse font (no external fetch) to keep the build fast. */
 export default function OgImage() {
   const paper = "#ffffff";
-  const ink = "#0b1533";
-  const ledger = "#2f6bff";
-  const rule = "#e3e8f7";
+  const ink = "#0C0B12";
+  const ledger = "#6D55F0";
+  const rule = "#E8E5DE";
 
   return new ImageResponse(
     (

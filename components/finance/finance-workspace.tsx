@@ -20,6 +20,7 @@ import {
   RefreshCcw, Loader2, LayoutDashboard, PackageSearch, Receipt,
   WalletCards, FolderOpen, RotateCcw, FileChartColumn, Settings,
   Megaphone, Boxes, Users, ArrowLeftRight, Store, Truck,
+  Inbox,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -40,6 +41,7 @@ import { OrdersLedger } from "@/components/finance/orders-ledger";
 import { OrdersAnalyticsPanel } from "@/components/finance/orders-analytics/orders-analytics";
 import { AdsExplorer } from "@/components/finance/ads/ads-explorer";
 import { DispatchPanel } from "@/components/finance/dispatch/dispatch-panel";
+import { LeadsInbox } from "@/components/finance/leads-inbox";
 import { CommandCenter } from "@/components/finance/dashboard-v2/command/command-center";
 import { StorefrontPanel } from "@/components/finance/storefront/storefront-panel";
 import { CustomersPanel } from "@/components/finance/customers-panel";
@@ -56,7 +58,7 @@ import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
 export type FinanceView =
   | "dashboard" | "sales" | "orders" | "reconciliation"
-  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings" | "dispatch";
+  | "payouts" | "documents" | "returns" | "reports" | "marketing" | "storefronts" | "inventory" | "customers" | "settings" | "dispatch" | "leads";
 
 /* ── Nav config ─────────────────────────────────────────────────────────── */
 
@@ -97,6 +99,7 @@ const NAV: NavItem[] = [
   { href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
   { href: "/inventory", view: "inventory", label: "Inventory", icon: Boxes },
   { href: "/customers", view: "customers", label: "Customers", icon: Users },
+  { href: "/leads", view: "leads", label: "Leads", icon: Inbox },
   { href: "/settings", view: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -746,6 +749,8 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
               <CommandCenter variant="marketing" />
               <AdsExplorer />
             </>
+          ) : view === "leads" ? (
+            <LeadsInbox />
           ) : view === "dispatch" ? (
             <DispatchPanel />
           ) : view === "storefronts" ? (

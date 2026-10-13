@@ -776,6 +776,9 @@ alter table leads add column if not exists situation         text not null defau
 alter table leads add column if not exists penalty_type      text not null default '';
 alter table leads add column if not exists penalty_issued_on date;
 alter table leads add column if not exists checker           jsonb;
+-- Leads inbox (/leads): founder's follow-up state per lead.
+alter table leads add column if not exists notes             text not null default '';
+alter table leads add column if not exists contacted_at      timestamptz;
 
 
 -- A payout file uploaded from a specific bank credit's panel is pinned to that

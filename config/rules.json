@@ -151,7 +151,21 @@
     "scope": "B2B/B2G; B2C-only currently out of scope",
     "source": "https://www.deloitte.com/middle-east/en/services/tax/perspectives/uae-e-invoicing-asp-appointment-deadline-extended-but-go-live-remains-01012027.html",
     "verified_on": "2026-09-28",
-    "VERIFY": "compliance-gate: confirm 'B2C-only out of scope' on mof.gov.ae before using it in copy"
+    "VERIFY": "compliance-gate: confirm 'B2C-only out of scope' on mof.gov.ae before using it in copy",
+    "penalties": {
+      "asp_late_aed_per_month": 5000,
+      "asp_late_per": "month or part thereof",
+      "invoice_not_issued_aed": 100,
+      "credit_note_not_issued_aed": 100,
+      "invoice_cap_aed_per_month": 5000,
+      "cap_rule": "AED 100 per e-invoice (and separately per e-credit note), capped at AED 5,000 per calendar month for each category",
+      "system_failure_notice_aed_per_day": 1000,
+      "asp_data_change_notice_aed_per_day": 1000,
+      "legal_basis": "Cabinet Decision No. 106 of 2025 on violations and administrative penalties for the Electronic Invoicing System",
+      "source": "https://mof.gov.ae/wp-content/uploads/2025/12/Cabinet-Decision-Violations-and-Penalties-eInvoicing-final-version-en-8.12.25.pdf",
+      "verified_on": "2026-10-03",
+      "voluntary_exempt": "Art. 2(2): does not apply to voluntary e-invoicing adopters"
+    }
   },
   "pricing": {
     "_status": "Tier model decided (transaction-based). Tier AED amounts still null = founder to set; UI shows 'Get a quote' until then.",

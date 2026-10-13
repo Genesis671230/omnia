@@ -7,7 +7,7 @@ export const RAMZA_ORIGIN = (
   process.env.NEXT_PUBLIC_RAMZA_ORIGIN || "https://ramza.ai"
 ).replace(/\/+$/, "");
 
-export const RAMZA_EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "hello@ramza.ai";
+export const RAMZA_EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "accounts@ramzaworks.com";
 export const RAMZA_LEGAL_LINE = process.env.LEGAL_LINE || "Lexoro Solutions LLC";
 
 export const BRAND = {

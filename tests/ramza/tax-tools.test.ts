@@ -52,3 +52,20 @@ test("e-invoicing phase by revenue", () => {
   assert.equal(big.goLive, "2027-01-01");
   assert.equal(checkEInvoicing(5000000, "2026-10-01").goLive, "2027-07-01");
 });
+
+test("e-invoicing penalties follow Cabinet Decision 106/2025", () => {
+  // before the ASP date: nothing owed yet, 5,000/month at risk
+  const early = checkEInvoicing(60000000, "2026-10-03");
+  assert.equal(early.exposureAed, 0);
+  assert.equal(early.monthlyRiskAed, 5000);
+  // one day late = one part month
+  assert.equal(checkEInvoicing(60000000, "2026-10-31").exposureAed, 5000);
+  // ~2.x months late, plus per-invoice penalty capped at 5,000/month after go-live
+  const late = checkEInvoicing(60000000, "2027-01-15", { b2bInvoicesPerMonth: 120 });
+  assert.equal(late.monthlyRiskAed, 5000 + 5000);
+  assert.equal(late.exposureAed, 3 * 5000 + 1 * 5000);
+  // appointed: no ASP penalty, small invoice volume under the cap
+  const ok = checkEInvoicing(60000000, "2026-10-31", { aspAppointed: true, b2bInvoicesPerMonth: 20 });
+  assert.equal(ok.exposureAed, 0);
+  assert.equal(ok.monthlyRiskAed, 2000);
+});

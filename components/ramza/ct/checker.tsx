@@ -20,7 +20,7 @@ const TYPES: { k: PenaltyType; label: string }[] = [
 
 const TONE_STYLE: Record<Tone, { ring: string; icon: typeof CheckCircle2; text: string; bg: string }> = {
   good: { ring: "ring-emerald-200", icon: CheckCircle2, text: "text-emerald-700", bg: "bg-emerald-50" },
-  act: { ring: "ring-[#2347D9]/25", icon: CalendarClock, text: "text-[#2347D9]", bg: "bg-[#EEF3FF]" },
+  act: { ring: "ring-[#4F35E8]/25", icon: CalendarClock, text: "text-[#4F35E8]", bg: "bg-[#F1EFEA]" },
   closed: { ring: "ring-rose-200", icon: XCircle, text: "text-rose-700", bg: "bg-rose-50" },
   info: { ring: "ring-slate-200", icon: Info, text: "text-slate-600", bg: "bg-slate-50" },
 };
@@ -52,7 +52,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
             key={t.k}
             type="button"
             onClick={() => setType(t.k)}
-            className={`h-11 rounded-2xl border text-[14px] transition ${type === t.k ? "border-[#2347D9] bg-[#EEF3FF] font-medium text-[#0A1A4A]" : "border-[#D9E1F5] bg-white text-[#4A5680] hover:border-[#9FB4F2]"}`}
+            className={`h-11 rounded-2xl border text-[14px] transition ${type === t.k ? "border-[#4F35E8] bg-[#F1EFEA] font-medium text-[#14131C]" : "border-[#E2DFD8] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}
           >
             {t.label}
           </button>
@@ -70,7 +70,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
           <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className={ct.input} />
         </label>
         <label className={`block ${compact ? "sm:col-span-2" : ""}`}>
-          <span className={ct.label}>Return filed on <span className="font-normal text-[#9AA6C8]">(leave empty if not yet)</span></span>
+          <span className={ct.label}>Return filed on <span className="font-normal text-[#A19EA6]">(leave empty if not yet)</span></span>
           <input type="date" value={filedOn} onChange={(e) => setFiledOn(e.target.value)} className={ct.input} />
         </label>
       </div>
@@ -91,7 +91,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
                 <span>{result.headline}</span>
               </div>
               {result.estimatedAed > 0 && (
-                <p className="mt-2 pl-7 text-[13px] text-[#4A5680]">Estimated exposure: <b className="text-[#0A1A4A]">AED {result.estimatedAed.toLocaleString("en-US")}</b></p>
+                <p className="mt-2 pl-7 text-[13px] text-[#55525E]">Estimated exposure: <b className="text-[#14131C]">AED {result.estimatedAed.toLocaleString("en-US")}</b></p>
               )}
             </div>
 
@@ -99,11 +99,11 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
               {result.findings.map((f) => {
                 const s = TONE_STYLE[f.tone];
                 return (
-                  <li key={f.key} className="flex gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-inset ring-[#E3E9F7]">
+                  <li key={f.key} className="flex gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-inset ring-[#E8E5DE]">
                     <s.icon size={17} className={`mt-0.5 shrink-0 ${s.text}`} />
                     <div>
-                      <div className="text-[14px] font-medium text-[#0A1A4A]">{f.title}</div>
-                      <p className="mt-0.5 text-[13px] leading-relaxed text-[#4A5680]">{f.detail}</p>
+                      <div className="text-[14px] font-medium text-[#14131C]">{f.title}</div>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-[#55525E]">{f.detail}</p>
                     </div>
                   </li>
                 );
@@ -115,7 +115,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
                 Send this to a tax expert — free review <ArrowRight size={16} />
               </button>
             )}
-            <p className="mt-3 flex gap-1.5 text-[11.5px] leading-relaxed text-[#8A96BD]">
+            <p className="mt-3 flex gap-1.5 text-[11.5px] leading-relaxed text-[#8E8B95]">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               General guidance from the published FTA rules, not legal advice. Business days exclude weekends but not public holidays, so real deadlines can be a little later — confirm on EmaraTax.
             </p>

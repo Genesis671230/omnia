@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { MessageCircle, ShieldCheck } from "lucide-react";
 import { RamzaShell } from "@/components/ramza/ramza-shell";
 import { AttributionInit } from "@/components/ramza/attribution-init";
 import { CT_MORE, CT_NAV, CT_PENALTY_LINKS, whatsappHref } from "@/lib/ramza/ct-site";
@@ -12,6 +11,7 @@ import { CtNav } from "./nav";
 import { Pixels } from "./pixels";
 import { WhatsAppLink } from "./tracked";
 import { ct } from "./brand";
+import { RamzaMark } from "./mark";
 
 
 export function CtSiteFrame({ children }: { children: ReactNode }) {
@@ -21,37 +21,40 @@ export function CtSiteFrame({ children }: { children: ReactNode }) {
       <AttributionInit />
       <Pixels />
 
-      {/* Solid ground so the old RAMZA backdrop never shows through */}
-      <div className="bg-[#F7F9FE] font-[family-name:var(--font-plex)]">
+      {/* One canvas for the whole page: sections are transparent and sit on it.
+          The only colour in the ground is a soft light pool at the very top
+          that fades into the canvas (no per-section tints). */}
+      <div className="relative bg-[#FAF9F6] font-[family-name:var(--font-plex)]">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[1100px] bg-[radial-gradient(60%_55%_at_78%_0%,rgba(79,53,232,0.10),transparent_70%),radial-gradient(45%_40%_at_8%_8%,rgba(214,186,150,0.16),transparent_70%)]" />
         <CtNav whatsappHref={wa} />
         <main>{children}</main>
 
         <footer className={ct.sectionDark}>
           <div className={`${ct.container} grid gap-10 py-16 md:grid-cols-[1.3fr_1fr_1fr]`}>
             <div>
-              <Link href="/ramza" className="inline-flex items-center gap-2.5 text-[18px] font-semibold tracking-[0.18em]">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2347D9]"><ShieldCheck size={18} /></span> RAMZA
+              <Link href="/ramza" className="inline-flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[19px] font-bold tracking-[0.16em]">
+                <RamzaMark tone="light" /> RAMZA
               </Link>
-              <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-[#B9C6EE]">
-                Corporate Tax filed on time for UAE businesses — AI bookkeeping, expert accountants, and help with penalties when a deadline was missed.
+              <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-[#B8B6C0]">
+                Payout reconciliation, e-invoicing readiness and Corporate Tax for UAE e-commerce and retail brands — AI bookkeeping, checked by accountants.
               </p>
-              <WhatsAppLink href={wa} placement="footer" className={`${ct.btnWhite} mt-6 h-11 text-[14px]`}><MessageCircle size={16} /> WhatsApp us</WhatsAppLink>
+              <WhatsAppLink href={wa} placement="footer" className={`${ct.btnWhite} mt-6 h-11 text-[14px]`}>WhatsApp us</WhatsAppLink>
             </div>
             <div>
-              <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#8FB0FF]">Corporate Tax</div>
-              <ul className="mt-4 space-y-2.5 text-[14px] text-[#DCE4FF]">
+              <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">Corporate Tax</div>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-[#E6E4EA]">
                 {[...CT_NAV, ...CT_PENALTY_LINKS].map((l) => <li key={l.href}><Link href={l.href} className="hover:text-white">{l.label}</Link></li>)}
               </ul>
             </div>
             <div>
-              <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#8FB0FF]">RAMZA</div>
-              <ul className="mt-4 space-y-2.5 text-[14px] text-[#DCE4FF]">
+              <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">RAMZA</div>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-[#E6E4EA]">
                 {CT_MORE.map((l) => <li key={l.href}><Link href={l.href} className="hover:text-white">{l.label}</Link></li>)}
                 <li><a href={`mailto:${RAMZA_EMAIL}`} className="hover:text-white">{RAMZA_EMAIL}</a></li>
               </ul>
             </div>
           </div>
-          <div className={`${ct.container} flex flex-col gap-2 border-t border-white/10 py-6 text-[12px] text-[#8A96BD] sm:flex-row sm:justify-between`}>
+          <div className={`${ct.container} flex flex-col gap-2 border-t border-white/10 py-6 text-[12px] text-[#8E8B95] sm:flex-row sm:justify-between`}>
             <span>© {new Date().getFullYear()} {RAMZA_LEGAL_LINE}</span>
             <span>General information, not legal advice. Deadlines and amounts follow the FTA’s published rules — confirm your case on EmaraTax.</span>
           </div>

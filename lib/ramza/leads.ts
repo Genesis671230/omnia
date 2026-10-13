@@ -125,6 +125,7 @@ export async function insertCtLead(
 const SITUATION_LABEL: Record<string, string> = {
   file_return: "Needs the Corporate Tax return filed",
   einvoicing: "Wants e-invoicing set up (ASP + clean invoice data)",
+  reconciliation: "Wants gateway payouts reconciled (Tabby/Tamara/Stripe/Telr → bank → books)",
   vat: "VAT registration / returns",
   books_behind: "Bookkeeping behind",
   got_penalty: "Received a penalty",
@@ -135,12 +136,20 @@ const SITUATION_LABEL: Record<string, string> = {
 
 export async function notifyCtLead(input: import("@/lib/ramza/validation").CtLeadInput, attr: LeadAttribution): Promise<void> {
   const line = [
-    "<b>New RAMZA Corporate Tax penalty lead</b>",
+    `<b>New RAMZA lead — ${input.situation === "einvoicing" ? "e-invoicing" : input.situation === "reconciliation" ? "reconciliation" : input.situation === "vat" ? "VAT" : "Corporate Tax"}</b>`,
     `${escapeHtml(input.name)} — ${escapeHtml(input.company)}`,
     `${escapeHtml(input.email)} · ${escapeHtml(input.whatsapp)}`,
     `${escapeHtml(SITUATION_LABEL[input.situation] ?? input.situation)}${input.penaltyType ? ` · ${escapeHtml(input.penaltyType)}` : ""}${input.penaltyIssuedOn ? ` · notice ${input.penaltyIssuedOn}` : ""}`,
     input.checker ? `Checker: ${escapeHtml(String(input.checker.headline ?? ""))}` : "",
     attr.utm_campaign || attr.utm_source ? `Campaign: ${escapeHtml(attr.utm_source || "?")} / ${escapeHtml(attr.utm_campaign || "?")}` : "",
+    attr.landing_path ? `Page: ${escapeHtml(attr.landing_path)}` : "",
+    waMe(input.whatsapp) ? `<a href="${waMe(input.whatsapp)}">Reply on WhatsApp</a> · inbox: /leads` : "",
   ].filter(Boolean).join("\n");
   await sendTelegramMessage(line).catch(() => {});
+}
+
+/** wa.me link for a UAE-style number (05x → 9715x); "" if it has no digits. */
+function waMe(n: string): string {
+  const d = n.replace(/[^\d]/g, "").replace(/^00/, "").replace(/^0(?=5)/, "971");
+  return d ? `https://wa.me/${d}` : "";
 }

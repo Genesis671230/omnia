@@ -1337,3 +1337,8 @@
   line-height: 1.5;
   color: var(--ink-40);
 }
+
+/* RAMZA site — logo marquee + slow photo drift (hero) */
+@keyframes ramza-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ramza-drift { from { transform: scale(1.04) translate3d(0, 0, 0); } to { transform: scale(1.12) translate3d(-2%, -1.5%, 0); } }
+@keyframes ramza-sheen { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(220%) skewX(-18deg); } }

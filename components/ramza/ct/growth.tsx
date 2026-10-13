@@ -29,16 +29,16 @@ function Flywheel() {
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[460px]">
       <svg ref={ref} viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
-        <motion.path d={sketch} fill="none" stroke="#2347D9" strokeWidth={3} strokeLinecap="round"
+        <motion.path d={sketch} fill="none" stroke="#4F35E8" strokeWidth={3} strokeLinecap="round"
           initial={{ pathLength: 0 }} animate={inView ? { pathLength: 1 } : undefined} transition={{ duration: 1.6, ease: "easeInOut" }} />
-        <motion.path d={sketch} fill="none" stroke="#4C7BFF" strokeWidth={1.2} strokeLinecap="round" opacity={0.5} transform="rotate(4 200 200)"
+        <motion.path d={sketch} fill="none" stroke="#B3A6FF" strokeWidth={1.2} strokeLinecap="round" opacity={0.5} transform="rotate(4 200 200)"
           initial={{ pathLength: 0 }} animate={inView ? { pathLength: 1 } : undefined} transition={{ duration: 1.8, delay: 0.2, ease: "easeInOut" }} />
         {/* arrowheads riding the loop */}
         <motion.g style={{ originX: "200px", originY: "200px" }} animate={inView && !reduced ? { rotate: 360 } : undefined} transition={{ duration: 18, repeat: Infinity, ease: "linear" }}>
           {[45, 135, 225, 315].map((a) => {
             const r = (a * Math.PI) / 180;
             const x = C + R * Math.cos(r), y = C + R * Math.sin(r);
-            return <path key={a} d="M-7 -6 L4 0 L-7 6" fill="none" stroke="#2347D9" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" transform={`translate(${x} ${y}) rotate(${a + 90})`} />;
+            return <path key={a} d="M-7 -6 L4 0 L-7 6" fill="none" stroke="#4F35E8" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" transform={`translate(${x} ${y}) rotate(${a + 90})`} />;
           })}
         </motion.g>
         {/* centre scribble */}
@@ -47,17 +47,16 @@ function Flywheel() {
         <motion.path d="M228 184 L242 184 L240 198" fill="none" stroke="#10B981" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round"
           initial={{ pathLength: 0 }} animate={inView ? { pathLength: 1 } : undefined} transition={{ duration: 0.3, delay: 2.1 }} />
       </svg>
-      <div className="absolute left-1/2 top-[57%] -translate-x-1/2 text-center text-[12px] font-medium uppercase tracking-[0.14em] text-[#6B77A0]">growth loop</div>
+      <div className="absolute left-1/2 top-[57%] -translate-x-1/2 text-center text-[12px] font-medium uppercase tracking-[0.14em] text-[#6E6B75]">growth loop</div>
       {STEPS.map((s, i) => {
         const r = (s.a * Math.PI) / 180;
         const left = 50 + 32 * Math.cos(r), top = 50 + 32 * Math.sin(r);
         return (
           <motion.div key={s.t} className="absolute w-[124px] -translate-x-1/2 -translate-y-1/2 sm:w-[170px]" style={{ left: `${left}%`, top: `${top}%` }}
             initial={{ opacity: 0, scale: 0.85 }} animate={inView ? { opacity: 1, scale: 1 } : undefined} transition={{ delay: 0.4 + i * 0.25, type: "spring", stiffness: 260, damping: 20 }}>
-            <div className="rounded-2xl bg-white px-3 py-2.5 text-center shadow-[0_14px_34px_-20px_rgba(10,26,74,0.55)] ring-1 ring-[#E3E9F8]">
-              <s.icon size={18} className="mx-auto text-[#2347D9]" />
-              <div className="mt-1 text-[13px] font-medium leading-tight text-[#0A1A4A]">{s.t}</div>
-              <div className="mt-0.5 text-[11px] leading-snug text-[#8A96BD]">{s.d}</div>
+            <div className="rounded-2xl bg-white px-3 py-2.5 text-center shadow-[0_14px_34px_-20px_rgba(20,19,28,0.55)] ring-1 ring-[#E8E5DE]">
+              <div className="mt-1 text-[13px] font-medium leading-tight text-[#14131C]">{s.t}</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-[#8E8B95]">{s.d}</div>
             </div>
           </motion.div>
         );
@@ -72,16 +71,16 @@ function BoardPack() {
     ? [["Revenue", "1.54M", "+35%"], ["Net profit", "326k", "+73%"], ["Margin", "21%", "+5 pts"]]
     : [["Revenue", "468k", "+16%"], ["Net profit", "109k", "+24%"], ["Margin", "23%", "+1 pt"]];
   return (
-    <div className="rounded-[28px] bg-white p-6 shadow-[0_30px_70px_-40px_rgba(10,26,74,0.5)] ring-1 ring-[#E3E9F8]">
+    <div className="rounded-[28px] bg-white p-6 shadow-[0_30px_70px_-40px_rgba(20,19,28,0.5)] ring-1 ring-[#E8E5DE]">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-[#8A96BD]">Board pack</div>
-          <div className="mt-1 text-[17px] font-medium text-[#0A1A4A]">Your company, as investors see it</div>
+          <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-[#8E8B95]">Board pack</div>
+          <div className="mt-1 text-[17px] font-medium text-[#14131C]">Your company, as investors see it</div>
         </div>
-        <div className="flex rounded-full bg-[#EEF3FF] p-0.5 text-[12px]">
+        <div className="flex rounded-full bg-[#F1EFEA] p-0.5 text-[12px]">
           {(["quarterly", "yearly"] as const).map((p) => (
-            <button key={p} onClick={() => setPeriod(p)} className={`relative rounded-full px-3 py-1 capitalize ${period === p ? "text-white" : "text-[#4A5680]"}`}>
-              {period === p && <motion.span layoutId="board-toggle" className="absolute inset-0 rounded-full bg-[#2347D9]" />}
+            <button key={p} onClick={() => setPeriod(p)} className={`relative rounded-full px-3 py-1 capitalize ${period === p ? "text-white" : "text-[#55525E]"}`}>
+              {period === p && <motion.span layoutId="board-toggle" className="absolute inset-0 rounded-full bg-[#14131C]" />}
               <span className="relative">{p}</span>
             </button>
           ))}
@@ -89,16 +88,16 @@ function BoardPack() {
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2">
         {kpis.map(([l, v, d]) => (
-          <div key={l} className="rounded-2xl bg-[#F7F9FE] px-3 py-3">
-            <div className="text-[11.5px] text-[#8A96BD]">{l}</div>
-            <div className="text-[20px] font-medium tabular-nums text-[#0A1A4A]">{v}</div>
+          <div key={l} className="rounded-2xl bg-[#FAF9F6] px-3 py-3">
+            <div className="text-[11.5px] text-[#8E8B95]">{l}</div>
+            <div className="text-[20px] font-medium tabular-nums text-[#14131C]">{v}</div>
             <div className="flex items-center gap-1 text-[11.5px] text-emerald-600"><TrendingUp size={12} />{d}</div>
           </div>
         ))}
       </div>
       <div className="mt-5"><ProfitBars key={period} period={period} /></div>
-      <div className="mt-3 flex items-center justify-between text-[11.5px] text-[#8A96BD]">
-        <span className="flex items-center gap-3"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#DCE6FF]" />Revenue</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#2347D9]" />Net profit</span></span>
+      <div className="mt-3 flex items-center justify-between text-[11.5px] text-[#8E8B95]">
+        <span className="flex items-center gap-3"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#E8E5DE]" />Revenue</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#14131C]" />Net profit</span></span>
         <span>Illustrative figures</span>
       </div>
     </div>

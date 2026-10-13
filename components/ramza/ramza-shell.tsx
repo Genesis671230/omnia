@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Fraunces } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Fraunces, Urbanist } from "next/font/google";
 import { Backdrop } from "./backdrop";
 import "@/app/ramza/ramza.css";
 
@@ -16,6 +16,13 @@ const fraunces = Fraunces({
   weight: ["400", "500", "600"],
   style: ["normal", "italic"],
   variable: "--font-fraunces",
+  display: "swap",
+});
+
+const urbanist = Urbanist({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -38,7 +45,7 @@ export function RamzaShell({ children }: { children: ReactNode }) {
          computed-value time, so it fell through to the inherited IBM Plex
          rather than to the Georgia fallback. The serif display face was
          loaded and never once rendered. */
-      className={`${plex.variable} ${plexArabic.variable} ${fraunces.variable} relative min-h-screen`}
+      className={`${plex.variable} ${plexArabic.variable} ${fraunces.variable} ${urbanist.variable} relative min-h-screen`}
       style={{ color: "var(--ink)" }}
     >
       <Backdrop />

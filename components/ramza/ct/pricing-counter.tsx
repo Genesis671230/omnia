@@ -11,7 +11,7 @@
  * "ramza:quote") and scrolls to it, so the accountant sees it on the lead. */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Calculator, Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { useMemo, useState } from "react";
 import { RESCUE_FEE_AED, billableTxn, priceForTxn, rules } from "@/lib/ramza/rules";
 import { track } from "@/lib/ramza/track";
@@ -28,12 +28,12 @@ function Slider({ label, value, onChange, max, hint }: { label: string; value: n
   return (
     <label className="block">
       <div className="flex items-baseline justify-between">
-        <span className="text-[14px] font-medium text-[#0A1A4A]">{label}</span>
-        <span className="text-[18px] font-medium tabular-nums text-[#2347D9]">{fmt(value)}</span>
+        <span className="text-[14px] font-medium text-[#14131C]">{label}</span>
+        <span className="text-[18px] font-medium tabular-nums text-[#4F35E8]">{fmt(value)}</span>
       </div>
       <input type="range" min={0} max={max} step={5} value={value} onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-3 w-full accent-[#2347D9]" aria-label={label} />
-      <span className="text-[12px] text-[#8A96BD]">{hint}</span>
+        className="mt-3 w-full accent-[#4F35E8]" aria-label={label} />
+      <span className="text-[12px] text-[#8E8B95]">{hint}</span>
     </label>
   );
 }
@@ -63,7 +63,7 @@ export function PricingCounter() {
     <section id="pricing" className={`${ct.sectionLight} scroll-mt-24 pb-24 pt-24`}>
       <TrackView section="pricing" event="ViewContent" className={ct.container}>
         <Reveal className="mx-auto max-w-2xl text-center">
-          <span className={ct.eyebrow}><Calculator size={14} /> Transaction-based pricing</span>
+          <span className={ct.eyebrow}>Transaction-based pricing</span>
           <h2 className={`${ct.h2} mt-4`}>Pay for what moves through your books</h2>
           <p className={`${ct.lead} mt-4`}>Gateway lines count {perLine} to 1 — so Stripe, Tabby, Tamara and Telr payouts don’t blow up your bill.</p>
         </Reveal>
@@ -73,13 +73,13 @@ export function PricingCounter() {
             <Slider label="Bank lines a month" value={bank} onChange={setBank} max={600} hint="Every line on your bank statements" />
             <Slider label="Online orders a month" value={orders} onChange={setOrders} max={3000} hint={`Each order is a gateway line — ${perLine} of them bill as 1 transaction`} />
             <div>
-              <span className="text-[14px] font-medium text-[#0A1A4A]">Payment gateways</span>
+              <span className="text-[14px] font-medium text-[#14131C]">Payment gateways</span>
               <div className="mt-3 flex flex-wrap gap-2">
                 {rules.pricing.gateways.map((g) => {
                   const on = gateways.includes(g);
                   return (
                     <button key={g} type="button" onClick={() => setGateways((cur) => (on ? cur.filter((x) => x !== g) : [...cur, g]))}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] transition ${on ? "bg-[#2347D9] text-white shadow-[0_8px_20px_-10px_rgba(35,71,217,0.8)]" : "bg-[#EEF3FF] text-[#4A5680] hover:bg-[#DCE6FF]"}`}>
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] transition ${on ? "bg-[#14131C] text-white shadow-[0_8px_20px_-10px_rgba(79,53,232,0.8)]" : "bg-[#F1EFEA] text-[#55525E] hover:bg-[#E8E5DE]"}`}>
                       {on && <Check size={13} />}{g}
                     </button>
                   );
@@ -95,13 +95,13 @@ export function PricingCounter() {
             </label>
           </Reveal>
 
-          <Reveal delay={0.1} className="flex flex-col rounded-[28px] bg-gradient-to-br from-[#0A1A4A] to-[#2347D9] p-6 text-white sm:p-8">
-            <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#8FB0FF]">Your estimate</div>
+          <Reveal delay={0.1} className="flex flex-col rounded-[28px] bg-gradient-to-br from-[#14131C] to-[#25232E] p-6 text-white sm:p-8">
+            <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">Your estimate</div>
             <div className="mt-4 flex items-baseline gap-2">
               <motion.span key={billable} initial={{ opacity: 0.4, y: 6 }} animate={{ opacity: 1, y: 0 }} className="text-[46px] font-medium leading-none tabular-nums">{fmt(billable)}</motion.span>
-              <span className="text-[14px] text-[#B9C6EE]">billable transactions / month</span>
+              <span className="text-[14px] text-[#B8B6C0]">billable transactions / month</span>
             </div>
-            <div className="mt-2 text-[13px] text-[#B9C6EE]">{fmt(bank)} bank + ⌈{fmt(gatewayLines)} ÷ {perLine}⌉ gateway</div>
+            <div className="mt-2 text-[13px] text-[#B8B6C0]">{fmt(bank)} bank + ⌈{fmt(gatewayLines)} ÷ {perLine}⌉ gateway</div>
 
             <div className="mt-6 rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
               <div className="flex items-center justify-between text-[14px]">
@@ -116,14 +116,14 @@ export function PricingCounter() {
                 {late && RESCUE_FEE_AED != null && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                     <div className="mt-3 flex items-center justify-between border-t border-white/15 pt-3 text-[14px]">
-                      <span>Late-filing rescue <span className="text-[#B9C6EE]">· one-off</span></span>
+                      <span>Late-filing rescue <span className="text-[#B8B6C0]">· one-off</span></span>
                       <b className="text-[18px] font-medium">AED {fmt(RESCUE_FEE_AED)}</b>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-            <p className="mb-7 mt-3 text-[12.5px] leading-relaxed text-[#B9C6EE]">
+            <p className="mb-7 mt-3 text-[12.5px] leading-relaxed text-[#B8B6C0]">
               For context: {anchor.name}s charge around AED {fmt(anchor.aed_month)}/month for {anchor.txn_included} transactions.
             </p>
             <button onClick={getQuote} className={`${ct.btnWhite} mt-auto w-full`}>

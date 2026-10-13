@@ -209,19 +209,63 @@ export function checkVat(i: VatInput): VatResult {
 
 /* ── e-invoicing ───────────────────────────────────────────────────────── */
 
-export type EInvResult = { phase: "large" | "sme"; aspBy: string; goLive: string; daysToAsp: number; daysToGoLive: number; lines: ToolLine[] };
+export type EInvResult = {
+  phase: "large" | "sme"; aspBy: string; goLive: string; daysToAsp: number; daysToGoLive: number;
+  /** Penalty estimate to date (AED) given the answers; 0 when nothing is late yet. */
+  exposureAed: number;
+  /** What one month of non-compliance would cost once a date is missed. */
+  monthlyRiskAed: number;
+  lines: ToolLine[];
+};
 
-export function checkEInvoicing(revenueAed: number, today: string): EInvResult {
+export type EInvOptions = { aspAppointed?: boolean; b2bInvoicesPerMonth?: number | null };
+
+/** Months (or part months) from the day after `due` to `today`, 0 if not late. */
+function monthsOrPartLate(due: string, today: string): number {
+  if (today <= due) return 0;
+  return Math.max(monthsLate(due, today), 1);
+}
+
+export function checkEInvoicing(revenueAed: number, today: string, o: EInvOptions = {}): EInvResult {
   const e = TAX.einvoicing;
+  const pen = e.penalties;
   const large = revenueAed >= e.large.revenue_gte_aed;
   const p = large ? e.large : e.sme;
   const daysToAsp = daysBetween(today, p.asp_by);
   const daysToGoLive = daysBetween(today, p.go_live);
-  return {
-    phase: large ? "large" : "sme", aspBy: p.asp_by, goLive: p.go_live, daysToAsp, daysToGoLive,
-    lines: [
-      { tone: daysToAsp < 0 ? "bad" : daysToAsp < 60 ? "warn" : "info", title: `Appoint an Accredited Service Provider by ${fmtDay(p.asp_by)}`, detail: daysToAsp < 0 ? "That date has passed — appoint one now." : `${daysToAsp} days left.` },
-      { tone: "info", title: `E-invoices go live ${fmtDay(p.go_live)}`, detail: `${large ? `Revenue of ${aed(e.large.revenue_gte_aed)} or more` : "Businesses below the large-company threshold"}. Applies to B2B and B2G invoices.` },
-    ],
-  };
+  const appointed = !!o.aspAppointed;
+  const invoices = Math.max(Math.round(o.b2bInvoicesPerMonth ?? 0), 0);
+  const invoiceMonthly = Math.min(invoices * pen.invoice_not_issued_aed, pen.invoice_cap_aed_per_month);
+  const monthlyRiskAed = (appointed ? 0 : pen.asp_late_aed_per_month) + invoiceMonthly;
+
+  let exposure = 0;
+  const lines: ToolLine[] = [];
+  if (appointed) {
+    lines.push({ tone: "good", title: "Accredited Service Provider appointed", detail: `Next: map your invoice data and test with the ASP before ${fmtDay(p.go_live)}.` });
+  } else {
+    const late = monthsOrPartLate(p.asp_by, today);
+    exposure += late * pen.asp_late_aed_per_month;
+    lines.push({
+      tone: late ? "bad" : daysToAsp < 60 ? "warn" : "info",
+      title: `Appoint an Accredited Service Provider by ${fmtDay(p.asp_by)}`,
+      detail: late
+        ? `That date has passed. Late appointment: ${aed(pen.asp_late_aed_per_month)} for each month or part month — about ${aed(exposure)} so far.`
+        : `${daysToAsp} days left. Missing it: ${aed(pen.asp_late_aed_per_month)} for each month or part month of delay.`,
+    });
+  }
+  const liveMonths = monthsOrPartLate(p.go_live, today);
+  if (invoices && liveMonths && !appointed) exposure += liveMonths * invoiceMonthly;
+  lines.push({
+    tone: "info",
+    title: `E-invoices go live ${fmtDay(p.go_live)}`,
+    detail: `${large ? `Revenue of ${aed(e.large.revenue_gte_aed)} or more` : "Businesses below the large-company threshold"}. Applies to B2B and B2G invoices.`,
+  });
+  lines.push({
+    tone: invoices ? "warn" : "info",
+    title: `Each invoice not sent as an e-invoice: ${aed(pen.invoice_not_issued_aed)}`,
+    detail: invoices
+      ? `At ~${invoices.toLocaleString("en-US")} B2B invoices a month that is ${aed(invoiceMonthly)} a month (capped at ${aed(pen.invoice_cap_aed_per_month)}; credit notes count separately).`
+      : `Capped at ${aed(pen.invoice_cap_aed_per_month)} a month; credit notes count separately. Source: ${pen.legal_basis}.`,
+  });
+  return { phase: large ? "large" : "sme", aspBy: p.asp_by, goLive: p.go_live, daysToAsp, daysToGoLive, exposureAed: exposure, monthlyRiskAed, lines };
 }

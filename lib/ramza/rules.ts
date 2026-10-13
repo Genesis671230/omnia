@@ -64,3 +64,16 @@ export function ctOn(taxableIncome: number): number {
   const over = Math.max(taxableIncome - rules.ct.rate.zero_rate_up_to_aed, 0);
   return Math.round(over * rules.ct.rate.rate_above);
 }
+
+/** E-invoicing dates + penalties (Cabinet Decision 106/2025). */
+export const EINV = {
+  largeRevenueAed: rules.einvoicing.large.revenue_gte_aed,
+  largeAspBy: rules.einvoicing.large.asp_by,
+  largeGoLive: rules.einvoicing.large.go_live,
+  smeAspBy: rules.einvoicing.sme.asp_by,
+  smeGoLive: rules.einvoicing.sme.go_live,
+  aspLateAedPerMonth: rules.einvoicing.penalties.asp_late_aed_per_month,
+  perInvoiceAed: rules.einvoicing.penalties.invoice_not_issued_aed,
+  invoiceCapAedPerMonth: rules.einvoicing.penalties.invoice_cap_aed_per_month,
+  legalBasis: rules.einvoicing.penalties.legal_basis,
+} as const;

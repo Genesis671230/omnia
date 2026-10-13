@@ -75,7 +75,7 @@ export function validateLead(body: unknown): ValidationResult {
    email, company and what happened. Dates and the checker's result ride
    along when the visitor ran the checker first. */
 
-const SITUATIONS = new Set(["file_return", "books_behind", "got_penalty", "missed_deadline", "register_or_file", "einvoicing", "vat", "other"]);
+const SITUATIONS = new Set(["file_return", "books_behind", "got_penalty", "missed_deadline", "register_or_file", "einvoicing", "reconciliation", "vat", "other"]);
 const PENALTY_TYPES = new Set(["late_registration", "late_filing", "other", "not_sure", ""]);
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 

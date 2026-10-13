@@ -30,6 +30,7 @@ const SITUATIONS = [
 // Asked for from a specific tool (e-invoicing, VAT) — shown as its own chip.
 const EXTRA_SITUATIONS: Record<string, { label: string; icon: typeof FileCheck2 }> = {
   einvoicing: { label: "Set up e-invoicing", icon: FileCheck2 },
+  reconciliation: { label: "Reconcile my gateway payouts", icon: ReceiptText },
   vat: { label: "VAT registration", icon: ReceiptText },
 };
 
@@ -41,17 +42,17 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 function Field({ icon: Icon, error, children }: { icon: typeof User; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className={`group relative flex items-center rounded-2xl border bg-white transition focus-within:border-[#2347D9] focus-within:ring-4 focus-within:ring-[#2347D9]/12 ${error ? "border-[#F3B3BF]" : "border-[#D9E1F5]"}`}>
-        <Icon size={17} className="pointer-events-none absolute left-4 text-[#9AA6C8] transition group-focus-within:text-[#2347D9]" />
+      <div className={`group relative flex items-center rounded-2xl border bg-white transition focus-within:border-[#14131C] focus-within:ring-4 focus-within:ring-[#14131C]/8 ${error ? "border-[#F3B3BF]" : "border-[#E2DFD8]"}`}>
+        <Icon size={17} className="pointer-events-none absolute left-4 text-[#A19EA6] transition group-focus-within:text-[#14131C]" />
         {children}
       </div>
       {error && <p className={ct.error}>{error}</p>}
     </div>
   );
 }
-const inputCls = "h-[52px] w-full rounded-2xl bg-transparent pl-11 pr-4 text-[15px] text-[#0A1A4A] placeholder:text-[#9AA6C8] focus:outline-none";
+const inputCls = "h-[52px] w-full rounded-2xl bg-transparent pl-11 pr-4 text-[15px] text-[#14131C] placeholder:text-[#A19EA6] focus:outline-none";
 
-export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form", initialSituation = "file_return" }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string; initialSituation?: string }) {
+export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form", initialSituation = "file_return", chips }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string; initialSituation?: string; chips?: string[] }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [situation, setSituation] = useState<string>(initialSituation);
   const [v, setV] = useState({ whatsapp: "", company: "", name: "", email: "" });
@@ -146,12 +147,12 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
             <CheckCircle2 size={36} />
           </motion.span>
         </div>
-        <h3 className="mt-5 text-[21px] font-medium text-[#0A1A4A]">You’re in, {v.name.trim().split(" ")[0] || "thanks"}!</h3>
-        <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-[#4A5680]">Here’s what happens next:</p>
+        <h3 className="mt-5 text-[21px] font-medium text-[#14131C]">You’re in, {v.name.trim().split(" ")[0] || "thanks"}!</h3>
+        <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-[#55525E]">Here’s what happens next:</p>
         <ol className="mx-auto mt-4 max-w-xs space-y-2 text-left">
           {steps.map((s, i) => (
-            <motion.li key={s} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.15 }} className="flex items-center gap-3 text-[13.5px] text-[#0A1A4A]">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF3FF] text-[12px] font-medium text-[#2347D9]">{i + 1}</span>{s}
+            <motion.li key={s} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.15 }} className="flex items-center gap-3 text-[13.5px] text-[#14131C]">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[12px] font-medium text-[#4F35E8]">{i + 1}</span>{s}
             </motion.li>
           ))}
         </ol>
@@ -165,14 +166,14 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
     <form onSubmit={submit} noValidate onFocusCapture={() => trackOnce(`formstart:${placement}`, "FormStart", { placement })}>
       {/* progress */}
       <div className="mb-5 flex items-center gap-3">
-        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#EEF3FF]">
-          <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#2347D9] to-[#4C7BFF]" animate={{ width: step === 1 ? "50%" : "100%" }} transition={{ duration: 0.5, ease: EASE }} />
+        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#F1EFEA]">
+          <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#4F35E8] to-[#B3A6FF]" animate={{ width: step === 1 ? "50%" : "100%" }} transition={{ duration: 0.5, ease: EASE }} />
         </div>
-        <span className="text-[12px] tabular-nums text-[#8A96BD]">Step {step} of 2</span>
+        <span className="text-[12px] tabular-nums text-[#8E8B95]">Step {step} of 2</span>
       </div>
 
       {quoteNote && (
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-[#EEF3FF] px-4 py-3 text-[12.5px] leading-relaxed text-[#0A1A4A]">
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-[#F1EFEA] px-4 py-3 text-[12.5px] leading-relaxed text-[#14131C]">
           <b className="font-medium">{handoff ? "Your check:" : "Your estimate:"}</b> {quoteNote}
         </motion.div>
       )}
@@ -182,12 +183,15 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
           <motion.div key="s1" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25, ease: EASE }}>
             <span className={ct.label}>What do you need?</span>
             <div className="mb-4 grid grid-cols-2 gap-2">
-              {[...(EXTRA_SITUATIONS[initialSituation] ? [{ k: initialSituation, ...EXTRA_SITUATIONS[initialSituation] }] : []), ...SITUATIONS.slice(0, EXTRA_SITUATIONS[initialSituation] ? 3 : 4)].map((s) => {
+              {(chips
+                ? chips.map((k) => ({ k, ...(EXTRA_SITUATIONS[k] ?? SITUATIONS.find((x) => x.k === k)!) }))
+                : [...(EXTRA_SITUATIONS[initialSituation] ? [{ k: initialSituation, ...EXTRA_SITUATIONS[initialSituation] }] : []), ...SITUATIONS.slice(0, EXTRA_SITUATIONS[initialSituation] ? 3 : 4)]
+              ).map((s) => {
                 const on = situation === s.k;
                 return (
                   <motion.button key={s.k} type="button" whileTap={{ scale: 0.97 }} onClick={() => setSituation(s.k)} aria-pressed={on}
-                    className={`relative flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-3 py-2 text-left text-[13px] leading-snug transition ${on ? "border-[#2347D9] bg-[#EEF3FF] font-medium text-[#0A1A4A]" : "border-[#D9E1F5] bg-white text-[#4A5680] hover:border-[#9FB4F2]"}`}>
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${on ? "bg-[#2347D9] text-white" : "bg-[#F2F5FD] text-[#6B77A0]"}`}><s.icon size={15} /></span>
+                    className={`relative flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-3 py-2 text-left text-[13px] leading-snug transition ${on ? "border-[#4F35E8] bg-[#F1EFEA] font-medium text-[#14131C]" : "border-[#E2DFD8] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}>
+                    <span className={`h-3.5 w-3.5 shrink-0 rotate-45 rounded-[3px] border-2 transition ${on ? "border-[#4F35E8] bg-[#4F35E8]" : "border-[#CFCCC6] bg-white"}`} aria-hidden />
                     {s.label}
                   </motion.button>
                 );
@@ -206,7 +210,7 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
           </motion.div>
         ) : (
           <motion.div key="s2" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }} transition={{ duration: 0.25, ease: EASE }}>
-            <p className="mb-3 text-[13.5px] text-[#4A5680]">Almost there — who should the accountant ask for?</p>
+            <p className="mb-3 text-[13.5px] text-[#55525E]">Almost there — who should the accountant ask for?</p>
             <div className="space-y-3">
               <Field icon={User} error={errors.name}>
                 <input name="name" autoComplete="name" value={v.name} onChange={set("name")} className={inputCls} placeholder="Your name" aria-label="Your name" autoFocus />
@@ -222,7 +226,7 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
             </div>
             {errors._form && <p className={`${ct.error} mt-3`}>{errors._form}</p>}
             <div className="mt-5 flex gap-2">
-              <button type="button" onClick={() => setStep(1)} className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-[#D9E1F5] text-[#4A5680] transition hover:border-[#2347D9] hover:text-[#2347D9]" aria-label="Back"><ArrowLeft size={17} /></button>
+              <button type="button" onClick={() => setStep(1)} className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-[#E2DFD8] text-[#55525E] transition hover:border-[#4F35E8] hover:text-[#4F35E8]" aria-label="Back"><ArrowLeft size={17} /></button>
               <button type="submit" disabled={status === "sending"} className={`${ct.btnPrimary} h-[52px] flex-1`}>
                 {status === "sending" && <Loader2 size={16} className="animate-spin" />} {cta} <ArrowRight size={16} />
               </button>
@@ -234,11 +238,11 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
       {/* honeypot — hidden from people, bots fill it */}
       <input name="company_website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
 
-      <div className={`mt-4 flex items-center justify-center gap-2 text-[12px] ${dark ? "text-[#B9C6EE]" : "text-[#8A96BD]"}`}>
+      <div className={`mt-4 flex items-center justify-center gap-2 text-[12px] ${dark ? "text-[#B8B6C0]" : "text-[#8E8B95]"}`}>
         <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
         Accountants online · free review · fixed quote
       </div>
-      <p className={`mt-1.5 flex items-center justify-center gap-1.5 text-[11.5px] ${dark ? "text-[#8FA0D6]" : "text-[#A3AECF]"}`}>
+      <p className={`mt-1.5 flex items-center justify-center gap-1.5 text-[11.5px] ${dark ? "text-[#8E8B95]" : "text-[#A19EA6]"}`}>
         <Lock size={11} /> Returns filed via our licensed partner, {FILING_PARTNER}
       </p>
     </form>

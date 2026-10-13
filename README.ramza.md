@@ -22,7 +22,7 @@ The app already provides `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
 | `META_CAPI_ACCESS_TOKEN` | Meta Conversions API | CAPI call skipped |
 | `NEXT_PUBLIC_CAL_LINK` | Cal.com booking (e.g. `ramza/audit-walkthrough`) | Success screen shows "we'll WhatsApp you to book" |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | WhatsApp CTA (E.164, `+` and spaces are stripped) | WhatsApp buttons point at `#audit` |
-| `NEXT_PUBLIC_RAMZA_EMAIL` | Footer contact email | falls back to `hello@ramza.example` |
+| `NEXT_PUBLIC_RAMZA_EMAIL` | Footer contact email | falls back to `accounts@ramzaworks.com` |
 | `LEGAL_LINE` | Footer legal line | renders the literal `LEGAL_LINE` placeholder |
 
 ## Database

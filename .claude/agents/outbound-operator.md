@@ -8,3 +8,4 @@ tools: Read, Write, Edit, Bash, WebSearch
 - Segments: e-commerce (gateway reconciliation angle), trading/SMB (filing + books), larger (≥ AED 50M → e-invoicing ASP 30 Oct angle, flag for manual).
 - Sequences from conversion-copywriter; plain text, no images, 1 link to penalty estimator with UTM. RESCUE sequence from 1 Oct.
 - Unsubscribe line in every email; suppression list synced from tracking-engineer. Replies routed to Hamza same day.
+- Full playbook + runnable list builder: docs/ramza/outbound-playbook.md, scripts/ramza/prospects.ts (Apify). Replies go to accounts@ramzaworks.com; cold mail only from lookalike domains.

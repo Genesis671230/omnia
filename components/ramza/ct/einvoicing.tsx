@@ -8,7 +8,7 @@
  * the page says so in plain words. No FTA/MoF marks or colours. */
 
 import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
-import { Building2, CalendarDays, Check, FileCode2, Landmark, Network, Pause, Play, ShieldCheck, Store } from "lucide-react";
+import { Building2, Check, FileCode2, Landmark, Network, Pause, Play, ShieldCheck, Store } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { rules, VAT_RATE } from "@/lib/ramza/rules";
 import { CtLeadForm } from "./lead-form";
@@ -43,12 +43,12 @@ function FlowDiagram() {
     <svg ref={ref} viewBox="0 0 800 310" className="block h-auto w-full" role="img" aria-label="Diagram: invoice travels from your business through two accredited service providers to the buyer, with tax data reported to the tax authority">
       {LINKS.map((d, i) => (
         <g key={d}>
-          <path d={d} fill="none" stroke="#D5DEF5" strokeWidth={3} strokeLinecap="round" />
-          <motion.path d={d} fill="none" stroke={i < 3 ? "#2347D9" : "#10B981"} strokeWidth={3} strokeLinecap="round" strokeDasharray="6 10"
+          <path d={d} fill="none" stroke="#E2DFD8" strokeWidth={3} strokeLinecap="round" />
+          <motion.path d={d} fill="none" stroke={i < 3 ? "#4F35E8" : "#10B981"} strokeWidth={3} strokeLinecap="round" strokeDasharray="6 10"
             initial={{ pathLength: 0 }} animate={inView ? { pathLength: 1 } : { pathLength: 0 }} transition={{ duration: 0.8, delay: i * 0.35 }} />
           {/* travelling packet */}
           {on && (
-            <circle r={6} fill={i < 3 ? "#2347D9" : "#10B981"}>
+            <circle r={6} fill={i < 3 ? "#4F35E8" : "#10B981"}>
               <animateMotion dur="2.6s" begin={`-${i * 0.45}s`} repeatCount="indefinite" path={d} />
             </circle>
           )}
@@ -58,16 +58,16 @@ function FlowDiagram() {
         <motion.g key={n.t} initial={{ opacity: 0, y: 10 }} animate={inView ? { opacity: 1, y: 0 } : undefined} transition={{ delay: 0.1 + i * 0.12 }}>
           <foreignObject x={n.x - 72} y={n.y - 38} width={144} height={92}>
             <div className="flex flex-col items-center text-center">
-              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${i === 0 ? "bg-[#2347D9] text-white" : i === 4 ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "bg-white text-[#2347D9] ring-1 ring-[#D9E1F5]"} shadow-sm`}>
+              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${i === 0 ? "bg-[#14131C] text-white" : i === 4 ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "bg-white text-[#4F35E8] ring-1 ring-[#E2DFD8]"} shadow-sm`}>
                 <n.icon size={20} />
               </span>
-              <span className="mt-2 text-[13px] font-medium text-[#0A1A4A]">{n.t}</span>
-              <span className="text-[11px] text-[#8A96BD]">{n.s}</span>
+              <span className="mt-2 text-[13px] font-medium text-[#14131C]">{n.t}</span>
+              <span className="text-[11px] text-[#8E8B95]">{n.s}</span>
             </div>
           </foreignObject>
         </motion.g>
       ))}
-      <text x={400} y={64} textAnchor="middle" fontSize={11} fill="#8A96BD">structured e-invoice</text>
+      <text x={400} y={64} textAnchor="middle" fontSize={11} fill="#8E8B95">structured e-invoice</text>
     </svg>
   );
 }
@@ -89,17 +89,17 @@ function InvoiceCard({ checks }: { checks: number }) {
   const net = 12500;
   const vat = Math.round(net * VAT_RATE);
   return (
-    <div className="w-[150px] rounded-2xl bg-white p-3 text-left shadow-[0_18px_40px_-18px_rgba(10,26,74,0.55)] ring-1 ring-[#D9E1F5]">
-      <div className="flex items-center justify-between text-[10px] font-medium text-[#2347D9]"><span>E-INVOICE</span><FileCode2 size={12} /></div>
+    <div className="w-[150px] rounded-2xl bg-white p-3 text-left shadow-[0_18px_40px_-18px_rgba(20,19,28,0.55)] ring-1 ring-[#E2DFD8]">
+      <div className="flex items-center justify-between text-[10px] font-medium text-[#4F35E8]"><span>E-INVOICE</span><FileCode2 size={12} /></div>
       <div className="mt-2 space-y-1">
-        <div className="h-1.5 w-20 rounded-full bg-[#E6ECFA]" /><div className="h-1.5 w-14 rounded-full bg-[#E6ECFA]" />
+        <div className="h-1.5 w-20 rounded-full bg-[#E8E5DE]" /><div className="h-1.5 w-14 rounded-full bg-[#E8E5DE]" />
       </div>
-      <div className="mt-2 flex justify-between text-[10.5px] text-[#4A5680]"><span>Net</span><span className="tabular-nums">{net.toLocaleString("en-US")}</span></div>
-      <div className="flex justify-between text-[10.5px] text-[#4A5680]"><span>VAT {Math.round(VAT_RATE * 100)}%</span><span className="tabular-nums">{vat.toLocaleString("en-US")}</span></div>
-      <div className="mt-1 flex justify-between border-t border-[#EEF2FA] pt-1 text-[11px] font-medium text-[#0A1A4A]"><span>AED</span><span className="tabular-nums">{(net + vat).toLocaleString("en-US")}</span></div>
+      <div className="mt-2 flex justify-between text-[10.5px] text-[#55525E]"><span>Net</span><span className="tabular-nums">{net.toLocaleString("en-US")}</span></div>
+      <div className="flex justify-between text-[10.5px] text-[#55525E]"><span>VAT {Math.round(VAT_RATE * 100)}%</span><span className="tabular-nums">{vat.toLocaleString("en-US")}</span></div>
+      <div className="mt-1 flex justify-between border-t border-[#F2F0EB] pt-1 text-[11px] font-medium text-[#14131C]"><span>AED</span><span className="tabular-nums">{(net + vat).toLocaleString("en-US")}</span></div>
       <div className="mt-2 flex gap-1">
         {["Format", "TRN", "VAT"].map((c, i) => (
-          <span key={c} className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] transition-colors duration-300 ${i < checks ? "bg-emerald-50 text-emerald-600" : "bg-[#F2F5FD] text-[#9AA6C8]"}`}>
+          <span key={c} className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] transition-colors duration-300 ${i < checks ? "bg-emerald-50 text-emerald-600" : "bg-[#F5F3EF] text-[#A19EA6]"}`}>
             {i < checks && <Check size={8} />}{c}
           </span>
         ))}
@@ -128,22 +128,22 @@ function EInvoiceFilm() {
     { icon: Store, t: "Your business" }, { icon: Network, t: "Your ASP" }, { icon: Network, t: "Buyer's ASP" }, { icon: Building2, t: "Your buyer" },
   ];
   return (
-    <div ref={ref} className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#050D2B] via-[#0A1A4A] to-[#1B3BB8] text-white" role="region" aria-label="Animation: how an e-invoice travels">
+    <div ref={ref} className="overflow-hidden rounded-[28px] bg-[#14131C] text-white" role="region" aria-label="Animation: how an e-invoice travels">
       <div className="relative h-[300px] px-4 sm:px-8">
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(76,123,255,0.35),transparent_60%)]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(179,166,255,0.14),transparent_60%)]" />
         {/* track */}
         <div className="absolute left-[8%] right-[8%] top-[118px] h-[2px] bg-white/15" />
-        <motion.div className="absolute left-[8%] top-[118px] h-[2px] bg-gradient-to-r from-[#8FB0FF] to-[#4C7BFF]"
+        <motion.div className="absolute left-[8%] top-[118px] h-[2px] bg-gradient-to-r from-[#CBC3FF] to-[#B3A6FF]"
           animate={{ width: `${((STOPS[Math.min(scene, 3)] - 6) / 74) * 84}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
         {nodes.map((n, i) => (
           <div key={n.t} className="absolute top-[96px] -translate-x-1/2 text-center" style={{ left: `${[8, 36, 64, 92][i]}%` }}>
-            <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl transition-colors duration-500 ${Math.min(scene, 3) >= i ? "bg-[#4C7BFF] text-white" : "bg-white/10 text-white/60"}`}><n.icon size={18} /></span>
+            <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-2xl transition-colors duration-500 ${Math.min(scene, 3) >= i ? "bg-[#B3A6FF] text-white" : "bg-white/10 text-white/60"}`}><n.icon size={18} /></span>
             <span className="mt-1.5 block whitespace-nowrap text-[11px] text-white/70">{n.t}</span>
           </div>
         ))}
         {/* authority, reported in the last scene */}
         <div className="absolute left-1/2 top-[226px] -translate-x-1/2 text-center">
-          <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl transition-colors duration-500 ${scene === 4 ? "bg-emerald-400 text-[#050D2B]" : "bg-white/10 text-white/50"}`}><Landmark size={17} /></span>
+          <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl transition-colors duration-500 ${scene === 4 ? "bg-emerald-400 text-[#0C0B12]" : "bg-white/10 text-white/50"}`}><Landmark size={17} /></span>
           <span className="mt-1 block text-[11px] text-white/60">Tax authority</span>
         </div>
         {scene === 4 && [36, 64].map((x, i) => (
@@ -157,13 +157,13 @@ function EInvoiceFilm() {
           </motion.div>
           <AnimatePresence>{scene === 3 && (
             <motion.span initial={{ scale: 1.6, opacity: 0, rotate: -12 }} animate={{ scale: 1, opacity: 1, rotate: -8 }} exit={{ opacity: 0 }}
-              className="absolute -right-3 -top-2 rounded-lg border-2 border-emerald-400 bg-[#050D2B]/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Received</motion.span>
+              className="absolute -right-3 -top-2 rounded-lg border-2 border-emerald-400 bg-[#0C0B12]/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Received</motion.span>
           )}</AnimatePresence>
         </motion.div>
       </div>
       {/* caption + player controls */}
       <div className="flex items-center gap-4 border-t border-white/10 bg-white/[0.04] px-5 py-4 sm:px-8">
-        <button type="button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0A1A4A]">
+        <button type="button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#14131C]">
           {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
         </button>
         <div className="min-w-0 flex-1">
@@ -210,27 +210,27 @@ export function EInvoicingSection() {
 
         <div className="mt-12 grid items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
           <Reveal delay={0.05}><EInvoiceFilm /></Reveal>
-          <Reveal delay={0.1} className="rounded-[28px] bg-white/80 p-6 shadow-[0_24px_60px_-34px_rgba(10,26,74,0.4)] ring-1 ring-white backdrop-blur-xl sm:p-7">
+          <Reveal delay={0.1} className="rounded-[28px] bg-white/80 p-6 shadow-[0_24px_60px_-34px_rgba(20,19,28,0.4)] ring-1 ring-white backdrop-blur-xl sm:p-7">
             <h3 className={ct.h3}>Request e-invoicing setup</h3>
             <p className={`${ct.body} mt-1 mb-5`}>We clean your invoice data, line up an Accredited Service Provider and test before your go-live.</p>
             <CtLeadForm placement="einvoicing" cta="Request e-invoicing setup" initialSituation="einvoicing" />
           </Reveal>
         </div>
 
-        <Reveal delay={0.05} className="mt-6 rounded-[28px] bg-white p-4 shadow-[0_24px_60px_-34px_rgba(10,26,74,0.4)] sm:p-8">
+        <Reveal delay={0.05} className="mt-6 rounded-[28px] bg-white p-4 shadow-[0_24px_60px_-34px_rgba(20,19,28,0.4)] sm:p-8">
           <FlowDiagram />
         </Reveal>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-          <Reveal className="rounded-[28px] bg-gradient-to-br from-[#0A1A4A] to-[#2347D9] p-6 text-white sm:p-8">
-            <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.16em] text-[#8FB0FF]"><CalendarDays size={14} /> Key dates</div>
+          <Reveal className="rounded-[28px] bg-gradient-to-br from-[#14131C] to-[#25232E] p-6 text-white sm:p-8">
+            <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">Key dates</div>
             <div className="mt-5 space-y-4">
               {tracks.map((t) => (
                 <div key={t.who} className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
                   <div className="text-[15px] font-medium">{t.who}</div>
                   <div className="mt-3 grid grid-cols-2 gap-3 text-[13px]">
-                    <div><div className="text-[#B9C6EE]">Appoint an ASP by</div><div className="mt-0.5 text-[17px] font-medium">{day(t.asp)}</div></div>
-                    <div><div className="text-[#B9C6EE]">E-invoicing live</div><div className="mt-0.5 text-[17px] font-medium">{day(t.live)}</div></div>
+                    <div><div className="text-[#B8B6C0]">Appoint an ASP by</div><div className="mt-0.5 text-[17px] font-medium">{day(t.asp)}</div></div>
+                    <div><div className="text-[#B8B6C0]">E-invoicing live</div><div className="mt-0.5 text-[17px] font-medium">{day(t.live)}</div></div>
                   </div>
                 </div>
               ))}
@@ -238,9 +238,9 @@ export function EInvoicingSection() {
           </Reveal>
           <div className="grid gap-3">
             {ready.map((r, i) => (
-              <Reveal key={r.t} delay={i * 0.08} className="flex gap-4 rounded-3xl bg-white p-5 shadow-[0_10px_30px_-24px_rgba(10,26,74,0.4)]">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EEF3FF] text-[#2347D9]"><r.icon size={19} /></span>
-                <div><div className="text-[16px] font-medium text-[#0A1A4A]">{r.t}</div><p className={`${ct.body} mt-1`}>{r.d}</p></div>
+              <Reveal key={r.t} delay={i * 0.08} className="flex gap-4 rounded-3xl bg-white p-5 shadow-[0_10px_30px_-24px_rgba(20,19,28,0.4)]">
+                <span className="mt-2 h-2.5 w-2.5 shrink-0 rotate-45 bg-[#4F35E8]" aria-hidden />
+                <div><div className="text-[16px] font-medium text-[#14131C]">{r.t}</div><p className={`${ct.body} mt-1`}>{r.d}</p></div>
               </Reveal>
             ))}
           </div>

@@ -1,5 +1,5 @@
 /* Sections shared by the RAMZA Corporate Tax pages. Each is a full-width band;
-   dark and light bands alternate and a <Seam> ring joins them.
+   dark and light bands alternate.
 
    Facts used here (all from the FTA's published rules):
    • late registration penalty            AED 10,000
@@ -12,7 +12,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, BadgeCheck, CalendarClock, ClipboardCheck, FileCheck2, FileSearch, Languages, Layers, ListChecks, Plus, Scale, ShieldCheck, Timer } from "lucide-react";
 import { ct } from "./brand";
-import { Rings, Seam, NoticeArt, WindowArt } from "./art";
+import { NoticeArt, WindowArt } from "./art";
 import { Reveal } from "./reveal";
 import { HeroConsole } from "./hero-console";
 import { CtLeadForm } from "./lead-form";
@@ -23,34 +23,32 @@ export function CtHero() {
   return (
     <section className={`${ct.sectionDark} pb-24 pt-32 sm:pt-36`}>
       {/* backdrop: glow + rings + faint grid */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_20%,rgba(47,91,255,0.35),transparent_70%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_70%_20%,rgba(184,149,90,0.35),transparent_70%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(#fff_1px,transparent_1px),linear-gradient(90deg,#fff_1px,transparent_1px)] [background-size:56px_56px]" />
-      <Rings size={760} className="absolute -right-48 -top-40 opacity-70" />
-      <Rings size={420} className="absolute -bottom-40 -left-32 opacity-50" />
 
       <div className={`${ct.container} grid items-start gap-12 lg:grid-cols-[1.05fr_1fr]`}>
         {/* no scroll-reveal above the fold: the hero must render without JS */}
         <div>
-          <span className={ct.eyebrowDark}><span className="h-1.5 w-1.5 rounded-full bg-[#4C7BFF]" /> UAE Corporate Tax penalties</span>
+          <span className={ct.eyebrowDark}><span className="h-1.5 w-1.5 rounded-full bg-[#B3A6FF]" /> UAE Corporate Tax penalties</span>
           <h1 className={`${ct.h1} mt-5`}>
             Got a Corporate Tax penalty?{" "}
-            <span className="bg-gradient-to-r from-[#8FB0FF] to-[#4C7BFF] bg-clip-text text-transparent">You may still clear it.</span>
+            <span className="bg-gradient-to-r from-[#CBC3FF] to-[#B3A6FF] bg-clip-text text-transparent">You may still clear it.</span>
           </h1>
           <p className={`${ct.leadDark} mt-6 max-w-xl`}>
             See in seconds whether the AED 10,000 late-registration fine can be waived, how many business days are left to ask the FTA to reconsider, and what the late-filing penalty is costing you each month.
           </p>
-          <ul className="mt-8 space-y-3 text-[15px] text-[#DCE4FF]">
+          <ul className="mt-8 space-y-3 text-[15px] text-[#E6E4EA]">
             {[
               "The AED 10,000 registration fine is waived if your first return is filed within 7 months",
               "You have 40 business days from the notice to request reconsideration",
               "We prepare the Arabic submission and file it before your deadline",
             ].map((t) => (
-              <li key={t} className="flex gap-3"><BadgeCheck size={19} className="mt-0.5 shrink-0 text-[#4C7BFF]" />{t}</li>
+              <li key={t} className="flex gap-3"><BadgeCheck size={19} className="mt-0.5 shrink-0 text-[#B3A6FF]" />{t}</li>
             ))}
           </ul>
-          <div className="mt-10 flex flex-wrap items-center gap-6 text-[13px] text-[#8FA3D9]">
-            <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-[#4C7BFF]" /> Private & free first review</span>
-            <span className="flex items-center gap-2"><Timer size={16} className="text-[#4C7BFF]" /> Reply within one business day</span>
+          <div className="mt-10 flex flex-wrap items-center gap-6 text-[13px] text-[#8E8B95]">
+            <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-[#B3A6FF]" /> Private & free first review</span>
+            <span className="flex items-center gap-2"><Timer size={16} className="text-[#B3A6FF]" /> Reply within one business day</span>
           </div>
         </div>
 
@@ -58,7 +56,6 @@ export function CtHero() {
           <HeroConsole />
         </div>
       </div>
-      <Seam from="dark" />
     </section>
   );
 }
@@ -68,17 +65,15 @@ export function CtHero() {
 export function PageHero({ eyebrow, title, lead, children }: { eyebrow: string; title: ReactNode; lead: string; children?: ReactNode }) {
   return (
     <section className={`${ct.sectionDark} pb-24 pt-36`}>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_80%_10%,rgba(47,91,255,0.32),transparent_70%)]" />
-      <Rings size={640} className="absolute -right-40 -top-48 opacity-60" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_80%_10%,rgba(184,149,90,0.32),transparent_70%)]" />
       <div className={`${ct.container} max-w-[900px]`}>
         <div>
-          <span className={ct.eyebrowDark}><span className="h-1.5 w-1.5 rounded-full bg-[#4C7BFF]" /> {eyebrow}</span>
+          <span className={ct.eyebrowDark}><span className="h-1.5 w-1.5 rounded-full bg-[#B3A6FF]" /> {eyebrow}</span>
           <h1 className={`${ct.h1} mt-5`}>{title}</h1>
           <p className={`${ct.leadDark} mt-6 max-w-2xl`}>{lead}</p>
           {children && <div className="mt-8 flex flex-wrap gap-3">{children}</div>}
         </div>
       </div>
-      <Seam from="dark" />
     </section>
   );
 }
@@ -103,9 +98,9 @@ export function FactsBand() {
           {facts.map((f, i) => (
             <Reveal key={f.v} delay={i * 0.07}>
               <div className={`${ct.card} h-full`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EEF3FF] text-[#2347D9]"><f.icon size={20} strokeWidth={1.6} /></span>
-                <div className="mt-6 text-[32px] font-medium tracking-[-0.03em] text-[#0A1A4A]">{f.v}</div>
-                <p className="mt-1 text-[14px] leading-snug text-[#4A5680]">{f.l}</p>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8]"><f.icon size={20} strokeWidth={1.6} /></span>
+                <div className="mt-6 text-[32px] font-medium tracking-[-0.03em] text-[#14131C]">{f.v}</div>
+                <p className="mt-1 text-[14px] leading-snug text-[#55525E]">{f.l}</p>
               </div>
             </Reveal>
           ))}
@@ -125,7 +120,6 @@ export function RoutesSection() {
   ];
   return (
     <section className={`${ct.sectionIce} pb-24 pt-28`}>
-      <Rings size={560} tone="light" className="absolute -left-40 top-10" />
       <div className={ct.container}>
         <Reveal className="max-w-2xl">
           <span className={ct.eyebrow}>Your options</span>
@@ -134,27 +128,26 @@ export function RoutesSection() {
         </Reveal>
         {/* connected cards: a thread with ring nodes runs behind them on desktop */}
         <div className="relative mt-14">
-          <div className="absolute left-0 right-0 top-[52px] hidden h-px bg-gradient-to-r from-transparent via-[#2347D9]/30 to-transparent lg:block" />
+          <div className="absolute left-0 right-0 top-[52px] hidden h-px bg-gradient-to-r from-transparent via-[#4F35E8]/30 to-transparent lg:block" />
           <div className="grid gap-5 lg:grid-cols-3">
             {routes.map((r, i) => (
               <Reveal key={r.n} delay={i * 0.1}>
                 <Link href={r.href} className={`${ct.card} group relative block h-full transition hover:-translate-y-1`}>
                   <div className="flex items-center justify-between">
-                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[#2347D9]/20 bg-white">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2347D9] text-white"><r.icon size={18} /></span>
+                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[#4F35E8]/20 bg-white">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#14131C] text-white"><r.icon size={18} /></span>
                     </span>
-                    <span className="text-[13px] font-medium text-[#9AA6C8]">{r.n}</span>
+                    <span className="text-[13px] font-medium text-[#A19EA6]">{r.n}</span>
                   </div>
-                  <h3 className={`${ct.h3} mt-6 text-[#0A1A4A]`}>{r.t}</h3>
+                  <h3 className={`${ct.h3} mt-6 text-[#14131C]`}>{r.t}</h3>
                   <p className={`${ct.body} mt-2`}>{r.d}</p>
-                  <span className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-[#2347D9]">Read the details <ArrowRight size={15} className="transition group-hover:translate-x-1" /></span>
+                  <span className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-[#4F35E8]">Read the details <ArrowRight size={15} className="transition group-hover:translate-x-1" /></span>
                 </Link>
               </Reveal>
             ))}
           </div>
         </div>
       </div>
-      <Seam from="light" icon="check" />
     </section>
   );
 }
@@ -178,8 +171,8 @@ export function WindowSection() {
           <ol className="mt-8 space-y-5">
             {steps.map(([t, d], i) => (
               <li key={t} className="flex gap-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0A1A4A] text-[13px] font-medium text-white">{i + 1}</span>
-                <div><div className="text-[16px] font-medium text-[#0A1A4A]">{t}</div><p className={`${ct.body} mt-0.5`}>{d}</p></div>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#14131C] text-[13px] font-medium text-white">{i + 1}</span>
+                <div><div className="text-[16px] font-medium text-[#14131C]">{t}</div><p className={`${ct.body} mt-0.5`}>{d}</p></div>
               </li>
             ))}
           </ol>
@@ -214,18 +207,18 @@ export function ServicesSection({ openFirst = true }: { openFirst?: boolean }) {
           <p className={`${ct.lead} mt-4`}>One team for the whole path — bookkeeping, filing, registration, and penalty help if a deadline was missed.</p>
           <Link href="/ramza/services" className={`${ct.btnPrimary} mt-8`}>All services <ArrowRight size={16} /></Link>
         </Reveal>
-        <Reveal delay={0.1} className="divide-y divide-[#E3E9F7] rounded-[28px] bg-white px-6 shadow-[0_24px_60px_-32px_rgba(10,26,74,0.3)] sm:px-8">
+        <Reveal delay={0.1} className="divide-y divide-[#E8E5DE] rounded-[28px] bg-white px-6 shadow-[0_24px_60px_-32px_rgba(20,19,28,0.3)] sm:px-8">
           {SERVICES.map((s, i) => (
             // native <details>: accessible, works without JS
             <details key={s.n} open={openFirst && i === 0} className="group py-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[17px] font-medium text-[#0A1A4A] [&::-webkit-details-marker]:hidden">
-                <span><span className="mr-3 text-[13px] text-[#9AA6C8]">[{s.n}]</span>{s.t}</span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF3FF] text-[#2347D9] transition group-open:rotate-45"><Plus size={16} /></span>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[17px] font-medium text-[#14131C] [&::-webkit-details-marker]:hidden">
+                <span><span className="mr-3 text-[13px] text-[#A19EA6]">[{s.n}]</span>{s.t}</span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
               </summary>
               <div className="pl-10 pt-3">
                 <p className={ct.body}>{s.d}</p>
                 <ul className="mt-3 space-y-1.5">
-                  {s.points.map((p) => <li key={p} className="flex items-center gap-2 text-[14px] text-[#0A1A4A]"><BadgeCheck size={16} className="text-[#2347D9]" />{p}</li>)}
+                  {s.points.map((p) => <li key={p} className="flex items-center gap-2 text-[14px] text-[#14131C]"><BadgeCheck size={16} className="text-[#4F35E8]" />{p}</li>)}
                 </ul>
                 {"href" in s && s.href && <Link href={s.href} className={`${ct.link} mt-3 inline-block text-[14px]`}>About payout reconciliation →</Link>}
               </div>
@@ -248,7 +241,6 @@ export function WhySection() {
   ];
   return (
     <section className={`${ct.sectionDark} pb-28 pt-28`}>
-      <Rings size={700} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-40" />
       <div className={ct.container}>
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className={ct.eyebrowDark}>Why RAMZA</span>
@@ -258,15 +250,14 @@ export function WhySection() {
           {items.map((it, i) => (
             <Reveal key={it.t} delay={i * 0.08}>
               <div className={`${ct.glass} h-full`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2347D9]"><it.icon size={19} /></span>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#14131C]"><it.icon size={19} /></span>
                 <h3 className={`${ct.h3} mt-6`}>{it.t}</h3>
-                <p className="mt-2 text-[14.5px] leading-relaxed text-[#B9C6EE]">{it.d}</p>
+                <p className="mt-2 text-[14.5px] leading-relaxed text-[#B8B6C0]">{it.d}</p>
               </div>
             </Reveal>
           ))}
         </div>
       </div>
-      <Seam from="dark" />
     </section>
   );
 }
@@ -292,10 +283,10 @@ export function FaqSection({ items = CT_FAQ }: { items?: { q: string; a: string 
         </Reveal>
         <Reveal delay={0.1} className="space-y-3">
           {items.map((f) => (
-            <details key={f.q} className="group rounded-3xl bg-white px-6 py-5 shadow-[0_10px_30px_-24px_rgba(10,26,74,0.4)]">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-[#0A1A4A] [&::-webkit-details-marker]:hidden">
+            <details key={f.q} className="group rounded-3xl bg-white px-6 py-5 shadow-[0_10px_30px_-24px_rgba(20,19,28,0.4)]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-[#14131C] [&::-webkit-details-marker]:hidden">
                 {f.q}
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF3FF] text-[#2347D9] transition group-open:rotate-45"><Plus size={16} /></span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
               </summary>
               <p className={`${ct.body} mt-3`}>{f.a}</p>
             </details>
@@ -311,24 +302,22 @@ export function FaqSection({ items = CT_FAQ }: { items?: { q: string; a: string 
 export function CtaSection({ whatsappHref }: { whatsappHref: string }) {
   return (
     <section id="contact" className={`${ct.sectionIce} scroll-mt-24 pb-28 pt-24`}>
-      <Rings size={620} tone="light" className="absolute -right-40 -top-20" />
       <div className={`${ct.container} grid gap-6 lg:grid-cols-[1.25fr_0.75fr]`}>
         <Reveal className={ct.card}>
           <span className={ct.eyebrow}>Free penalty review</span>
-          <h2 className="mt-3 text-[28px] font-medium tracking-[-0.02em] text-[#0A1A4A]">Tell us what happened</h2>
+          <h2 className="mt-3 text-[28px] font-medium tracking-[-0.02em] text-[#14131C]">Tell us what happened</h2>
           <p className={`${ct.body} mb-6 mt-2`}>Two minutes. A specialist replies on WhatsApp within one business day.</p>
           <CtLeadForm />
         </Reveal>
-        <Reveal delay={0.1} className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#2347D9] to-[#0A1A4A] p-8 text-white">
-          <Rings size={380} className="absolute -bottom-32 -right-32 opacity-60" />
+        <Reveal delay={0.1} className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#4F35E8] to-[#14131C] p-8 text-white">
           <ShieldCheck size={32} strokeWidth={1.4} />
           <h3 className="mt-6 text-[22px] font-medium">Prefer to talk?</h3>
-          <p className="mt-2 text-[14.5px] text-[#DCE4FF]">Send the notice on WhatsApp and we’ll tell you where you stand.</p>
+          <p className="mt-2 text-[14.5px] text-[#E6E4EA]">Send the notice on WhatsApp and we’ll tell you where you stand.</p>
           <ol className="mt-8 space-y-3 border-t border-white/15 pt-6 text-[14px]">
             {["You send the notice or your dates", "We map your deadlines and options", "You get a fixed quote — then we file"].map((t, i) => (
               <li key={t} className="flex items-center gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-[12px]">{i + 1}</span>
-                <span className="text-[#DCE4FF]">{t}</span>
+                <span className="text-[#E6E4EA]">{t}</span>
               </li>
             ))}
           </ol>

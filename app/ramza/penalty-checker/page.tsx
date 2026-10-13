@@ -27,13 +27,13 @@ export default function PenaltyCheckerPage() {
           <div className="space-y-6">
             <WindowArt used={9} />
             <div className={ct.card}>
-              <h2 className="text-[20px] font-medium text-[#0A1A4A]">What the checker uses</h2>
+              <h2 className="text-[20px] font-medium text-[#14131C]">What the checker uses</h2>
               <ul className={`${ct.body} mt-3 list-disc space-y-1.5 pl-5`}>
                 <li>Reconsideration: 40 business days from the notice (Mon–Fri).</li>
                 <li>Registration waiver: first return filed within 7 months of the first tax period ending.</li>
                 <li>Late filing: return due 9 months after the period ends; AED 500 per month or part month for 12 months, then AED 1,000.</li>
               </ul>
-              <p className="mt-4 text-[13px] text-[#8A96BD]">Public holidays aren’t counted, so the real deadline can fall a little later than shown. Nothing you type here is stored unless you send it to us.</p>
+              <p className="mt-4 text-[13px] text-[#8E8B95]">Public holidays aren’t counted, so the real deadline can fall a little later than shown. Nothing you type here is stored unless you send it to us.</p>
             </div>
           </div>
         </div>
