@@ -280,7 +280,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
       animate={{ width: collapsed ? 76 : 240 }}
       transition={{ type: "spring", stiffness: 380, damping: 38 }}
       /* deep violet rail (founder's reference, 2026-10-13) */
-      className="fixed inset-y-0 left-0 z-30 flex flex-col bg-[linear-gradient(180deg,#3B1D72_0%,#2E1660_55%,#24114D_100%)] text-white shadow-[8px_0_30px_-18px_rgba(36,17,77,0.6)]"
+      className="fixed inset-y-0 left-0 z-30 flex flex-col bg-[linear-gradient(180deg,#3B1D72_0%,#2E1660_55%,#24114D_100%)] text-white"
     >
       {/* Collapse toggle — a small round button sitting on the rail's edge */}
       <button
@@ -294,7 +294,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
 
       {/* Brand */}
       <div className={`flex h-20 items-center ${collapsed ? "justify-center" : "gap-3 px-5"}`}>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#C77DFF,#7B5CFA)] text-[15px] font-semibold text-white shadow-[0_6px_16px_-6px_rgba(199,125,255,0.7)]">O</span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#C77DFF,#7B5CFA)] text-[15px] font-semibold text-white">O</span>
         {!collapsed && (
           <div className="leading-tight">
             <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-white">{BRAND.name}</div>
@@ -321,7 +321,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                   className={[
                     "flex flex-1 items-center gap-3 rounded-full py-1.5 text-[13.5px] transition-colors",
                     collapsed ? "justify-center px-0" : "pl-1.5 pr-3",
-                    on ? "bg-[#1D5BFF] text-white shadow-[0_8px_20px_-10px_rgba(29,91,255,0.9)]" : childHot ? "bg-white/[0.12] text-white" : "text-white/65 hover:bg-white/10 hover:text-white",
+                    on ? "bg-[#1D5BFF] text-white" : childHot ? "bg-white/[0.12] text-white" : "text-white/85 hover:bg-white/10 hover:text-white",
                   ].join(" ")}
                 >
                   {/* round icon well, like the reference's top nav */}
@@ -359,7 +359,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                           href={child.href}
                           className={[
                             "truncate rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
-                            childActive ? "bg-white/15 font-medium text-white" : "text-white/55 hover:text-white",
+                            childActive ? "bg-white/15 font-medium text-white" : "text-white/80 hover:text-white",
                           ].join(" ")}
                         >
                           {child.label}
