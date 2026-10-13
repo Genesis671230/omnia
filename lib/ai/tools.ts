@@ -480,7 +480,7 @@ async function get_payments_money(input: { from?: string; to?: string; include_o
     totals: { ...v.totals, deductionRate: pct(v.totals.deductionRate) },
     byGateway: v.gateways.map((g) => ({ ...g, deductionRate: pct(g.deductionRate) })),
     overdue: v.overdue,
-    feesEstimatedFor: v.missingPayoutFiles,
+    payoutFilesMissingFor: v.missingPayoutFiles,
     ...(input.include_overdue_orders
       ? { overdueOrders: v.orders.filter((o) => o.status === "overdue").sort((a, b) => b.ageDays - a.ageDays).slice(0, 40)
           .map((o) => ({ order: o.orderNumber, day: o.day, gateway: o.gateway, awaiting: o.awaiting, ageDays: o.ageDays, daysLate: o.overdueDays, why: o.reason })) }

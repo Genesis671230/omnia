@@ -7,7 +7,7 @@
   /* Omnia surface — white cards on a contrasted blue page, navy ink, one
      blue accent; figures wear meaning colours (see dashboard-v2/overview/kit.tsx).
      Shared by the dashboard and the reconciliation page (and their dialogs). */
-  --os-page: #F1F3F7;
+  --os-page: #F3F2FA;
   --os-card: #FFFFFF;
   --os-card-solid: #FFFFFF;
   --os-line: #D8E1F1;

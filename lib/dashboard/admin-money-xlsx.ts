@@ -31,7 +31,7 @@ export async function buildAdminMoneyWorkbook(v: AdminMoney): Promise<Buffer> {
 
   const daily = wb.addWorksheet("Daily");
   daily.addRow(["Date", ...MONEY_HEAD]);
-  for (const d of [...v.days].reverse()) daily.addRow([d.day, ...totalsCells(d)]);
+  for (const d of v.days) daily.addRow([d.day, ...totalsCells(d)]);
   const dt = daily.addRow(["Total", ...totalsCells(v.totals)]);
   dt.font = { bold: true };
   head(daily);
@@ -52,10 +52,10 @@ export async function buildAdminMoneyWorkbook(v: AdminMoney): Promise<Buffer> {
   gw.columns.forEach((c, i) => (c.width = i === 0 ? 18 : 15));
 
   const ord = wb.addWorksheet("Orders");
-  ord.addRow(["Date", "Order", "Store", "Customer", "Gateway", "Status", "Sale", "Fee", "VAT", "Total deductions", "Refunds", "Net payout", "FX charges", "Net received", "Awaiting", "Received on", "Days", "Days overdue", "Fee source", "Why"]);
+  ord.addRow(["Date", "Order", "Store", "Customer", "Gateway", "Status", "Sale", "Fee", "VAT", "Total deductions", "Refunds", "Net payout", "FX charges", "Net received", "Awaiting", "Received on", "Days", "Days overdue", "Stage", "Why"]);
   for (const o of v.orders) {
     ord.addRow([o.day, o.orderNumber, o.store, o.customer, o.gateway, o.status, o.sale, o.fee, o.vat, o.deductions, o.refunds, o.netPayout, o.fx,
-      o.netReceived, o.awaiting, o.receivedOn ?? "", o.ageDays, o.overdueDays || "", o.feeEstimated ? "Estimated (no payout file yet)" : "Payout file / live charge", o.reason]);
+      o.netReceived, o.awaiting, o.receivedOn ?? "", o.ageDays, o.overdueDays || "", o.stage, o.reason]);
   }
   // Cancelled orders sit under the sales, with 0 money so the columns still sum to the sales.
   for (const c of v.cancelled) {
@@ -83,7 +83,7 @@ export async function buildAdminMoneyWorkbook(v: AdminMoney): Promise<Buffer> {
     [`Omnia admin money · ${v.from} → ${v.to} · built ${v.today} (Dubai)`],
     [],
     ["Gross sales", "Paid orders by Dubai order date (same orders as the Gross Sales panel)."],
-    ["Fee / VAT", "What the gateway kept, from its payout file or live charge; estimated at the gateway's rate until the file arrives (Orders → Fee source)."],
+    ["Fee / VAT", "What the gateway kept, from its payout file or live charge. Never estimated: with no payout file yet the whole sale stays in Awaiting; where a file states no fee, deductions = sale − what reached the bank."],
     ["Total deductions", "Fee + VAT. Deductions % = deductions ÷ gross sales — identical in Daily, By gateway and the dashboard."],
     ["Refunds", "Orders returned / refunded with a credit note before any money moved."],
     ["Net payout", "Gross − deductions − refunds: what the gateway pays out."],

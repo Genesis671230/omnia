@@ -90,12 +90,12 @@ export async function buildAdminMoney(from: string, to: string, opts: { fresh?: 
       }
     }
   }
-  orders.sort((a, b) => (a.day === b.day ? a.orderNumber.localeCompare(b.orderNumber) : a.day < b.day ? 1 : -1));
+  orders.sort((a, b) => (a.day === b.day ? a.orderNumber.localeCompare(b.orderNumber) : a.day < b.day ? -1 : 1));
 
   return withCancelled({
     from, to, today, terms,
     totals: sumMoney(orders),
-    days: byDay(orders, days).reverse(),
+    days: byDay(orders, days), // 1st of the range first
     gateways: byGateway(orders, terms),
     overdue: overdueByGateway(orders, terms),
     orders,
@@ -115,7 +115,7 @@ export function withCancelled(
   const zero = (gateway: string): GatewayRow => ({ gateway, ...sumMoney([]), expectedDays: 0, oldestAwaitingDays: 0 });
   return {
     ...v,
-    cancelled: [...cancelled].sort((a, b) => (a.day < b.day ? 1 : -1)),
+    cancelled: [...cancelled].sort((a, b) => (a.day < b.day ? -1 : 1)),
     totals: { ...v.totals, cancelled: sumCancelled(cancelled) },
     days: v.days.map((d) => ({ ...d, cancelled: sumCancelled(cancelled.filter((c) => c.day === d.day)) })),
     gateways: gws.map((g) => ({ ...(v.gateways.find((x) => x.gateway === g) ?? zero(g)), cancelled: sumCancelled(cancelled.filter((c) => c.gateway === g)) })),

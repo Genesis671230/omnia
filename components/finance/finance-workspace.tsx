@@ -277,26 +277,26 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
     <motion.aside
       animate={{ width: collapsed ? 76 : 240 }}
       transition={{ type: "spring", stiffness: 380, damping: 38 }}
-      /* light rail: white, hairline right edge, no heavy colour */
-      className="fixed inset-y-0 left-0 z-30 flex flex-col border-r border-slate-200/70 bg-white"
+      /* deep violet rail (founder's reference, 2026-10-13) */
+      className="fixed inset-y-0 left-0 z-30 flex flex-col bg-[linear-gradient(180deg,#3B1D72_0%,#2E1660_55%,#24114D_100%)] text-white shadow-[8px_0_30px_-18px_rgba(36,17,77,0.6)]"
     >
       {/* Collapse toggle — a small round button sitting on the rail's edge */}
       <button
         onClick={onToggle}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute -right-3.5 top-7 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 transition hover:bg-slate-900 hover:text-white"
+        className="absolute -right-3.5 top-7 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 transition hover:bg-[#3B1D72] hover:text-white"
       >
         <ChevronRight size={14} className={`transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`} />
       </button>
 
       {/* Brand */}
       <div className={`flex h-20 items-center ${collapsed ? "justify-center" : "gap-3 px-5"}`}>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[15px] font-semibold text-white">O</span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#C77DFF,#7B5CFA)] text-[15px] font-semibold text-white shadow-[0_6px_16px_-6px_rgba(199,125,255,0.7)]">O</span>
         {!collapsed && (
           <div className="leading-tight">
-            <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-slate-900">{BRAND.name}</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Finance OS</div>
+            <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-white">{BRAND.name}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Finance OS</div>
           </div>
         )}
       </div>
@@ -319,11 +319,11 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                   className={[
                     "flex flex-1 items-center gap-3 rounded-full py-1.5 text-[13.5px] transition-colors",
                     collapsed ? "justify-center px-0" : "pl-1.5 pr-3",
-                    on ? "bg-slate-900 text-white" : childHot ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                    on ? "bg-[#1D5BFF] text-white shadow-[0_8px_20px_-10px_rgba(29,91,255,0.9)]" : childHot ? "bg-white/[0.12] text-white" : "text-white/65 hover:bg-white/10 hover:text-white",
                   ].join(" ")}
                 >
                   {/* round icon well, like the reference's top nav */}
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${on ? "bg-white/10" : "bg-white ring-1 ring-slate-200/80 group-hover:ring-slate-300"}`}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${on ? "bg-white/15" : "bg-white/[0.06] ring-1 ring-white/10 group-hover:ring-white/25"}`}>
                     <item.icon size={16} strokeWidth={1.8} />
                   </span>
                   {!collapsed && <span className="truncate">{item.label}</span>}
@@ -332,7 +332,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                 {hasChildren && !collapsed && (
                   <button
                     onClick={() => setExpanded((prev) => ({ ...prev, [item.href]: !open }))}
-                    className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    className="rounded-full p-1.5 text-white/45 transition-colors hover:bg-white/10 hover:text-white"
                     aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
                   >
                     <ChevronRight size={13} className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
@@ -346,7 +346,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="ml-[30px] flex flex-col gap-0.5 overflow-hidden border-l border-slate-200 pl-3"
+                    className="ml-[30px] flex flex-col gap-0.5 overflow-hidden border-l border-white/15 pl-3"
                   >
                     <div className="h-1" />
                     {item.children!.map((child) => {
@@ -357,7 +357,7 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
                           href={child.href}
                           className={[
                             "truncate rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
-                            childActive ? "bg-slate-100 font-medium text-slate-900" : "text-slate-500 hover:text-slate-900",
+                            childActive ? "bg-white/15 font-medium text-white" : "text-white/55 hover:text-white",
                           ].join(" ")}
                         >
                           {child.label}
@@ -374,9 +374,9 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
       </nav>
 
       {/* Footer */}
-      <div className={`flex items-center gap-2.5 border-t border-slate-100 py-4 ${collapsed ? "justify-center" : "px-5"}`}>
-        <ShieldCheck size={15} className="shrink-0 text-emerald-500" />
-        {!collapsed && <span className="text-[11.5px] text-slate-400">Bank-verified truth</span>}
+      <div className={`flex items-center gap-2.5 border-t border-white/10 py-4 ${collapsed ? "justify-center" : "px-5"}`}>
+        <ShieldCheck size={15} className="shrink-0 text-[#C77DFF]" />
+        {!collapsed && <span className="text-[11.5px] text-white/50">Bank-verified truth</span>}
       </div>
     </motion.aside>
   );

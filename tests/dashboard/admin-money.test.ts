@@ -37,6 +37,21 @@ describe("orderMoney", () => {
     like(ref, { status: "refunded", refunds: 1000, awaiting: 0, netPayout: 0 });
     assert.equal(foots(ref), 1000);
   });
+  it("never estimates a fee: no payout file = whole sale pending, nothing deducted", () => {
+    const r = orderMoney(o({ status: "no_payout_file", feeBasis: "estimated", feeAed: 30, vatAed: null, payoutNetAed: 970 }), TODAY);
+    like(r, { fee: 0, vat: 0, deductions: 0, awaiting: 1000, inPayout: 0 });
+    assert.equal(foots(r), 1000);
+  });
+  it("file with no fee (Telr): deductions = sale − what reached the bank", () => {
+    const r = orderMoney(o({ status: "received", feeBasis: "estimated", feeAed: 30, vatAed: null, receivedAed: 970, fxAed: 5,
+      bank: { id: "b", date: "2026-10-09", amountAed: 965, reference: "", state: "SETTLED", confirmed: true } }), TODAY);
+    like(r, { netReceived: 965, deductions: 35, fx: 0, awaiting: 0 });
+    assert.equal(foots(r), 1000);
+  });
+  it("payout file in, bank not yet: counted as paid out, not in bank", () => {
+    like(orderMoney(o({}), TODAY), { inPayout: 968.5, awaiting: 968.5 });
+    like(orderMoney(o({ status: "awaiting_payout" }), TODAY), { inPayout: 0, awaiting: 968.5 });
+  });
   it("uses the dubai day of the order (early-morning UTC orders)", () => {
     assert.equal(orderMoney(o({ orderDate: "2026-10-04T21:30:00" }), TODAY).day, "2026-10-05");
   });

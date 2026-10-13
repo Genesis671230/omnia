@@ -10,6 +10,11 @@
 //   Net received = Net payout − FX                    (what reached the bank)
 //   Awaiting = Net payout still on its way            (not received yet)
 //
+// Fees are never estimated here. An order with no payout file yet has no
+// deduction — its whole sale is pending until the file states the fee. A
+// received order whose file stated no fee (Telr's xls) takes what reached the
+// bank as the truth: deductions = sale − net received.
+//
 // Day, gateway and range rows are plain sums of order rows — never computed
 // separately — which is what makes the cross-checks hold.
 
@@ -37,8 +42,8 @@ export type OrderMoney = {
   status: MoneyStatus;
   /** The ledger's finer status (no payout file, awaiting bank, COD…). */
   stage: LedgerStatus;
-  /** Fee read off a payout file / live charge, or estimated from the gateway rate. */
-  feeEstimated: boolean;
+  /** Part of `awaiting` already paid out by the gateway (payout file in), not yet seen in the bank. */
+  inPayout: number;
   receivedOn: string | null;
   /** Days from the order to the bank credit (received) or to today (awaiting). */
   ageDays: number;
@@ -58,6 +63,8 @@ export type MoneyTotals = {
   fx: number;
   netReceived: number;
   awaiting: number;
+  /** Of awaiting: payout issued (file in), not in the bank yet. */
+  inPayout: number;
   overdue: number;
   overdueOrders: number;
   /** Deductions as a share of sales (0–1). */
@@ -108,17 +115,25 @@ export function orderMoney(o: LedgerOrder, today: string, terms: Terms = DEFAULT
   const base = {
     uid: o.uid, day, orderNumber: o.orderNumber, store: o.store, customer: o.customerName,
     gateway: o.gateway || "Unclassified", sale, stage: o.status, reason: o.reason,
-    feeEstimated: o.feeBasis === "estimated",
   };
+  const estimated = o.feeBasis === "estimated";
 
   if (o.status === "adjusted") {
-    return { ...base, fee: 0, vat: 0, deductions: 0, refunds: sale, netPayout: 0, fx: 0, netReceived: 0, awaiting: 0,
+    return { ...base, fee: 0, vat: 0, deductions: 0, refunds: sale, netPayout: 0, fx: 0, netReceived: 0, awaiting: 0, inPayout: 0,
       status: "refunded", receivedOn: null, ageDays: 0, overdueDays: 0 };
   }
 
-  // COD with no courier voucher yet: the whole sale is still to come, and the
-  // courier's charge isn't known, so nothing is deducted until it is.
-  const netPayout = r2(o.status === "cod" ? sale : Math.min(o.status === "received" ? o.receivedAed : o.payoutNetAed, sale));
+  if (o.status === "received" && estimated) {
+    // No fee in the file: the bank credit is the fact, the gap is the deduction.
+    const netReceived = r2(Math.min(o.receivedAed - (o.fxAed || 0), sale));
+    const receivedOn = o.bank?.date ?? null;
+    return { ...base, fee: r2(sale - netReceived), vat: 0, deductions: r2(sale - netReceived), refunds: 0, netPayout: netReceived, fx: 0,
+      netReceived, awaiting: 0, inPayout: 0, status: "received", receivedOn, ageDays: receivedOn ? daysBetween(day, receivedOn) : 0, overdueDays: 0 };
+  }
+
+  // COD with no courier voucher yet, or no payout file yet: the whole sale is
+  // still to come — the charge isn't known, so nothing is deducted until it is.
+  const netPayout = r2(o.status === "cod" || estimated ? sale : Math.min(o.status === "received" ? o.receivedAed : o.payoutNetAed, sale));
   const deductions = r2(Math.max(sale - netPayout, 0));
   const vat = r2(Math.min(Math.max(o.vatAed ?? 0, 0), deductions));
   const fee = r2(deductions - vat);
@@ -126,30 +141,31 @@ export function orderMoney(o: LedgerOrder, today: string, terms: Terms = DEFAULT
   if (o.status === "received") {
     const fx = r2(o.fxAed || 0);
     const receivedOn = o.bank?.date ?? null;
-    return { ...base, fee, vat, deductions, refunds: 0, netPayout, fx, netReceived: r2(netPayout - fx), awaiting: 0,
+    return { ...base, fee, vat, deductions, refunds: 0, netPayout, fx, netReceived: r2(netPayout - fx), awaiting: 0, inPayout: 0,
       status: "received", receivedOn, ageDays: receivedOn ? daysBetween(day, receivedOn) : 0, overdueDays: 0 };
   }
 
   const ageDays = daysBetween(day, today);
   const late = ageDays - expectedDaysFor(base.gateway, terms) - terms.graceDays;
-  return { ...base, fee, vat, deductions, refunds: 0, netPayout, fx: 0, netReceived: 0, awaiting: netPayout,
+  const inPayout = o.status === "awaiting_bank" || o.status === "in_review" ? netPayout : 0;
+  return { ...base, fee, vat, deductions, refunds: 0, netPayout, fx: 0, netReceived: 0, awaiting: netPayout, inPayout,
     status: late > 0 ? "overdue" : "awaiting", receivedOn: null, ageDays, overdueDays: Math.max(late, 0) };
 }
 
 export function sumMoney(rows: OrderMoney[]): MoneyTotals {
-  const t = { orders: 0, sale: 0, fee: 0, vat: 0, deductions: 0, refunds: 0, netPayout: 0, fx: 0, netReceived: 0, awaiting: 0, overdue: 0, overdueOrders: 0 };
+  const t = { orders: 0, sale: 0, fee: 0, vat: 0, deductions: 0, refunds: 0, netPayout: 0, fx: 0, netReceived: 0, awaiting: 0, inPayout: 0, overdue: 0, overdueOrders: 0 };
   let bankDays = 0, bankOrders = 0;
   for (const r of rows) {
     t.orders += 1;
     t.sale += r.sale; t.fee += r.fee; t.vat += r.vat; t.deductions += r.deductions; t.refunds += r.refunds;
-    t.netPayout += r.netPayout; t.fx += r.fx; t.netReceived += r.netReceived; t.awaiting += r.awaiting;
+    t.netPayout += r.netPayout; t.fx += r.fx; t.netReceived += r.netReceived; t.awaiting += r.awaiting; t.inPayout += r.inPayout;
     if (r.status === "overdue") { t.overdue += r.awaiting; t.overdueOrders += 1; }
     if (r.status === "received" && r.receivedOn) { bankDays += r.ageDays; bankOrders += 1; }
   }
   return {
     orders: t.orders,
     sale: r2(t.sale), fee: r2(t.fee), vat: r2(t.vat), deductions: r2(t.deductions), refunds: r2(t.refunds),
-    netPayout: r2(t.netPayout), fx: r2(t.fx), netReceived: r2(t.netReceived), awaiting: r2(t.awaiting),
+    netPayout: r2(t.netPayout), fx: r2(t.fx), netReceived: r2(t.netReceived), awaiting: r2(t.awaiting), inPayout: r2(t.inPayout),
     overdue: r2(t.overdue), overdueOrders: t.overdueOrders,
     deductionRate: t.sale > 0 ? t.deductions / t.sale : 0,
     avgDaysToBank: bankOrders ? Math.round((bankDays / bankOrders) * 10) / 10 : null,
