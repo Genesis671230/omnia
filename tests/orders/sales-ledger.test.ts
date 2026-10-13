@@ -198,3 +198,64 @@ test("a COD order whose courier voucher is uploaded shows the voucher's fee, net
   assert.equal(o.payout?.id, "CP17187");
   assert.equal(o.bank?.reference, "FT262652TTF0");
 });
+
+const adj = (kind: "cancelled" | "returned" | "refunded" | "exchanged", creditAed: number) => ({
+  kind, creditAed, deductAed: 0, creditNote: "CN-1", exchangeInvoice: "", exchangeTotalAed: 0, refundDueAed: 0, customerOwesAed: 0, markOnly: false, date: "2026-10-02",
+});
+
+test("app adjustments: cancelled leaves the sales and is listed; full return is 'adjusted', not a missing payout file", () => {
+  const orders = [
+    order({ order_number: "1", ops_status: "cancelled" }),
+    order({ order_number: "2", ops_status: "returned" }),
+    order({ order_number: "3", gateway: "COD", financial_status: "pending", store_id: "UAE", ops_status: "returned" }),
+    order({ order_number: "4", ops_status: "exchanged" }),
+    order({ order_number: "5" }),
+  ];
+  const adjustments = new Map([
+    ["1", adj("cancelled", 100)], ["2", adj("returned", 100)], ["3", adj("returned", 60)], ["4", adj("exchanged", 100)],
+  ]);
+  const ledger = computeSalesLedger({ month: "2026-09", orders, payouts: [], adjustments });
+  const d = ledger.days.find((x) => x.day === "2026-09-10")!;
+  const by = Object.fromEntries(d.orderList.map((o) => [o.orderNumber, o]));
+  assert.equal(by["1"], undefined, "cancelled is not a sale");
+  assert.equal(d.cancelled.orders, 1);
+  assert.equal(d.cancelled.list[0].orderNumber, "1");
+  assert.equal(by["2"].status, "adjusted");
+  assert.equal(by["3"].status, "cod", "partial return (damage owed) stays with the courier");
+  assert.equal(by["4"].status, "no_payout_file", "an exchange is still a sale");
+  assert.equal(d.grossAed, 400);
+  assert.equal(d.creditedAed, 160);
+  assert.equal(d.netAed, 240);
+  assert.equal(ledger.missingPayoutFiles[0].orders, 2);
+  assert.equal(ledger.totals.cancelled.orders, 1);
+});
+
+test("closed by hand ('Received — close invoice') counts as received, not a missing payout file", () => {
+  const ledger = computeSalesLedger({
+    month: "2026-09", orders: [order({ order_number: "7", ops_status: "received" })], payouts: [],
+    adjustments: new Map([["7", { ...adj("received" as never, 0), kind: "received" as const, creditAed: 0, receivedAed: 100, receivedVia: "Tabby" }]]),
+  });
+  const o = ledger.days.find((x) => x.day === "2026-09-10")!.orderList[0];
+  assert.equal(o.status, "received");
+  assert.equal(o.receivedAed, 100);
+  assert.match(o.reason, /Closed by hand — received via Tabby/);
+  assert.equal(ledger.missingPayoutFiles.length, 0);
+});
+
+test("a credit larger than the sale is capped at the sale (OS3734: Zoho 876.55 on a 874.35 order)", () => {
+  const ledger = computeSalesLedger({ month: "2026-09", orders: [order({ order_number: "8", ops_status: "returned" })], payouts: [], adjustments: new Map([["8", adj("returned", 102.2)]]) });
+  assert.equal(ledger.totals.creditedAed, 100);
+  assert.equal(ledger.totals.netAed, 0);
+});
+
+test("received by hand, then refunded: still received, the refund comes off net", () => {
+  const ledger = computeSalesLedger({
+    month: "2026-09", orders: [order({ order_number: "9", ops_status: "refunded" })], payouts: [],
+    adjustments: new Map([["9", { ...adj("refunded", 40), alsoReceived: { receivedAed: 100, receivedVia: "Tabby", date: "2026-09-12" } }]]),
+  });
+  const o = ledger.days.find((x) => x.day === "2026-09-10")!.orderList[0];
+  assert.equal(o.status, "received");
+  assert.equal(o.receivedAed, 100);
+  assert.equal(ledger.totals.creditedAed, 40);
+  assert.equal(ledger.totals.netAed, 60);
+});

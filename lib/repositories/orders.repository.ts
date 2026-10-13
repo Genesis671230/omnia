@@ -4,7 +4,7 @@ import { keywordsForLocation } from "@/lib/orders-locations";
 import { dropClobberRiskFields, type ExistingOrderState } from "@/lib/orders-clobber-guard";
 
 const ORDER_COLUMNS =
-  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status,shipping_address1, shipping_address2,shipping_state,shipping_postcode,shipping_company,billing_address1,billing_address2,billing_state,billing_postcode,billing_company, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error";
+  "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status,shipping_address1, shipping_address2,shipping_state,shipping_postcode,shipping_company,billing_address1,billing_address2,billing_state,billing_postcode,billing_company, fulfillment_status, telr_cartid, telr_tranref, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number, shipped_at, label_url, ship_error, ops_status, ops_credit_aed";
 
   export type OrdersQuery = {
     days: number;
@@ -56,6 +56,7 @@ export type OrderRowRaw = {
   courier: string; tracking_number: string; tracking_url: string;
   fulfillment_stage: string; fulfillment_stage_updated_at: string | null;
   awb_number: string; shipped_at: string | null; label_url: string; ship_error: string;
+  ops_status: string | null; ops_credit_aed: number | null;
 };
 
 // Pure — turns URL search params into clamped, normalized query args. Kept
@@ -325,7 +326,7 @@ export const OrdersRepository = {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number,shipping_address1, shipped_at, label_url, ship_error",
+        "uid, store_id, order_number, order_date, customer_name, customer_email, customer_phone, customer_id, city, country, currency, gross_original, gross_aed, gateway, gateway_raw, financial_status, fulfillment_status, payout_id, payout_status, line_items, courier, tracking_number, tracking_url, fulfillment_stage, fulfillment_stage_updated_at, awb_number,shipping_address1, shipped_at, label_url, ship_error, ops_status, ops_credit_aed",
       )
       .eq("uid", uid)
       .single();

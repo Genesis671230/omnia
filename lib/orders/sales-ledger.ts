@@ -31,7 +31,8 @@ export type LedgerStatus =
   | "awaiting_bank" // payout file uploaded, no bank credit matched to it yet
   | "awaiting_payout" // gateway charged it (fee + net known live), payout not issued yet
   | "no_payout_file" // no uploaded payout file mentions this order
-  | "cod"; // cash on delivery, the courier's remittance (voucher) not uploaded yet
+  | "cod" // cash on delivery, the courier's remittance (voucher) not uploaded yet
+  | "adjusted"; // returned / refunded from the app with a credit note — no money is coming for it
 
 export type FeeBasis = "measured" | "allocated" | "estimated";
 
@@ -50,6 +51,26 @@ export type LedgerOrderInput = {
   currency?: string | null;
   gross_original?: number | null;
   gateway_raw?: string | null;
+  ops_status?: string | null;
+};
+
+/** A posted order adjustment (order_adjustments) — the credit note the app raised. */
+export type LedgerAdjustmentInput = {
+  kind: "cancelled" | "returned" | "refunded" | "exchanged" | "received";
+  creditAed: number;
+  /** kind "received": closed by hand — what came in and through which gateway. */
+  receivedAed?: number;
+  receivedVia?: string;
+  deductAed: number;
+  creditNote: string;
+  exchangeInvoice: string;
+  exchangeTotalAed: number;
+  refundDueAed: number;
+  customerOwesAed: number;
+  markOnly: boolean;
+  date: string;
+  /** Closed as received by hand before this refund / return was marked. */
+  alsoReceived?: { receivedAed: number; receivedVia: string; date: string } | null;
 };
 
 export type LedgerPayoutInput = {
@@ -123,6 +144,10 @@ export type LedgerOrder = {
   /** What this order nets in its payout (gross − fee − VAT), whether or not
    *  the bank has received it yet. Measured/allocated from the file, else estimated. */
   payoutNetAed: number;
+  /** Exchange / bank difference on the money that landed: this order's share
+   *  of (payout nets − bank credit) on its bank line. Positive = less arrived
+   *  than the payouts said (a cost). 0 until received. */
+  fxAed: number;
   status: LedgerStatus;
   reason: string;
   /** The order as the store recorded it. */
@@ -143,6 +168,8 @@ export type LedgerOrder = {
     netOriginal: number | null;
     isRefund: boolean;
   } | null;
+  /** Cancelled / returned / refunded / exchanged from the app. */
+  adjustment: LedgerAdjustmentInput | null;
   /** A payout line matched this order number but covers far less than the
    *  order (e.g. a AED 70 Stripe top-up on a AED 2,382 Tamara order). The sale
    *  itself is still unpaid-out; this is shown so nobody reads it as settled. */
@@ -188,11 +215,22 @@ export type LedgerDay = {
   /** Portion of the day's gross whose money is confirmed in the bank. */
   receivedGrossAed: number;
   statusCounts: LedgerStatusCounts;
+  /** Returned / refunded from the app — the credit notes raised against the day's sales. */
+  creditedAed: number;
+  /** grossAed − creditedAed. */
+  netAed: number;
+  /** Cancelled from the app: not sales, listed so the day is complete. */
+  cancelled: { orders: number; grossAed: number; list: LedgerCancelledOrder[] };
   /** Worst status on the day, for a single colour on the chart. */
   headline: LedgerStatus | "empty";
   /** One plain sentence: why the day's money is or isn't all in. */
   reason: string;
   orderList: LedgerOrder[];
+};
+
+export type LedgerCancelledOrder = {
+  uid: string; store: string; orderNumber: string; orderDate: string; customerName: string; gateway: string;
+  grossAed: number; adjustment: LedgerAdjustmentInput | null;
 };
 
 export type SalesLedger = {
@@ -208,6 +246,9 @@ export type SalesLedger = {
     receivedAed: number;
     receivedGrossAed: number;
     statusCounts: LedgerStatusCounts;
+    creditedAed: number;
+    netAed: number;
+    cancelled: { orders: number; grossAed: number };
   };
   /** Gateways with sales in the month that no payout file covers yet. */
   missingPayoutFiles: { gateway: string; orders: number; grossAed: number; days: string[] }[];
@@ -216,7 +257,7 @@ export type SalesLedger = {
   days: LedgerDay[];
 };
 
-const STATUS_ORDER: LedgerStatus[] = ["no_payout_file", "in_review", "awaiting_payout", "awaiting_bank", "received", "cod"];
+const STATUS_ORDER: LedgerStatus[] = ["no_payout_file", "in_review", "awaiting_payout", "awaiting_bank", "received", "cod", "adjusted"];
 
 const money = (n: number) => +n.toFixed(2);
 
@@ -228,6 +269,7 @@ function emptyCounts(): LedgerStatusCounts {
     awaiting_payout: { orders: 0, grossAed: 0 },
     no_payout_file: { orders: 0, grossAed: 0 },
     cod: { orders: 0, grossAed: 0 },
+    adjusted: { orders: 0, grossAed: 0 },
   };
 }
 
@@ -337,7 +379,19 @@ function orderReason(
         : "Matched to a bank credit that needs confirming in Reconciliation";
     case "received":
       return bank?.date ? `Received in bank on ${bank.date}` : "Received in bank";
+    case "adjusted":
+      return "Returned / refunded — credit note raised, no payout expected";
   }
+}
+
+/** FX_MAX_GAP: a bank credit more than 5% off its payouts is a mismatch to
+ *  review, not an exchange difference — it is never spread over orders. */
+export const FX_MAX_GAP = 0.05;
+export function fxShare(orderNet: number, bankAmount: number, payoutsNet: number): number {
+  if (!(payoutsNet > 0) || !(bankAmount > 0) || !(orderNet > 0)) return 0;
+  const gap = payoutsNet - bankAmount;
+  if (Math.abs(gap) > payoutsNet * FX_MAX_GAP) return 0;
+  return money(gap * (orderNet / payoutsNet));
 }
 
 function dayReason(counts: LedgerStatusCounts, orders: LedgerOrder[]): string {
@@ -360,6 +414,7 @@ function dayReason(counts: LedgerStatusCounts, orders: LedgerOrder[]): string {
     parts.push(`${counts.in_review.orders} matched to the bank but need confirming`);
   }
   if (counts.cod.orders > 0) parts.push(`${counts.cod.orders} cash on delivery`);
+  if (counts.adjusted.orders > 0) parts.push(`${counts.adjusted.orders} returned / refunded`);
   if (parts.length === 0) return "All received in bank";
   if (counts.received.orders > 0) parts.unshift(`${counts.received.orders} received`);
   return parts.join(" · ");
@@ -385,6 +440,7 @@ export function computeSalesLedger({
   recon = [],
   bank = [],
   pending = [],
+  adjustments = new Map(),
   stores = [...GROSS_SALES_STORES],
 }: {
   month: string;
@@ -394,6 +450,8 @@ export function computeSalesLedger({
   recon?: LedgerReconInput[];
   bank?: LedgerBankInput[];
   pending?: LedgerPendingChargeInput[];
+  /** Posted order adjustments by order number. */
+  adjustments?: Map<string, LedgerAdjustmentInput>;
   stores?: string[];
 }): SalesLedger {
   const { fromDay, toDay, label } = monthBounds(month);
@@ -407,6 +465,13 @@ export function computeSalesLedger({
     if (!prev || r.match_status === "SETTLED" || r.confirmed_by) reconByPayout.set(r.payout_id, r);
   }
   const bankById = new Map(bank.map((b) => [b.id, b]));
+  // What the payouts landing on each bank credit say should have arrived —
+  // the gap to the credit is the exchange / bank difference (SAR/KWD wires).
+  const payoutNetByBank = new Map<string, number>();
+  for (const [pid, r] of reconByPayout) {
+    const p = payoutById.get(pid);
+    if (p) payoutNetByBank.set(r.bank_line_id, (payoutNetByBank.get(r.bank_line_id) ?? 0) + Number(p.net_amount || 0));
+  }
   const pendingByOrder = new Map<string, LedgerPendingChargeInput>();
   for (const c of pending) for (const k of refCandidates(c.order_ref)) if (!pendingByOrder.has(k)) pendingByOrder.set(k, c);
 
@@ -416,7 +481,8 @@ export function computeSalesLedger({
     for (const s of stores) byStore[s] = 0;
     dayMap.set(day, {
       day, grossAed: 0, orders: 0, byStore, feeAed: 0, receivedAed: 0, receivedGrossAed: 0,
-      statusCounts: emptyCounts(), headline: "empty", reason: "", orderList: [],
+      statusCounts: emptyCounts(), creditedAed: 0, netAed: 0, cancelled: { orders: 0, grossAed: 0, list: [] },
+      headline: "empty", reason: "", orderList: [],
     });
   }
 
@@ -425,8 +491,16 @@ export function computeSalesLedger({
   for (const o of orders) {
     const day = dubaiDayKey(o.order_date);
     if (!day || day < fromDay || day > toDay) continue;
+    const adj = adjustments.get(o.order_number) ?? null;
     if (!isCountedSale(o)) {
       excludedOrders += 1;
+      if ((o.ops_status || "").toLowerCase() === "cancelled" && Number(o.gross_aed) > 0) {
+        const c = dayMap.get(day)!.cancelled;
+        c.orders += 1;
+        c.grossAed += Number(o.gross_aed) || 0;
+        c.list.push({ uid: o.uid, store: o.store_id, orderNumber: o.order_number, orderDate: o.order_date!, customerName: o.customer_name || "",
+          gateway: o.gateway, grossAed: money(Number(o.gross_aed) || 0), adjustment: adj });
+      }
       continue;
     }
     const bucket = dayMap.get(day)!;
@@ -482,7 +556,22 @@ export function computeSalesLedger({
     const charge = !hit && status === "no_payout_file" ? pendingByOrder.get(o.order_number) ?? null : null;
     if (charge) status = "awaiting_payout";
 
-    const fee = status === "cod"
+    // Fully returned / refunded from the app before any money moved: no
+    // payout is coming for it, so it must not sit in "file not uploaded".
+    // Money already in a payout keeps its chain (the refund settles later).
+    // An exchange is still a sale — it keeps its status.
+    // never more than the sale (OS3734: Zoho invoice AED 876.55 on a 874.35 order)
+    const credited = adj && (adj.kind === "returned" || adj.kind === "refunded") ? Math.min(adj.creditAed, gross) : 0;
+    if (credited >= gross - 1 && credited > 0 && (status === "no_payout_file" || status === "awaiting_payout" || status === "cod")) status = "adjusted";
+    // Closed by hand ("Received — close invoice"): the founder says the money
+    // is in (paid with another order, by hand…). It counts as received.
+    const manual = adj?.kind === "received" && status !== "received" ? adj
+      : adj?.alsoReceived && status !== "received" ? { ...adj, ...adj.alsoReceived } : null;
+    if (manual) status = "received";
+
+    const fee = manual
+      ? { fee: 0, received: money(Number(manual.receivedAed) || gross), basis: "measured" as FeeBasis, vat: null }
+      : status === "cod" || status === "adjusted"
       ? { fee: 0, received: 0, basis: "estimated" as FeeBasis, vat: null }
       : charge
         ? { fee: money(charge.fee_aed), received: money(charge.net_aed), basis: "measured" as FeeBasis, vat: null }
@@ -495,6 +584,7 @@ export function computeSalesLedger({
             net_original: charge.net_original, currency: charge.currency.toUpperCase() }
         : null;
 
+    const payoutNet = status === "cod" || status === "adjusted" ? 0 : fee.received;
     const line: LedgerOrder = {
       uid: o.uid,
       store: o.store_id,
@@ -507,7 +597,8 @@ export function computeSalesLedger({
       receivedAed: status === "received" ? fee.received : 0,
       feeBasis: fee.basis,
       vatAed: fee.vat,
-      payoutNetAed: status === "cod" ? 0 : fee.received,
+      payoutNetAed: payoutNet,
+      fxAed: status === "received" && !manual && bankInfo ? fxShare(payoutNet, bankInfo.amountAed, payoutNetByBank.get(bankInfo.id) ?? 0) : 0,
       currency: (o.currency || "AED").toUpperCase(),
       grossOriginal: o.gross_original != null ? money(Number(o.gross_original)) : null,
       paymentMethod: o.gateway_raw || o.gateway,
@@ -526,8 +617,10 @@ export function computeSalesLedger({
           }
         : null,
       status,
-      reason:
-        orderReason(status, o, hit, bankInfo) +
+      adjustment: adj,
+      reason: manual
+        ? `Closed by hand — received via ${manual.receivedVia || o.gateway} on ${manual.date}`
+        : orderReason(status, o, hit, bankInfo) +
         (partialHit && !hit
           ? ` (only AED ${partialHit.tx.gross_aed.toFixed(2)} found in a ${partialHit.payout.gateway} payout under this order number)`
           : ""),
@@ -560,6 +653,7 @@ export function computeSalesLedger({
     bucket.feeAed += line.feeAed;
     bucket.receivedAed += line.receivedAed;
     if (status === "received") bucket.receivedGrossAed += gross;
+    bucket.creditedAed += credited;
     bucket.statusCounts[status].orders += 1;
     bucket.statusCounts[status].grossAed += gross;
     bucket.orderList.push(line);
@@ -567,7 +661,7 @@ export function computeSalesLedger({
 
   const totals = {
     grossAed: 0, orders: 0, feeAed: 0, receivedAed: 0, receivedGrossAed: 0,
-    statusCounts: emptyCounts(),
+    statusCounts: emptyCounts(), creditedAed: 0, netAed: 0, cancelled: { orders: 0, grossAed: 0 },
   };
   const missing = new Map<string, { gateway: string; orders: number; grossAed: number; days: Set<string> }>();
 
@@ -586,6 +680,9 @@ export function computeSalesLedger({
     totals.feeAed += d.feeAed;
     totals.receivedAed += d.receivedAed;
     totals.receivedGrossAed += d.receivedGrossAed;
+    totals.creditedAed += d.creditedAed;
+    totals.cancelled.orders += d.cancelled.orders;
+    totals.cancelled.grossAed += d.cancelled.grossAed;
     for (const s of STATUS_ORDER) {
       totals.statusCounts[s].orders += d.statusCounts[s].orders;
       totals.statusCounts[s].grossAed += d.statusCounts[s].grossAed;
@@ -597,6 +694,9 @@ export function computeSalesLedger({
       feeAed: money(d.feeAed),
       receivedAed: money(d.receivedAed),
       receivedGrossAed: money(d.receivedGrossAed),
+      creditedAed: money(d.creditedAed),
+      netAed: money(d.grossAed - d.creditedAed),
+      cancelled: { ...d.cancelled, grossAed: money(d.cancelled.grossAed) },
       byStore: Object.fromEntries(Object.entries(d.byStore).map(([k, v]) => [k, money(v)])),
       headline: headlineFor(d.statusCounts, d.orders),
       reason: dayReason(d.statusCounts, d.orderList),
@@ -617,6 +717,9 @@ export function computeSalesLedger({
       feeAed: money(totals.feeAed),
       receivedAed: money(totals.receivedAed),
       receivedGrossAed: money(totals.receivedGrossAed),
+      creditedAed: money(totals.creditedAed),
+      netAed: money(totals.grossAed - totals.creditedAed),
+      cancelled: { orders: totals.cancelled.orders, grossAed: money(totals.cancelled.grossAed) },
     },
     missingPayoutFiles: [...missing.values()]
       .map((m) => ({ gateway: m.gateway, orders: m.orders, grossAed: money(m.grossAed), days: [...m.days].sort() }))

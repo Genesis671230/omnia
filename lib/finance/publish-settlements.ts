@@ -102,6 +102,8 @@ function describe(e: unknown): { message: string; uncertain: boolean } {
 
 export type PublishOptions = {
   line: ReconLine;
+  /** False when this run books orders picked into another org than the payout's. */
+  inPayoutOrg?: boolean;
   settlements: SettlementRecord[];
   accounts: PostingAccounts;
   referenceOverride?: string;
@@ -183,7 +185,9 @@ export async function publishSettlements(opts: PublishOptions): Promise<PublishO
   }
   const delivery = opts.includeDelivery ? await publishDeliveryCharges(opts) : undefined;
   // A delivery-charges-only run (no orders) leaves the wire journal alone.
-  const wire: WirePublishResult = opts.settlements.length === 0 && opts.includeDelivery
+  // The wire charge belongs to the payout's own books — never booked from a
+  // run that closes orders picked into another company (opts.inPayoutOrg false).
+  const wire: WirePublishResult = (opts.settlements.length === 0 && opts.includeDelivery) || opts.inPayoutOrg === false
     ? { amount: 0, status: "not_needed", ok: true }
     : await publishWireResidual(opts);
   return { results, wire, ...(delivery ? { delivery } : {}) };

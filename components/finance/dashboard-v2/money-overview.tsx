@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { sumDays, sumGateways, toDayMoney, type DayMoney } from "@/lib/orders/day-money";
 import { DaySalesDrawer, STATUS_META, downloadSalesXlsx, type LedgerDay, type LedgerStatus } from "./day-sales-drawer";
-import { Card, CountUp, Eyebrow, ProgressRing, Seg, aed, compact, dayLong, fmt, gatewayColor, pct } from "./overview/kit";
+import { Card, CountUp, Eyebrow, ProgressRing, Seg, aed, dayLong, fmt, gatewayColor, pct } from "./overview/kit";
 import { ui } from "./overview/ui";
 import { DailyChart, type ChartMode } from "./overview/daily-chart";
 import { GatewayDonut } from "./overview/gateway-donut";
@@ -76,7 +76,7 @@ function Kpi({
       {/* ui.number = big, light, tight tracking */}
       <div className={`mt-3 ${ui.number}`} title={aed(value)}>
         <span className="mr-1.5 text-[14px] font-normal tracking-normal text-slate-400">AED</span>
-        <CountUp value={value} format={compact} />
+        <CountUp value={value} format={(n: number) => fmt(n)} />
       </div>
       <div className={`mt-1 truncate ${ui.caption}`}>{sub}</div>
     </Card>
@@ -114,7 +114,7 @@ function Inspector({
               <ProgressRing value={share} size={80} stroke={8} />
               <div className="min-w-0">
                 <div className={ui.caption}>{dayLong(day.day)}{day.day === today ? " · today" : ""}</div>
-                <div className={ui.number} title={aed(day.soldAed)}>AED {compact(day.soldAed)}</div>
+                <div className={ui.number} title={aed(day.soldAed)}>AED {fmt(day.soldAed)}</div>
                 <div className={ui.hint}>{day.orders} orders</div>
               </div>
             </div>
@@ -128,7 +128,7 @@ function Inspector({
                 <div key={l as string} className="flex items-baseline justify-between">
                   <dt className="text-slate-500">{l}</dt>
                   <dd className="tabular-nums text-slate-900" title={aed(v as number)}>
-                    {extra && <span className="mr-2 text-[12px] font-normal text-slate-400">{extra}</span>}AED {compact(v as number)}
+                    {extra && <span className="mr-2 text-[12px] font-normal text-slate-400">{extra}</span>}AED {fmt(v as number)}
                   </dd>
                 </div>
               ))}
@@ -199,6 +199,9 @@ export function MoneyOverview() {
 
   const inRange = rangeDays.map((d) => money.get(d)).filter(Boolean) as DayMoney[];
   const totals = sumDays(inRange);
+  // refunds / returns raised against these days' sales, and what's left (same as Sales & receipts and the management report)
+  const rangeSet = new Set(rangeDays);
+  const refundsAed = (ledger?.days ?? []).filter((d) => rangeSet.has(d.day)).reduce((t, d) => t + (d.creditedAed ?? 0), 0);
   const gateways = sumGateways(inRange);
   const gatewayNames = sumGateways([...money.values()]).map((g) => g.gateway); // fixed stack order for the month
   const realDays = [...money.keys()].sort();
@@ -268,7 +271,7 @@ export function MoneyOverview() {
             </div>
             <div className="text-center">
               <div className={ui.bigNumber} title={aed(totals.soldAed)}>
-                <span className="mr-1 align-top text-[16px] font-normal tracking-normal text-slate-400">AED</span>{compact(totals.soldAed)}
+                <span className="mr-1 align-top text-[16px] font-normal tracking-normal text-slate-400">AED</span>{fmt(totals.soldAed)}
               </div>
               <div className={`mt-2 ${ui.caption}`}>Sold · {fmt(totals.orders)} orders · {pct(totals.soldAed ? totals.receivedAed / totals.soldAed : 0)} in the bank</div>
             </div>
@@ -298,9 +301,10 @@ export function MoneyOverview() {
       </div>
 
       {/* 3. four small figures under the hero, like the reference's lower cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi delay={0.04} label="Received" value={totals.receivedAed} sub={`${pct(totals.soldAed ? totals.receivedAed / totals.soldAed : 0)} of sales`} />
-        <Kpi delay={0.08} label="Pending" value={totals.pendingAed} sub={`${pct(totals.soldAed ? totals.pendingAed / totals.soldAed : 0)} of sales`} />
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
+        <Kpi delay={0.04} label="Paid in · sales value" value={totals.receivedAed} sub={`${pct(totals.soldAed ? totals.receivedAed / totals.soldAed : 0)} of sales · AED ${fmt(totals.landedNetAed)} cash in bank after fees`} />
+        <Kpi delay={0.08} label="Still to come" value={totals.pendingAed} sub={`${pct(totals.soldAed ? totals.pendingAed / totals.soldAed : 0)} of sales`} />
+        <Kpi delay={0.1} label="Refunds & returns" value={refundsAed} sub={`net sales AED ${fmt(totals.soldAed - refundsAed)}`} />
         <Kpi delay={0.12} label="≈ Gateway fees" value={totals.feeAed} sub={`${pct(totals.feeRate)} of sales`} />
         <Kpi delay={0.16} label="Ad spend" value={spend} sub={spend ? `ROAS ${(totals.soldAed / spend).toFixed(1)}×` : "no spend"} />
       </div>
@@ -317,7 +321,7 @@ export function MoneyOverview() {
                 {pendingParts.map((p) => (
                   <li key={p.s} className="flex items-center justify-between gap-3 text-[12.5px]">
                     <span className="text-slate-600">{STATUS_META[p.s].label} <span className="text-slate-400">· {p.orders}</span></span>
-                    <span className="tabular-nums text-slate-900" title={aed(p.grossAed)}>AED {compact(p.grossAed)}</span>
+                    <span className="tabular-nums text-slate-900" title={aed(p.grossAed)}>AED {fmt(p.grossAed)}</span>
                   </li>
                 ))}
               </ul>
@@ -342,7 +346,7 @@ export function MoneyOverview() {
           <table className="w-full border-separate border-spacing-0 text-[13px]">
             <thead>
               <tr className="text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
-                {["Day", "", "Orders", "Sold", "Received", "Pending", "≈ Fee", "Status"].map((h, index) => (
+                {["Day", "", "Orders", "Sold", "Paid in", "Still to come", "≈ Fee", "Status"].map((h, index) => (
                   <th key={index} className={`border-b border-slate-100 px-3 py-2 ${index >= 2 && index <= 6 ? "text-right" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
@@ -363,10 +367,10 @@ export function MoneyOverview() {
                     </td>
                     <td className="w-10 border-b border-slate-100 px-1 py-1.5"><ProgressRing value={d.soldAed ? d.receivedAed / d.soldAed : 0} size={28} stroke={3.5} /></td>
                     <td className={`${cell} text-slate-500`}>{d.orders}</td>
-                    <td className={`${cell} font-semibold text-slate-900`} title={aed(d.soldAed)}>{compact(d.soldAed)}</td>
-                    <td className={`${cell} text-slate-900`} title={aed(d.receivedAed)}>{d.receivedAed ? compact(d.receivedAed) : <span className="text-slate-300">—</span>}</td>
-                    <td className={`${cell} text-slate-900`} title={aed(d.pendingAed)}>{d.pendingAed ? compact(d.pendingAed) : <span className="text-slate-300">—</span>}</td>
-                    <td className={`${cell} text-slate-500`} title={`${aed(d.feeAed)} · ${pct(d.feeRate)}${d.feeEstimatedShare > 0.5 ? " · mostly estimated" : ""}`}>{compact(d.feeAed)}</td>
+                    <td className={`${cell} font-semibold text-slate-900`} title={aed(d.soldAed)}>{fmt(d.soldAed)}</td>
+                    <td className={`${cell} text-slate-900`} title={aed(d.receivedAed)}>{d.receivedAed ? fmt(d.receivedAed) : <span className="text-slate-300">—</span>}</td>
+                    <td className={`${cell} text-slate-900`} title={aed(d.pendingAed)}>{d.pendingAed ? fmt(d.pendingAed) : <span className="text-slate-300">—</span>}</td>
+                    <td className={`${cell} text-slate-500`} title={`${aed(d.feeAed)} · ${pct(d.feeRate)}${d.feeEstimatedShare > 0.5 ? " · mostly estimated" : ""}`}>{fmt(d.feeAed)}</td>
                     <td className="whitespace-nowrap border-b border-slate-100 px-3 text-[12.5px] text-slate-500">
                       {meta && <span className="inline-flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full" style={{ background: d.headline === "received" ? "#10B981" : d.headline === "no_payout_file" ? "#E11D48" : "#F59E0B" }} />{meta.label}</span>}
                     </td>
@@ -384,10 +388,10 @@ export function MoneyOverview() {
                     <td className="px-3 pt-3">Month</td>
                     <td className="px-1 pt-3"><ProgressRing value={t.soldAed ? t.receivedAed / t.soldAed : 0} size={28} stroke={3.5} /></td>
                     <td className={c}>{fmt(t.orders)}</td>
-                    <td className={c} title={aed(t.soldAed)}>{compact(t.soldAed)}</td>
-                    <td className={c} title={aed(t.receivedAed)}>{compact(t.receivedAed)}</td>
-                    <td className={c} title={aed(t.pendingAed)}>{compact(t.pendingAed)}</td>
-                    <td className={c} title={aed(t.feeAed)}>{compact(t.feeAed)}</td>
+                    <td className={c} title={aed(t.soldAed)}>{fmt(t.soldAed)}</td>
+                    <td className={c} title={aed(t.receivedAed)}>{fmt(t.receivedAed)}</td>
+                    <td className={c} title={aed(t.pendingAed)}>{fmt(t.pendingAed)}</td>
+                    <td className={c} title={aed(t.feeAed)}>{fmt(t.feeAed)}</td>
                     <td />
                   </tr>
                 </tfoot>
@@ -398,7 +402,7 @@ export function MoneyOverview() {
         {(ledger?.excludedOrders ?? 0) > 0 && <p className="mt-2 px-2 text-[12px] text-slate-400">{ledger!.excludedOrders} unpaid, pending or cancelled orders are not counted as sales.</p>}
       </Card>
 
-      <DaySalesDrawer day={openDay ? byDay.get(openDay) ?? null : null} onClose={() => setOpenDay(null)} />
+      <DaySalesDrawer day={openDay ? byDay.get(openDay) ?? null : null} onClose={() => setOpenDay(null)} onChanged={() => load(true)} />
     </section>
   );
 }

@@ -4,7 +4,9 @@
 import { supabase } from "@/lib/supabase";
 import { addDubaiDays, dubaiDayBoundsUtc, dubaiToday } from "@/lib/dubai-day";
 import { OrdersRepository } from "@/lib/repositories/orders.repository";
+import { OrderAdjustmentsRepository } from "@/lib/repositories/order-adjustments.repository";
 import { ZohoInvoiceIndexRepository } from "@/lib/repositories/zoho-invoice-index";
+import { listZohoConnections } from "@/lib/integrations/zoho-org";
 import { buildSalesLedger } from "@/lib/orders/sales-ledger.service";
 import { readDispatchSheets } from "@/lib/integrations/dispatch-sheet-read";
 import { buildManagementReport, type MrGatewayRefund, type MrLedger, type MrStoreOrder } from "./management-report";
@@ -46,7 +48,7 @@ async function inChunks<T>(keys: string[], size: number, fn: (chunk: string[]) =
 
 /** Refund cash per order: gateway payout refund lines, plus refunds this app
  *  booked against a payout (Tabby/Tamara deduct them inside the payout). */
-async function gatewayRefundsFor(orderNumbers: string[]): Promise<MrGatewayRefund[]> {
+export async function gatewayRefundsFor(orderNumbers: string[]): Promise<MrGatewayRefund[]> {
   const lines = await inChunks(orderNumbers, 300, async (c) => {
     const { data, error } = await supabase.from("payout_transactions").select("payout_id, order_ref, gross_aed").eq("is_refund", true).in("order_ref", c);
     if (error) throw new Error(`payout refund lines: ${error.message}`);
@@ -83,6 +85,14 @@ async function refundsPaidIn(month: string): Promise<MrGatewayRefund[]> {
     .filter((r) => r.date?.startsWith(month));
 }
 
+/** The organisation COD settles into (Settings → default for COD), by the
+ *  label the invoice index stores — "House of Omnia". */
+async function codOrgLabel(): Promise<string> {
+  const conns = await listZohoConnections().catch(() => []);
+  const c = conns.find((x) => x.defaultForProviders.includes("COD"));
+  return c?.label || c?.orgName || "House of Omnia";
+}
+
 export async function buildMonthManagementReport(month: string) {
   const { from, to } = monthBounds(month);
   const today = dubaiToday();
@@ -93,10 +103,12 @@ export async function buildMonthManagementReport(month: string) {
   ]);
   const numbers = orders.map((o) => o.order_number);
   const sheetTo = [addDubaiDays(to, 60), today].sort()[0];
-  const [gatewayRefunds, creditNotes, invoiceCounts, sheet] = await Promise.all([
+  const [gatewayRefunds, creditNotes, invoiceCounts, invoicesByOrg, codOrg, sheet] = await Promise.all([
     gatewayRefundsFor(numbers),
     ZohoInvoiceIndexRepository.creditNotesFor(numbers),
     ZohoInvoiceIndexRepository.invoiceCounts(numbers),
+    ZohoInvoiceIndexRepository.byOrgForOrders(numbers),
+    codOrgLabel(),
     readDispatchSheets(from, sheetTo > from ? sheetTo : to),
   ]);
   const ledgerMap = new Map<string, MrLedger>();
@@ -113,7 +125,10 @@ export async function buildMonthManagementReport(month: string) {
 
   const report = buildManagementReport({
     month, today, orders: orders as unknown as MrStoreOrder[], ledger: ledgerMap, gatewayRefunds, creditNotes, invoiceCounts,
-    sheet: sheet.rows, refundsPaidInMonth: paidIn, orderMonthOf,
+    sheet: sheet.rows, refundsPaidInMonth: paidIn, orderMonthOf, invoicesByOrg, codOrg,
+    adjustments: new Map([...(await OrderAdjustmentsRepository.postedFor(numbers))].map(([k, a]) => [norm(k), {
+      kind: a.kind, creditAed: a.credit_aed, creditNote: a.zoho_creditnote_number, exchangeTotalAed: a.exchange_total, date: a.adjustment_date,
+    }])),
   });
   return { ...report, sources: { sheets: sheet.sources, sheetErrors: sheet.errors, zohoIndexAsOf: await ZohoInvoiceIndexRepository.lastUpdated() } };
 }

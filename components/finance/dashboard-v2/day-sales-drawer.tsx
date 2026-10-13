@@ -10,14 +10,22 @@
    invoice/ship modals before. */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight, Download, Loader2, Search, BarChart3, List } from "lucide-react";
+import { X, Landmark, FileText, BadgeCheck, Clock, AlertTriangle, FileX, Wallet, ArrowRight, Download, Loader2, Search, BarChart3, List, RotateCcw, Ban } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { DayCharts } from "./overview/day-charts";
+import { OrderAdjustDialog } from "@/components/finance/order-adjust-dialog";
 import { STORE_COLOR, GATEWAY_COLOR, aed2 } from "./types";
 
-export type LedgerStatus = "received" | "in_review" | "awaiting_bank" | "awaiting_payout" | "no_payout_file" | "cod";
+export type LedgerStatus = "received" | "in_review" | "awaiting_bank" | "awaiting_payout" | "no_payout_file" | "cod" | "adjusted";
+
+/** Cancelled / returned / refunded / exchanged from the app (order_adjustments). */
+export type LedgerAdjustment = {
+  kind: "cancelled" | "returned" | "refunded" | "exchanged" | "received"; creditAed: number; deductAed: number; creditNote: string;
+  receivedAed?: number; receivedVia?: string;
+  exchangeInvoice: string; exchangeTotalAed: number; refundDueAed: number; customerOwesAed: number; markOnly: boolean; date: string;
+};
 
 export type LedgerOrder = {
   uid: string;
@@ -45,6 +53,7 @@ export type LedgerOrder = {
   partial: { gateway: string; grossAed: number; payoutId: string } | null;
   payout: { id: string; gateway: string; source: string | null; uploadedAt: string | null; netAed: number; feeAed: number | null; grossAed: number | null; lineCount: number; linesNetAed: number; currency: string; netOriginal: number | null } | null;
   bank: { id: string; date: string | null; amountAed: number; reference: string; state: string; confirmed: boolean } | null;
+  adjustment?: LedgerAdjustment | null;
 };
 
 export type LedgerDay = {
@@ -56,6 +65,9 @@ export type LedgerDay = {
   receivedAed: number;
   receivedGrossAed: number;
   statusCounts: Record<LedgerStatus, { orders: number; grossAed: number }>;
+  creditedAed?: number;
+  netAed?: number;
+  cancelled?: { orders: number; grossAed: number; list: { uid: string; store: string; orderNumber: string; orderDate: string; customerName: string; gateway: string; grossAed: number; adjustment: LedgerAdjustment | null }[] };
   headline: LedgerStatus | "empty";
   reason: string;
   orderList: LedgerOrder[];
@@ -68,7 +80,15 @@ export const STATUS_META: Record<LedgerStatus, { label: string; tone: string; ic
   awaiting_payout: { label: "Charged · payout pending", tone: "info", icon: Clock, color: "#22d3ee" },
   no_payout_file: { label: "Payout file not uploaded", tone: "bad", icon: FileX, color: "#fb7185" },
   cod: { label: "Cash on delivery", tone: "muted", icon: Wallet, color: "#c084fc" },
+  adjusted: { label: "Returned / refunded", tone: "muted", icon: RotateCcw, color: "#94a3b8" },
 };
+
+const KIND_TEXT = { cancelled: "Cancelled", returned: "Returned", refunded: "Refunded", exchanged: "Exchanged", received: "Received" } as const;
+const adjustmentText = (a: LedgerAdjustment) => a.kind === "received"
+  ? `Closed by hand · received ${aed2(a.receivedAed ?? 0)} via ${a.receivedVia || "—"}${a.markOnly ? " · marked" : ""}`
+  : `${KIND_TEXT[a.kind]}${a.creditNote ? ` · ${a.creditNote}` : a.markOnly ? " · marked" : ""} · credit ${aed2(a.creditAed)}` +
+  (a.exchangeInvoice ? ` · new invoice ${a.exchangeInvoice}` : "") +
+  (a.customerOwesAed > 0 ? ` · owes ${aed2(a.customerOwesAed)}` : "") + (a.refundDueAed > 0 ? ` · refund due ${aed2(a.refundDueAed)}` : "");
 
 const BASIS_LABEL = { measured: "from payout file", allocated: "share of file fee", estimated: "estimated" } as const;
 
@@ -98,7 +118,7 @@ export async function downloadSalesXlsx(q: { day?: string; month?: string }): Pr
 
 type Settle = "all" | "received" | "open" | "cod";
 const SETTLE_LABEL: Record<Settle, string> = { all: "All", received: "Received", open: "Not yet settled", cod: "Cash on delivery" };
-const settleOf = (o: LedgerOrder): Settle => (o.status === "received" ? "received" : o.status === "cod" ? "cod" : "open");
+const settleOf = (o: LedgerOrder): Settle => (o.status === "received" ? "received" : o.status === "cod" ? "cod" : o.status === "adjusted" ? "all" : "open");
 
 /** Every field someone might type: order #, customer, store, gateway, the
  *  store's payment method, status, payout ID / file, bank reference. */
@@ -106,7 +126,8 @@ const haystack = (o: LedgerOrder) =>
   [o.orderNumber, `#${o.orderNumber}`, o.customerName, o.store, o.gateway, o.paymentMethod, STATUS_META[o.status].label,
     o.payout?.id, o.payout?.source, o.bank?.reference, o.bank?.date].filter(Boolean).join(" ").toLowerCase();
 
-export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClose: () => void }) {
+export function DaySalesDrawer({ day, onClose, onChanged }: { day: LedgerDay | null; onClose: () => void; onChanged?: () => void }) {
+  const [adjusting, setAdjusting] = useState<{ uid: string; orderNumber: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [settle, setSettle] = useState<Settle>("all");
   const [gateway, setGateway] = useState("all");
@@ -127,7 +148,7 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
   }, [orders]);
   const settleCounts = useMemo(() => {
     const c: Record<Settle, number> = { all: orders.length, received: 0, open: 0, cod: 0 };
-    for (const o of orders) c[settleOf(o)] += 1;
+    for (const o of orders) { const k = settleOf(o); if (k !== "all") c[k] += 1; }
     return c;
   }, [orders]);
   const shown = useMemo(() => {
@@ -216,6 +237,13 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
                 <div><span>Not in bank yet</span><b>{aed2(Math.max(day.grossAed - day.receivedGrossAed, 0))}</b><em>gross</em></div>
               </div>
   
+              {((day.creditedAed ?? 0) > 0 || (day.cancelled?.orders ?? 0) > 0) && (
+                <div className="dsd-adjline">
+                  {(day.creditedAed ?? 0) > 0 && <span>Returns / refunds credited <b>{aed2(day.creditedAed!)}</b> · net sales <b>{aed2(day.netAed ?? day.grossAed)}</b></span>}
+                  {(day.cancelled?.orders ?? 0) > 0 && <span>{day.cancelled!.orders} cancelled from the app ({aed2(day.cancelled!.grossAed)}) — not in gross sales</span>}
+                </div>
+              )}
+
               <div className="dsd-status-row">
                 {(Object.keys(STATUS_META) as LedgerStatus[]).filter((s) => day.statusCounts[s].orders > 0).map((s) => {
                   const m = STATUS_META[s];
@@ -327,16 +355,41 @@ export function DaySalesDrawer({ day, onClose }: { day: LedgerDay | null; onClos
                         <span className="dsd-reason">{o.reason}</span>
                         {o.status === "received" && <b className="dsd-recv">+{aed2(o.receivedAed)}</b>}
                       </div>
+                      <div className="dsd-adj">
+                        {o.adjustment && <span className="dsd-pill muted"><RotateCcw size={11} />{adjustmentText(o.adjustment)}</span>}
+                        <button type="button" className="dsd-adj-btn" onClick={() => setAdjusting({ uid: o.uid, orderNumber: o.orderNumber })}>
+                          {o.adjustment ? "View / undo" : "Cancel · return · refund · exchange"}
+                        </button>
+                      </div>
                     </article>
                   );
                 })}
               </div>
+
+              {(day.cancelled?.list.length ?? 0) > 0 && (
+                <div className="dsd-cancelled">
+                  <h3><Ban size={13} /> Cancelled from the app · {day.cancelled!.orders} · {aed2(day.cancelled!.grossAed)}</h3>
+                  {day.cancelled!.list.map((c) => (
+                    <div key={c.uid} className="dsd-cx">
+                      <span className="dsd-num">#{c.orderNumber}</span>
+                      <span className="dsd-name" dir="auto">{c.customerName || "—"}</span>
+                      <span className="dsd-reason">{c.gateway}{c.adjustment ? ` · ${adjustmentText(c.adjustment)}` : ""}</span>
+                      <b>{aed2(c.grossAed)}</b>
+                      <button type="button" className="dsd-adj-btn" onClick={() => setAdjusting({ uid: c.uid, orderNumber: c.orderNumber })}>View / undo</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               </>
             )}
 
             <a className="dsd-more" href="/reconciliation">Upload payout files or confirm credits in Reconciliation <ArrowRight size={12} /></a>
           </motion.div>
         </motion.div>
+      )}
+      {adjusting && (
+        <OrderAdjustDialog key={adjusting.uid} uid={adjusting.uid} orderNumber={adjusting.orderNumber}
+          onClose={() => setAdjusting(null)} onDone={() => onChanged?.()} />
       )}
     </AnimatePresence>,
     document.body,
@@ -363,6 +416,14 @@ const DRAWER_CSS = `
   .dsd-sum span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: #5E6B85; font-weight: 600; }
   .dsd-sum b { font-size: 15px; font-variant-numeric: tabular-nums; }
   .dsd-sum em { font-style: normal; font-size: 10.5px; color: #5E6B85; }
+  .dsd-adjline { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: #46546F; background: #fff; border: 1px solid #D8E1F1; border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; }
+  .dsd-adj { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .dsd-adj-btn { border: 1px solid #D8E1F1; background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; color: #46546F; cursor: pointer; }
+  .dsd-adj-btn:hover { border-color: #BFD3F8; color: #1d4ed8; }
+  .dsd-cancelled { margin-top: 16px; background: #fff; border: 1px solid #D8E1F1; border-radius: 14px; padding: 12px 14px; }
+  .dsd-cancelled h3 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin: 0 0 8px; color: #46546F; }
+  .dsd-cx { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 6px 0; border-top: 1px dashed #E3E9F5; flex-wrap: wrap; }
+  .dsd-cx b { margin-left: auto; font-variant-numeric: tabular-nums; text-decoration: line-through; color: #5E6B85; }
   .dsd-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
   .dsd-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; font-weight: 500; white-space: nowrap; }
   .dsd-pill.ok { background: #d1fae5; color: #047857; } .dsd-pill.bad { background: #ffe4e6; color: #be123c; }

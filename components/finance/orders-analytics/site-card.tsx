@@ -143,7 +143,7 @@ function TrafficView({ sources, color }: { sources: { source: string; sessions: 
   return (
     <ul className="space-y-2">
       {sources.map((s, i) => (
-        <li key={s.source} className="grid grid-cols-[88px_1fr_auto] items-center gap-3 text-[12.5px]">
+        <li key={i} className="grid grid-cols-[88px_1fr_auto] items-center gap-3 text-[12.5px]">
           <span className="capitalize text-slate-500">{s.source}</span>
           <span className="relative h-5 overflow-hidden rounded-full bg-slate-100">
             <motion.span className="absolute inset-y-0 left-0 rounded-full" style={{ background: color, opacity: 0.55 }}

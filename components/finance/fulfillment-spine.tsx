@@ -9,6 +9,16 @@ import {
 import { toast } from "sonner";
 import type { OrderRow } from "@/lib/types/orders";
 import type { FinanceStatus, ZohoState } from "@/lib/hooks/use-order-actions";
+import { OrderAdjustDialog } from "./order-adjust-dialog";
+import { KsaDispatchPanel, KsaRecordCard, KsaSendSummary, type KsaSelection, type KsaSendResult } from "./ksa-dispatch-panel";
+import { UaePackPanel } from "./uae-pack-panel";
+
+// SMSA Fulfillment KSA — picking it opens the KSA dispatch panel (packaging,
+// sheet rows, Zoho close) instead of the plain reserve button.
+const KSA_WAREHOUSE_ID = "2330082000016063536";
+// Omniastores LLC — picking it (or scanning the order) opens the box picker /
+// scanner panel that closes the Zoho sales order from the UAE warehouse.
+const UAE_WAREHOUSE_ID = "2330082000000980131";
 
 const C = {
   paper: "#F7F3EA", card: "#FFFFFF", raise: "#FBF8F1",
@@ -46,11 +56,12 @@ type Event = {
 type FulfillmentOption = {
   warehouse_id: string; warehouse_name: string;
   can_fulfill: boolean; blockers: any[];
+  stock?: { sku: string; need: number; have: number | null }[];
 };
 
 export function FulfillmentSpine({
   order, detail, onStageChanged, onFinanceChanged, onInvoice, onShip,
-  actions, zoho, setZoho, wrap,
+  actions, zoho, setZoho, wrap, autoPack = false,
 }: any) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -58,9 +69,34 @@ export function FulfillmentSpine({
   const [selectedWh, setSelectedWh] = useState<string | null>(null);
   const [busyStep, setBusyStep] = useState<StageKey | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [ksaResult, setKsaResult] = useState<KsaSendResult | null>(null);
+  const [ksaRetrying, setKsaRetrying] = useState(false);
+  const [ksaRec, setKsaRec] = useState<any>(null);
+  const [ksaEditing, setKsaEditing] = useState(false);
+  // Pack & close from Omniastores LLC: open when the order was opened by a scan.
+  const [packOpen, setPackOpen] = useState<boolean>(autoPack);
+  useEffect(() => { if (autoPack) setPackOpen(true); }, [autoPack]);
+  const loadKsa = useCallback(() => {
+    fetch(`/api/orders/${order.uid}/ksa-dispatch?record=1`).then((r) => r.json()).then((d) => setKsaRec(d.record ?? null)).catch(() => {});
+  }, [order.uid]);
+  useEffect(() => { loadKsa(); }, [loadKsa]);
+  const ksaInitial: KsaSelection | undefined = React.useMemo(
+    () => (ksaRec ? { ksaSkus: ksaRec.ksa_skus, packaging: ksaRec.packaging, uaePackaging: ksaRec.uae_packaging, rateOverride: ksaRec.rate_override, matchOrderTotal: ksaRec.match_order_total } : undefined), [ksaRec]);
+
+  async function retryKsa() {
+    setKsaRetrying(true);
+    try {
+      const d = await post("ksa-dispatch", { retry: true });
+      setKsaResult(d);
+      await load();
+      loadKsa();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setKsaRetrying(false); }
+  }
 
   const stage = (order.fulfillment_stage || "new") as StageKey | "new" | "processing";
   const idx = FLOW.findIndex((s) => s.key === stage);
+  useEffect(() => { if (autoPack && idx === 0) setSelectedWh((w) => w ?? UAE_WAREHOUSE_ID); }, [autoPack, idx]);
 
   const load = useCallback(async () => {
     try {
@@ -75,13 +111,14 @@ export function FulfillmentSpine({
   useEffect(() => { load(); }, [load]);
 
   // Load fulfillment options when it's time to reserve
+  const loadOptions = useCallback((fresh = false) => {
+    fetch(`/api/orders/${order.uid}/fulfillment-options${fresh ? "?fresh=1" : ""}`)
+      .then((r) => r.json()).then((d) => setOptions(d.options ?? []))
+      .catch((e) => toast.error(`load options: ${e.message}`));
+  }, [order.uid]);
   useEffect(() => {
-    if (idx === 0 && !options) {
-      fetch(`/api/orders/${order.uid}/fulfillment-options`)
-        .then((r) => r.json()).then((d) => setOptions(d.options ?? []))
-        .catch((e) => toast.error(`load options: ${e.message}`));
-    }
-  }, [idx, order.uid, options]);
+    if (idx === 0 && !options) loadOptions();
+  }, [idx, options, loadOptions]);
 
   async function post(path: string, body: any = {}): Promise<any> {
     const res = await fetch(`/api/orders/${order.uid}/${path}`, {
@@ -210,19 +247,27 @@ export function FulfillmentSpine({
                 <div style={{ fontSize: 12, color: C.coral }}>No warehouses available for this order.</div>
               ) : (
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {options.map((o) => (
+                  {options.map((o) => {
+                    // KSA stays pickable when short: the panel lets you send part of a split order.
+                    const pickable = o.can_fulfill || o.warehouse_id === KSA_WAREHOUSE_ID;
+                    return (
                     <button key={o.warehouse_id}
-                      onClick={() => o.can_fulfill && setSelectedWh(o.warehouse_id)}
-                      disabled={!o.can_fulfill}
+                      onClick={() => pickable && setSelectedWh(o.warehouse_id)}
+                      disabled={!pickable}
                       style={{
                         display: "flex", flexDirection: "column", gap: 4, minWidth: 200,
                         padding: "10px 14px", borderRadius: 10, textAlign: "left",
                         background: selectedWh === o.warehouse_id ? C.mintBg : C.card,
                         border: `1.5px solid ${selectedWh === o.warehouse_id ? C.mint : C.line2}`,
-                        cursor: o.can_fulfill ? "pointer" : "not-allowed",
-                        opacity: o.can_fulfill ? 1 : 0.5,
+                        cursor: pickable ? "pointer" : "not-allowed",
+                        opacity: pickable ? 1 : 0.5,
                       }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: C.ink }}>{o.warehouse_name}</span>
+                      {o.stock?.map((s) => (
+                        <span key={s.sku} style={{ fontSize: 10.5, color: s.have != null && s.have >= s.need ? C.dim : C.coral }}>
+                          {s.sku}: {s.have ?? "—"} available · needs {s.need}
+                        </span>
+                      ))}
                       {o.can_fulfill ? (
                         <span style={{ fontSize: 11, color: C.mint, display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <CheckCircle2 size={11} /> All items available
@@ -233,10 +278,23 @@ export function FulfillmentSpine({
                         </span>
                       )}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
-              {selectedWh && (
+              {selectedWh === KSA_WAREHOUSE_ID && (
+                <KsaDispatchPanel uid={order.uid} onLoaded={() => loadOptions(true)} onSent={(r) => {
+                  setKsaResult(r);
+                  onStageChanged("reserved");
+                  load();
+                  loadKsa();
+                  toast.success(r.sheet.ok && r.zoho.ok ? "Sent from KSA" : "Reserved — check the KSA steps below");
+                }} />
+              )}
+              {selectedWh === UAE_WAREHOUSE_ID && (
+                <UaePackPanel uid={order.uid} scanTarget onDone={() => { load(); onStageChanged("reserved"); }} />
+              )}
+              {selectedWh && selectedWh !== KSA_WAREHOUSE_ID && (
                 <button onClick={() => run("reserved", stepActions.reserved)} disabled={busyStep === "reserved"}
                   style={{
                     marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "none",
@@ -245,13 +303,42 @@ export function FulfillmentSpine({
                     display: "inline-flex", alignItems: "center", gap: 6,
                   }}>
                   {busyStep === "reserved" && <Loader2 size={12} className="spin" />}
-                  Reserve from {options?.find((o) => o.warehouse_id === selectedWh)?.warehouse_name}
+                  {selectedWh === UAE_WAREHOUSE_ID ? "Reserve only (close later)" : "Reserve from"} {selectedWh === UAE_WAREHOUSE_ID ? "" : options?.find((o) => o.warehouse_id === selectedWh)?.warehouse_name}
                 </button>
               )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {/* Pack & close from Omniastores LLC — any stage outside the reserve step, unless it went out from KSA. */}
+      {idx !== 0 && !ksaRec && (
+        packOpen ? (
+          <div style={{ padding: 14, background: C.raise, border: `1px solid ${C.line}`, borderRadius: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: C.faint, fontWeight: 700 }}>
+              <span>Pack & close · Omniastores LLC</span>
+              <button onClick={() => setPackOpen(false)} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 12, letterSpacing: 0, textTransform: "none" }}>Hide</button>
+            </div>
+            <UaePackPanel uid={order.uid} scanTarget onDone={() => load()} />
+          </div>
+        ) : (
+          <button onClick={() => setPackOpen(true)} style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: `1px solid ${C.line2}`, background: C.card, color: C.ink, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+            <Package size={13} /> Pack boxes & close SO · Omniastores LLC
+          </button>
+        )
+      )}
+
+      {ksaResult && <KsaSendSummary result={ksaResult} onRetry={retryKsa} busy={ksaRetrying} />}
+      {ksaRec && idx !== 0 && !ksaEditing && <KsaRecordCard rec={ksaRec} onEdit={() => setKsaEditing(true)} onRetry={retryKsa} busy={ksaRetrying} />}
+      {ksaRec && ksaEditing && (
+        <div style={{ padding: 14, background: C.raise, border: `1px solid ${C.line}`, borderRadius: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: C.dim }}>
+            <span>Edit the KSA send — items, packaging; the sheet rows are rewritten and the Zoho close re-checked.</span>
+            <button onClick={() => setKsaEditing(false)} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+          </div>
+          <KsaDispatchPanel uid={order.uid} initial={ksaInitial} onSent={(r) => { setKsaResult(r); setKsaEditing(false); load(); loadKsa(); }} />
+        </div>
+      )}
 
       {/* ── documents strip ── */}
       {(invoicePdf || awbLabel || zohoInv) && (
@@ -306,7 +393,8 @@ function DocChip({ href, icon, label, sub, color }: any) {
 }
 
 function SecondaryActions({ order, actions, zoho, setZoho, onFinanceChanged, wrap, reload }: any) {
-  const [confirm, setConfirm] = useState<null | "cancel" | "refund">(null);
+  // null = closed; undefined = open on the order's existing adjustment
+  const [adjust, setAdjust] = useState<null | undefined | "cancelled" | "refunded">(null);
   const settled = order.finance_status === "SETTLED";
   const isException = Boolean(order.ship_error);
   const zohoPushed = Boolean(zoho?.invoiceId);
@@ -329,27 +417,16 @@ function SecondaryActions({ order, actions, zoho, setZoho, onFinanceChanged, wra
           icon={<ArrowUpRight size={12} />} label="Push to Zoho" busy={actions.pending === "zoho"} />
       )}
 
-      {confirm ? (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 10px", borderRadius: 10, background: C.coralBg, border: `1px solid ${C.coralEdge}` }}>
-          <AlertTriangle size={11} color={C.coral} />
-          <span style={{ fontSize: 11.5, color: C.coral, fontWeight: 600 }}>{confirm === "cancel" ? "Cancel order?" : "Refund order?"}</span>
-          <button onClick={() => {
-            const fn = confirm === "cancel" ? actions.cancelOrder() : actions.refundOrder();
-            wrap(fn, confirm === "cancel" ? "Order cancelled" : "Refund issued").then(() => reload());
-            setConfirm(null);
-          }} style={{ background: C.coral, color: "#fff", border: "none", borderRadius: 6, padding: "4px 9px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-            Confirm
-          </button>
-          <button onClick={() => setConfirm(null)} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", fontSize: 11 }}>Keep</button>
-        </span>
-      ) : (
-        <>
-          <MiniBtn tone="danger" onClick={() => setConfirm("refund")}
-            icon={<RotateCw size={12} />} label="Refund"
-            disabled={order.finance_status === "COD_PENDING"} />
-          <MiniBtn onClick={() => setConfirm("cancel")}
-            icon={<XCircle size={12} />} label="Cancel" />
-        </>
+      {/* Cancel / return / refund / exchange: books the Zoho credit note
+          (and an exchange's new invoice) — lib/orders/order-adjustment.ts */}
+      <MiniBtn tone={order.ops_status ? "ghost" : "danger"} onClick={() => setAdjust(order.ops_status ? undefined : "refunded")}
+        icon={<RotateCw size={12} />} label={order.ops_status ? `${String(order.ops_status).replace(/^./, (c: string) => c.toUpperCase())} · view` : "Refund / return"} />
+      {!order.ops_status && (
+        <MiniBtn onClick={() => setAdjust("cancelled")} icon={<XCircle size={12} />} label="Cancel" />
+      )}
+      {adjust !== null && (
+        <OrderAdjustDialog uid={order.uid} orderNumber={order.order_number} initialKind={adjust}
+          onClose={() => setAdjust(null)} onDone={() => reload()} />
       )}
     </div>
   );

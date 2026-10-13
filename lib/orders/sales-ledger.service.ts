@@ -9,9 +9,11 @@ import { PayoutsRepository } from "@/lib/repositories/payouts.repository";
 import { dubaiRangeBoundsUtc } from "@/lib/dubai-day";
 import { SyncRunsRepository } from "@/lib/repositories/sync-runs.repository";
 import { PendingChargesRepository } from "@/lib/repositories/pending-charges.repository";
+import { OrderAdjustmentsRepository, type OrderAdjustmentRow } from "@/lib/repositories/order-adjustments.repository";
 import {
   computeSalesLedger,
   ledgerMonthBounds,
+  type LedgerAdjustmentInput,
   type LedgerBankInput,
   type LedgerOrderInput,
   type LedgerReconInput,
@@ -64,7 +66,10 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
       currency: r.currency ?? null,
       gross_original: r.gross_original ?? null,
       gateway_raw: r.gateway_raw ?? null,
+      ops_status: r.ops_status ?? null,
     }));
+  const adjusted = orderRows.filter((r) => r.ops_status).map((r) => r.order_number);
+  const adjRows = adjusted.length ? await OrderAdjustmentsRepository.postedFor(adjusted) : new Map<string, OrderAdjustmentRow>();
 
   const bankIds = [...new Set(recon.map((r) => r.bank_line_id))];
   const bank: LedgerBankInput[] = [];
@@ -82,6 +87,7 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
     orders,
     payouts,
     pending,
+    adjustments: new Map([...adjRows].map(([k, a]) => [k, toLedgerAdjustment(a)])),
     links: new Map(linkRows.map((l) => [`${l.payout_id}|${l.order_ref}`, l.order_number])),
     recon,
     bank,
@@ -93,5 +99,15 @@ export async function buildSalesLedger(month: string): Promise<SalesLedgerRespon
     payoutSyncErrors: results
       .filter((r) => r.error)
       .map((r) => ({ provider: r.provider, error: r.error!, at: lastSync?.started_at ?? null })),
+  };
+}
+
+export function toLedgerAdjustment(a: OrderAdjustmentRow): LedgerAdjustmentInput {
+  return {
+    kind: a.kind, creditAed: a.credit_aed, deductAed: a.damage_aed, creditNote: a.zoho_creditnote_number,
+    exchangeInvoice: a.zoho_exchange_invoice_number, exchangeTotalAed: a.exchange_total, refundDueAed: a.refund_due_aed,
+    customerOwesAed: a.customer_owes_aed, markOnly: a.mark_only, date: a.adjustment_date,
+    receivedAed: a.received_aed, receivedVia: a.received_via,
+    alsoReceived: a.receivedAlso ? { receivedAed: a.receivedAlso.received_aed, receivedVia: a.receivedAlso.received_via, date: a.receivedAlso.adjustment_date } : null,
   };
 }

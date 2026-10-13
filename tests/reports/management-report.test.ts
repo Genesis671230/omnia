@@ -47,20 +47,21 @@ test("waterfall, refunds by source, exchanges, receivables and the dashboard tie
   assert.equal(w.cancelled.aed, 1100);
   assert.equal(w.cancelled.bySheetOnly, 1);
   assert.equal(w.grossSales.aed, 2200);               // 1000 + 500 + 700
-  assert.equal(w.refunds.aed, 300);                   // 200 gateway + 100 Zoho-only
-  assert.equal(w.netSales.aed, 1900);
+  assert.equal(w.refunds.aed, 200);                   // 200 gateway; OS3706's 100 credit note is an exchange credit
+  assert.equal(w.netSales.aed, 2000);
   assert.deepEqual(r.fromDashboard.dashboard, { orders: 4, aed: 3000 });   // 1000 + 500 + 800 + 700
   assert.equal(r.fromDashboard.sheetCancelled.aed, 800);
   const by = Object.fromEntries(r.lines.map((l) => [l.order, l]));
   assert.equal(by.OS3701.refund.source, "gateway");
   assert.equal(by.OS3701.refund.paidMonth, "2026-10");
   assert.ok(by.OS3701.issues.some((i) => i.key === "zoho_ne_gateway"));
-  assert.equal(by.OS3706.refund.source, "zoho");
+  assert.equal(by.OS3706.refund.source, null);         // exchange: the valued credit note went onto the new invoice
+  assert.equal(by.OS3706.exchange.creditAed, 100);
   assert.equal(by.OS3706.exchange.count, 1);
   assert.equal(by.OS3706.exchange.extraAed, 30);
   assert.ok(by.OS3706.issues.some((i) => i.key === "exchange_reinvoiced"));
   assert.equal(r.cash.receivedAed, 970);
-  assert.equal(r.cash.receivableAed, 500 + 600);      // COD 500 + OS3706 net 600
+  assert.equal(r.cash.receivableAed, 500 + 700);      // COD 500 + OS3706 net 700
   assert.equal(r.cash.receivableByBucket.find((b) => b.bucket === "cod_courier")!.aed, 500);
   assert.equal(r.refundsPaidThisMonth.ofEarlierMonths, 1);
   assert.equal(r.exchanges.reinvoicedInZoho, 1);
@@ -68,4 +69,81 @@ test("waterfall, refunds by source, exchanges, receivables and the dashboard tie
   assert.ok(Math.abs(t.receivedAed + t.feesOnReceivedAed + t.fxOtherAed - t.refundsOnReceivedAed + t.receivableAed - t.netSalesAed) < 0.01);
   assert.equal(t.feesOnReceivedAed, 30);
   assert.equal(t.refundsOnReceivedAed, 200);
+});
+
+test("app adjustments: cancel is a cancellation, COD return is the official refund, exchange note is not a refund", () => {
+  const r = buildManagementReport({
+    month: "2026-09", today: "2026-10-02",
+    orders: [
+      o("WA1", 500, { gateway: "COD", financial_status: "pending", store_id: "WA", ops_status: "cancelled" }),
+      o("WA2", 500, { gateway: "COD", financial_status: "pending", store_id: "WA", ops_status: "returned" }),
+      o("WA3", 800, { ops_status: "exchanged" }),
+    ],
+    ledger: new Map([
+      ["WA2", { status: "cod", feeAed: 0, receivedAed: 0, payoutId: null, bankDate: null }],
+      ["WA3", { status: "received", feeAed: 20, receivedAed: 780, payoutId: "P1", bankDate: "2026-09-15" }],
+    ]),
+    gatewayRefunds: [],
+    creditNotes: new Map([
+      ["WA2", [{ number: "CN-2", date: "2026-10-02", total: 400, reference: "ADJ/WA2/CN" }]],
+      ["WA3", [{ number: "CN-3", date: "2026-10-02", total: 800, reference: "ADJ/WA3/CN" }]],
+    ]),
+    invoiceCounts: new Map([["WA3", 2]]),
+    sheet: [], refundsPaidInMonth: [], orderMonthOf: new Map(),
+    adjustments: new Map([
+      ["WA1", { kind: "cancelled" as const, creditAed: 500, creditNote: "CN-1", exchangeTotalAed: 0, date: "2026-10-02" }],
+      ["WA2", { kind: "returned" as const, creditAed: 400, creditNote: "CN-2", exchangeTotalAed: 0, date: "2026-10-02" }],
+      ["WA3", { kind: "exchanged" as const, creditAed: 800, creditNote: "CN-3", exchangeTotalAed: 900, date: "2026-10-02" }],
+    ]),
+  });
+  const by = Object.fromEntries(r.lines.map((l) => [l.order, l]));
+  assert.equal(by.WA1.stage, "cancelled");
+  assert.equal(by.WA1.cancelledBy, "app");
+  assert.equal(by.WA2.refund.source, "app");
+  assert.equal(by.WA2.refund.officialAed, 400);
+  assert.equal(by.WA2.netSalesAed, 100);
+  assert.deepEqual(by.WA2.issues, []);
+  assert.equal(by.WA3.refund.officialAed, 0, "an exchange credit note is not a refund");
+  assert.equal(by.WA3.exchange.count, 1);
+  assert.equal(by.WA3.exchange.extraAed, 100);
+  assert.ok(!by.WA3.issues.some((i) => i.key === "exchange_reinvoiced"));
+});
+
+test("COD shows both organisations and takes its amount from House of Omnia", () => {
+  const r = buildManagementReport({
+    month: "2026-09", today: "2026-10-03",
+    orders: [
+      o("OS4001", 700, { gateway: "COD", financial_status: "pending" }),
+      o("OS4002", 450, { gateway: "COD", financial_status: "pending" }),   // only the intercompany copy
+      o("OS4003", 900),                                                       // card — main org
+    ],
+    ledger: new Map([
+      ["OS4001", { status: "cod", feeAed: 0, receivedAed: 0, payoutId: null, bankDate: null }],
+      ["OS4002", { status: "cod", feeAed: 0, receivedAed: 0, payoutId: null, bankDate: null }],
+      ["OS4003", { status: "received", feeAed: 25, receivedAed: 875, payoutId: "P1", bankDate: "2026-09-12" }],
+    ]),
+    gatewayRefunds: [],
+    creditNotes: new Map(),
+    invoiceCounts: new Map([["OS4001", 2], ["OS4002", 1], ["OS4003", 1]]),
+    invoicesByOrg: new Map([
+      ["OS4001", [{ org: "Omniastores LLC", numbers: ["MNS-1"], totalAed: 0 }, { org: "House of Omnia", numbers: ["HOO-1"], totalAed: 690 }]],
+      ["OS4002", [{ org: "Omniastores LLC", numbers: ["MNS-2"], totalAed: 0 }]],
+      ["OS4003", [{ org: "Omniastores LLC", numbers: ["MNS-3"], totalAed: 900 }]],
+    ]),
+    codOrg: "House of Omnia",
+    sheet: [row("OS4001", { kind: "exchange", amountAed: 0 })],
+    refundsPaidInMonth: [],
+    orderMonthOf: new Map(),
+  });
+  const by = Object.fromEntries(r.lines.map((l) => [l.order, l]));
+  assert.equal(by.OS4001.zoho.amountAed, 690);
+  assert.equal(by.OS4001.zoho.amountOrg, "House of Omnia");
+  assert.equal(by.OS4003.zoho.amountOrg, "Omniastores LLC");
+  // one invoice in each org is NOT a re-invoiced exchange
+  assert.ok(!by.OS4001.issues.some((i) => i.key === "exchange_reinvoiced"));
+  assert.equal(r.cod.orders, 2);
+  assert.equal(r.cod.grossAed, 1150);
+  assert.equal(r.cod.byOrg[0].org, "House of Omnia");
+  assert.deepEqual(r.cod.notInAmountOrg, ["OS4002"]);
+  assert.deepEqual(r.cod.mismatches, [{ order: "OS4001", storeAed: 700, zohoAed: 690 }]);
 });

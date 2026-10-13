@@ -1,0 +1,26 @@
+import { NextResponse } from "next/server";
+import { CLOSE_LIMIT, close, forgetBoard, soSettings, targetsFor, type AmountOptions } from "@/lib/sales-orders/so-close.service";
+import { sheetIdFromInput } from "@/lib/sales-orders/packing-sheet";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+// POST /api/sales-orders/close { month, orders: string[], confirm: true, limit?, sheet?, options?: { [order]: { rateOverride?, matchOrderTotal? } } }
+//   Live Zoho write, only for the orders named, at most CLOSE_LIMIT per call.
+//   Each order is re-planned on fresh stock first; anything not ready is skipped.
+export async function POST(req: Request) {
+  const body = (await req.json().catch(() => ({}))) as { month?: string; orders?: string[]; confirm?: boolean; limit?: number; sheet?: string; options?: Record<string, AmountOptions> };
+  if (body.confirm !== true) return NextResponse.json({ error: "confirm: true is required — this writes to Zoho" }, { status: 400 });
+  if (!body.month || !/^\d{4}-\d{2}$/.test(body.month) || !Array.isArray(body.orders) || !body.orders.length) {
+    return NextResponse.json({ error: "month and orders[] are required" }, { status: 400 });
+  }
+  const limit = Math.max(1, Math.min(CLOSE_LIMIT, Number(body.limit) || (await soSettings()).maxPerRun));
+  try {
+    const { targets, missing } = await targetsFor(body.month, body.orders.slice(0, CLOSE_LIMIT), body.sheet ? sheetIdFromInput(body.sheet) : undefined, body.options ?? {});
+    const results = await close(targets, limit);
+    forgetBoard(body.month);
+    return NextResponse.json({ results, missing, limit });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
+}

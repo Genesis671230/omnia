@@ -72,6 +72,28 @@ export const ZohoInvoiceIndexRepository = {
   },
 
   /** How many live invoices each order has — 2+ with an exchange = sold twice in Zoho. */
+  /** Live invoices per order, split by organisation (COD orders have one in each). */
+  async byOrgForOrders(orderNumbers: string[]): Promise<Map<string, { org: string; numbers: string[]; totalAed: number }[]>> {
+    const out = new Map<string, { org: string; numbers: string[]; totalAed: number }[]>();
+    const keys = [...new Set(orderNumbers.map(norm).filter(Boolean))];
+    for (let i = 0; i < keys.length; i += 300) {
+      const { data, error } = await supabase.from("zoho_invoice_index")
+        .select("invoice_number, order_number, total, status, org").in("order_number", keys.slice(i, i + 300));
+      if (error) throw new Error(`zoho_invoice_index read failed: ${error.message}`);
+      for (const r of data ?? []) {
+        if (r.status === "void" || r.status === "draft") continue;
+        const k = norm(r.order_number);
+        const list = out.get(k) ?? [];
+        let cur = list.find((x) => x.org === String(r.org));
+        if (!cur) { cur = { org: String(r.org), numbers: [], totalAed: 0 }; list.push(cur); }
+        cur.numbers.push(String(r.invoice_number));
+        cur.totalAed = Math.round((cur.totalAed + (Number(r.total) || 0)) * 100) / 100;
+        out.set(k, list);
+      }
+    }
+    return out;
+  },
+
   async invoiceCounts(orderNumbers: string[]): Promise<Map<string, number>> {
     const idx = await this.forOrders(orderNumbers);
     return new Map([...idx].map(([k, v]) => [k, v.numbers.length]));

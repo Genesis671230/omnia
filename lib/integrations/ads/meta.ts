@@ -34,7 +34,7 @@ export function accountGroups(): MetaAccountGroup[] {
     groups.push({
       label: "ksa",
       accessToken: process.env.META_KSA_ACCESS_TOKEN,
-      adAccountIds: [normalizeAdAccountId(process.env.META_KSA_AD_ACCOUNT_ID)],
+      adAccountIds: process.env.META_KSA_AD_ACCOUNT_ID.split(",").map(normalizeAdAccountId).filter(Boolean),
     });
   }
   return groups;

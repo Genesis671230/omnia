@@ -27,6 +27,8 @@ export type SaleRuleOrder = {
   financial_status: string | null;
   gateway?: string | null;
   gross_aed: number | null;
+  /** Set when the founder marked the order from the app (order_adjustments). */
+  ops_status?: string | null;
 };
 
 const REVERSED = new Set(["refunded", "cancelled", "voided"]);
@@ -39,6 +41,10 @@ export function isCountedSale(o: SaleRuleOrder): boolean {
   if (!(Number(o.gross_aed) > 0)) return false;
   const s = (o.financial_status || "").trim().toLowerCase();
   if (REVERSED.has(s)) return false;
+  // Cancelled from the app (credit note raised there) — the store may never
+  // be updated, so the app's word wins. Returns/refunds stay sales: the
+  // credit reduces the order's net, like a store refund.
+  if ((o.ops_status || "").toLowerCase() === "cancelled") return false;
 
   if (o.store_id === "WOO") return WOO_COUNTED.has(s);
   if (SHOPIFY_PAID.has(s)) return true;
@@ -49,5 +55,5 @@ export function isCountedSale(o: SaleRuleOrder): boolean {
 
 /** Reversed rather than merely unfinished — reported separately as "cancelled". */
 export function isReversedOrder(o: SaleRuleOrder): boolean {
-  return REVERSED.has((o.financial_status || "").trim().toLowerCase());
+  return REVERSED.has((o.financial_status || "").trim().toLowerCase()) || (o.ops_status || "").toLowerCase() === "cancelled";
 }

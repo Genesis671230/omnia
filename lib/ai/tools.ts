@@ -150,6 +150,18 @@ export const AI_TOOLS = [
       },
     },
   },
+  {
+    name: "get_payments_money",
+    description: "The Admin dashboard's money for a Dubai date range: gross sales, gateway fee, VAT, total deductions (and % of sales), FX charges, net received in bank, awaiting and OVERDUE payments — in total, per gateway (with usual vs actual days to bank) and, optionally, the overdue orders. Use for 'how much did we receive', 'what's pending/overdue', 'which gateway charges more / pays late', 'chase payments' questions. Same numbers as the dashboard's Admin tab.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "YYYY-MM-DD (Dubai). Default: first of this month." },
+        to: { type: "string", description: "YYYY-MM-DD (Dubai). Default: today." },
+        include_overdue_orders: { type: "boolean", description: "List the overdue orders (max 40, oldest first).", default: false },
+      },
+    },
+  },
 ] as const;
 
 export type ToolName = (typeof AI_TOOLS)[number]["name"];
@@ -457,7 +469,27 @@ async function get_campaign_performance(input: { days?: number; store?: string; 
   };
 }
 
+async function get_payments_money(input: { from?: string; to?: string; include_overdue_orders?: boolean }) {
+  const { buildAdminMoney } = await import("@/lib/dashboard/admin-money.service");
+  const { dubaiToday } = await import("@/lib/dubai-day");
+  const today = dubaiToday();
+  const v = await buildAdminMoney(input.from || `${today.slice(0, 7)}-01`, input.to || today);
+  const pct = (r: number) => +(r * 100).toFixed(2);
+  return {
+    from: v.from, to: v.to,
+    totals: { ...v.totals, deductionRate: pct(v.totals.deductionRate) },
+    byGateway: v.gateways.map((g) => ({ ...g, deductionRate: pct(g.deductionRate) })),
+    overdue: v.overdue,
+    payoutFilesMissingFor: v.missingPayoutFiles,
+    ...(input.include_overdue_orders
+      ? { overdueOrders: v.orders.filter((o) => o.status === "overdue").sort((a, b) => b.ageDays - a.ageDays).slice(0, 40)
+          .map((o) => ({ order: o.orderNumber, day: o.day, gateway: o.gateway, awaiting: o.awaiting, ageDays: o.ageDays, daysLate: o.overdueDays, why: o.reason })) }
+      : {}),
+  };
+}
+
 const EXECUTORS: Record<ToolName, (input: any) => Promise<unknown>> = {
+  get_payments_money,
   get_sales_summary,
   get_financial_report,
   get_reconciliation_status,

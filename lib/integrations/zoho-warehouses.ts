@@ -8,7 +8,7 @@
 
 import { getAccessToken } from "@/lib/integrations/zoho";
 import { zohoThrottledFetch } from "@/lib/integrations/zoho-throttle";
-import { zohoOrgId } from "@/lib/integrations/zoho-context";
+import { zohoOrgId, zohoBooksBase } from "@/lib/integrations/zoho-context";
 
 const API_BASE = "https://www.zohoapis.com/inventory/v1";
 
@@ -82,9 +82,12 @@ export type ZohoItemDetail = {
 // fetched — do NOT refresh the token per call, or you'll burn 11K OAuth
 // calls on a backfill. Retries on Zoho's documented 429 (rate limit) up to
 // 4 times with exponential backoff — a real backfill WILL trip this.
+// Goes through Books, not Inventory: the current token 401s (code 57) on
+// /inventory/v1/items/{id}, while /books/v3/items/{id} returns the same
+// warehouses[] shape (verified live 2026-10-10).
 export async function fetchZohoItemDetail(itemId: string, accessToken: string): Promise<ZohoItemDetail> {
   const orgId = zohoOrgId();
-  const url = `${API_BASE}/items/${itemId}?organization_id=${orgId}`;
+  const url = `${zohoBooksBase()}/items/${itemId}?organization_id=${orgId}`;
 
   for (let attempt = 1; attempt <= 4; attempt++) {
     const res = await zohoThrottledFetch(url, {

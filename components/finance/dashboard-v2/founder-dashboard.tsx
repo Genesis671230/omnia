@@ -23,6 +23,8 @@ import { MoneyDrawer } from "./money-drawer";
 import { PaymentsInsightsPanel } from "./payments-insights-panel";
 import { PaymentsFullDashboard } from "./payments-full-dashboard";
 import { MoneyOverview } from "./money-overview";
+import { StoreReceipts } from "./store-receipts";
+import { AdminMoney } from "./admin/admin-money";
 
 /* ── live pulse (unchanged behavior: poll /api/pulse, toast new orders) ──── */
 
@@ -215,7 +217,59 @@ export function FounderDashboard({ version }: { version: number }) {
     }
   }, [days, store]);
 
-  useEffect(() => { load(); }, [load, version]);
+  // Admin (default) | Overview | Details | Sales & receipts — kept in ?tab= so a view can be bookmarked.
+  // Admin is the simple money view; Details keeps the older, denser panels.
+  type Tab = "admin" | "overview" | "details" | "receipts";
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "admin", label: "Admin" },
+    { key: "overview", label: "Overview" },
+    { key: "details", label: "Details" },
+    { key: "receipts", label: "Sales & receipts" },
+  ];
+  const [tab, setTabState] = useState<Tab>("admin");
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some((x) => x.key === t)) setTabState(t as Tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    const u = new URL(window.location.href);
+    if (t === "admin") u.searchParams.delete("tab"); else u.searchParams.set("tab", t);
+    window.history.replaceState(null, "", u.toString());
+  };
+
+  useEffect(() => { if (tab === "overview") load(); }, [load, version, tab]);
+
+  const tabBar = (
+    <div className="dv2-tabs" role="tablist">
+      <style>{TABS_CSS}</style>
+      {TABS.map((t) => (
+        <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? "on" : ""} onClick={() => setTab(t.key)}>{t.label}</button>
+      ))}
+    </div>
+  );
+
+  if (tab === "admin") {
+    return <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>{tabBar}<AdminMoney /></div>;
+  }
+  if (tab === "receipts") {
+    return <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>{tabBar}<StoreReceipts /></div>;
+  }
+  if (tab === "details") {
+    return (
+      <div className="dv2" style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
+        <style>{DASH_CSS}</style>
+        {tabBar}
+        <CommandCenter />
+        <MoneyOverview />
+        <PaymentsInsightsPanel />
+        <PaymentsFullDashboard />
+        <InsightRail days={days} store={store} onViewCampaign={setCampaignId} onViewMoney={setDrawer} />
+        {campaignId && <CampaignDrawer campaignId={campaignId} days={days} onClose={() => setCampaignId(null)} />}
+      </div>
+    );
+  }
 
   if (!data) {
     return <div className="dv2-loading"><style>{DASH_CSS}</style><Loader2 size={18} className="dv2-spin" /> Building your view…</div>;
@@ -229,21 +283,10 @@ export function FounderDashboard({ version }: { version: number }) {
     <div className="dv2" style={{ opacity: loading ? 0.65 : 1 }}>
       <style>{DASH_CSS}</style>
       <style>{CHARTS_CSS}</style>
+      {tabBar}
 
-      {/* <PulseTicker /> */}
-
-      {/* <HeroBand data={data} days={days} store={store} onDays={setDays} onStore={setStore} onOpenDrawer={setDrawer} /> */}
-
-      {/* Top line first: per day, what the stores sold, how much is already in
-          the bank, what is pending and the approximate gateway fee. */}
-      <CommandCenter />
-      <MoneyOverview />
-
-      <PaymentsInsightsPanel />
-
-      <PaymentsFullDashboard />
-
-      <InsightRail days={days} store={store} onViewCampaign={setCampaignId} onViewMoney={setDrawer} />
+      {/* Overview stays visual: sales trend, payment mix, products, latest
+          orders. The money detail lives in Admin; the older panels in Details. */}
 
       <div className="dv2-grid">
         <section className="dv2-panel dv2-span2">
@@ -301,6 +344,12 @@ export function FounderDashboard({ version }: { version: number }) {
     </div>
   );
 }
+
+const TABS_CSS = `
+  .dv2-tabs { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 4px; padding: 4px; background: var(--os-card); border: 1px solid var(--os-line); border-radius: 999px; align-self: flex-start; font-family: var(--os-font); }
+  .dv2-tabs button { border: 0; background: none; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 13px; font-weight: 600; color: var(--os-muted); cursor: pointer; }
+  .dv2-tabs button.on { background: #0F1B3D; color: #fff; }
+`;
 
 const DASH_CSS = `
   .dv2 { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; transition: opacity .15s; font-family: var(--os-font); color: var(--os-ink); }

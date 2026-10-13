@@ -494,7 +494,7 @@ export function GrossSalesPanel() {
         </p>
       </footer>
 
-      <DaySalesDrawer day={openLedgerDay} onClose={() => setOpenDay(null)} />
+      <DaySalesDrawer day={openLedgerDay} onClose={() => setOpenDay(null)} onChanged={() => loadLedger(true)} />
     </section>
   );
 }

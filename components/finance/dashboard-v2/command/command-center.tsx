@@ -2,7 +2,7 @@
 
 /* Command centre — the top of the founder dashboard.
  *
- *   ┌ greeting banner: today, yesterday, month to date ──────────────────┐
+ *   ┌ banner: today, yesterday, month to date (dark blue gradient) ──────────────────┐
  *   │ sales funnel ribbon (store / ads)        │ checkout conversion     │
  *   │ courier lanes (road · air)               │ top products            │
  *   │ ads driving revenue                                                │
@@ -15,7 +15,7 @@ import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LaneStats, Pulse, SummedFunnel } from "@/lib/dashboard/command-center";
 import type { SkuRow } from "@/lib/orders/orders-analytics";
-import { compact, fmt } from "../overview/kit";
+import { fmt } from "../overview/kit";
 import { FunnelRibbon, ConversionGauge, type AdFunnelTotals } from "./funnel";
 import { AdClicks, CourierLanes, TopAds, TopProducts, type TopAd } from "./cards";
 import { MonthFinancials } from "./financials";
@@ -28,7 +28,7 @@ export type CommandData = {
   topSkus: SkuRow[];
   lanes: LaneStats[];
 };
-type RangeKey = "7d" | "30d" | "month";
+type RangeKey = "1d" | "7d" | "30d" | "month";
 
 function dubaiNow() {
   return new Date(Date.now() + 4 * 3600_000);
@@ -40,8 +40,8 @@ function rangeFor(k: RangeKey): { from: string; to: string; label: string } {
   const now = dubaiNow();
   const to = dayStr(now);
   if (k === "month") return { from: `${to.slice(0, 7)}-01`, to, label: "this month" };
-  const back = new Date(now.getTime() - ((k === "7d" ? 7 : 30) - 1) * 86_400_000);
-  return { from: dayStr(back), to, label: k === "7d" ? "last 7 days" : "last 30 days" };
+  const back = new Date(now.getTime() - ((k === "1d" ? 1 : k === "7d" ? 7 : k === "30d" ? 30 : 1) - 1) * 86_400_000);
+  return { from: dayStr(back), to, label: k === "1d" ? "last 1 day" : k === "7d" ? "last 7 days" : k === "30d" ? "last 30 days" : "last month" };
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -107,12 +107,7 @@ export function CommandCenter({ variant = "finance" }: { variant?: "finance" | "
   );
 }
 
-/* ── greeting banner ───────────────────────────────────────────────────── */
-
-function greeting() {
-  const h = dubaiNow().getUTCHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
+/* ── banner ───────────────────────────────────────────────────── */
 
 function Chip({ children, tone = "glass" }: { children: React.ReactNode; tone?: "glass" | "up" | "down" }) {
   const cls = tone === "up" ? "bg-emerald-400/20 text-emerald-100" : tone === "down" ? "bg-rose-400/20 text-rose-100" : "bg-white/10 text-white/90";
@@ -127,33 +122,22 @@ function HeroBanner({ pulse, rangeKey, onRange, loading, onRefresh }: {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-[32px] bg-[#0B1433] px-6 pb-6 pt-7 text-white shadow-[0_30px_60px_-30px_rgba(15,27,61,0.6)] sm:px-9"
+      className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0B1433] via-[#13235C] to-[#1E3A8A] px-6 py-5 text-white shadow-[0_30px_60px_-30px_rgba(15,27,61,0.6)] sm:px-9"
     >
-      {/* Lush streaks: blurred vertical light, drifting slowly. */}
-      <motion.div aria-hidden className="pointer-events-none absolute inset-[-20%] opacity-90"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(90deg, rgba(56,189,248,0.0) 0px, rgba(56,189,248,0.35) 6px, rgba(99,102,241,0.0) 14px, rgba(129,140,248,0.45) 22px, rgba(37,99,235,0.0) 34px, rgba(167,139,250,0.35) 41px, rgba(14,165,233,0) 52px)",
-          filter: "blur(10px)",
-        }}
-        animate={{ x: ["0%", "-6%", "0%"] }} transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_120%_at_0%_0%,rgba(11,20,51,0.95)_30%,transparent_70%),radial-gradient(60%_80%_at_100%_100%,rgba(244,114,182,0.35),transparent_60%),linear-gradient(180deg,transparent_55%,rgba(11,20,51,0.85))]" />
+      {/* Plain deep-blue gradient — no streaks, no greeting. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_140%_at_100%_0%,rgba(37,99,235,0.45),transparent_60%),radial-gradient(60%_90%_at_0%_100%,rgba(99,102,241,0.30),transparent_65%)]" />
 
       <div className="relative flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-[13px] text-white/60">{date}</div>
-          <h1 className="mt-2 text-[34px] font-light leading-[1.05] tracking-[-0.03em] sm:text-[44px]">
-            {greeting()},<br /><span className="font-semibold italic">Omnia</span>
-          </h1>
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {pulse ? (
               <>
-                <Chip><Sparkles size={13} /> Today AED {compact(pulse.today.salesAed)} · {fmt(pulse.today.orders)} orders</Chip>
+                <Chip><Sparkles size={13} /> Today AED {fmt(pulse.today.salesAed)} · {fmt(pulse.today.orders)} orders</Chip>
                 {vsYesterday != null && (
                   <Chip tone={vsYesterday >= 0 ? "up" : "down"}>{vsYesterday >= 0 ? "▲" : "▼"} {Math.abs(vsYesterday * 100).toFixed(1)}% vs yesterday</Chip>
                 )}
-                <Chip>Month to date AED {compact(pulse.mtd.salesAed)}</Chip>
+                <Chip>Month to date AED {fmt(pulse.mtd.salesAed)}</Chip>
                 {pulse.mtd.change != null && (
                   <Chip tone={pulse.mtd.change >= 0 ? "up" : "down"}>{pulse.mtd.change >= 0 ? "▲" : "▼"} {Math.abs(pulse.mtd.change)}% vs same days last month</Chip>
                 )}
@@ -165,7 +149,7 @@ function HeroBanner({ pulse, rangeKey, onRange, loading, onRefresh }: {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-full bg-white/10 p-1 backdrop-blur-md">
-            {([["7d", "7 days"], ["30d", "30 days"], ["month", "This month"]] as [RangeKey, string][]).map(([k, label]) => (
+            {([["1d", "1 day"],["7d", "7 days"], ["30d", "30 days"], ["month", "This month"]] as [RangeKey, string][]).map(([k, label]) => (
               <button key={k} onClick={() => onRange(k)}
                 className={`rounded-full px-3.5 py-1.5 text-[12.5px] transition ${rangeKey === k ? "bg-white text-[#0B1433]" : "text-white/80 hover:text-white"}`}>{label}</button>
             ))}

@@ -27,7 +27,8 @@ import {
   suggestPostingAccounts,
   vatInclusiveSplit,
 } from "@/lib/finance/settlement-posting";
-import { ZohoOrgTag } from "@/components/finance/zoho/org-picker";
+import { ZohoOrgTag, useZohoOrgs, withZohoOrg } from "@/components/finance/zoho/org-picker";
+import { isBookedInZoho } from "@/lib/finance/payout-booked";
 
 /* Per-order proof, the products behind each order, and booking the payout
  * into Zoho.
@@ -857,8 +858,12 @@ function CloseCreditNotePanel({ r, row, cn, accounts, depositAccountId, feeRefun
 function ProofRow({
   t, order, missing, open, onToggle, status, originalCurrency, showSelectColumn,
   canSelect, selected, onSelectToggle, onRecordOne, busy, crossBorder, splitFigure, feeFigure,
-  invoiceAmount, colCount, linkPanel, linkLabel, forcePanel, onForce, invoiceNote,
+  invoiceAmount, colCount, linkPanel, linkLabel, forcePanel, onForce, invoiceNote, orgPicker, splitNote,
 }: {
+  /** "Rest paid by Tabby AED 534 · booked" — the order is split across payouts. */
+  splitNote?: { text: string; booked: boolean }[];
+  /** Which company's books this order closes in — shown when 2+ orgs exist. */
+  orgPicker?: React.ReactNode;
   /** Button text for the link control, e.g. "Fix other payout". */
   linkLabel?: string;
   /** "2 Zoho invoices · 1 open" when the order number carries several. */
@@ -916,6 +921,13 @@ function ProofRow({
               style={{ transform: open ? "rotate(90deg)" : "none" }}
             />
             #{t.ref}
+            {orgPicker}
+            {splitNote?.map((n) => (
+              <span key={n.text} title="This order was paid across more than one payout; each books only its own part"
+                className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 font-sans text-[10.5px] ring-1 ring-inset ${n.booked ? "bg-[#F0F5EF] text-[#4B7A54] ring-[#CFE0D2]" : "bg-[#FFF6E5] text-[#8A5A00] ring-[#F3D9A4]"}`}>
+                {n.text}
+              </span>
+            ))}
             {t.orderNumber && t.orderNumber !== t.ref && t.orderNumber !== bare(t.ref) && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-[#F0F5EF] px-1.5 py-0.5 text-[10.5px] text-[#4B7A54]" title="Linked by hand">
                 <Link2 size={9} /> #{t.orderNumber}
@@ -1106,6 +1118,8 @@ export function GatewayProof({ r, live, onChanged }: {
    *  "no settlement record" against orders that are settled and booked. */
   const [settlementsFailed, setSettlementsFailed] = useState(false);
   const [claimedElsewhere, setClaimedElsewhere] = useState<Record<string, { payoutId: string | null; gateway: string; published: boolean }>>({});
+  /** Split payments: what other payouts paid on the same orders. */
+  const [otherGateways, setOtherGateways] = useState<Record<string, { gateway: string; payoutId: string; grossAed: number | null; booked: boolean }[]>>({});
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [invoiceMeta, setInvoiceMeta] = useState<{ fetched: number; cached: number } | null>(null);
   const [refreshingInvoices, setRefreshingInvoices] = useState(false);
@@ -1204,13 +1218,14 @@ export function GatewayProof({ r, live, onChanged }: {
     setSetupError(null);
     setSettlementsFailed(false);
 
-    const settlementsP = getJson<{ settlements?: SettlementRecord[]; claimedElsewhere?: Record<string, { payoutId: string | null; gateway: string; published: boolean }> }>(
+    const settlementsP = getJson<{ settlements?: SettlementRecord[]; claimedElsewhere?: Record<string, { payoutId: string | null; gateway: string; published: boolean }>; otherGateways?: Record<string, { gateway: string; payoutId: string; grossAed: number | null; booked: boolean }[]> }>(
       `/api/reconcile/line/${encodeURIComponent(r.id)}/settlements`,
     )
       .then((d) => {
         if (!alive) return;
         setSettlements(d.settlements ?? []);
         setClaimedElsewhere(d.claimedElsewhere ?? {});
+        setOtherGateways(d.otherGateways ?? {});
       })
       // Leave `settlements` null on failure. Null means "we don't know yet";
       // [] means "we asked and there are none". statusFor() relies on the
@@ -1268,6 +1283,61 @@ export function GatewayProof({ r, live, onChanged }: {
     }
     return (ref: string) => map.get(ref) ?? map.get(bare(ref));
   }, [settlements]);
+
+  /* ── per-order organisation (a payout carrying two companies' orders) ── */
+  const { orgs: zohoOrgs } = useZohoOrgs();
+  const usableOrgs = zohoOrgs.filter((o) => o.status !== "disabled");
+  const payoutOrg = r.payout?.zohoConnectionId || "env";
+  const orgOfSettlement = (s: SettlementRecord | undefined) => s?.zoho_connection_id || payoutOrg;
+  const orgLabel = (id: string) => { const o = usableOrgs.find((x) => x.id === id); return o?.label || o?.orgName || id; };
+  /** Posting options of every org other than the payout's that an order uses. */
+  const [orgOptions, setOrgOptions] = useState<Record<string, PostingOptions | "loading" | "error">>({});
+  const otherOrgsInUse = useMemo(
+    () => [...new Set((settlements ?? []).map((s) => s.zoho_connection_id || "").filter((o) => o && o !== payoutOrg))],
+    [settlements, payoutOrg],
+  );
+  useEffect(() => {
+    for (const org of otherOrgsInUse) {
+      if (orgOptions[org]) continue;
+      setOrgOptions((m) => ({ ...m, [org]: "loading" }));
+      fetch(withZohoOrg("/api/settlements/posting-options", org))
+        .then(async (x) => { const d = await x.json(); if (!x.ok) throw new Error(d.error || `HTTP ${x.status}`); return d as PostingOptions; })
+        .then((d) => setOrgOptions((m) => ({ ...m, [org]: d })))
+        .catch(() => setOrgOptions((m) => ({ ...m, [org]: "error" })));
+    }
+  }, [otherOrgsInUse, orgOptions]);
+  const setOrderOrg = async (s: SettlementRecord, org: string) => {
+    try {
+      const res = await fetch(`/api/settlements/${encodeURIComponent(s.id)}/zoho-org`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zohoConnectionId: org }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setSettlements((prev) => (prev ?? []).map((x) => (x.id === s.id ? { ...x, zoho_connection_id: j.zohoConnectionId } : x)));
+      toast.success(`#${s.order_number} closes in ${orgLabel(org)}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  /** The same-named accounts in another org (clearing / fee / FX / VAT), so one
+   *  selection books both companies' orders. */
+  const accountsFor = (org: string) => {
+    if (org === payoutOrg) return { depositAccountId, feeAccountId, differenceAccountId, vatTaxId };
+    const o = orgOptions[org];
+    if (!o || o === "loading" || o === "error") return null;
+    const byName = (list: { account_id: string; account_name: string }[], id: string, from?: { account_id: string; account_name: string }[]) => {
+      const name = from?.find((a) => a.account_id === id)?.account_name?.trim().toLowerCase();
+      return (name && list.find((a) => a.account_name.trim().toLowerCase() === name)?.account_id) || "";
+    };
+    const sug = suggestPostingAccounts({ provider: r.provider, currency }, o);
+    const taxName = options?.taxes.find((x) => x.tax_id === vatTaxId)?.tax_name?.toLowerCase();
+    return {
+      depositAccountId: byName(o.depositAccounts, depositAccountId, options?.depositAccounts) || sug.depositAccountId,
+      feeAccountId: byName(o.feeAccounts, feeAccountId, options?.feeAccounts) || sug.feeAccountId,
+      differenceAccountId: byName(o.differenceAccounts, differenceAccountId, options?.differenceAccounts) || sug.differenceAccountId,
+      vatTaxId: (taxName && o.taxes.find((x) => x.tax_name.toLowerCase() === taxName)?.tax_id) || sug.vatTaxId,
+    };
+  };
 
   const resultByRef = useMemo(() => {
     const map = new Map<string, OrderPublishResult>();
@@ -1503,29 +1573,55 @@ export function GatewayProof({ r, live, onChanged }: {
       return;
     }
     writePrefs(prefsKey, { depositAccountId, feeAccountId, vatTaxId, differenceAccountId });
+    // One publish per organisation: orders picked into another company's books
+    // go in their own request, with that org's same-named accounts.
+    const byOrg = new Map<string, string[]>();
+    for (const id of settlementIds) {
+      const org = orgOfSettlement((settlements ?? []).find((x) => x.id === id));
+      byOrg.set(org, [...(byOrg.get(org) ?? []), id]);
+    }
+    for (const org of byOrg.keys()) {
+      const a = accountsFor(org);
+      if (!a || !a.depositAccountId || !a.feeAccountId) {
+        toast.error(`No matching clearing / charges account in ${orgLabel(org)} yet — ${a ? "create the same-named accounts there" : "its accounts are still loading"}.`);
+        return;
+      }
+    }
     setBusy(dryRun ? "preview" : "post");
     setRunError(null);
     try {
-      const res = await fetch("/api/settlements/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bankLineId: r.id,
-          settlementIds,
-          depositAccountId,
-          feeAccountId,
-          vatTaxId: crossBorder ? "" : vatTaxId,
-          differenceAccountId,
-          referenceNumberOverride: useCustomRef && customRef.trim() ? customRef.trim() : undefined,
-          bookFeesOnExternallyPaid: bookExternal,
-          dryRun,
-        }),
-      });
-      const json = (await res.json()) as { results?: OrderPublishResult[]; wire?: WirePublishResult; settlements?: SettlementRecord[]; error?: string };
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      const results = json.results ?? [];
-      if (json.settlements) setSettlements(json.settlements);
-      setLastRun({ dryRun, results, wire: json.wire });
+      const results: OrderPublishResult[] = [];
+      let wire: WirePublishResult | undefined;
+      let latest: SettlementRecord[] | undefined;
+      const errors: string[] = [];
+      for (const [org, ids] of byOrg) {
+        const a = accountsFor(org)!;
+        const res = await fetch("/api/settlements/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bankLineId: r.id,
+            settlementIds: ids,
+            ...(org !== payoutOrg ? { zohoOrg: org } : {}),
+            depositAccountId: a.depositAccountId,
+            feeAccountId: a.feeAccountId,
+            vatTaxId: crossBorder ? "" : a.vatTaxId,
+            differenceAccountId: a.differenceAccountId,
+            referenceNumberOverride: useCustomRef && customRef.trim() ? customRef.trim() : undefined,
+            bookFeesOnExternallyPaid: bookExternal,
+            dryRun,
+          }),
+        });
+        const json = (await res.json()) as { results?: OrderPublishResult[]; wire?: WirePublishResult; settlements?: SettlementRecord[]; error?: string };
+        if (!res.ok) { errors.push(byOrg.size > 1 ? `${orgLabel(org)}: ${json.error || `HTTP ${res.status}`}` : json.error || `HTTP ${res.status}`); continue; }
+        results.push(...(json.results ?? []));
+        if (org === payoutOrg) wire = json.wire;
+        if (json.settlements) latest = json.settlements;
+      }
+      if (errors.length && !results.length) throw new Error(errors.join(" · "));
+      if (errors.length) toast.error(errors.join(" · "));
+      if (latest) setSettlements(latest);
+      setLastRun({ dryRun, results, wire });
 
       const good = results.filter((x) => x.ok).length;
       const bad = results.length - good;
@@ -2030,6 +2126,31 @@ export function GatewayProof({ r, live, onChanged }: {
                 selected={selected.has(t.ref)}
                 onSelectToggle={() => toggleSelect(t.ref)}
                 onRecordOne={() => run([t.ref], false)}
+                splitNote={(otherGateways[orderOf(t)] ?? []).map((g) => ({
+                  booked: g.booked,
+                  text: `${g.booked ? "rest paid" : "rest to be paid"} by ${g.gateway}${g.grossAed != null ? ` AED ${g.grossAed.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : ""}${g.booked ? " · booked" : ""}`,
+                }))}
+                orgPicker={(() => {
+                  const st = settlementFor(orderOf(t));
+                  if (!st || usableOrgs.length < 2) return undefined;
+                  const org = orgOfSettlement(st);
+                  const booked = isBookedInZoho(st as unknown as Record<string, string | null>);
+                  return (
+                    <select
+                      value={org}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => void setOrderOrg(st, e.target.value)}
+                      disabled={booked || !!busy}
+                      title={booked ? `Booked in ${orgLabel(org)} — stays there` : "Which company's books this order's invoice closes in"}
+                      aria-label={`Organisation for order ${st.order_number}`}
+                      className={`ml-1 h-6 max-w-[150px] rounded-md border-0 px-1.5 font-sans text-[11px] ring-1 ring-inset focus:outline-none ${
+                        org === payoutOrg ? "bg-white text-[#5E6B85] ring-[#D8E1F1]" : "bg-[#FFF6E5] font-medium text-[#8A5A00] ring-[#F3D9A4]"
+                      }`}
+                    >
+                      {usableOrgs.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                    </select>
+                  );
+                })()}
                 invoiceNote={r.confirmedBy ? invoiceNoteFor(t.ref) : undefined}
                 onForce={(() => {
                   if (!r.confirmedBy || !settlementFor(orderOf(t)) || t.isRefund) return undefined;
@@ -2047,8 +2168,12 @@ export function GatewayProof({ r, live, onChanged }: {
                       fee={plan.fee}
                       netReceived={plan.netReceived}
                       differenceName={nameOf(options?.differenceAccounts, differenceAccountId)}
-                      depositOptions={(options?.depositAccounts ?? []).map((a) => ({ id: a.account_id, name: a.account_name }))}
-                      defaultDepositAccountId={depositAccountId}
+                      depositOptions={(() => {
+                        const org = orgOfSettlement(settlementFor(orderOf(t)));
+                        const o = org === payoutOrg ? options : orgOptions[org];
+                        return (o && typeof o === "object" ? o.depositAccounts : []).map((a) => ({ id: a.account_id, name: a.account_name }));
+                      })()}
+                      defaultDepositAccountId={accountsFor(orgOfSettlement(settlementFor(orderOf(t))))?.depositAccountId ?? ""}
                       defaultDate={(r.date ?? "").slice(0, 10)}
                       onCancel={() => setForcingRef(null)}
                       onBooked={async () => { setForcingRef(null); await run([t.ref], false); }}
