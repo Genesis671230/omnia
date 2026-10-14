@@ -41,7 +41,7 @@ const TONE: Record<ToolLine["tone"], { icon: typeof Info; cls: string }> = {
   good: { icon: CheckCircle2, cls: "text-emerald-600 bg-emerald-50" },
   warn: { icon: AlertTriangle, cls: "text-amber-600 bg-amber-50" },
   bad: { icon: ShieldAlert, cls: "text-rose-600 bg-rose-50" },
-  info: { icon: Info, cls: "text-[#4F35E8] bg-[#F1EFEA]" },
+  info: { icon: Info, cls: "text-[#4F35E8] bg-[#EEF1F7]" },
 };
 
 function Lines({ lines }: { lines: ToolLine[] }) {
@@ -75,7 +75,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
 
 function Toggle({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
-    <div className="flex flex-wrap gap-1.5 rounded-2xl bg-[#F1EFEA] p-1">
+    <div className="flex flex-wrap gap-1.5 rounded-2xl bg-[#EEF1F7] p-1">
       {options.map(([k, l]) => (
         <button key={k} type="button" onClick={() => onChange(k)}
           className={`flex-1 rounded-xl px-3 py-2 text-[13px] transition ${value === k ? "bg-white font-medium text-[#14131C] shadow-sm" : "text-[#55525E]"}`}>{l}</button>
@@ -240,7 +240,7 @@ function ToolLayout({ form, result, empty, situation, cta }: { form: React.React
               <div className={`mt-1 text-[40px] font-medium leading-none tracking-[-0.03em] ${result.bad ? "text-[#C2334D]" : "text-[#14131C]"}`}>{result.big}</div>
               {!!result.chips.length && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {result.chips.map((c) => <span key={c} className="rounded-full bg-[#F1EFEA] px-2.5 py-1 text-[12px] font-medium text-[#4F35E8]">{c}</span>)}
+                  {result.chips.map((c) => <span key={c} className="rounded-full bg-[#EEF1F7] px-2.5 py-1 text-[12px] font-medium text-[#4F35E8]">{c}</span>)}
                 </div>
               )}
               <div className="mt-5"><Lines lines={result.lines} /></div>
@@ -274,7 +274,7 @@ export function FreeToolsSection() {
               return (
                 <button key={t.k} type="button" onClick={() => setTool(t.k)} aria-pressed={on}
                   className={`relative flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-left transition ${on ? "text-white" : "text-[#14131C] hover:bg-white/70"}`}>
-                  {on && <motion.span layoutId="tool-pill" className="absolute inset-0 rounded-[22px] bg-[#14131C]" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                  {on && <motion.span layoutId="tool-pill" className="absolute inset-0 rounded-[22px] bg-[#0B1533]" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
                   
                   <span className="relative min-w-0">
                     <span className="block text-[14.5px] font-medium">{t.label}</span>

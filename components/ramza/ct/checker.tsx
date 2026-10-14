@@ -20,7 +20,7 @@ const TYPES: { k: PenaltyType; label: string }[] = [
 
 const TONE_STYLE: Record<Tone, { ring: string; icon: typeof CheckCircle2; text: string; bg: string }> = {
   good: { ring: "ring-emerald-200", icon: CheckCircle2, text: "text-emerald-700", bg: "bg-emerald-50" },
-  act: { ring: "ring-[#4F35E8]/25", icon: CalendarClock, text: "text-[#4F35E8]", bg: "bg-[#F1EFEA]" },
+  act: { ring: "ring-[#4F35E8]/25", icon: CalendarClock, text: "text-[#4F35E8]", bg: "bg-[#EEF1F7]" },
   closed: { ring: "ring-rose-200", icon: XCircle, text: "text-rose-700", bg: "bg-rose-50" },
   info: { ring: "ring-slate-200", icon: Info, text: "text-slate-600", bg: "bg-slate-50" },
 };
@@ -52,7 +52,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
             key={t.k}
             type="button"
             onClick={() => setType(t.k)}
-            className={`h-11 rounded-2xl border text-[14px] transition ${type === t.k ? "border-[#4F35E8] bg-[#F1EFEA] font-medium text-[#14131C]" : "border-[#E2DFD8] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}
+            className={`h-11 rounded-2xl border text-[14px] transition ${type === t.k ? "border-[#4F35E8] bg-[#EEF1F7] font-medium text-[#14131C]" : "border-[#DDE2EC] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}
           >
             {t.label}
           </button>
@@ -99,7 +99,7 @@ export function PenaltyChecker({ onSend, compact = false }: { onSend?: (h: Check
               {result.findings.map((f) => {
                 const s = TONE_STYLE[f.tone];
                 return (
-                  <li key={f.key} className="flex gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-inset ring-[#E8E5DE]">
+                  <li key={f.key} className="flex gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-inset ring-[#E3E7F0]">
                     <s.icon size={17} className={`mt-0.5 shrink-0 ${s.text}`} />
                     <div>
                       <div className="text-[14px] font-medium text-[#14131C]">{f.title}</div>

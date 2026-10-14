@@ -132,11 +132,15 @@ const SITUATION_LABEL: Record<string, string> = {
   missed_deadline: "Worried a deadline was missed",
   register_or_file: "Needs to register / file",
   other: "Other",
+  pkg_complete: "Package: Complete Clean Close (books + accounting + e-invoicing + CT)",
+  pkg_einvoicing: "Package: E-invoicing Ready (backlog close + ASP)",
+  pkg_books: "Package: Bookkeeping & Accounting (monthly)",
+  pkg_ct: "Package: Corporate Tax (registration + return)",
 };
 
 export async function notifyCtLead(input: import("@/lib/ramza/validation").CtLeadInput, attr: LeadAttribution): Promise<void> {
   const line = [
-    `<b>New RAMZA lead — ${input.situation === "einvoicing" ? "e-invoicing" : input.situation === "reconciliation" ? "reconciliation" : input.situation === "vat" ? "VAT" : "Corporate Tax"}</b>`,
+    `<b>New RAMZA lead — ${input.situation.startsWith("pkg_") ? "package" : input.situation === "einvoicing" ? "e-invoicing" : input.situation === "reconciliation" ? "reconciliation" : input.situation === "vat" ? "VAT" : "Corporate Tax"}</b>`,
     `${escapeHtml(input.name)} — ${escapeHtml(input.company)}`,
     `${escapeHtml(input.email)} · ${escapeHtml(input.whatsapp)}`,
     `${escapeHtml(SITUATION_LABEL[input.situation] ?? input.situation)}${input.penaltyType ? ` · ${escapeHtml(input.penaltyType)}` : ""}${input.penaltyIssuedOn ? ` · notice ${input.penaltyIssuedOn}` : ""}`,

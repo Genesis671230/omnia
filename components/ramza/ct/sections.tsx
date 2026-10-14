@@ -98,7 +98,7 @@ export function FactsBand() {
           {facts.map((f, i) => (
             <Reveal key={f.v} delay={i * 0.07}>
               <div className={`${ct.card} h-full`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8]"><f.icon size={20} strokeWidth={1.6} /></span>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EEF1F7] text-[#4F35E8]"><f.icon size={20} strokeWidth={1.6} /></span>
                 <div className="mt-6 text-[32px] font-medium tracking-[-0.03em] text-[#14131C]">{f.v}</div>
                 <p className="mt-1 text-[14px] leading-snug text-[#55525E]">{f.l}</p>
               </div>
@@ -135,7 +135,7 @@ export function RoutesSection() {
                 <Link href={r.href} className={`${ct.card} group relative block h-full transition hover:-translate-y-1`}>
                   <div className="flex items-center justify-between">
                     <span className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[#4F35E8]/20 bg-white">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#14131C] text-white"><r.icon size={18} /></span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0B1533] text-white"><r.icon size={18} /></span>
                     </span>
                     <span className="text-[13px] font-medium text-[#A19EA6]">{r.n}</span>
                   </div>
@@ -171,7 +171,7 @@ export function WindowSection() {
           <ol className="mt-8 space-y-5">
             {steps.map(([t, d], i) => (
               <li key={t} className="flex gap-4">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#14131C] text-[13px] font-medium text-white">{i + 1}</span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0B1533] text-[13px] font-medium text-white">{i + 1}</span>
                 <div><div className="text-[16px] font-medium text-[#14131C]">{t}</div><p className={`${ct.body} mt-0.5`}>{d}</p></div>
               </li>
             ))}
@@ -207,13 +207,13 @@ export function ServicesSection({ openFirst = true }: { openFirst?: boolean }) {
           <p className={`${ct.lead} mt-4`}>One team for the whole path — bookkeeping, filing, registration, and penalty help if a deadline was missed.</p>
           <Link href="/ramza/services" className={`${ct.btnPrimary} mt-8`}>All services <ArrowRight size={16} /></Link>
         </Reveal>
-        <Reveal delay={0.1} className="divide-y divide-[#E8E5DE] rounded-[28px] bg-white px-6 shadow-[0_24px_60px_-32px_rgba(20,19,28,0.3)] sm:px-8">
+        <Reveal delay={0.1} className="divide-y divide-[#E3E7F0] rounded-[28px] bg-white px-6 shadow-[0_24px_60px_-32px_rgba(20,19,28,0.3)] sm:px-8">
           {SERVICES.map((s, i) => (
             // native <details>: accessible, works without JS
             <details key={s.n} open={openFirst && i === 0} className="group py-5">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[17px] font-medium text-[#14131C] [&::-webkit-details-marker]:hidden">
                 <span><span className="mr-3 text-[13px] text-[#A19EA6]">[{s.n}]</span>{s.t}</span>
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF1F7] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
               </summary>
               <div className="pl-10 pt-3">
                 <p className={ct.body}>{s.d}</p>
@@ -250,7 +250,7 @@ export function WhySection() {
           {items.map((it, i) => (
             <Reveal key={it.t} delay={i * 0.08}>
               <div className={`${ct.glass} h-full`}>
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#14131C]"><it.icon size={19} /></span>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0B1533]"><it.icon size={19} /></span>
                 <h3 className={`${ct.h3} mt-6`}>{it.t}</h3>
                 <p className="mt-2 text-[14.5px] leading-relaxed text-[#B8B6C0]">{it.d}</p>
               </div>
@@ -286,7 +286,7 @@ export function FaqSection({ items = CT_FAQ }: { items?: { q: string; a: string 
             <details key={f.q} className="group rounded-3xl bg-white px-6 py-5 shadow-[0_10px_30px_-24px_rgba(20,19,28,0.4)]">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-[#14131C] [&::-webkit-details-marker]:hidden">
                 {f.q}
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF1F7] text-[#4F35E8] transition group-open:rotate-45"><Plus size={16} /></span>
               </summary>
               <p className={`${ct.body} mt-3`}>{f.a}</p>
             </details>

@@ -44,7 +44,7 @@ export function HomeHero({ whatsappHref }: { whatsappHref: string }) {
     <section className="relative overflow-x-clip text-[#14131C]">
       <TrackView section="hero" className={`${ct.container} relative grid items-center gap-12 pb-14 pt-28 sm:pt-32 lg:min-h-[min(calc(100svh-40px),860px)] lg:grid-cols-[1fr_1fr] lg:pb-16`}>
         <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] text-[#55525E] ring-1 ring-[#E8E5DE]">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] text-[#55525E] ring-1 ring-[#E3E7F0]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden /> For UAE e-commerce &amp; retail brands
           </span>
           <h1 className="mt-6 max-w-[16ch] font-[family-name:var(--font-display)] text-[40px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-[52px] lg:text-[60px]">
@@ -55,10 +55,10 @@ export function HomeHero({ whatsappHref }: { whatsappHref: string }) {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a href="#start" className={`${ct.btnPrimary} h-[52px] px-7 text-[15.5px]`}>Get a free reconciliation check <ArrowRight size={16} /></a>
-            <a href="#free-tools" className="inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-[#14131C] ring-1 ring-[#E2DFD8] transition hover:ring-[#14131C]/30">Am I in e-invoicing scope?</a>
+            <a href="#free-tools" className="inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-white px-6 text-[15px] font-medium text-[#14131C] ring-1 ring-[#DDE2EC] transition hover:ring-[#14131C]/30">Am I in e-invoicing scope?</a>
           </div>
 
-          <dl className="mt-10 grid max-w-[34rem] grid-cols-3 gap-px overflow-hidden rounded-2xl bg-[#E8E5DE] ring-1 ring-[#E8E5DE]">
+          <dl className="mt-10 grid max-w-[34rem] grid-cols-3 gap-px overflow-hidden rounded-2xl bg-[#E3E7F0] ring-1 ring-[#E3E7F0]">
             {[["5+", "gateways in one view"], ["3-way", "order · payout · bank"], ["Every", "match signed off"]].map(([v, l]) => (
               <div key={l} className="bg-white/80 px-4 py-3.5">
                 <dt className="font-[family-name:var(--font-display)] text-[20px] font-semibold tracking-[-0.02em]">{v}</dt>
@@ -78,7 +78,7 @@ export function HomeHero({ whatsappHref }: { whatsappHref: string }) {
       </TrackView>
 
       {/* the gateways, in their own colours, between two hairlines */}
-      <div className="border-y border-[#E8E5DE] py-6">
+      <div className="border-y border-[#E3E7F0] py-6">
         <div className={`${ct.container} flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8`}>
           <p className="shrink-0 text-[13px] leading-snug text-[#6E6B75] lg:w-[220px]">Reconciles the gateways and books you already use</p>
           <div className="min-w-0 flex-1"><LogoMarquee /></div>
@@ -90,9 +90,15 @@ export function HomeHero({ whatsappHref }: { whatsappHref: string }) {
 
 /* ── 1b. start: real retail photo + the form ─────────────────────────── */
 
-export function StartSection() {
+export function StartSection({ focus = "reconciliation" }: { focus?: "reconciliation" | "einvoicing" } = {}) {
   const rescue = rulesMode(dubaiToday()) === "rescue";
-  const steps = [
+  const einv = focus === "einvoicing";
+  const steps = einv ? [
+    ["01", "Collect", "We pull your bank, gateway payouts and invoices — you send logins or exports, nothing else."],
+    ["02", "Match", "Every payout to its orders and the bank, fees and VAT split out."],
+    ["03", "Fix", "Open invoices closed, missing TRNs chased, credit notes raised — you approve on WhatsApp."],
+    ["04", "File", "Books closed for the month, e-invoicing ready, Corporate Tax filed via our licensed partner."],
+  ] : [
     ["01", "Tell us your gateways", "Which of Tabby, Tamara, Stripe, Telr, Shopify Payments or COD you take, and where your books live."],
     ["02", "We pull a month and match it", "Orders → payout → bank credit, line by line, with fees and VAT split out."],
     ["03", "You get the unmatched list", "What’s missing, what’s short-paid, what’s booked twice — before anything posts to Zoho."],
@@ -101,19 +107,19 @@ export function StartSection() {
     <section id="start" className={`${ct.sectionLight} scroll-mt-24 pb-24 pt-24`}>
       <TrackView section="start" className={`${ct.container} grid items-start gap-12 lg:grid-cols-[1.05fr_0.95fr]`}>
         <Reveal>
-          <span className={ct.eyebrow}>Free reconciliation check</span>
-          <h2 className={`${ct.h2} mt-4 max-w-[18ch]`}>See exactly which payouts never reached your books.</h2>
+          <span className={ct.eyebrow}>{einv ? "The Clean Close · free readiness check" : "Free reconciliation check"}</span>
+          <h2 className={`${ct.h2} mt-4 max-w-[18ch]`}>{einv ? "Books clean and e-invoicing ready by month end." : "See exactly which payouts never reached your books."}</h2>
           <div className="relative mt-8 grid grid-cols-[1.25fr_0.75fr] gap-3">
             <div className="relative aspect-[4/3.4] overflow-hidden rounded-[28px]">
-              <Image src={`${P}/px-studio-packing.jpg`} alt="Store owner wrapping an online order in her studio" fill sizes="(min-width:1024px) 380px, 60vw" className="object-cover transition duration-[1.6s] hover:scale-105" />
+              <Image src={einv ? `${P}/bb-office-window-call.jpg` : `${P}/px-studio-packing.jpg`} alt={einv ? "Business owner on a call in a high-rise office" : "Store owner wrapping an online order in her studio"} fill sizes="(min-width:1024px) 380px, 60vw" className="object-cover transition duration-[1.6s] hover:scale-105" />
             </div>
             <div className="grid gap-3">
-              <div className="relative overflow-hidden rounded-[28px]"><Image src={`${P}/px-order-label.jpg`} alt="Order boxed and labelled for the courier" fill sizes="220px" className="object-cover" /></div>
-              <div className="relative overflow-hidden rounded-[28px]"><Image src={`${P}/px-card-terminal.jpg`} alt="Customer paying by card at the counter" fill sizes="220px" className="object-cover" /></div>
+              <div className="relative overflow-hidden rounded-[28px]"><Image src={einv ? `${P}/bb-dubai-business-street.jpg` : `${P}/px-order-label.jpg`} alt={einv ? "Business street in Dubai" : "Order boxed and labelled for the courier"} fill sizes="220px" className="object-cover" /></div>
+              <div className="relative overflow-hidden rounded-[28px]"><Image src={einv ? `${P}/bb-office-lounge-skyline.jpg` : `${P}/px-card-terminal.jpg`} alt={einv ? "Office lounge overlooking the city" : "Customer paying by card at the counter"} fill sizes="220px" className="object-cover" /></div>
             </div>
             <div className="absolute -bottom-6 left-5 right-5 rounded-2xl bg-white p-4 shadow-[0_24px_60px_-28px_rgba(20,19,28,0.4)] ring-1 ring-black/[0.04] sm:right-auto sm:max-w-[360px]">
               <p className="text-[13.5px] leading-snug text-[#14131C]"><b className="font-semibold">Mobius Network Artificial Intelligence</b> came to us days from a deadline with the books unprocessed. Caught up and filed on time.</p>
-              <a href="#case" className="mt-1.5 inline-block text-[13px] font-medium text-[#4F35E8] hover:underline">Read what happened</a>
+              <a href="#clients" className="mt-1.5 inline-block text-[13px] font-medium text-[#4F35E8] hover:underline">Read what happened</a>
             </div>
           </div>
           <ol className="mt-16 space-y-5">
@@ -127,10 +133,12 @@ export function StartSection() {
         </Reveal>
 
         <Reveal delay={0.1} className="lg:sticky lg:top-28">
-          <div className="rounded-[28px] bg-white p-6 shadow-[0_1px_2px_rgba(20,19,28,0.04),0_40px_80px_-48px_rgba(20,19,28,0.35)] ring-1 ring-[#E8E5DE] sm:p-8">
-            <h3 className="font-[family-name:var(--font-display)] text-[24px] font-semibold tracking-[-0.02em] text-[#14131C]">Tell us what you need</h3>
-            <p className="mb-5 mt-1 text-[14px] text-[#55525E]">20 seconds. An accountant replies on WhatsApp with what we need.</p>
-            <CtLeadForm placement="start" cta="Send" initialSituation="reconciliation" chips={["reconciliation", "einvoicing", "books_behind", "file_return"]} />
+          <div className="rounded-[28px] bg-white p-6 shadow-[0_1px_2px_rgba(20,19,28,0.04),0_40px_80px_-48px_rgba(20,19,28,0.35)] ring-1 ring-[#E3E7F0] sm:p-8">
+            <h3 className="font-[family-name:var(--font-display)] text-[24px] font-semibold tracking-[-0.02em] text-[#14131C]">{einv ? "Choose what to close" : "Tell us what you need"}</h3>
+            <p className="mb-5 mt-1 text-[14px] text-[#55525E]">{einv ? "20 seconds. An accountant replies on WhatsApp with a fixed quote — no surprise add-ons." : "20 seconds. An accountant replies on WhatsApp with what we need."}</p>
+            {einv
+              ? <CtLeadForm placement="start" cta="Get my fixed quote" initialSituation="pkg_complete" packages />
+              : <CtLeadForm placement="start" cta="Send" initialSituation="reconciliation" chips={["reconciliation", "einvoicing", "books_behind", "file_return"]} />}
           </div>
         </Reveal>
       </TrackView>
@@ -249,7 +257,7 @@ export function ServicesGrid() {
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {items.map((it, i) => (
             <Reveal key={it.t} delay={i * 0.07}>
-              <Link href={it.href} className="group block h-full overflow-hidden rounded-[28px] bg-white ring-1 ring-[#E8E5DE] transition hover:-translate-y-1 hover:shadow-[0_30px_60px_-40px_rgba(20,19,28,0.45)]">
+              <Link href={it.href} className="group block h-full overflow-hidden rounded-[28px] bg-white ring-1 ring-[#E3E7F0] transition hover:-translate-y-1 hover:shadow-[0_30px_60px_-40px_rgba(20,19,28,0.45)]">
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <Image src={`${P}/${it.img}`} alt="" fill sizes="(min-width:1024px) 290px, 50vw" className="object-cover transition duration-500 group-hover:scale-105" />
                 </div>
@@ -284,7 +292,7 @@ export function PeopleSection({ whatsappHref }: { whatsappHref: string }) {
         </Reveal>
         {/* stock photography carries no name or words (see the header note) */}
         <Reveal delay={0.1} className="relative [height:520px]">
-          <div className="absolute bottom-0 left-[8%] right-0 top-10 overflow-hidden rounded-[36px] bg-[#E8E5DE]">
+          <div className="absolute bottom-0 left-[8%] right-0 top-10 overflow-hidden rounded-[36px] bg-[#E3E7F0]">
             <Image src={`${P}/px-accountant-review.jpg`} alt="Accountant reviewing a client file" fill sizes="(min-width:1024px) 520px, 90vw" className="object-cover object-[50%_30%]" />
           </div>
           <div className="absolute left-0 top-0 max-w-[270px] rounded-3xl bg-white px-5 py-4 shadow-[0_24px_60px_-30px_rgba(20,19,28,0.4)] ring-1 ring-black/[0.04]">
@@ -292,7 +300,7 @@ export function PeopleSection({ whatsappHref }: { whatsappHref: string }) {
             <p className="-mt-3 text-[15px] font-medium leading-snug text-[#14131C]">Nothing reaches the FTA until an accountant has checked it and you’ve approved it.</p>
             <p className="mt-2 text-[12.5px] text-[#6E6B75]">The RAMZA review promise</p>
           </div>
-          <div className="absolute bottom-5 right-5 rounded-2xl bg-[#14131C] px-4 py-3 text-white">
+          <div className="absolute bottom-5 right-5 rounded-2xl bg-[#0B1533] px-4 py-3 text-white">
             <span className="text-[13px] leading-snug">Filed by {FILING_PARTNER}<br /><span className="text-[#B8B6C0]">our licensed partner</span></span>
           </div>
         </Reveal>
@@ -312,7 +320,7 @@ export function PenaltyBand() {
   return (
     <section className={`${ct.sectionLight} pb-24 pt-28`}>
       <TrackView section="penalty" className={ct.container}>
-        <Reveal className="relative overflow-hidden rounded-[36px] bg-[#14131C] p-8 text-white sm:p-12">
+        <Reveal className="relative overflow-hidden rounded-[36px] bg-[#0B1533] p-8 text-white sm:p-12">
           <div className="relative grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
             <div>
               <span className={ct.eyebrowDark}>Already late?</span>
@@ -359,7 +367,7 @@ export function HomeFaq() {
         </Reveal>
         <Reveal delay={0.1} className="space-y-3">
           {HOME_FAQ.map((f, i) => (
-            <details key={f.q} open={i === 0} className="group rounded-3xl bg-white px-6 py-5 ring-1 ring-[#E8E5DE]">
+            <details key={f.q} open={i === 0} className="group rounded-3xl bg-white px-6 py-5 ring-1 ring-[#E3E7F0]">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-[#14131C] [&::-webkit-details-marker]:hidden">
                 {f.q}
                 <span className="shrink-0 font-[family-name:var(--font-display)] text-[24px] font-medium leading-none text-[#4F35E8] transition group-open:rotate-45" aria-hidden>+</span>

@@ -22,7 +22,7 @@ export function HeroConsole({ start = "check" }: { start?: "check" | "form" }) {
   return (
     <div id="check" className="scroll-mt-28 rounded-[32px] bg-white p-2 text-[#14131C] shadow-[0_40px_120px_-40px_rgba(0,0,0,0.6)]">
       {/* tab switch — the white pill slides between the two */}
-      <div className="relative grid grid-cols-2 rounded-[26px] bg-[#F1EFEA] p-1">
+      <div className="relative grid grid-cols-2 rounded-[26px] bg-[#EEF1F7] p-1">
         {tabs.map((t) => (
           <button key={t.k} onClick={() => setTab(t.k)} className={`relative z-10 flex h-11 items-center justify-center gap-2 rounded-[22px] text-[14px] font-medium transition-colors ${tab === t.k ? "text-[#14131C]" : "text-[#6E6B75] hover:text-[#14131C]"}`}>
             {tab === t.k && <motion.span layoutId="hero-tab" className="absolute inset-0 -z-10 rounded-[22px] bg-white shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}

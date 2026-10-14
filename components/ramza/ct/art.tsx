@@ -29,22 +29,22 @@ export function NoticeArt() {
             ["Amount", "AED 10,000"],
             ["Notice date", "Sample"],
           ].map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-dashed border-[#E8E5DE] pb-2.5">
+            <div key={k} className="flex justify-between border-b border-dashed border-[#E3E7F0] pb-2.5">
               <span className="text-[#6E6B75]">{k}</span>
               <span className="font-medium text-[#14131C]">{v}</span>
             </div>
           ))}
         </div>
-        <div className="mt-5 h-2 w-2/3 rounded-full bg-[#F1EFEA]" />
-        <div className="mt-2 h-2 w-1/2 rounded-full bg-[#F1EFEA]" />
+        <div className="mt-5 h-2 w-2/3 rounded-full bg-[#EEF1F7]" />
+        <div className="mt-2 h-2 w-1/2 rounded-full bg-[#EEF1F7]" />
       </motion.div>
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.4, type: "spring", stiffness: 220, damping: 18 }}
-        className="absolute -bottom-6 -right-2 flex items-center gap-3 rounded-2xl bg-[#14131C] px-4 py-3 text-white shadow-xl"
+        className="absolute -bottom-6 -right-2 flex items-center gap-3 rounded-2xl bg-[#0B1533] px-4 py-3 text-white shadow-xl"
       >
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#14131C]"><Check size={16} /></span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0B1533]"><Check size={16} /></span>
         <span className="text-[13px] leading-tight"><b className="block font-medium">Reconsideration filed</b><span className="text-[#B8B6C0]">inside 40 business days</span></span>
       </motion.div>
     </div>
@@ -66,7 +66,7 @@ export function WindowArt({ used = 12 }: { used?: number }) {
             initial={{ opacity: 0, scale: 0.6 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.012 }}
-            className={`flex h-7 items-center justify-center rounded-lg text-[10.5px] ${i < used ? "bg-[#14131C] text-white" : i === 39 ? "bg-[#14131C] text-white" : "bg-[#F1EFEA] text-[#6E6B75]"}`}
+            className={`flex h-7 items-center justify-center rounded-lg text-[10.5px] ${i < used ? "bg-[#0B1533] text-white" : i === 39 ? "bg-[#0B1533] text-white" : "bg-[#EEF1F7] text-[#6E6B75]"}`}
           >
             {i + 1}
           </motion.span>

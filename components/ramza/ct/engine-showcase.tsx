@@ -115,9 +115,9 @@ function Match() {
       </div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.7 }}
         className="col-span-3 mt-3 flex flex-wrap gap-2 text-[11.5px]">
-        <span className="rounded-full bg-[#F1EFEA] px-3 py-1 text-[#4F35E8]">Gateway fees split out</span>
-        <span className="rounded-full bg-[#F1EFEA] px-3 py-1 text-[#4F35E8]">VAT on fees recovered</span>
-        <span className="rounded-full bg-[#F1EFEA] px-3 py-1 text-[#4F35E8]">FX difference booked</span>
+        <span className="rounded-full bg-[#EEF1F7] px-3 py-1 text-[#4F35E8]">Gateway fees split out</span>
+        <span className="rounded-full bg-[#EEF1F7] px-3 py-1 text-[#4F35E8]">VAT on fees recovered</span>
+        <span className="rounded-full bg-[#EEF1F7] px-3 py-1 text-[#4F35E8]">FX difference booked</span>
       </motion.div>
     </div>
   );
@@ -131,8 +131,8 @@ function Invoices() {
           className="relative overflow-hidden rounded-2xl bg-white p-3.5 shadow-[0_6px_20px_-14px_rgba(20,19,28,0.5)]" style={{ transformPerspective: 600 }}>
           <div className="text-[11px] text-[#8E8B95]">{inv}</div>
           <div className="mt-1 text-[14px] font-medium tabular-nums text-[#14131C]">AED {fmt(1_240 + i * 385)}</div>
-          <div className="mt-2 h-1.5 w-3/4 rounded-full bg-[#F1EFEA]" />
-          <div className="mt-1 h-1.5 w-1/2 rounded-full bg-[#F1EFEA]" />
+          <div className="mt-2 h-1.5 w-3/4 rounded-full bg-[#EEF1F7]" />
+          <div className="mt-1 h-1.5 w-1/2 rounded-full bg-[#EEF1F7]" />
           <motion.span initial={{ scale: 2.4, opacity: 0, rotate: -18 }} animate={{ scale: 1, opacity: 1, rotate: -12 }} transition={{ delay: 0.5 + i * 0.15, type: "spring", stiffness: 300, damping: 16 }}
             className="absolute right-2 top-2 rounded-md border-2 border-emerald-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600">Paid</motion.span>
         </motion.div>
@@ -176,7 +176,7 @@ function Tax() {
     <div className="rounded-2xl bg-white p-4 shadow-[0_6px_20px_-14px_rgba(20,19,28,0.5)]">
       {rows.map(([l, v, s], i) => (
         <motion.div key={l} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.22 }}
-          className={`flex items-center justify-between py-2 text-[13.5px] ${s ? "border-t border-[#F1EFEA] font-medium text-[#14131C]" : "text-[#55525E]"}`}>
+          className={`flex items-center justify-between py-2 text-[13.5px] ${s ? "border-t border-[#EEF1F7] font-medium text-[#14131C]" : "text-[#55525E]"}`}>
           <span>{l}</span>
           <span className="tabular-nums">AED <Counter from={0} to={v} delay={0.15 + i * 0.22} /></span>
         </motion.div>
@@ -196,7 +196,7 @@ export function ProfitBars({ period, compact = false }: { period: "quarterly" | 
       {data.map((d, i) => (
         <div key={d.l} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
           <div className="relative flex w-full max-w-[56px] flex-1 items-end justify-center">
-            <motion.div className="absolute bottom-0 w-full rounded-t-xl bg-[#E8E5DE]" initial={{ height: 0 }} animate={{ height: `${(d.rev / max) * 100}%` }} transition={{ delay: i * 0.12, duration: 0.8, ease: EASE }} />
+            <motion.div className="absolute bottom-0 w-full rounded-t-xl bg-[#E3E7F0]" initial={{ height: 0 }} animate={{ height: `${(d.rev / max) * 100}%` }} transition={{ delay: i * 0.12, duration: 0.8, ease: EASE }} />
             <motion.div className="absolute bottom-0 w-full rounded-t-xl bg-gradient-to-t from-[#4F35E8] to-[#B3A6FF]" initial={{ height: 0 }} animate={{ height: `${(d.profit / max) * 100}%` }} transition={{ delay: 0.3 + i * 0.12, duration: 0.8, ease: EASE }} />
           </div>
           <span className="text-[11.5px] text-[#8E8B95]">{d.l}</span>
@@ -213,17 +213,17 @@ function Investors() {
     <div className="rounded-2xl bg-white p-4 shadow-[0_6px_20px_-14px_rgba(20,19,28,0.5)]">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-[13px] font-medium text-[#14131C]">Net profit</div>
-        <div className="flex rounded-full bg-[#F1EFEA] p-0.5 text-[11.5px]">
+        <div className="flex rounded-full bg-[#EEF1F7] p-0.5 text-[11.5px]">
           {(["quarterly", "yearly"] as const).map((p) => (
             <button key={p} onClick={() => setPeriod(p)} className={`relative rounded-full px-3 py-1 capitalize ${period === p ? "text-white" : "text-[#55525E]"}`}>
-              {period === p && <motion.span layoutId="inv-toggle" className="absolute inset-0 rounded-full bg-[#14131C]" />}
+              {period === p && <motion.span layoutId="inv-toggle" className="absolute inset-0 rounded-full bg-[#0B1533]" />}
               <span className="relative">{p}</span>
             </button>
           ))}
         </div>
       </div>
       <ProfitBars key={period} period={period} compact />
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }} className="mt-3 flex items-center gap-2 rounded-xl bg-[#FAF9F6] px-3 py-2 text-[12px] text-[#55525E]">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }} className="mt-3 flex items-center gap-2 rounded-xl bg-[#FFFFFF] px-3 py-2 text-[12px] text-[#55525E]">
         <span className="flex -space-x-2">
           {["#4F35E8", "#B3A6FF", "#14131C"].map((c) => <span key={c} className="h-6 w-6 rounded-full ring-2 ring-white" style={{ background: c }} />)}
         </span>
@@ -305,7 +305,7 @@ export function EngineShowcase() {
                       </div>
                     </div>
                     {active && (
-                      <motion.span key={`${stage}-${playing}`} className="absolute bottom-0 left-0 h-[3px] bg-[#14131C]"
+                      <motion.span key={`${stage}-${playing}`} className="absolute bottom-0 left-0 h-[3px] bg-[#0B1533]"
                         initial={{ width: "0%" }} animate={{ width: playing ? "100%" : "0%" }} transition={{ duration: playing ? STAGE_MS / 1000 : 0, ease: "linear" }} />
                     )}
                   </button>
@@ -315,7 +315,7 @@ export function EngineShowcase() {
           </ol>
 
           {/* app window */}
-          <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#F5F3EF] to-[#E8E5DE] p-2 shadow-[0_40px_90px_-50px_rgba(20,19,28,0.6)] ring-1 ring-[#E2DFD8]">
+          <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#F5F3EF] to-[#E3E7F0] p-2 shadow-[0_40px_90px_-50px_rgba(20,19,28,0.6)] ring-1 ring-[#DDE2EC]">
             <div className="flex items-center justify-between rounded-t-[22px] bg-white/70 px-4 py-2.5 backdrop-blur">
               <div className="flex gap-1.5">{["#FF5F57", "#FEBC2E", "#28C840"].map((c) => <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />)}</div>
               <div className="text-[12px] text-[#55525E]">RAMZA · Live books</div>

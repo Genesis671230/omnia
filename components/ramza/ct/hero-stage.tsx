@@ -42,7 +42,7 @@ function PayoutCard() {
     <div className="w-[300px] rounded-[22px] bg-white/95 p-4 text-[#14131C] shadow-[0_30px_70px_-30px_rgba(12,11,18,0.55)] ring-1 ring-black/[0.05] backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#6E6B75]">Payout reconciliation</span>
-        <span className="rounded-md bg-[#F1EFEA] px-1.5 py-0.5 text-[10px] font-medium text-[#6E6B75]">Sample</span>
+        <span className="rounded-md bg-[#EEF1F7] px-1.5 py-0.5 text-[10px] font-medium text-[#6E6B75]">Sample</span>
       </div>
       <AnimatePresence mode="wait">
         <motion.div key={p.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35, ease: EASE }}>
@@ -54,7 +54,7 @@ function PayoutCard() {
             <div className="flex justify-between"><dt className="text-[#6E6B75]">Orders in payout</dt><dd className="font-medium tabular-nums">{p.orders}</dd></div>
             <div className="flex justify-between"><dt className="text-[#6E6B75]">Gross</dt><dd className="font-medium tabular-nums">{aed(p.gross)}</dd></div>
             <div className="flex justify-between"><dt className="text-[#6E6B75]">Fees + VAT</dt><dd className="font-medium tabular-nums text-[#C2334D]">−{aed(p.fee)}</dd></div>
-            <div className="flex justify-between border-t border-dashed border-[#E8E5DE] pt-1.5"><dt className="font-medium">Net to bank</dt><dd className="font-semibold tabular-nums">{aed(p.gross - p.fee)}</dd></div>
+            <div className="flex justify-between border-t border-dashed border-[#E3E7F0] pt-1.5"><dt className="font-medium">Net to bank</dt><dd className="font-semibold tabular-nums">{aed(p.gross - p.fee)}</dd></div>
           </dl>
         </motion.div>
       </AnimatePresence>
@@ -84,7 +84,7 @@ function InvoiceCard() {
     return () => clearInterval(t);
   }, [reduce]);
   return (
-    <div className="w-[248px] rounded-[22px] bg-[#14131C]/90 p-4 text-white shadow-[0_30px_70px_-25px_rgba(12,11,18,0.8)] ring-1 ring-white/15 backdrop-blur-xl">
+    <div className="w-[248px] rounded-[22px] bg-[#0B1533]/90 p-4 text-white shadow-[0_30px_70px_-25px_rgba(12,11,18,0.8)] ring-1 ring-white/15 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#B3A6FF]">E-invoice</span>
         <span className="font-mono text-[11px] text-[#B8B6C0]">INV-24117</span>
@@ -109,7 +109,7 @@ export function HeroStage() {
   return (
     <div className="relative mx-auto w-full max-w-[600px] pb-10 pl-0 sm:pb-12 sm:pl-14">
       <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE }}
-        className="relative aspect-[4/4.4] overflow-hidden rounded-[36px] bg-[#E8E5DE] shadow-[0_50px_100px_-50px_rgba(20,19,28,0.55)] sm:aspect-[4/4.6]">
+        className="relative aspect-[4/4.4] overflow-hidden rounded-[36px] bg-[#E3E7F0] shadow-[0_50px_100px_-50px_rgba(20,19,28,0.55)] sm:aspect-[4/4.6]">
         <Image
           src="/ramza/photos/px-operator-desk.jpg"
           alt="Business owner checking payments on her phone at her desk"
@@ -132,7 +132,7 @@ export function HeroStage() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.85, duration: 0.6, ease: EASE }}
         className="absolute right-4 top-4 flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-2.5 shadow-[0_24px_50px_-20px_rgba(20,19,28,0.45)] ring-1 ring-black/[0.04] backdrop-blur sm:-right-4 sm:top-[6%]">
         <GatewayMark g={zoho} h={34} />
-        <span className="border-l border-[#E8E5DE] pl-3 text-[12px] leading-tight text-[#55525E]"><b className="block font-semibold text-[#14131C]">Booked automatically</b>payment · fee · VAT · FX</span>
+        <span className="border-l border-[#E3E7F0] pl-3 text-[12px] leading-tight text-[#55525E]"><b className="block font-semibold text-[#14131C]">Booked automatically</b>payment · fee · VAT · FX</span>
       </motion.div>
     </div>
   );

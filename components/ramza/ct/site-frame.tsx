@@ -20,12 +20,8 @@ export function CtSiteFrame({ children }: { children: ReactNode }) {
     <RamzaShell>
       <AttributionInit />
       <Pixels />
-
-      {/* One canvas for the whole page: sections are transparent and sit on it.
-          The only colour in the ground is a soft light pool at the very top
-          that fades into the canvas (no per-section tints). */}
-      <div className="relative bg-[#FAF9F6] font-[family-name:var(--font-plex)]">
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[1100px] bg-[radial-gradient(60%_55%_at_78%_0%,rgba(79,53,232,0.10),transparent_70%),radial-gradient(45%_40%_at_8%_8%,rgba(214,186,150,0.16),transparent_70%)]" />
+      {/* One white canvas; the home hero and dark islands carry the navy brand. */}
+      <div className="relative bg-[#FFFFFF] font-[family-name:var(--font-plex)]">
         <CtNav whatsappHref={wa} />
         <main>{children}</main>
 

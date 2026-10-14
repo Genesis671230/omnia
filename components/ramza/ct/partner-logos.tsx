@@ -33,7 +33,7 @@ export function GatewayMark({ g, h = 28 }: { g: (typeof GATEWAYS)[number]; h?: n
 
 function Tile({ g }: { g: (typeof GATEWAYS)[number] }) {
   return (
-    <span className="flex h-[64px] shrink-0 items-center justify-center rounded-2xl bg-white px-6 shadow-[0_1px_2px_rgba(20,19,28,0.06),0_14px_30px_-22px_rgba(20,19,28,0.45)] ring-1 ring-[#E8E5DE]" title={g.name}>
+    <span className="flex h-[64px] shrink-0 items-center justify-center rounded-2xl bg-white px-6 shadow-[0_1px_2px_rgba(20,19,28,0.06),0_14px_30px_-22px_rgba(20,19,28,0.45)] ring-1 ring-[#E3E7F0]" title={g.name}>
       <GatewayMark g={g} h={g.kind === "icon" ? 30 : 30} />
     </span>
   );

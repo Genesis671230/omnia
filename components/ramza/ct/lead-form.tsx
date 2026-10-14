@@ -34,6 +34,21 @@ const EXTRA_SITUATIONS: Record<string, { label: string; icon: typeof FileCheck2 
   vat: { label: "VAT registration", icon: ReceiptText },
 };
 
+/* Packages — the home offer ("The Clean Close"). One outcome each, built from
+ * the obstacles UAE SMBs hit: gateway payouts that never match, an invoice
+ * backlog that blocks e-invoicing, Corporate Tax registration + filing.
+ * No prices here: tier amounts in rules.json are unset → fixed quote. */
+export const PACKAGES = [
+  { k: "pkg_complete", label: "Complete Clean Close", tag: "Recommended", line: "Everything below, one accountant, one monthly fee.",
+    includes: ["Bookkeeping + accounting every month", "Invoice backlog closed, e-invoicing ready", "Corporate Tax registration + return", "WhatsApp updates, month-end report"] },
+  { k: "pkg_einvoicing", label: "E-invoicing Ready", line: "Backlog closed by month end, connected to an accredited provider.",
+    includes: ["Open invoices + credit notes cleared", "Missing buyer TRNs chased", "Invoice data mapped for e-invoicing", "Accredited provider set up via partner"] },
+  { k: "pkg_books", label: "Bookkeeping & Accounting", line: "Every payout matched and booked, books closed monthly.",
+    includes: ["Tabby, Tamara, Stripe, Telr, COD → bank", "Booked in Zoho, fees + VAT split", "VAT-return ready figures", "Monthly P&L and balance sheet"] },
+  { k: "pkg_ct", label: "Corporate Tax", line: "Registration and return, filed by our licensed partner.",
+    includes: ["CT registration", "Small Business Relief check", "Return prepared from clean books", "Filed via licensed partner"] },
+] as const;
+
 const PHONE_RE = /^\+?\d[\d\s().-]{7,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STEP1 = new Set(["situation", "whatsapp", "company"]);
@@ -42,7 +57,7 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 function Field({ icon: Icon, error, children }: { icon: typeof User; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className={`group relative flex items-center rounded-2xl border bg-white transition focus-within:border-[#14131C] focus-within:ring-4 focus-within:ring-[#14131C]/8 ${error ? "border-[#F3B3BF]" : "border-[#E2DFD8]"}`}>
+      <div className={`group relative flex items-center rounded-2xl border bg-white transition focus-within:border-[#14131C] focus-within:ring-4 focus-within:ring-[#14131C]/8 ${error ? "border-[#F3B3BF]" : "border-[#DDE2EC]"}`}>
         <Icon size={17} className="pointer-events-none absolute left-4 text-[#A19EA6] transition group-focus-within:text-[#14131C]" />
         {children}
       </div>
@@ -52,7 +67,7 @@ function Field({ icon: Icon, error, children }: { icon: typeof User; error?: str
 }
 const inputCls = "h-[52px] w-full rounded-2xl bg-transparent pl-11 pr-4 text-[15px] text-[#14131C] placeholder:text-[#A19EA6] focus:outline-none";
 
-export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form", initialSituation = "file_return", chips }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string; initialSituation?: string; chips?: string[] }) {
+export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", placement = "form", initialSituation = "file_return", chips, packages = false }: { handoff?: CheckerHandoff | null; dark?: boolean; cta?: string; placement?: string; initialSituation?: string; chips?: string[]; packages?: boolean }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [situation, setSituation] = useState<string>(initialSituation);
   const [v, setV] = useState({ whatsapp: "", company: "", name: "", email: "" });
@@ -152,7 +167,7 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
         <ol className="mx-auto mt-4 max-w-xs space-y-2 text-left">
           {steps.map((s, i) => (
             <motion.li key={s} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.15 }} className="flex items-center gap-3 text-[13.5px] text-[#14131C]">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1EFEA] text-[12px] font-medium text-[#4F35E8]">{i + 1}</span>{s}
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF1F7] text-[12px] font-medium text-[#4F35E8]">{i + 1}</span>{s}
             </motion.li>
           ))}
         </ol>
@@ -166,14 +181,14 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
     <form onSubmit={submit} noValidate onFocusCapture={() => trackOnce(`formstart:${placement}`, "FormStart", { placement })}>
       {/* progress */}
       <div className="mb-5 flex items-center gap-3">
-        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#F1EFEA]">
+        <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#EEF1F7]">
           <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#4F35E8] to-[#B3A6FF]" animate={{ width: step === 1 ? "50%" : "100%" }} transition={{ duration: 0.5, ease: EASE }} />
         </div>
         <span className="text-[12px] tabular-nums text-[#8E8B95]">Step {step} of 2</span>
       </div>
 
       {quoteNote && (
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-[#F1EFEA] px-4 py-3 text-[12.5px] leading-relaxed text-[#14131C]">
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-4 rounded-2xl bg-[#EEF1F7] px-4 py-3 text-[12.5px] leading-relaxed text-[#14131C]">
           <b className="font-medium">{handoff ? "Your check:" : "Your estimate:"}</b> {quoteNote}
         </motion.div>
       )}
@@ -181,6 +196,34 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
       <AnimatePresence mode="wait" initial={false}>
         {step === 1 ? (
           <motion.div key="s1" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.25, ease: EASE }}>
+            {packages ? (
+              <>
+                <span className={ct.label}>Pick a package</span>
+                <div role="radiogroup" className="mb-4 space-y-2">
+                  {PACKAGES.map((pk) => {
+                    const on = situation === pk.k;
+                    return (
+                      <button key={pk.k} type="button" role="radio" aria-checked={on} onClick={() => setSituation(pk.k)}
+                        className={`relative w-full rounded-2xl border px-4 py-3 text-left transition ${on ? "border-[#4F35E8] bg-[#F3F1FF] shadow-[0_10px_30px_-18px_rgba(79,53,232,0.7)]" : "border-[#DDE2EC] bg-white hover:border-[#A99CFF]"}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${on ? "border-[#4F35E8]" : "border-[#C5CBD8]"}`} aria-hidden>{on && <span className="h-2 w-2 rounded-full bg-[#4F35E8]" />}</span>
+                          <span className="text-[14.5px] font-semibold text-[#14131C]">{pk.label}</span>
+                          {"tag" in pk && <span className="ml-auto rounded-full bg-[#0B1533] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-white">{pk.tag}</span>}
+                        </div>
+                        <p className="mt-1 pl-[30px] text-[12.5px] leading-snug text-[#55525E]">{pk.line}</p>
+                        <AnimatePresence initial={false}>
+                          {on && (
+                            <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: EASE }} className="grid gap-x-3 gap-y-1 overflow-hidden pl-[30px] pt-2 sm:grid-cols-2">
+                              {pk.includes.map((x) => <li key={x} className="flex gap-1.5 text-[12px] leading-snug text-[#14131C]"><CheckCircle2 size={13} className="mt-[1px] shrink-0 text-[#12805C]" />{x}</li>)}
+                            </motion.ul>
+                          )}
+                        </AnimatePresence>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (<>
             <span className={ct.label}>What do you need?</span>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {(chips
@@ -190,13 +233,14 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
                 const on = situation === s.k;
                 return (
                   <motion.button key={s.k} type="button" whileTap={{ scale: 0.97 }} onClick={() => setSituation(s.k)} aria-pressed={on}
-                    className={`relative flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-3 py-2 text-left text-[13px] leading-snug transition ${on ? "border-[#4F35E8] bg-[#F1EFEA] font-medium text-[#14131C]" : "border-[#E2DFD8] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}>
+                    className={`relative flex min-h-[52px] items-center gap-2.5 rounded-2xl border px-3 py-2 text-left text-[13px] leading-snug transition ${on ? "border-[#4F35E8] bg-[#EEF1F7] font-medium text-[#14131C]" : "border-[#DDE2EC] bg-white text-[#55525E] hover:border-[#A99CFF]"}`}>
                     <span className={`h-3.5 w-3.5 shrink-0 rotate-45 rounded-[3px] border-2 transition ${on ? "border-[#4F35E8] bg-[#4F35E8]" : "border-[#CFCCC6] bg-white"}`} aria-hidden />
                     {s.label}
                   </motion.button>
                 );
               })}
             </div>
+            </>)}
             <div className="space-y-3">
               <Field icon={MessageCircle} error={errors.whatsapp}>
                 <input name="whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={v.whatsapp} onChange={set("whatsapp")} className={inputCls} placeholder="WhatsApp  +971 50 123 4567" aria-label="WhatsApp number" />
@@ -226,7 +270,7 @@ export function CtLeadForm({ handoff, dark = false, cta = "Start my filing", pla
             </div>
             {errors._form && <p className={`${ct.error} mt-3`}>{errors._form}</p>}
             <div className="mt-5 flex gap-2">
-              <button type="button" onClick={() => setStep(1)} className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-[#E2DFD8] text-[#55525E] transition hover:border-[#4F35E8] hover:text-[#4F35E8]" aria-label="Back"><ArrowLeft size={17} /></button>
+              <button type="button" onClick={() => setStep(1)} className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-[#DDE2EC] text-[#55525E] transition hover:border-[#4F35E8] hover:text-[#4F35E8]" aria-label="Back"><ArrowLeft size={17} /></button>
               <button type="submit" disabled={status === "sending"} className={`${ct.btnPrimary} h-[52px] flex-1`}>
                 {status === "sending" && <Loader2 size={16} className="animate-spin" />} {cta} <ArrowRight size={16} />
               </button>

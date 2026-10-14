@@ -225,10 +225,7 @@ export function AdminMoney() {
       <style>{CSS}</style>
 
       <div className="adm-title">
-        <div>
-          <h1>Money</h1>
-          <span>Today, {longDate(today)}</span>
-        </div>
+        
         <RangePicker range={range} setRange={setRange} today={today}>
           <button className="adm-icon" title="Refresh from the latest payouts" onClick={() => load(true)} disabled={loading}>
             {loading ? <Loader2 size={14} className="adm-spin" /> : <RefreshCw size={14} />}
@@ -587,8 +584,8 @@ function UploadsCard() {
                 <div className="adm-up-ic"><Landmark size={16} /></div>
                 <div className="adm-up-body">
                   <b>Bank statement</b>
-                  <span className="fn" title={u.latestBank.filename}>{u.latestBank.filename}</span>
-                  <small>{u.latestBank.summary}</small>
+                  {/* <span className="fn" title={u.latestBank.filename}>{u.latestBank.filename}</span> */}
+                  {/* <small>{u.latestBank.summary}</small> */}
                 </div>
                 <div className="adm-up-when"><b>{stamp(u.latestBank.uploadedAt)}</b><small>{ago(u.latestBank.uploadedAt)}</small></div>
               </div>
@@ -598,8 +595,8 @@ function UploadsCard() {
                 <div className="adm-up-logo"><GwLogo name={p.gateway} size={32} /></div>
                 <div className="adm-up-body">
                   <b>{p.gateway}{p.store ? <em> · {p.store}</em> : null}</b>
-                  <span className="fn" title={p.source}>{p.viaApi ? `synced by API · ${p.payoutId}` : p.source}</span>
-                  <small>net AED {n2(p.netAed)}{p.orders ? ` · ${p.orders} lines` : ""} · {p.last30} payouts in 30 days</small>
+                  {/* <span className="fn" title={p.source}>{p.viaApi ? `synced by API · ${p.payoutId}` : p.source}</span> */}
+                  <small>net AED {n2(p.netAed)}{p.orders ? ` · ${p.orders} lines` : ""}</small>
                 </div>
                 <div className="adm-up-when"><b>{stamp(p.uploadedAt)}</b><small>{ago(p.uploadedAt)}</small></div>
               </div>

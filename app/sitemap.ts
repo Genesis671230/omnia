@@ -21,7 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   /* Corporate Tax penalty pages (static routes, not in the registry). */
   const ctPaths = [
     "penalty-checker", "corporate-tax-penalties", "reconsideration",
-    "late-registration-waiver", "services", "contact", "payout-reconciliation",
+    "late-registration-waiver", "services", "contact", "payout-reconciliation", "reconcile",
   ];
   landing.push(...ctPaths.map((p) => ({
     url: absoluteUrl(ramzaPath(p)),

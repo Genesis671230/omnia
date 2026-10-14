@@ -1,59 +1,67 @@
 import type { Metadata } from "next";
 import { CtSiteFrame } from "@/components/ramza/ct/site-frame";
-import {
-  CaseStudySection, FinalCta, HOME_FAQ, HomeFaq, HomeHero, PenaltyBand, PeopleSection, ServicesGrid, StartSection,
-} from "@/components/ramza/ct/home";
-import { EngineShowcase } from "@/components/ramza/ct/engine-showcase";
-import { AiOfficeSection } from "@/components/ramza/ct/ai-office";
+import { FinalCta, HOME_FAQ, HomeFaq, PenaltyBand, PeopleSection, ServicesGrid, StartSection } from "@/components/ramza/ct/home";
+import { EInvoicingHero } from "@/components/ramza/ct/einv-hero";
 import { EInvoicingSection } from "@/components/ramza/ct/einvoicing";
-import { StorySection } from "@/components/ramza/ct/story";
 import { TestimonialsSection } from "@/components/ramza/ct/testimonials";
-import { FreeToolsSection } from "@/components/ramza/ct/free-tools";
-import { GrowthSection } from "@/components/ramza/ct/growth";
 import { PricingCounter } from "@/components/ramza/ct/pricing-counter";
-import { DeadlineTimeline, StakesSection } from "@/components/ramza/ct/editorial";
+import { LogoMarquee } from "@/components/ramza/ct/partner-logos";
+import { IndustryProvider } from "@/components/ramza/demo/industry";
+import { ProcessFilm } from "@/components/ramza/demo/process-film";
+import { IndustryLive } from "@/components/ramza/demo/industry-live";
+import { LiveUpdates } from "@/components/ramza/demo/live-updates";
+import { ToolsHub } from "@/components/ramza/demo/tools-hub";
+import { TrackingDebug } from "@/components/ramza/demo/tracking-debug";
 import { ctMetadata } from "@/lib/ramza/ct-seo";
 import { whatsappHref } from "@/lib/ramza/ct-site";
 import { faqNode, organizationNode, websiteNode } from "@/lib/ramza/seo";
 
-/* RAMZA home — multi-gateway payout reconciliation + e-invoicing readiness
-   for UAE e-commerce and retail brands; Corporate Tax and penalty help follow.
-   Primary action: the form in <StartSection> (#start), right under the hero.
-   Section order and the job each does: components/ramza/ct/home.tsx. */
+/* RAMZA home (2026-10-14) — e-invoicing readiness first:
+ *   1 EInvoicingHero  "E-invoicing is coming. Your invoice backlog must close by
+ *                     month end." Business Bay / DIFC photography, go-live
+ *                     dates (rules.json), month-end countdown, live WhatsApp +
+ *                     Telegram phones
+ *   2 StartSection    the offer: free readiness check form (#start)
+ *   3 EInvoicing      5-corner model + the two go-live tracks
+ *   4 ProcessFilm / IndustryLive / LiveUpdates / ToolsHub
+ *   then clients, services, pricing, people, FAQ, CT rescue band, CTA.
+ * The reconcile tool (InstantDemo) lives on /ramza/reconcile.
+ * Every interaction is a funnel event (lib/ramza/funnel.ts); ?ramza_debug=1
+ * shows the pixels and events live. */
 
 export const metadata: Metadata = ctMetadata(
   "/ramza",
-  "Gateway payout reconciliation & e-invoicing for UAE e-commerce — RAMZA",
-  "Tabby, Tamara, Stripe, Telr and COD payouts matched to orders and the bank, booked in Zoho, and invoice data made e-invoicing ready — checked by UAE accountants. Free reconciliation check.",
+  "UAE e-invoicing readiness — close your invoice backlog by month end | RAMZA",
+  "E-invoicing is coming to the UAE. RAMZA closes your invoice backlog, reconciles every gateway payout and connects you to an accredited provider — checked by UAE accountants. Free readiness check.",
 );
 
 // Hourly, so the deadline → rescue switch (rules.json campaign dates) goes live on its own.
 export const revalidate = 3600;
 
 export default function RamzaHome() {
-  const wa = whatsappHref("Hi RAMZA, I need my gateway payouts reconciled.");
+  const wa = whatsappHref("Hi RAMZA, I want my invoices e-invoicing ready.");
   const jsonLd = { "@context": "https://schema.org", "@graph": [organizationNode(), websiteNode(), faqNode(HOME_FAQ)] };
   return (
     <CtSiteFrame>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HomeHero whatsappHref={wa} />
-      <StartSection />
-      <StorySection />
-      <EngineShowcase />
-      <EInvoicingSection />
-      <TestimonialsSection />
-      <ServicesGrid />
-      <FreeToolsSection />
-      <AiOfficeSection />
-      <GrowthSection />
-      <CaseStudySection />
-      <PricingCounter />
-      <PeopleSection whatsappHref={wa} />
-      <DeadlineTimeline />
-      <StakesSection />
-      <PenaltyBand />
-      <HomeFaq />
-      <FinalCta whatsappHref={wa} />
+      <IndustryProvider>
+        <EInvoicingHero whatsappHref={wa} />
+        <div className="border-b border-[#E3E7F0] bg-white py-6"><LogoMarquee /></div>
+        <StartSection focus="einvoicing" />
+        <EInvoicingSection />
+        <ProcessFilm />
+        <IndustryLive />
+        <LiveUpdates />
+        <ToolsHub />
+        <TestimonialsSection />
+        <ServicesGrid />
+        <PricingCounter />
+        <PeopleSection whatsappHref={wa} />
+        <HomeFaq />
+        <PenaltyBand />
+        <FinalCta whatsappHref={wa} />
+        <TrackingDebug />
+      </IndustryProvider>
     </CtSiteFrame>
   );
 }

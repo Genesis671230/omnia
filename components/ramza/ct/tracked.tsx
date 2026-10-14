@@ -5,7 +5,8 @@
  *   <WhatsAppLink href={…} placement="hero">WhatsApp us</WhatsAppLink> */
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { track, trackOnce } from "@/lib/ramza/track";
+import { trackOnce } from "@/lib/ramza/track";
+import { funnel } from "@/lib/ramza/funnel";
 
 export function TrackView({ section, event = "SectionView", children, className }: { section: string; event?: string; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -23,7 +24,7 @@ export function TrackView({ section, event = "SectionView", children, className 
 
 export function WhatsAppLink({ href, placement, className, children }: { href: string; placement: string; className?: string; children: ReactNode }) {
   return (
-    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className={className} onClick={() => track("Contact", { placement, channel: "whatsapp" })}>
+    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className={className} onClick={() => funnel("whatsapp_click", { placement })}>
       {children}
     </a>
   );

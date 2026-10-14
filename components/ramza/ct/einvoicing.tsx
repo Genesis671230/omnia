@@ -43,7 +43,7 @@ function FlowDiagram() {
     <svg ref={ref} viewBox="0 0 800 310" className="block h-auto w-full" role="img" aria-label="Diagram: invoice travels from your business through two accredited service providers to the buyer, with tax data reported to the tax authority">
       {LINKS.map((d, i) => (
         <g key={d}>
-          <path d={d} fill="none" stroke="#E2DFD8" strokeWidth={3} strokeLinecap="round" />
+          <path d={d} fill="none" stroke="#DDE2EC" strokeWidth={3} strokeLinecap="round" />
           <motion.path d={d} fill="none" stroke={i < 3 ? "#4F35E8" : "#10B981"} strokeWidth={3} strokeLinecap="round" strokeDasharray="6 10"
             initial={{ pathLength: 0 }} animate={inView ? { pathLength: 1 } : { pathLength: 0 }} transition={{ duration: 0.8, delay: i * 0.35 }} />
           {/* travelling packet */}
@@ -58,7 +58,7 @@ function FlowDiagram() {
         <motion.g key={n.t} initial={{ opacity: 0, y: 10 }} animate={inView ? { opacity: 1, y: 0 } : undefined} transition={{ delay: 0.1 + i * 0.12 }}>
           <foreignObject x={n.x - 72} y={n.y - 38} width={144} height={92}>
             <div className="flex flex-col items-center text-center">
-              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${i === 0 ? "bg-[#14131C] text-white" : i === 4 ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "bg-white text-[#4F35E8] ring-1 ring-[#E2DFD8]"} shadow-sm`}>
+              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${i === 0 ? "bg-[#0B1533] text-white" : i === 4 ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "bg-white text-[#4F35E8] ring-1 ring-[#DDE2EC]"} shadow-sm`}>
                 <n.icon size={20} />
               </span>
               <span className="mt-2 text-[13px] font-medium text-[#14131C]">{n.t}</span>
@@ -89,10 +89,10 @@ function InvoiceCard({ checks }: { checks: number }) {
   const net = 12500;
   const vat = Math.round(net * VAT_RATE);
   return (
-    <div className="w-[150px] rounded-2xl bg-white p-3 text-left shadow-[0_18px_40px_-18px_rgba(20,19,28,0.55)] ring-1 ring-[#E2DFD8]">
+    <div className="w-[150px] rounded-2xl bg-white p-3 text-left shadow-[0_18px_40px_-18px_rgba(20,19,28,0.55)] ring-1 ring-[#DDE2EC]">
       <div className="flex items-center justify-between text-[10px] font-medium text-[#4F35E8]"><span>E-INVOICE</span><FileCode2 size={12} /></div>
       <div className="mt-2 space-y-1">
-        <div className="h-1.5 w-20 rounded-full bg-[#E8E5DE]" /><div className="h-1.5 w-14 rounded-full bg-[#E8E5DE]" />
+        <div className="h-1.5 w-20 rounded-full bg-[#E3E7F0]" /><div className="h-1.5 w-14 rounded-full bg-[#E3E7F0]" />
       </div>
       <div className="mt-2 flex justify-between text-[10.5px] text-[#55525E]"><span>Net</span><span className="tabular-nums">{net.toLocaleString("en-US")}</span></div>
       <div className="flex justify-between text-[10.5px] text-[#55525E]"><span>VAT {Math.round(VAT_RATE * 100)}%</span><span className="tabular-nums">{vat.toLocaleString("en-US")}</span></div>
@@ -128,7 +128,7 @@ function EInvoiceFilm() {
     { icon: Store, t: "Your business" }, { icon: Network, t: "Your ASP" }, { icon: Network, t: "Buyer's ASP" }, { icon: Building2, t: "Your buyer" },
   ];
   return (
-    <div ref={ref} className="overflow-hidden rounded-[28px] bg-[#14131C] text-white" role="region" aria-label="Animation: how an e-invoice travels">
+    <div ref={ref} className="overflow-hidden rounded-[28px] bg-[#0B1533] text-white" role="region" aria-label="Animation: how an e-invoice travels">
       <div className="relative h-[300px] px-4 sm:px-8">
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(179,166,255,0.14),transparent_60%)]" />
         {/* track */}
@@ -143,7 +143,7 @@ function EInvoiceFilm() {
         ))}
         {/* authority, reported in the last scene */}
         <div className="absolute left-1/2 top-[226px] -translate-x-1/2 text-center">
-          <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl transition-colors duration-500 ${scene === 4 ? "bg-emerald-400 text-[#0C0B12]" : "bg-white/10 text-white/50"}`}><Landmark size={17} /></span>
+          <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl transition-colors duration-500 ${scene === 4 ? "bg-emerald-400 text-[#050B1F]" : "bg-white/10 text-white/50"}`}><Landmark size={17} /></span>
           <span className="mt-1 block text-[11px] text-white/60">Tax authority</span>
         </div>
         {scene === 4 && [36, 64].map((x, i) => (
@@ -157,7 +157,7 @@ function EInvoiceFilm() {
           </motion.div>
           <AnimatePresence>{scene === 3 && (
             <motion.span initial={{ scale: 1.6, opacity: 0, rotate: -12 }} animate={{ scale: 1, opacity: 1, rotate: -8 }} exit={{ opacity: 0 }}
-              className="absolute -right-3 -top-2 rounded-lg border-2 border-emerald-400 bg-[#0C0B12]/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Received</motion.span>
+              className="absolute -right-3 -top-2 rounded-lg border-2 border-emerald-400 bg-[#050B1F]/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Received</motion.span>
           )}</AnimatePresence>
         </motion.div>
       </div>

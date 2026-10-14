@@ -52,3 +52,34 @@ Pexels License: free for commercial use, no attribution required. Same rule: sto
 | px-dubai-dusk.jpg | Aleksandar Pasaric | https://www.pexels.com/photo/city-buildings-during-sunset-692102/ | 2000x1333 |
 | px-analyst-desk.jpg | Thirdman   | https://www.pexels.com/photo/a-woman-wearing-hijab-while-looking-on-her-laptop-7993560/ | 1333x2000 |
 | px-cafe-laptop.jpg | Tashkeel boutique agency | https://www.pexels.com/photo/cozy-cafe-workspace-with-coffee-and-laptop-39993615/ | 1500x2000 |
+
+## Pexels — Business Bay / DIFC set (fetched 2026-10-14 via Apify memo23/pexels-scraper)
+
+Pexels License. Location labels are used only where the photo shows the place (The Opus / Business Bay canal; Emirates Financial Towers, DIFC). Stock people never get names, titles or quotes.
+
+| File | Pexels id | Shows |
+|---|---|---|
+| bb-business-bay-dusk.jpg | 13398520 (Leon Macapagal) | Business Bay canal skyline at sunset |
+| bb-difc-towers-night.jpg | 4561006 (Denys Gromov) | Emirates Financial Towers, DIFC, at night |
+| bb-office-team.jpg | 31709062 (Misbaa eri) | open-plan office team |
+| bb-dubai-business-street.jpg | 31413041 (nana liu) | Dubai business street |
+| bb-office-window-call.jpg | 561458 | high-rise office, call by the window |
+| bb-office-lounge-skyline.jpg | 35074089 | office lounge with skyline view |
+
+## Pexels — industry mirror set (fetched 2026-10-14, Apify memo23/pexels-scraper)
+
+Pexels License. Stock people never get names, titles or quotes.
+
+| File | Pexels id |
+|---|---|
+| in-construction-dubai.jpg | 3367920 |
+| in-construction-engineers.jpg | 8961146 |
+| in-realestate-towers.jpg | 35027039 |
+| in-realestate-keys.jpg | 7415097 |
+| in-logistics-courier.jpg | 7362960 |
+| in-logistics-van.jpg | 6169177 |
+| in-wholesale-forklift.jpg | 17229385 |
+| in-wholesale-warehouse.jpg | 36696522 |
+| in-retail-boutique.jpg | 8201177 |
+| in-retail-counter.jpg | 3738387 |
+| in-ecommerce-packing.jpg | 5025635 |

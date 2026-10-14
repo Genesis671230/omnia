@@ -203,8 +203,8 @@ export function StorefrontPanel() {
                 ) : <div className="text-[12.5px] text-[#8A96AD]">Needs the session funnel (see left).</div>}
                 {funnelOk && funnelOk.sources.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-1.5 text-[11.5px]">
-                    {funnelOk.sources.map((s) => (
-                      <span key={s.source} className="rounded-full bg-[#F3F6FC] px-2.5 py-1 text-[#46546F]">
+                    {funnelOk.sources.map((s, i) => (
+                      <span key={i} className="rounded-full bg-[#F3F6FC] px-2.5 py-1 text-[#46546F]">
                         {s.source}: {n0(s.sessions)} → {n0(s.completed)} buy
                       </span>
                     ))}

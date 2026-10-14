@@ -13,7 +13,7 @@ const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2)
 function Person({ t, size }: { t: Testimonial; size: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="relative shrink-0 overflow-hidden rounded-2xl bg-[#F1EFEA]" style={{ width: size, height: size }}>
+      <span className="relative shrink-0 overflow-hidden rounded-2xl bg-[#EEF1F7]" style={{ width: size, height: size }}>
         {t.photo
           ? <Image src={`/ramza/testimonials/${t.photo}`} alt={t.name} fill sizes={`${size}px`} className="object-cover" />
           : <span className="flex h-full w-full items-center justify-center font-[family-name:var(--font-display)] text-[15px] font-semibold text-[#4F35E8]">{initials(t.name)}</span>}
@@ -50,7 +50,7 @@ export function TestimonialsSection() {
           {rest.length > 0 && (
             <div className="grid gap-5">
               {rest.slice(0, 3).map((t, i) => (
-                <Reveal key={t.name} delay={0.08 * (i + 1)} className="flex flex-col justify-between gap-6 rounded-[28px] bg-white p-6 text-[#14131C] ring-1 ring-[#E8E5DE]">
+                <Reveal key={t.name} delay={0.08 * (i + 1)} className="flex flex-col justify-between gap-6 rounded-[28px] bg-white p-6 text-[#14131C] ring-1 ring-[#E3E7F0]">
                   <blockquote className="text-[16px] leading-relaxed">“{t.quote}”</blockquote>
                   {t.outcome && <p className="text-[13px] font-medium text-[#4F35E8]">{t.outcome}</p>}
                   <Person t={t} size={44} />

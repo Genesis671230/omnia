@@ -45,7 +45,7 @@ function NightFeed() {
   }, [reduce, inView]);
   const shown = FEED.slice(Math.max(0, n - 5), n);
   return (
-    <div ref={ref} className="w-[min(340px,86vw)] rounded-[22px] bg-[#14131C]/88 p-4 text-white shadow-[0_30px_70px_-25px_rgba(12,11,18,0.7)] ring-1 ring-white/10 backdrop-blur-xl">
+    <div ref={ref} className="w-[min(340px,86vw)] rounded-[22px] bg-[#0B1533]/88 p-4 text-white shadow-[0_30px_70px_-25px_rgba(12,11,18,0.7)] ring-1 ring-white/10 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#B3A6FF]">
           <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]" /></span>
@@ -80,7 +80,7 @@ export function AiOfficeSection() {
     <section className={`${ct.sectionLight} pb-24 pt-24`}>
       <TrackView section="ai-office" className={`${ct.container} grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]`}>
         <Reveal className="relative pb-14 sm:pb-0 sm:pr-10">
-          <div className="relative aspect-[4/3.3] overflow-hidden rounded-[36px] bg-[#E8E5DE]">
+          <div className="relative aspect-[4/3.3] overflow-hidden rounded-[36px] bg-[#E3E7F0]">
             <Image src="/ramza/photos/px-charts-review.jpg" alt="Finance team going through the month’s figures" fill sizes="(min-width:1024px) 600px, 92vw" className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-tr from-[#14131C]/45 via-transparent to-transparent" />
           </div>
@@ -94,14 +94,14 @@ export function AiOfficeSection() {
           <span className={ct.eyebrow}>Infrastructure, not another firm</span>
           <h2 className={`${ct.h2} mt-4`}>No second accounting firm. RAMZA runs underneath yours.</h2>
           <p className={`${ct.lead} mt-4`}>RAMZA becomes your finance infrastructure: the engine books every line around the clock, an accountant signs off each morning, and returns are filed through our licensed partner, {FILING_PARTNER}.</p>
-          <div className="mt-7 overflow-hidden rounded-3xl bg-white ring-1 ring-[#E8E5DE]">
-            <div className="grid grid-cols-[1fr_1fr_1fr] bg-[#FAF9F6] px-4 py-2.5 text-[11.5px] font-medium uppercase tracking-[0.1em] text-[#8E8B95]">
+          <div className="mt-7 overflow-hidden rounded-3xl bg-white ring-1 ring-[#E3E7F0]">
+            <div className="grid grid-cols-[1fr_1fr_1fr] bg-[#FFFFFF] px-4 py-2.5 text-[11.5px] font-medium uppercase tracking-[0.1em] text-[#8E8B95]">
               <span />
               <span>Traditional</span>
               <span className="text-[#4F35E8]">RAMZA</span>
             </div>
             {rows.map(([k, a, b]) => (
-              <div key={k} className="grid grid-cols-[1fr_1fr_1fr] items-start gap-2 border-t border-[#F1EFEA] px-4 py-3 text-[13.5px]">
+              <div key={k} className="grid grid-cols-[1fr_1fr_1fr] items-start gap-2 border-t border-[#EEF1F7] px-4 py-3 text-[13.5px]">
                 <span className="font-medium text-[#14131C]">{k}</span>
                 <span className="flex gap-1.5 text-[#6E6B75]"><X size={14} className="mt-0.5 shrink-0 text-[#C2334D]" />{a}</span>
                 <span className="flex gap-1.5 text-[#14131C]"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />{b}</span>

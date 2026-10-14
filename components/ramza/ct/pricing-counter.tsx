@@ -79,7 +79,7 @@ export function PricingCounter() {
                   const on = gateways.includes(g);
                   return (
                     <button key={g} type="button" onClick={() => setGateways((cur) => (on ? cur.filter((x) => x !== g) : [...cur, g]))}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] transition ${on ? "bg-[#14131C] text-white shadow-[0_8px_20px_-10px_rgba(79,53,232,0.8)]" : "bg-[#F1EFEA] text-[#55525E] hover:bg-[#E8E5DE]"}`}>
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] transition ${on ? "bg-[#0B1533] text-white shadow-[0_8px_20px_-10px_rgba(79,53,232,0.8)]" : "bg-[#EEF1F7] text-[#55525E] hover:bg-[#E3E7F0]"}`}>
                       {on && <Check size={13} />}{g}
                     </button>
                   );

@@ -26,6 +26,7 @@ const STATUS_TONE: Record<string, string> = {
 const NEED: Record<string, string> = {
   einvoicing: "E-invoicing setup", file_return: "CT return", missed_deadline: "Missed CT deadline", books_behind: "Books behind",
   got_penalty: "Got a penalty", register_or_file: "Register / file", vat: "VAT", other: "Other",
+  pkg_complete: "Complete Clean Close", pkg_einvoicing: "E-invoicing Ready", pkg_books: "Books & accounting", pkg_ct: "Corporate Tax pkg",
 };
 
 const waLink = (n: string, name: string) => {

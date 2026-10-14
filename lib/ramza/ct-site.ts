@@ -2,8 +2,10 @@
    footer and sitemap never disagree. */
 
 export const CT_NAV = [
+  { href: "/ramza#e-invoicing", label: "E-invoicing" },
   { href: "/ramza#how", label: "How it works" },
-  { href: "/ramza#case", label: "Case study" },
+  { href: "/ramza/reconcile", label: "Reconcile tool" },
+  { href: "/ramza#tools", label: "Free tools" },
   { href: "/ramza/services", label: "Services" },
   { href: "/ramza/penalty-checker", label: "Penalty checker" },
   { href: "/ramza/corporate-tax-penalties", label: "Penalties" },

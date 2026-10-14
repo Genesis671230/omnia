@@ -54,7 +54,7 @@ function Flywheel() {
         return (
           <motion.div key={s.t} className="absolute w-[124px] -translate-x-1/2 -translate-y-1/2 sm:w-[170px]" style={{ left: `${left}%`, top: `${top}%` }}
             initial={{ opacity: 0, scale: 0.85 }} animate={inView ? { opacity: 1, scale: 1 } : undefined} transition={{ delay: 0.4 + i * 0.25, type: "spring", stiffness: 260, damping: 20 }}>
-            <div className="rounded-2xl bg-white px-3 py-2.5 text-center shadow-[0_14px_34px_-20px_rgba(20,19,28,0.55)] ring-1 ring-[#E8E5DE]">
+            <div className="rounded-2xl bg-white px-3 py-2.5 text-center shadow-[0_14px_34px_-20px_rgba(20,19,28,0.55)] ring-1 ring-[#E3E7F0]">
               <div className="mt-1 text-[13px] font-medium leading-tight text-[#14131C]">{s.t}</div>
               <div className="mt-0.5 text-[11px] leading-snug text-[#8E8B95]">{s.d}</div>
             </div>
@@ -71,16 +71,16 @@ function BoardPack() {
     ? [["Revenue", "1.54M", "+35%"], ["Net profit", "326k", "+73%"], ["Margin", "21%", "+5 pts"]]
     : [["Revenue", "468k", "+16%"], ["Net profit", "109k", "+24%"], ["Margin", "23%", "+1 pt"]];
   return (
-    <div className="rounded-[28px] bg-white p-6 shadow-[0_30px_70px_-40px_rgba(20,19,28,0.5)] ring-1 ring-[#E8E5DE]">
+    <div className="rounded-[28px] bg-white p-6 shadow-[0_30px_70px_-40px_rgba(20,19,28,0.5)] ring-1 ring-[#E3E7F0]">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-[#8E8B95]">Board pack</div>
           <div className="mt-1 text-[17px] font-medium text-[#14131C]">Your company, as investors see it</div>
         </div>
-        <div className="flex rounded-full bg-[#F1EFEA] p-0.5 text-[12px]">
+        <div className="flex rounded-full bg-[#EEF1F7] p-0.5 text-[12px]">
           {(["quarterly", "yearly"] as const).map((p) => (
             <button key={p} onClick={() => setPeriod(p)} className={`relative rounded-full px-3 py-1 capitalize ${period === p ? "text-white" : "text-[#55525E]"}`}>
-              {period === p && <motion.span layoutId="board-toggle" className="absolute inset-0 rounded-full bg-[#14131C]" />}
+              {period === p && <motion.span layoutId="board-toggle" className="absolute inset-0 rounded-full bg-[#0B1533]" />}
               <span className="relative">{p}</span>
             </button>
           ))}
@@ -88,7 +88,7 @@ function BoardPack() {
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2">
         {kpis.map(([l, v, d]) => (
-          <div key={l} className="rounded-2xl bg-[#FAF9F6] px-3 py-3">
+          <div key={l} className="rounded-2xl bg-[#FFFFFF] px-3 py-3">
             <div className="text-[11.5px] text-[#8E8B95]">{l}</div>
             <div className="text-[20px] font-medium tabular-nums text-[#14131C]">{v}</div>
             <div className="flex items-center gap-1 text-[11.5px] text-emerald-600"><TrendingUp size={12} />{d}</div>
@@ -97,7 +97,7 @@ function BoardPack() {
       </div>
       <div className="mt-5"><ProfitBars key={period} period={period} /></div>
       <div className="mt-3 flex items-center justify-between text-[11.5px] text-[#8E8B95]">
-        <span className="flex items-center gap-3"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#E8E5DE]" />Revenue</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#14131C]" />Net profit</span></span>
+        <span className="flex items-center gap-3"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#E3E7F0]" />Revenue</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#0B1533]" />Net profit</span></span>
         <span>Illustrative figures</span>
       </div>
     </div>

@@ -21,7 +21,7 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const P = "/ramza/photos";
 
 function Sample() {
-  return <span className="rounded-md bg-[#F1EFEA] px-1.5 py-0.5 text-[10px] font-medium text-[#6E6B75]">Sample</span>;
+  return <span className="rounded-md bg-[#EEF1F7] px-1.5 py-0.5 text-[10px] font-medium text-[#6E6B75]">Sample</span>;
 }
 
 function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -71,7 +71,7 @@ const CHAPTERS = [
       <Card>
         <div className="flex items-center justify-between"><GatewayMark g={tabby} h={24} /><Sample /></div>
         <div className="mt-3 space-y-1.5"><Row k="Orders in payout" v="42" /><Row k="Gross" v="AED 19,860.00" /><Row k="Fees + VAT" v="−AED 1,618.50" tone="neg" /></div>
-        <div className="mt-2 flex justify-between border-t border-dashed border-[#E8E5DE] pt-2 text-[12.5px]"><span className="font-medium">Net to bank</span><span className="font-semibold tabular-nums">AED 18,241.50</span></div>
+        <div className="mt-2 flex justify-between border-t border-dashed border-[#E3E7F0] pt-2 text-[12.5px]"><span className="font-medium">Net to bank</span><span className="font-semibold tabular-nums">AED 18,241.50</span></div>
       </Card>
     ),
   },
@@ -111,7 +111,7 @@ const CHAPTERS = [
             <li key={a} className="flex justify-between"><span className="text-[#6E6B75]">{a}</span><span className="font-medium tabular-nums">{b}</span></li>
           ))}
         </ul>
-        <div className="mt-3 flex items-center justify-between border-t border-[#E8E5DE] pt-2 text-[12px]"><span className="text-[#6E6B75]">Reviewed by accountant</span><span className="font-semibold text-[#0E8A5F]">Booked ✓</span></div>
+        <div className="mt-3 flex items-center justify-between border-t border-[#E3E7F0] pt-2 text-[12px]"><span className="text-[#6E6B75]">Reviewed by accountant</span><span className="font-semibold text-[#0E8A5F]">Booked ✓</span></div>
       </Card>
     ),
   },
@@ -125,7 +125,7 @@ function Chapter({ c, i, onActive }: { c: (typeof CHAPTERS)[number]; i: number; 
     <div ref={ref} className="py-10 lg:flex lg:min-h-[78vh] lg:items-center lg:py-0">
       <div>
         {/* phones: the photo + card inline */}
-        <div className="relative mb-7 aspect-[4/3] overflow-hidden rounded-[28px] bg-[#E8E5DE] lg:hidden">
+        <div className="relative mb-7 aspect-[4/3] overflow-hidden rounded-[28px] bg-[#E3E7F0] lg:hidden">
           <Image src={`${P}/${c.img}`} alt={c.alt} fill sizes="92vw" className="object-cover" style={{ objectPosition: c.pos }} />
           <div className="absolute bottom-3 left-3 origin-bottom-left scale-[0.78]">{c.card}</div>
         </div>
@@ -161,7 +161,7 @@ export function StorySection() {
           {/* desktop: sticky photo that follows the chapter in view */}
           <div className="relative hidden lg:block">
             <div className="sticky top-24 h-[calc(100vh-8rem)] max-h-[720px]">
-              <div className="relative h-full overflow-hidden rounded-[36px] bg-[#E8E5DE]">
+              <div className="relative h-full overflow-hidden rounded-[36px] bg-[#E3E7F0]">
                 <AnimatePresence initial={false}>
                   <motion.div key={c.img} className="absolute inset-0"
                     initial={{ opacity: 0, scale: reduce ? 1 : 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}

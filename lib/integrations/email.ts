@@ -7,7 +7,7 @@ export function emailConfigured(): boolean {
   return Boolean(process.env.SENDGRID_API_KEY && process.env.FROM_EMAIL);
 }
 
-export async function sendEmail(input: { to: string; subject: string; html: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendEmail(input: { to: string; subject: string; html: string; fromName?: string; replyTo?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!emailConfigured()) return { ok: false, error: "Email is not configured (SENDGRID_API_KEY / FROM_EMAIL)" };
   if (!input.to) return { ok: false, error: "No recipient email on this order" };
 
@@ -20,7 +20,8 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: input.to }] }],
-        from: { email: process.env.FROM_EMAIL, name: "Omnia Stores" },
+        from: { email: process.env.FROM_EMAIL, name: input.fromName ?? "Omnia Stores" },
+        ...(input.replyTo ? { reply_to: { email: input.replyTo } } : {}),
         subject: input.subject,
         content: [{ type: "text/html", value: input.html }],
       }),

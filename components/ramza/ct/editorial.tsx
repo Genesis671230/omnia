@@ -42,7 +42,7 @@ export function DeadlineTimeline() {
     { key: "rescue", date: `to ${longDay(rules.campaign.rescue_mode_until)}`, title: "Late-filer rescue", body: `Every month or part month late adds ${aedFmt(CT.lateFilingFirst12Aed)}. Filing now stops it growing.`, active: mode === "rescue" },
   ];
   return (
-    <section className="relative overflow-x-clip bg-[#FAF9F6] pb-20 pt-6 text-white">
+    <section className="relative overflow-x-clip bg-[#FFFFFF] pb-20 pt-6 text-white">
       <TrackView section="timeline" className={ct.container}>
         <Reveal className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#14131C] via-[#1C1D21] to-[#1D1B26] px-6 py-8 sm:px-10 sm:py-10">
           <SlideMeta topic="Corporate Tax calendar" index="02" dark />
@@ -53,7 +53,7 @@ export function DeadlineTimeline() {
                 <span
                   className={`inline-flex items-center rounded-[22px] px-5 py-3 text-[26px] font-medium tracking-[-0.02em] sm:text-[30px] ${
                     s.active
-                      ? "bg-[#14131C] text-white shadow-[0_24px_50px_-20px_rgba(12,11,18,0.8)] ring-2 ring-white/40"
+                      ? "bg-[#0B1533] text-white shadow-[0_24px_50px_-20px_rgba(12,11,18,0.8)] ring-2 ring-white/40"
                       : "bg-white/15 text-white/90 ring-1 ring-white/25 backdrop-blur"
                   }`}
                 >
@@ -94,7 +94,7 @@ export function StakesSection() {
               <Reveal key={c.label} delay={i * 0.08}>
                 <article
                   className={`flex h-full min-h-[300px] flex-col justify-between rounded-[28px] p-7 ${
-                    hero ? "bg-[#14131C] text-white" : "bg-white text-[#14131C] ring-1 ring-[#E8E5DE]"
+                    hero ? "bg-[#0B1533] text-white" : "bg-white text-[#14131C] ring-1 ring-[#E3E7F0]"
                   }`}
                 >
                   

@@ -780,6 +780,35 @@ alter table leads add column if not exists checker           jsonb;
 alter table leads add column if not exists notes             text not null default '';
 alter table leads add column if not exists contacted_at      timestamptz;
 
+-- RAMZA instant demo (/ramza hero): the industry picked, the visitor's demo
+-- result (numbers only — files never leave the browser), and the anonymous id
+-- that ties the lead to its funnel events in ramza_events.
+alter table leads add column if not exists industry          text not null default '';
+alter table leads add column if not exists demo              jsonb;
+alter table leads add column if not exists anon_id           text not null default '';
+alter table leads add column if not exists report_sent_at    timestamptz;
+
+-- First-party funnel events from the RAMZA pages (works with no ad pixel).
+-- One row per event; anon_id = first-party cookie, session_id = this visit.
+create table if not exists ramza_events (
+  id           bigserial primary key,
+  anon_id      text not null,
+  session_id   text not null default '',
+  name         text not null,
+  props        jsonb not null default '{}',
+  path         text not null default '',
+  utm_source   text not null default '',
+  utm_medium   text not null default '',
+  utm_campaign text not null default '',
+  utm_content  text not null default '',
+  referrer     text not null default '',
+  lead_id      uuid,
+  created_at   timestamptz not null default now()
+);
+create index if not exists ramza_events_anon_idx on ramza_events (anon_id, created_at);
+create index if not exists ramza_events_name_idx on ramza_events (name, created_at);
+create index if not exists ramza_events_created_idx on ramza_events (created_at);
+
 
 -- A payout file uploaded from a specific bank credit's panel is pinned to that
 -- credit: it always shows there (as Variance if the totals disagree) instead
