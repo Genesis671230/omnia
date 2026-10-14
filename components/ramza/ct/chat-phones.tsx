@@ -136,13 +136,13 @@ function WaBubble({ m }: { m: WaMsg }) {
           <div className="border-b border-[#E9EDEF] pb-1.5 text-[12.5px] font-semibold">{m.card.title}</div>
           <ul className="mt-1 space-y-[3px]">
             {m.card.rows.map(([k, v, s]) => (
-              <li key={k} className="flex items-center justify-between text-[12px]">
+              <li key={k} className="flex items-center justify-between text-[12px] mr-4" >
                 <span className="text-[#54656F]">{k}</span>
-                <span className={`font-semibold tabular-nums ${s === "ok" ? "text-[#008069]" : s === "warn" ? "text-[#C77700]" : ""}`}>{v}</span>
+                <span className={`font-semibold tabular-nums  ${s === "ok" ? "text-[#008069]" : s === "warn" ? "text-[#C77700]" : ""}`}>{v}</span>
               </li>
             ))}
           </ul>
-          <div className="h-3">{meta}</div>
+          <div className="h-3 mr-[8px]">{meta}</div>
         </div>
       )}
     </div>

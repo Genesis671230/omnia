@@ -994,16 +994,37 @@ export function withShopifyStore(p: ParsedPayout, store: string): ParsedPayout {
 // hint only matters when detection is ambiguous (generic CSVs).
 /** parsePayoutFile, plus PDF: an OnTrack Client Payment Voucher (the only
  *  payout PDF we receive). PDF text extraction is async, hence the wrapper. */
+// export async function parsePayoutFileAsync(
+//   buf: Buffer | ArrayBuffer,
+//   filename: string,
+//   hint?: Gateway,
+// ): Promise<ParsedPayout[]> {
+//   const buffer = buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
+//   if (/\.pdf$/i.test(filename) || buffer.subarray(0, 5).toString("latin1") === "%PDF-") {
+//     const { parseOnTrackVoucherPdf } = await import("./ontrack-voucher");
+//     return [await parseOnTrackVoucherPdf(buffer, filename)];
+//   }
+//   return parsePayoutFile(buffer, filename, hint);
+// }
 export async function parsePayoutFileAsync(
   buf: Buffer | ArrayBuffer,
   filename: string,
   hint?: Gateway,
 ): Promise<ParsedPayout[]> {
-  const buffer = buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
-  if (/\.pdf$/i.test(filename) || buffer.subarray(0, 5).toString("latin1") === "%PDF-") {
-    const { parseOnTrackVoucherPdf } = await import("./ontrack-voucher");
+  const buffer =
+    buf instanceof ArrayBuffer ? Buffer.from(buf) : buf;
+
+  const isPdf =
+    /\.pdf$/i.test(filename) ||
+    buffer.subarray(0, 5).toString("latin1") === "%PDF-";
+
+  if (isPdf) {
+    const { parseOnTrackVoucherPdf } =
+      await import("./ontrack-voucher");
+
     return [await parseOnTrackVoucherPdf(buffer, filename)];
   }
+
   return parsePayoutFile(buffer, filename, hint);
 }
 

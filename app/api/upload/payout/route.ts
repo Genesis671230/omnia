@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-
+  console.log("buf", buf);
   let payouts: ParsedPayout[];
   try {
     payouts = await parsePayoutFileAsync(buf, file.name, provider);
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     // numbers in it do. Optional `store` form field overrides.
     payouts = await assignShopifyStores(payouts, String(form.get("store") || "").toUpperCase() || null);
   } catch (e) {
+    console.error("parsePayoutFileAsync error", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 422 });
   }
 

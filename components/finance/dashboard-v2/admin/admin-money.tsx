@@ -248,7 +248,7 @@ export function AdminMoney() {
               <SalesCurve days={view.days} />
             </section>
             <section className="adm-card">
-              <header><h2>Where the money is</h2><span>share of gross sales</span></header>
+              <header><h2>Summary</h2></header>
               <MoneyDonut t={t} />
             </section>
           </div>

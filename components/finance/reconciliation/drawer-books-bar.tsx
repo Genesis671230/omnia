@@ -102,7 +102,7 @@ export function DrawerBooksBar({ line, onSwitched }: { line: ReconLine; onSwitch
             <span className="text-[12px] text-[#5E6B85]">
               {state.bookedOrders ? `${state.bookedOrders} booked order${state.bookedOrders === 1 ? "" : "s"} stay where booked · ` : ""}
               {state.ordersInOtherOrgs ? <b className="font-medium text-[#8A5A00]">{state.ordersInOtherOrgs} order{state.ordersInOtherOrgs === 1 ? "" : "s"} in another organisation · </b> : null}
-              change any order&apos;s books on its row
+              {/* change any order&apos;s books on its row */}
             </span>
           )}
           <span className="ml-auto text-[12px] text-[#5E6B85]">
