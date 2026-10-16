@@ -1,0 +1,9 @@
+Statements and payout files come in every format: PDF, CSV, Excel.
+
+RAMZA reads them as they are. Upload a bank statement and each credit waits for the payout file that explains it. Payout files sent to your Gmail are picked up on their own.
+
+Coming soon: RAMZA agents that ask your team or your client for the document that's missing, and Google Drive folders.
+
+ramza.ai
+
+#accounting #documents #automation #AI #ecommerce #UAE

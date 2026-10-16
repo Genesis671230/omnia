@@ -2,25 +2,25 @@
 
 /* Status is always color + icon + text — never color alone. */
 
-import { AlertOctagon, BookCheck, CheckCircle2, Clock, Flag, Scale } from "lucide-react";
+import { AlertOctagon, CheckCircle2, Clock, Scale } from "lucide-react";
 import { matchKind, type MatchKind } from "@/lib/reconciliation/match-status";
 import { aed2, type ReconLine } from "./types";
 
 export const MATCH_META: Record<MatchKind, { label: string; Icon: typeof Clock; cls: string; dot: string }> = {
-  matched: { label: "Matched", Icon: CheckCircle2, cls: "bg-[#EEF6EF] text-[#2F6B3B] ring-[#CFE5D3]", dot: "#2F6B3B" },
-  force: { label: "Force matched", Icon: Scale, cls: "bg-[#FDF4E4] text-[#8A5A12] ring-[#F0DDB8]", dot: "#B7791F" },
-  exception: { label: "Exception", Icon: AlertOctagon, cls: "bg-[#FBECE8] text-[#9B3A24] ring-[#F1CFC6]", dot: "#9B3A24" },
-  awaiting: { label: "Awaiting payout", Icon: Clock, cls: "bg-[#EAF2F6] text-[#2B5F74] ring-[#CFE1EA]", dot: "#2B5F74" },
+  matched: { label: "Matched", Icon: CheckCircle2, cls: "text-[#1F7A4D] ring-[#CFE6D8]", dot: "#1F9D5C" },
+  force: { label: "Matched with difference", Icon: Scale, cls: "text-[#8A5A12] ring-[#EBDDBF]", dot: "#C68A1E" },
+  exception: { label: "To check", Icon: AlertOctagon, cls: "text-[#B42318] ring-[#F2D3CF]", dot: "#D92D20" },
+  awaiting: { label: "Needs payout file", Icon: Clock, cls: "text-[#4A5263] ring-[#E3E7F0]", dot: "#9AA1B0" },
 };
 
 export function MatchStatusBadge({ line }: { line: ReconLine }) {
   const { kind, gap } = matchKind({ ...line, forceBook: line.forceBook ?? null });
   const m = MATCH_META[kind];
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-medium ring-1 ring-inset ${m.cls}`}>
-      <m.Icon size={12} aria-hidden />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[4px] bg-white px-2 py-0.5 text-[12px] font-medium ring-1 ring-inset ${m.cls}`}>
+      <i className="h-1.5 w-1.5 rounded-full" style={{ background: m.dot }} aria-hidden />
       {m.label}
-      {kind === "force" && Math.abs(gap) >= 0.01 && (
+      {(kind === "force" || kind === "exception") && Math.abs(gap) >= 0.01 && (
         <span className="font-mono tabular-nums opacity-80">· {gap > 0 ? "+" : "−"}{aed2(Math.abs(gap))}</span>
       )}
     </span>
@@ -32,13 +32,13 @@ export function RowTags({ line, posted }: { line: ReconLine; posted: boolean }) 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {line.reviewFlag && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#FDF4E4] px-1.5 py-0.5 text-[10.5px] font-medium text-[#8A5A12]" title={line.reviewNote || "Flagged for review"}>
-          <Flag size={10} aria-hidden /> Flagged
+        <span className="inline-flex items-center rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium text-[#8A5A12] ring-1 ring-inset ring-[#EBDDBF]" title={line.reviewNote || "Flagged for review"}>
+          Flagged
         </span>
       )}
       {posted && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF2FA] px-1.5 py-0.5 text-[10.5px] font-medium text-[#1E3A8A]">
-          <BookCheck size={10} aria-hidden /> In Zoho
+        <span className="inline-flex items-center rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium text-[#0B1533] ring-1 ring-inset ring-[#D9DEE8]">
+          In Zoho
         </span>
       )}
     </span>

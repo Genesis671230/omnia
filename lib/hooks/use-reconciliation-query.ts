@@ -11,7 +11,7 @@
    the same as before. */
 
 import { useCallback, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ReconPayload } from "@/components/finance/reconciliation/types";
 
@@ -25,9 +25,10 @@ async function fetchRecon(fromDate: string, toDate: string): Promise<ReconPayloa
   return r as ReconPayload;
 }
 
-export function useReconciliation(enabled: boolean) {
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+export function useReconciliation(enabled: boolean, initialRange?: [string, string]) {
+  // Month close opens on the current month: a quarter of the all-time payload.
+  const [fromDate, setFromDate] = useState(initialRange?.[0] ?? "");
+  const [toDate, setToDate] = useState(initialRange?.[1] ?? "");
   const queryClient = useQueryClient();
 
   const reconQuery = useQuery({
@@ -35,6 +36,10 @@ export function useReconciliation(enabled: boolean) {
     queryFn: () => fetchRecon(fromDate, toDate),
     enabled,
     refetchInterval: enabled ? 60_000 : false,
+    // Switching month keeps the old rows on screen instead of a skeleton flash,
+    // and a remount within 30s reuses the cache.
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 
   const refresh = useCallback(async () => {
@@ -77,6 +82,7 @@ export function useReconciliation(enabled: boolean) {
   return {
     recon: reconQuery.data ?? null,
     loading: reconQuery.isLoading,
+    fetching: reconQuery.isFetching,
     syncing: syncMutation.isPending,
     // dashVersion existed to force-remount version-keyed children on every
     // refresh (e.g. FounderDashboard) — React Query's own queryKey already

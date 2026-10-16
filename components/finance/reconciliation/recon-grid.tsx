@@ -10,13 +10,13 @@ import {
   flexRender, getCoreRowModel, getSortedRowModel, useReactTable,
   type ColumnDef, type SortingState,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Download, FilterX, Loader2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Download, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { gatewayColor } from "./colors";
+import { GatewayLogo } from "./gateway-logo";
 import { MatchStatusBadge, RowTags } from "./recon-status-badge";
 import { aed2, isDownloadableSource, type ReconLine, type ReconPayload, type UploadSlotFor } from "./types";
 
@@ -84,20 +84,20 @@ function RowActions({ r, refresh, uploadSlotFor }: { r: ReconLine; refresh: () =
         </a>
       )}
       {r.payout && !isDownloadableSource(r.payout.source) && (
-        <span title="Synced from the gateway API, no file" className="rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#5E6B85] ring-1 ring-inset ring-[#D8E1F1]">
+        <span title="Synced from the gateway API, no file" className="rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-[#6B7385] ring-1 ring-inset ring-[#E3E7F0]">
           API
         </span>
       )}
       <DeletePayoutButton line={r} refresh={refresh} />
-      <ChevronRight size={15} className="ml-0.5 text-[#C8D2E6]" aria-hidden />
+      <ChevronRight size={15} className="ml-0.5 text-[#C9CFDA]" aria-hidden />
     </div>
   );
 }
 
 function Gateway({ name }: { name: string }) {
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-[#0F1B3D]">
-      <i className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white" style={{ background: gatewayColor(name) }} aria-hidden />
+    <span className="inline-flex items-center gap-2.5 whitespace-nowrap font-medium text-[#14131C]">
+      <GatewayLogo name={name} size={20} />
       {name}
     </span>
   );
@@ -139,22 +139,24 @@ export function ReconGrid({
   const columns = useMemo<ColumnDef<ReconLine>[]>(() => [
     { id: "date", accessorFn: (r) => r.date ?? "", header: "Date",
       cell: ({ row }) => <span className="whitespace-nowrap tabular-nums text-[#0F1B3D]">{fmtDate(row.original.date)}</span> },
-    { id: "provider", accessorFn: (r) => r.provider, header: "Gateway", cell: ({ row }) => <Gateway name={row.original.provider} /> },
-    { id: "reference", accessorFn: (r) => r.reference, header: "Bank ref",
-      cell: ({ row }) => <span className="font-mono text-[12px] text-[#46546F]">{row.original.reference || row.original.id.slice(0, 10)}</span> },
-    { id: "bankAmount", accessorFn: (r) => r.bankAmount, header: "Bank credit", meta: { right: true },
+    { id: "provider", accessorFn: (r) => r.provider, header: "Gateway",
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <Gateway name={row.original.provider} />
+          <div className="mt-0.5 pl-[58px] font-mono text-[11px] text-[#9AA1B0]">{row.original.reference || row.original.id.slice(0, 10)}</div>
+        </div>
+      ) },
+    { id: "bankAmount", accessorFn: (r) => r.bankAmount, header: "In bank", meta: { right: true },
       cell: ({ row }) => <span className="font-mono font-medium tabular-nums text-[#0F1B3D]">{aed2(row.original.bankAmount)}</span> },
     { id: "payout", accessorFn: (r) => r.payout?.net ?? -Infinity, header: "Payout net", meta: { right: true },
       cell: ({ row }) => row.original.payout
         ? <span className="font-mono tabular-nums text-[#0F1B3D]">{aed2(row.original.payout.net)}</span>
         : row.original.provider !== "Unclassified"
-          ? <span onClick={(e) => e.stopPropagation()} title="No payout file for this bank credit yet — upload it to reconcile" className="inline-flex [&_button]:!h-7 [&_button]:!rounded-full [&_button]:!border-0 [&_button]:!bg-[#FFF1F2] [&_button]:!px-2.5 [&_button]:!text-[12px] [&_button]:!font-semibold [&_button]:!text-[#BE123C] [&_button]:!ring-1 [&_button]:!ring-inset [&_button]:!ring-[#FECDD3] [&_button:hover]:!bg-[#BE123C] [&_button:hover]:!text-white [&_svg]:!mr-1 [&_svg]:!h-3 [&_svg]:!w-3">{uploadSlotFor(row.original.provider, row.original.id)}</span>
+          ? <span onClick={(e) => e.stopPropagation()} title="No payout file for this bank credit yet — upload it to reconcile" className="inline-flex [&_button]:!h-7 [&_button]:!rounded-[6px] [&_button]:!border [&_button]:!border-[#D9DEE8] [&_button]:!bg-white [&_button]:!px-2.5 [&_button]:!text-[12px] [&_button]:!font-medium [&_button]:!text-[#14131C] [&_button:hover]:!border-[#0B1533] [&_svg]:!mr-1 [&_svg]:!h-3 [&_svg]:!w-3">{uploadSlotFor(row.original.provider, row.original.id)}</span>
           : <span className="text-[12px] text-[#5E6B85]">No file</span> },
-    { id: "variance", accessorFn: (r) => (r.payout ? Math.abs(r.variance) : -1), header: "Variance", meta: { right: true },
-      cell: ({ row }) => <Variance v={row.original.variance} hasPayout={!!row.original.payout} /> },
     { id: "orders", accessorFn: (r) => r.resolvedOrders.length + r.unresolvedRefs.length, header: "Orders", meta: { right: true },
       cell: ({ row }) => <Orders r={row.original} /> },
-    { id: "status", accessorFn: (r) => `${r.state}${r.reviewFlag ? "1" : "0"}`, header: "Match status",
+    { id: "status", accessorFn: (r) => `${r.state}${r.reviewFlag ? "1" : "0"}`, header: "Status",
       cell: ({ row }) => (
         <div className="flex flex-wrap items-center gap-1">
           <MatchStatusBadge line={row.original} />
@@ -169,28 +171,32 @@ export function ReconGrid({
     data: lines, columns, state: { sorting }, onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
   });
-  const rows = table.getRowModel().rows;
+  // Render a page at a time: 400 rows of badges and upload slots is what made
+  // the page feel slow, not the API.
+  const [limit, setLimit] = useState(60);
+  const allRows = table.getRowModel().rows;
+  const rows = allRows.slice(0, limit);
 
   const card = (children: React.ReactNode) => (
-    <section className="overflow-hidden rounded-[24px] border border-[#D8E1F1] bg-[var(--os-card)]">
+    <section className="rounded-[8px] border border-[#E3E7F0] bg-white">
       {toolbar}
-      {above && <div className="border-b border-[#D8E1F1] px-3 py-2.5 [&>div]:mb-0">{above}</div>}
+      {above && <div className="border-b border-[#EEF1F5] px-4 py-3 [&>div]:mb-0">{above}</div>}
       {children}
     </section>
   );
 
-  if (!loading && rows.length === 0) {
+  if (!loading && allRows.length === 0) {
     return card(
       <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-        <FilterX size={22} className="text-[#1D4ED8]" aria-hidden />
-        <p className="text-[14px] font-medium text-[#0F1B3D]">
+        
+        <p className="text-[14px] font-medium text-[#14131C]">
           {hasAnyData ? "No credits match these filters" : "No bank credits yet"}
         </p>
         <p className="max-w-md text-[12.5px] leading-relaxed text-[#5E6B85]">
           {hasAnyData ? filterSummary : "Upload a bank statement. Each credit then waits for the payout file that explains it."}
         </p>
         {hasAnyData && (
-          <button onClick={onClearFilters} className="mt-1 rounded-full bg-[#0F1B3D] px-4 py-1.5 text-[12.5px] font-medium text-[#F3F6FC] hover:bg-[#35302A]">
+          <button onClick={onClearFilters} className="mt-1 h-8 rounded-[6px] bg-[#0B1533] px-3 text-[12.5px] font-medium text-white hover:bg-[#1A2647]">
             Clear filters
           </button>
         )}
@@ -202,8 +208,8 @@ export function ReconGrid({
 
   return card(
     <>
-      {/* Desktop table: its own scroll box, so the drawer never loses your place */}
-      <div className="hidden overflow-auto md:block md:max-h-[calc(100vh-235px)] md:min-h-[460px]">
+      {/* Desktop table: the page is the only scroll; the header sticks to the top of the window */}
+      <div className="hidden md:block">
         <table className="w-full border-separate border-spacing-0 text-[13.5px]">
           <thead>
             {table.getHeaderGroups().map((hg) => (
@@ -216,12 +222,12 @@ export function ReconGrid({
                       key={h.id}
                       scope="col"
                       aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}
-                      className={`sticky top-0 z-10 border-b border-[#D8E1F1] bg-[#F3F6FC] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#5E6B85] backdrop-blur ${right(h.column) ? "text-right" : "text-left"}`}
+                      className={`sticky top-0 z-10 border-b border-[#E3E7F0] bg-[#F9FAFB] px-4 py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[#6B7385] ${right(h.column) ? "text-right" : "text-left"}`}
                     >
                       {can ? (
-                        <button onClick={h.column.getToggleSortingHandler()} className={`inline-flex items-center gap-1 hover:text-[#0F1B3D] ${right(h.column) ? "flex-row-reverse" : ""}`}>
+                        <button onClick={h.column.getToggleSortingHandler()} className={`inline-flex items-center gap-1 hover:text-[#14131C] ${right(h.column) ? "flex-row-reverse" : ""}`}>
                           {flexRender(h.column.columnDef.header, h.getContext())}
-                          {sorted === "asc" ? <ArrowUp size={11} className="text-[#1D4ED8]" /> : sorted === "desc" ? <ArrowDown size={11} className="text-[#1D4ED8]" /> : <ArrowUpDown size={11} className="text-[#C9D5EA]" />}
+                          {sorted === "asc" ? <ArrowUp size={11} className="text-[#0B1533]" /> : sorted === "desc" ? <ArrowDown size={11} className="text-[#0B1533]" /> : <ArrowUpDown size={11} className="text-[#C9CFDA]" />}
                         </button>
                       ) : flexRender(h.column.columnDef.header, h.getContext())}
                     </th>
@@ -235,7 +241,7 @@ export function ReconGrid({
               ? Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i}>
                     {columns.map((_, j) => (
-                      <td key={j} className="border-b border-[#EEF2FA] px-4 py-3.5">
+                      <td key={j} className="border-b border-[#EEF1F5] px-4 py-3.5">
                         <div className="h-3 animate-pulse rounded bg-[#E9EEF8]" style={{ width: `${45 + ((i * 7 + j * 13) % 45)}%` }} />
                       </td>
                     ))}
@@ -248,10 +254,10 @@ export function ReconGrid({
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(row.original.id); } }}
                     tabIndex={0}
                     aria-selected={openId === row.original.id}
-                    className={`group cursor-pointer outline-none transition-colors hover:bg-[#F3F6FC] focus-visible:bg-[#EAF1FD] ${openId === row.original.id ? "bg-[#EAF1FD]" : ""}`}
+                    className={`group cursor-pointer outline-none transition-colors hover:bg-[#F9FAFB] focus-visible:bg-[#F1F3F7] ${openId === row.original.id ? "bg-[#F1F3F7]" : ""}`}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className={`border-b border-[#EEF2FA] px-4 py-3.5 align-middle ${right(cell.column) ? "text-right" : "text-left"}`}>
+                      <td key={cell.id} className={`border-b border-[#EEF1F5] px-4 py-3 align-middle ${right(cell.column) ? "text-right" : "text-left"}`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -259,6 +265,13 @@ export function ReconGrid({
                 ))}
           </tbody>
         </table>
+        {!loading && allRows.length > rows.length && (
+          <div className="flex justify-center py-3">
+            <button onClick={() => setLimit((n) => n + 100)} className="h-8 rounded-[6px] border border-[#D9DEE8] bg-white px-3 text-[12.5px] font-medium text-[#14131C] hover:border-[#0B1533]">
+              Show {Math.min(100, allRows.length - rows.length)} more · {allRows.length - rows.length} hidden
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mobile cards */}

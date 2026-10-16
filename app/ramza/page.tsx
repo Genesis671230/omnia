@@ -4,6 +4,7 @@ import { FinalCta, HOME_FAQ, HomeFaq, PenaltyBand, PeopleSection, ServicesGrid, 
 import { EInvoicingHero } from "@/components/ramza/ct/einv-hero";
 import { EInvoicingSection } from "@/components/ramza/ct/einvoicing";
 import { TestimonialsSection } from "@/components/ramza/ct/testimonials";
+import { CaseStudySection } from "@/components/ramza/ct/case-study";
 import { PricingCounter } from "@/components/ramza/ct/pricing-counter";
 import { LogoMarquee } from "@/components/ramza/ct/partner-logos";
 import { IndustryProvider } from "@/components/ramza/demo/industry";
@@ -21,6 +22,7 @@ import { faqNode, organizationNode, websiteNode } from "@/lib/ramza/seo";
  *                     month end." Business Bay / DIFC photography, go-live
  *                     dates (rules.json), month-end countdown, live WhatsApp +
  *                     Telegram phones
+ *   1b CaseStudySection  Omnia's real September 2026 close (social proof)
  *   2 StartSection    the offer: free readiness check form (#start)
  *   3 EInvoicing      5-corner model + the two go-live tracks
  *   4 ProcessFilm / IndustryLive / LiveUpdates / ToolsHub
@@ -47,6 +49,7 @@ export default function RamzaHome() {
       <IndustryProvider>
         <EInvoicingHero whatsappHref={wa} />
         <div className="border-b border-[#E3E7F0] bg-white py-6"><LogoMarquee /></div>
+        <CaseStudySection />
         <StartSection focus="einvoicing" />
         <EInvoicingSection />
         <ProcessFilm />

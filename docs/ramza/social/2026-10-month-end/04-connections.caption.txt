@@ -1,0 +1,11 @@
+Connect once, and every source feeds the same month-end close.
+
+Stores: Shopify and WooCommerce. Gateways: Tabby, Tamara, Stripe, Telr, Checkout.com, Shopify Payments and COD couriers. Books: Zoho Books. Payout emails: Gmail.
+
+Google Drive folders are coming soon.
+
+RAMZA reads first and posts nothing to your books without a click.
+
+ramza.ai
+
+#integrations #Shopify #ZohoBooks #Tabby #Tamara #Stripe #ecommerce #UAE

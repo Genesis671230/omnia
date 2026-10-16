@@ -13,7 +13,7 @@
  * because a payout can straddle the boundary. */
 
 import { useCallback, useMemo, useState } from "react";
-import { BarChart3, BookOpen, Building2, Library, Download, Landmark, Loader2, RefreshCcw, Search, X } from "lucide-react";
+import { Download, Loader2, Search, X } from "lucide-react";
 import { matchesQuery } from "@/lib/reconciliation/filters";
 import { inStatus, type StatusFilter } from "@/lib/reconciliation/match-status";
 import { useZohoSettings } from "@/lib/hooks/use-zoho-settings";
@@ -21,7 +21,7 @@ import { InsightsTab } from "./insights-tab";
 import { LedgerTab } from "./ledger-tab";
 import { BankTransactionsTab } from "./bank-transactions-tab";
 import { UnmatchedPayouts } from "./unmatched-payouts";
-import { ReconKpis } from "./recon-kpis";
+import { MonthCloseHero } from "./month-close-hero";
 import { ReconGrid } from "./recon-grid";
 import { ReconDrawer } from "./recon-drawer";
 import { ReconToolbar, STATUS_TABS as STATUS } from "./recon-toolbar";
@@ -43,8 +43,12 @@ function ago(isoTime?: string) {
 }
 
 export function ReconView({
-  recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor,
+  recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor, statementUpload, headerActions,
 }: {
+  /** Bank statement upload control, shown in the close's step 1. */
+  statementUpload?: React.ReactNode;
+  /** Sync / account controls, shown at the right of the tab row. */
+  headerActions?: React.ReactNode;
   recon: ReconPayload | null;
   loading: boolean;
   isFounder: boolean;
@@ -87,9 +91,12 @@ export function ReconView({
     () => lines.filter((l) => inBooks(l) && (gateways.size === 0 || gateways.has(l.provider)) && matchesQuery(l, query)),
     [lines, gateways, query, inBooks],
   );
-  const asLine = (l: ReconLine) => ({ ...l, forceBook: l.forceBook ?? null });
-  const counts = useMemo(() => Object.fromEntries(STATUS.map((s) => [s.key, scoped.filter((l) => inStatus(asLine(l), s.key)).length])) as Record<StatusFilter, number>, [scoped]);
-  const visible = useMemo(() => scoped.filter((l) => inStatus(asLine(l), status)), [scoped, status]);
+  // Unclassified credits are owner transfers: no payout file will ever explain
+  // them, so they never count as "needs file" (they stay under All).
+  const inTab = (l: ReconLine, f: StatusFilter) =>
+    f === "awaiting" && l.provider === "Unclassified" ? false : inStatus({ ...l, forceBook: l.forceBook ?? null }, f);
+  const counts = useMemo(() => Object.fromEntries(STATUS.map((s) => [s.key, scoped.filter((l) => inTab(l, s.key)).length])) as Record<StatusFilter, number>, [scoped]);
+  const visible = useMemo(() => scoped.filter((l) => inTab(l, status)), [scoped, status]);
 
   const toggleGateway = (g: string) => setGateways((prev) => { const n = new Set(prev); if (n.has(g)) n.delete(g); else n.add(g); return n; });
   const clearFilters = () => { setQuery(""); setStatus("all"); setGateways(new Set()); onRange("", ""); };
@@ -128,57 +135,70 @@ export function ReconView({
   return (
     <div className="space-y-4">
       {/* 1 + 2: header row and KPI strip, sticky together on desktop */}
-      <div className="z-30 -mx-2 space-y-3 bg-[#F1F3F7]/85 px-2 pb-3 pt-1 backdrop-blur md:sticky md:top-0">
-        <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
-          <nav className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-inset ring-[#D8E1F1]" aria-label="Reconciliation sections">
-            {([["recon", "Reconciliation", RefreshCcw], ["transactions", "Bank Transactions", Landmark], ["insights", "Insights", BarChart3], ["ledger", "Zoho Ledger", BookOpen], ["books", "Zoho Books", Library]] as const).map(([k, label, Icon]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                aria-current={tab === k ? "page" : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${tab === k ? "bg-[#0F1B3D] text-[#F3F6FC]" : "text-[#46546F] hover:bg-[#F3F6FC] hover:text-[#0F1B3D]"}`}
-              >
-                <Icon size={13} aria-hidden /> {label}
-              </button>
-            ))}
-          </nav>
-          <label className="inline-flex items-center gap-2 rounded-full bg-white py-1 pl-3 pr-1 text-[12.5px] text-[#46546F] ring-1 ring-inset ring-[#D8E1F1]">
-            <Building2 size={13} className="text-[#1D4ED8]" aria-hidden /> Books
+      <div className="space-y-5">
+        {/* Page title row: what this is, which books, search and sync */}
+        <div className="flex flex-col gap-3 pt-6 lg:flex-row lg:items-end">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.015em]">Month close</h1>
+            <p className="mt-0.5 text-[13px] text-[#6B7385]">Every bank credit traced to its payout file and its orders.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
             <select
               value={books}
               onChange={(e) => setBooks(e.target.value)}
               aria-label="Zoho organisation"
-              className="h-8 rounded-full bg-[#EEF3FF] px-2.5 text-[12.5px] font-medium text-[#0F1B3D] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              className="h-9 rounded-[6px] border border-[#D9DEE8] bg-white px-2.5 text-[13px] text-[#14131C] focus:border-[#0B1533] focus:outline-none"
             >
               {tab !== "ledger" && tab !== "books" && <option value="all">All books</option>}
               {orgs.filter((o) => o.status !== "disabled").map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
-          </label>
-          {/* Search + export act on the payout rows; the Ledger tab has its own. */}
-          <div className={`flex items-center gap-2 ${tab === "ledger" || tab === "books" ? "hidden" : ""}`}>
-            <label className="relative flex-1 md:w-72 md:flex-none">
-              <Search size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5E6B85]" aria-hidden />
+            {/* Search + export act on the payout rows; the Ledger tab has its own. */}
+            <label className={`relative w-56 ${tab === "ledger" || tab === "books" ? "hidden" : ""}`}>
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8A93A5]" aria-hidden />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search ref, order, amount…"
+                placeholder="Search"
                 aria-label="Search credits"
-                className="h-10 w-full rounded-full border-0 bg-white pl-9 pr-8 text-[13px] text-[#0F1B3D] ring-1 ring-inset ring-[#D8E1F1] placeholder:text-[#97A3BA] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                className="h-9 w-full rounded-[6px] border border-[#D9DEE8] bg-white pl-8 pr-7 text-[13px] text-[#14131C] placeholder:text-[#9AA1B0] focus:border-[#0B1533] focus:outline-none"
               />
               {query && (
-                <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#5E6B85] hover:text-[#0F1B3D]"><X size={13} /></button>
+                <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-[#8A93A5] hover:text-[#14131C]"><X size={13} /></button>
               )}
             </label>
+            {headerActions}
             <button
               onClick={exportXlsx}
               disabled={exporting || lines.length === 0}
-              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#0F1B3D] px-4 text-[12.5px] font-medium text-white transition-colors hover:bg-[#1E3A8A] disabled:opacity-60"
+              className={`${tab === "recon" || tab === "ledger" || tab === "books" ? "hidden" : "inline-flex"} h-9 shrink-0 items-center gap-1.5 rounded-[6px] border border-[#D9DEE8] bg-white px-3 text-[13px] text-[#14131C] hover:border-[#0B1533] disabled:opacity-60`}
             >
               {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Export .xlsx
             </button>
           </div>
         </div>
-        {tab === "recon" && <ReconKpis lines={scoped} loading={loading} />}
+
+        {/* Section tabs: plain text, navy underline on the active one */}
+        <nav className="flex gap-6 overflow-x-auto border-b border-[#E3E7F0]" aria-label="Reconciliation sections">
+          {([["recon", "Close"], ["transactions", "Bank lines"], ["insights", "Insights"], ["ledger", "Zoho ledger"], ["books", "Zoho books"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              aria-current={tab === k ? "page" : undefined}
+              className={`-mb-px whitespace-nowrap border-b-2 pb-2.5 pt-1 text-[13.5px] transition-colors ${tab === k ? "border-[#0B1533] font-medium text-[#0B1533]" : "border-transparent text-[#6B7385] hover:text-[#14131C]"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {tab === "recon" && (
+          <MonthCloseHero
+            lines={scoped} loading={loading} fromDate={fromDate} toDate={toDate} onRange={onRange}
+            status={status} onStatus={setStatus}
+            statementMissing={!!recon?.documents?.range?.noStatementForRange}
+            actions={statementUpload} onExport={exportXlsx} exporting={exporting}
+          />
+        )}
       </div>
 
       {/* Bank Transactions keeps its own fetch and selection, so it stays mounted. */}

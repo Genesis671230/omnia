@@ -1,0 +1,11 @@
+Case study: how Omnia closes the month in RAMZA.
+
+Omnia sells across the UAE and KSA and gets paid through seven gateways. In September 2026 RAMZA checked AED 1.42m of sales money against the bank and traced 1,173 orders to the payout files that paid them, including 22 payouts in foreign currency matched at the bank's own rate.
+
+No spreadsheet is rebuilt at month end. Every credit opens to its payout and its orders, and differences stay listed until they're resolved.
+
+Omnia Stores is RAMZA's founding company and first user.
+
+ramza.ai
+
+#casestudy #ecommerce #UAE #KSA #monthend #reconciliation

@@ -47,7 +47,9 @@ import { SalesOrdersPanel } from "@/components/finance/sales-orders/sales-orders
 import { CommandCenter } from "@/components/finance/dashboard-v2/command/command-center";
 import { StorefrontPanel } from "@/components/finance/storefront/storefront-panel";
 import { CustomersPanel } from "@/components/finance/customers-panel";
+import { RamzaMark } from "@/components/ramza/ct/mark";
 import { ReconView } from "@/components/finance/reconciliation/recon-view";
+import { currentMonthRange } from "@/components/finance/reconciliation/month-close-hero";
 import { ZohoOrgsPanel } from "@/components/finance/zoho/zoho-orgs-panel";
 import { BRAND } from "@/lib/config/brand";
 import { ZohoSettingsPanel } from "@/components/finance/reconciliation/zoho-settings-panel";
@@ -66,6 +68,7 @@ export type FinanceView =
 
 type NavChild = { href: string; label: string; matchParams?: Record<string, string> };
 type NavItem = {
+  group: "Overview" | "Money" | "Operations" | "Setup";
   href: string;
   view: FinanceView;
   label: string;
@@ -74,17 +77,17 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/", view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/orders", view: "orders", label: "Orders", icon: PackageSearch },
+  { group: "Overview", href: "/", view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { group: "Overview", href: "/orders", view: "orders", label: "Orders", icon: PackageSearch },
   {
-    href: "/reconciliation", view: "reconciliation", label: "Reconciliation", icon: RefreshCcw,
+    group: "Overview", href: "/reconciliation", view: "reconciliation", label: "Month close", icon: RefreshCcw,
     children: [
-      { href: "/reconciliation", label: "Bank recon" },
+      { href: "/reconciliation", label: "Bank reconciliation" },
       { href: "/reconciliation?tab=invoices", label: "Invoices workbench", matchParams: { tab: "invoices" } },
     ],
   },
   {
-    href: "/payouts", view: "payouts", label: "Payouts", icon: WalletCards,
+    group: "Money", href: "/payouts", view: "payouts", label: "Payouts", icon: WalletCards,
     children: [
       { href: "/payouts?gateway=stripe",   label: "Stripe",   matchParams: { gateway: "stripe" } },
       { href: "/payouts?gateway=telr",     label: "Telr",     matchParams: { gateway: "telr" } },
@@ -94,16 +97,16 @@ const NAV: NavItem[] = [
       { href: "/payouts?gateway=cod",      label: "COD",      matchParams: { gateway: "cod" } },
     ],
   },
-  { href: "/documents", view: "documents", label: "Bank actuals", icon: FolderOpen },
-  { href: "/dispatch", view: "dispatch", label: "Dispatch", icon: Truck },
-  { href: "/sales-orders", view: "salesorders", label: "Sales orders", icon: PackageCheck },
-  { href: "/returns", view: "returns", label: "Returns", icon: RotateCcw },
-  { href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
-  { href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
-  { href: "/inventory", view: "inventory", label: "Inventory", icon: Boxes },
-  { href: "/customers", view: "customers", label: "Customers", icon: Users },
-  { href: "/leads", view: "leads", label: "Leads", icon: Inbox },
-  { href: "/settings", view: "settings", label: "Settings", icon: Settings },
+  { group: "Money", href: "/documents", view: "documents", label: "Bank actuals", icon: FolderOpen },
+  { group: "Operations", href: "/dispatch", view: "dispatch", label: "Dispatch", icon: Truck },
+  { group: "Operations", href: "/sales-orders", view: "salesorders", label: "Sales orders", icon: PackageCheck },
+  { group: "Money", href: "/returns", view: "returns", label: "Returns", icon: RotateCcw },
+  { group: "Operations", href: "/marketing", view: "marketing", label: "Marketing", icon: Megaphone },
+  { group: "Operations", href: "/storefronts", view: "storefronts", label: "Storefronts", icon: Store },
+  { group: "Operations", href: "/inventory", view: "inventory", label: "Inventory", icon: Boxes },
+  { group: "Operations", href: "/customers", view: "customers", label: "Customers", icon: Users },
+  { group: "Setup", href: "/leads", view: "leads", label: "Leads", icon: Inbox },
+  { group: "Setup", href: "/settings", view: "settings", label: "Settings", icon: Settings },
 ];
 
 const aed = (v: number) =>
@@ -113,15 +116,15 @@ const aed = (v: number) =>
 
 /** Which bank / card account the next statement upload belongs to.
  *  "" = let the statement's own header decide (account no., card mask). */
-function StatementAccountSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function StatementAccountSelect({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
   const [accounts, setAccounts] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     fetch("/api/statement-accounts").then((r) => r.json()).then((j) => setAccounts(j.accounts ?? [])).catch(() => {});
   }, []);
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Statement account"
-      className="h-9 max-w-[230px] rounded-full border border-[#D8E1F1] bg-white px-3 text-[12.5px] text-[#0F1B3D]">
-      <option value="">Auto-detect account</option>
+      className={className ?? "h-9 max-w-[230px] rounded-full border border-[#D8E1F1] bg-white px-3 text-[12.5px] text-[#0F1B3D]"}>
+      <option value="">Any account</option>
       {accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
     </select>
   );
@@ -215,15 +218,15 @@ function UploadButton({ endpoint, extraFields, accept, label, onDone, variant = 
   }
 
   return (
-    <span {...dropProps} className={`inline-flex rounded-full ${dragging ? "ring-2 ring-[#3B82F6] ring-offset-1" : ""}`}>
+    <span {...dropProps} className={`inline-flex rounded-[6px] ${dragging ? "ring-2 ring-[#0B1533] ring-offset-1" : ""}`}>
       <Button
         variant={variant}
         size="sm"
         disabled={busy}
         onClick={() => input.current?.click()}
         className={variant === "outline"
-          ? "h-9 rounded-full border-[#0F1B3D] bg-[#0F1B3D] px-3.5 text-[13px] text-white hover:bg-[#1E3A8A] hover:text-white"
-          : "h-9 rounded-full border-[#D8E1F1] hover:bg-[#EAF1FD] hover:text-[#0F1B3D]"
+          ? "h-8 rounded-[6px] border-[#D9DEE8] bg-white px-3 text-[12.5px] font-medium text-[#14131C] shadow-none hover:border-[#0B1533] hover:bg-white"
+          : "h-8 rounded-[6px] border-[#D9DEE8] text-[12.5px] hover:border-[#0B1533] hover:bg-white hover:text-[#14131C]"
         }
       >
         {busy ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Upload size={14} className="mr-1.5" />}
@@ -244,7 +247,7 @@ function useSidebarCollapsed() {
     try { setCollapsed(localStorage.getItem("omnia.sidebar.collapsed") === "1"); } catch { /* storage blocked */ }
   }, []);
   useEffect(() => {
-    document.documentElement.style.setProperty("--sb-w", collapsed ? "76px" : "240px");
+    document.documentElement.style.setProperty("--sb-w", collapsed ? "64px" : "232px");
     try { localStorage.setItem("omnia.sidebar.collapsed", collapsed ? "1" : "0"); } catch { /* storage blocked */ }
   }, [collapsed]);
   return [collapsed, setCollapsed] as const;
@@ -253,8 +256,10 @@ function useSidebarCollapsed() {
 function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
   pathname: string; searchParams: URLSearchParams; collapsed: boolean; onToggle: () => void;
 }) {
+  /* RAMZA light rail: white, hairline edge, grouped text nav. The active item
+   * is ink on a quiet fill with a thin navy rule; no coloured slabs, no icon
+   * wells (founder rule, see design_quality_bar). */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
   const paramString = searchParams.toString();
 
   const matchChild = (child: NavChild, itemHref: string) => {
@@ -265,122 +270,101 @@ function Sidebar({ pathname, searchParams, collapsed, onToggle }: {
     }
     return true;
   };
-
-  const isChildActive = (item: NavItem) =>
-    item.children?.some((c) => matchChild(c, item.href)) ?? false;
-
+  const isChildActive = (item: NavItem) => item.children?.some((c) => matchChild(c, item.href)) ?? false;
   const isOpen = (item: NavItem) => {
     if (collapsed || !item.children?.length) return false;
     if (item.href in expanded) return expanded[item.href];
     return pathname === item.href || pathname.startsWith(item.href + "/") || isChildActive(item);
   };
+  const groups = [...new Set(NAV.map((n) => n.group))];
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 76 : 240 }}
-      transition={{ type: "spring", stiffness: 380, damping: 38 }}
-      /* deep violet rail (founder's reference, 2026-10-13) */
-      className="fixed inset-y-0 left-0 z-30 flex flex-col bg-[linear-gradient(180deg,#3B1D72_0%,#2E1660_55%,#24114D_100%)] text-white"
+    <aside
+      style={{ width: collapsed ? 64 : 232 }}
+      className="fixed inset-y-0 left-0 z-30 flex flex-col border-r border-[#E3E7F0] bg-white text-[#14131C] transition-[width] duration-200"
     >
-      {/* Collapse toggle — a small round button sitting on the rail's edge */}
-      <button
-        onClick={onToggle}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute -right-3.5 top-7 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 shadow-[0_2px_8px_rgba(15,23,42,0.12)] ring-1 ring-slate-200 transition hover:bg-[#3B1D72] hover:text-white"
-      >
-        <ChevronRight size={14} className={`transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`} />
-      </button>
-
-      {/* Brand */}
-      <div className={`flex h-20 items-center ${collapsed ? "justify-center" : "gap-3 px-5"}`}>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#C77DFF,#7B5CFA)] text-[15px] font-semibold text-white">O</span>
+      <div className={`flex h-16 items-center border-b border-[#EEF1F5] ${collapsed ? "justify-center" : "justify-between pl-5 pr-3"}`}>
+        <div className="flex items-center gap-2.5">
+          <RamzaMark size={26} />
+          {!collapsed && (
+            <div className="leading-none">
+              <div className="text-[15px] font-semibold tracking-[0.12em]">RAMZA</div>
+              <div className="mt-1 text-[11px] text-[#7A8294]">{BRAND.name} workspace</div>
+            </div>
+          )}
+        </div>
         {!collapsed && (
-          <div className="leading-tight">
-            <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-white">{BRAND.name}</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Finance OS</div>
-          </div>
+          <button onClick={onToggle} aria-label="Collapse sidebar" title="Collapse sidebar" className="rounded-[6px] p-1.5 text-[#7A8294] hover:bg-[#F1F3F7] hover:text-[#14131C]">
+            <ChevronRight size={15} className="rotate-180" />
+          </button>
         )}
       </div>
+      {collapsed && (
+        <button onClick={onToggle} aria-label="Expand sidebar" title="Expand sidebar" className="mx-auto mt-2 rounded-[6px] p-1.5 text-[#7A8294] hover:bg-[#F1F3F7] hover:text-[#14131C]">
+          <ChevronRight size={15} />
+        </button>
+      )}
 
-      {/* Nav — overflow-x-hidden stops labels spilling while the rail animates */}
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-3 py-2" aria-label="Finance navigation">
-        {NAV.map((item) => {
-          const active = pathname === item.href && (!item.children || paramString === "");
-          const hasChildren = Boolean(item.children?.length);
-          const open = isOpen(item);
-          const childHot = isChildActive(item) || (collapsed && pathname === item.href);
-          const on = active || (collapsed && childHot);
-
-          return (
-            <div key={item.href} className="flex flex-col">
-              <div className="group relative flex items-center gap-0.5">
-                <Link
-                  href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={[
-                    "flex flex-1 items-center gap-3 rounded-full py-1.5 text-[13.5px] transition-colors",
-                    collapsed ? "justify-center px-0" : "pl-1.5 pr-3",
-                    on ? "bg-[#1D5BFF] text-white" : childHot ? "bg-white/[0.12] text-white" : "text-white/85 hover:bg-white/10 hover:text-white",
-                  ].join(" ")}
-                >
-                  {/* round icon well, like the reference's top nav */}
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${on ? "bg-white/15" : "bg-white/[0.06] ring-1 ring-white/10 group-hover:ring-white/25"}`}>
-                    <item.icon size={16} strokeWidth={1.8} />
-                  </span>
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                </Link>
-
-                {hasChildren && !collapsed && (
-                  <button
-                    onClick={() => setExpanded((prev) => ({ ...prev, [item.href]: !open }))}
-                    className="rounded-full p-1.5 text-white/45 transition-colors hover:bg-white/10 hover:text-white"
-                    aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
-                  >
-                    <ChevronRight size={13} className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
-                  </button>
-                )}
-              </div>
-
-              <AnimatePresence initial={false}>
-                {hasChildren && open && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="ml-[30px] flex flex-col gap-0.5 overflow-hidden border-l border-white/15 pl-3"
-                  >
-                    <div className="h-1" />
-                    {item.children!.map((child) => {
-                      const childActive = matchChild(child, item.href);
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={[
-                            "truncate rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
-                            childActive ? "bg-white/15 font-medium text-white" : "text-white/80 hover:text-white",
-                          ].join(" ")}
-                        >
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                    <div className="h-1" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
+      <nav className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-3 pb-4 pt-3" aria-label="Finance navigation">
+        {groups.map((g) => (
+          <div key={g} className="mb-3">
+            {!collapsed && <div className="px-2.5 pb-1.5 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#9AA1B0]">{g}</div>}
+            {NAV.filter((n) => n.group === g).map((item) => {
+              const active = pathname === item.href && (!item.children || paramString === "");
+              const hasChildren = Boolean(item.children?.length);
+              const open = isOpen(item);
+              const on = active || isChildActive(item) || (collapsed && pathname === item.href);
+              return (
+                <div key={item.href}>
+                  <div className="relative flex items-center">
+                    {on && <span aria-hidden className="absolute -left-3 top-1.5 bottom-1.5 w-[2px] bg-[#0B1533]" />}
+                    <Link
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      className={`flex h-8 flex-1 items-center gap-2.5 rounded-[6px] text-[13.5px] transition-colors ${collapsed ? "justify-center" : "px-2.5"} ${on ? "bg-[#F1F3F7] font-medium text-[#0B1533]" : "text-[#4A5263] hover:bg-[#F6F7F9] hover:text-[#14131C]"}`}
+                    >
+                      <item.icon size={15} strokeWidth={1.6} className={on ? "text-[#0B1533]" : "text-[#8A93A5]"} />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                    {hasChildren && !collapsed && (
+                      <button
+                        onClick={() => setExpanded((prev) => ({ ...prev, [item.href]: !open }))}
+                        className="ml-0.5 rounded-[6px] p-1 text-[#9AA1B0] hover:bg-[#F1F3F7] hover:text-[#14131C]"
+                        aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
+                      >
+                        <ChevronRight size={13} className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+                  {hasChildren && open && (
+                    <div className="mb-1 ml-[19px] mt-0.5 flex flex-col border-l border-[#E3E7F0] pl-2.5">
+                      {item.children!.map((child) => {
+                        const childActive = matchChild(child, item.href);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`truncate rounded-[6px] px-2.5 py-1 text-[12.5px] transition-colors ${childActive ? "font-medium text-[#0B1533]" : "text-[#6B7385] hover:text-[#14131C]"}`}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* Footer */}
-      <div className={`flex items-center gap-2.5 border-t border-white/10 py-4 ${collapsed ? "justify-center" : "px-5"}`}>
-        <ShieldCheck size={15} className="shrink-0 text-[#C77DFF]" />
-        {!collapsed && <span className="text-[11.5px] text-white/50">Bank-verified truth</span>}
-      </div>
-    </motion.aside>
+      {!collapsed && (
+        <div className="border-t border-[#EEF1F5] px-5 py-3.5 text-[11.5px] leading-snug text-[#7A8294]">
+          Every figure is checked against the bank statement.
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -441,8 +425,10 @@ function DocChip({ tone, children }: { tone: "bad" | "warn" | "ok"; children: Re
 /* ── Reconciliation tabbed view ─────────────────────────────────────────── */
 
 function ReconciliationTabs({
-  recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor,
+  recon, loading, isFounder, fromDate, toDate, onRange, onConfirm, refresh, uploadSlotFor, statementUpload, headerActions,
 }: {
+  statementUpload?: React.ReactNode;
+  headerActions?: React.ReactNode;
   recon: ReconPayload | null;
   loading: boolean;
   isFounder: boolean;
@@ -511,6 +497,8 @@ function ReconciliationTabs({
               onConfirm={onConfirm}
               refresh={refresh}
               uploadSlotFor={uploadSlotFor}
+              statementUpload={statementUpload}
+              headerActions={headerActions}
             />
           )}
         </TabsContent>
@@ -550,7 +538,7 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
   // data.
   const [statementAccount, setStatementAccount] = useState("");
   const { recon, loading, syncing, dashVersion, fromDate, toDate, onRange, refresh, sync, onConfirm } =
-    useReconciliation(showReconContext);
+    useReconciliation(showReconContext, view === "reconciliation" ? currentMonthRange() : undefined);
 
   const lines = recon?.lines ?? [];
   const settled = lines.filter((r) => r.state === "SETTLED");
@@ -581,10 +569,10 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
       : "Workspace";
 
   return (
-    <div className="min-h-screen bg-[var(--os-page)] text-slate-900 antialiased">
+    <div className="min-h-screen bg-[#F6F7F9] font-[family-name:var(--font-plex)] text-[#14131C] antialiased">
       <Sidebar pathname={pathname} searchParams={searchParams} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
 
-      <main className="min-h-screen transition-[margin] duration-300" style={{ marginLeft: sidebarCollapsed ? 76 : 240 }}>
+      <main className="min-h-screen transition-[margin] duration-300" style={{ marginLeft: sidebarCollapsed ? 64 : 232 }}>
         <div className="mx-auto max-w-[1440px] px-8 pt-0 pb-28">
 
           <header className="mb-2 flex items-center justify-between gap-6">
@@ -596,33 +584,6 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
                 {pageTitle}
               </h1> */}
             </div>
-            {view === "reconciliation" && !isInvoicesTab && (
-            <div className="flex flex-wrap absolute top-0 right-0 items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={syncing}
-                onClick={sync}
-                className="h-9 rounded-full border-[#D8E1F1] bg-white px-3.5 text-[13px] text-[#0F1B3D] hover:bg-[#0F1B3D] hover:text-white hover:border-[#0F1B3D]"
-              >
-                {syncing ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RefreshCcw size={14} className="mr-1.5" />}
-                Sync stores
-              </Button>
-
-              {view === "reconciliation" && !isInvoicesTab && (
-                <>
-                  <StatementAccountSelect value={statementAccount} onChange={setStatementAccount} />
-                  <UploadButton
-                    endpoint="/api/upload/bank"
-                    extraFields={statementAccount ? { account: statementAccount } : undefined}
-                    accept=".pdf,.csv,.txt,.xls,.xlsx"
-                    label="Upload statement"
-                    onDone={refresh}
-                  />
-                </>
-              )}
-            </div>
-            )}
           </header>
 
           {/* Date-range bar for context-sharing views (not on reconciliation — recon has its own) */}
@@ -788,6 +749,34 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
               onRange={onRange}
               onConfirm={onConfirm}
               refresh={refresh}
+              statementUpload={
+                <div className="flex items-center gap-1.5">
+                <UploadButton
+                  endpoint="/api/upload/bank"
+                  extraFields={statementAccount ? { account: statementAccount } : undefined}
+                  accept=".pdf,.csv,.txt,.xls,.xlsx"
+                  label="Upload"
+                  onDone={refresh}
+                />
+                <StatementAccountSelect value={statementAccount} onChange={setStatementAccount}
+                  className="h-8 max-w-[118px] cursor-pointer rounded-[6px] border border-[#D9DEE8] bg-white px-2 text-[12px] text-[#4A5263]" />
+                </div>
+              }
+              headerActions={
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={syncing}
+                    onClick={sync}
+                    title="Pull the latest orders from every store"
+                    className="h-9 rounded-[6px] border-[#D9DEE8] bg-white px-3 text-[13px] text-[#14131C] shadow-none hover:border-[#0B1533] hover:bg-white"
+                  >
+                    {syncing ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RefreshCcw size={14} className="mr-1.5" />}
+                    Sync
+                  </Button>
+                </>
+              }
               uploadSlotFor={(provider, bankLineId, variant) => (
                 <UploadButton
                   variant={variant === "dropzone" ? "dropzone" : "ghost"}
@@ -801,13 +790,6 @@ export function FinanceWorkspace({ view = "reconciliation" }: { view?: FinanceVi
             />
           )}
 
-          <footer className="mt-12 flex items-start gap-2.5 border-t border-[#EAE3D6] pt-6 text-[11.5px] leading-relaxed text-[#8A8175]">
-            <ShieldCheck size={13} className="mt-0.5 shrink-0 text-[#B08343]" />
-            <span>
-              Parsing and matching run server-side. This surface is for review and confirmation — the bank
-              line is truth, everything else must earn its place against it.
-            </span>
-          </footer>
         </div>
       </main>
 

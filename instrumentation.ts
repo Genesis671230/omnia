@@ -4,6 +4,9 @@
 // Telegram-listener and Gmail payout-ingest schedulers exactly once when the
 // Node server process comes up. Not invoked in the edge runtime or during build.
 export async function register() {
+  // OMNIA_DISABLE_SCHEDULERS=1 runs a second copy (local demo, screenshots)
+  // without fighting the live bots for Telegram getUpdates or re-running syncs.
+  if (process.env.OMNIA_DISABLE_SCHEDULERS === "1") return;
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startPayoutSyncScheduler } = await import("@/lib/scheduler/payout-sync-scheduler");
     startPayoutSyncScheduler();
