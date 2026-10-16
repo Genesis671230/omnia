@@ -1,0 +1,221 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<style>
+  .panel{position:absolute;top:0;bottom:0;left:0;width:860px;background:#0B1533;color:#fff;padding:120px 96px;display:flex;flex-direction:column;justify-content:center}
+  .h1{font-size:104px;line-height:1.0}
+  .h2{font-size:80px;line-height:1.04}
+  .sub{font-size:30px;line-height:1.45;color:#C3CADB;margin-top:34px}
+  .sq{width:46px;height:46px;border-radius:4px;background:#0B1533}
+  .win{position:absolute;left:160px;top:120px;width:1600px;height:1000px;border:1px solid #D9DEE8;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 30px 80px -40px rgba(11,21,51,.45)}
+  .cam{position:absolute;left:0;top:0;width:1600px;height:1000px;transform-origin:0 0}
+  .cam img{width:1600px;height:1000px;display:block}
+  .callout{position:absolute;background:#0B1533;color:#fff;border-radius:8px;padding:16px 22px;font-size:28px;font-weight:500;white-space:nowrap}
+  .callout b{font-family:'Urbanist';font-size:40px;font-weight:600;display:block;letter-spacing:-.02em}
+  .step{position:absolute;top:390px;width:500px;height:380px;padding:40px;display:flex;flex-direction:column}
+  .step .n{font-family:'Urbanist';font-size:30px;font-weight:600;color:#8A93A5}
+  .step .t{font-family:'Urbanist';font-size:42px;white-space:nowrap;font-weight:600;letter-spacing:-.02em;margin-top:18px;line-height:1.05}
+  .step .d{font-size:27px;color:#4A5263;margin-top:18px;line-height:1.4}
+  .step .f{margin-top:auto;padding-top:20px;border-top:1px solid #EEF1F5;font-size:24px;color:#1F7A4D;font-weight:500}
+</style></head>
+<body><div class="stage">
+
+<!-- S1: real photo, solid navy panel -->
+<section class="scene" id="s1">
+  <img class="photo" id="s1img" src="PHOTO/px-studio-packing.jpg" style="object-position:center 35%">
+  <div class="panel" id="s1panel">
+    <div class="eyebrow" id="s1e">For e-commerce brands · UAE &amp; KSA</div>
+    <div class="disp h1" id="s1h" style="margin-top:34px">
+      <span class="line"><span>Month end,</span></span><span class="line"><span>without the</span></span><span class="line"><span>spreadsheet.</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- S2: one bank credit, 44 orders inside -->
+<section class="scene white" id="s2">
+  <div style="position:absolute;left:150px;top:150px">
+    <div class="eyebrow">Omnia · 12 Oct 2026 · real bank line</div>
+    <div class="disp h2" id="s2h" style="margin-top:28px">
+      <span class="line"><span>One bank credit.</span></span><span class="line"><span>44 orders inside.</span></span>
+    </div>
+  </div>
+  <div class="card" id="s2card" style="position:absolute;left:150px;top:520px;width:640px;padding:40px">
+    <div style="display:flex;align-items:center;gap:18px"><img src="GW/tabby.png" style="height:56px;border-radius:8px"><div><div style="font-size:30px;font-weight:600">Tabby payout</div><div class="mono" style="font-size:22px;color:#8A93A5">FT26285LQZZ5</div></div></div>
+    <div class="hair" style="margin:30px 0"></div>
+    <div style="font-size:24px;color:#6B7385">Credited to the bank</div>
+    <div class="disp num" style="font-size:72px;margin-top:6px" id="s2amt">AED 0.00</div>
+    <div style="font-size:24px;color:#6B7385;margin-top:16px">Fees and VAT already taken out</div>
+  </div>
+  <div id="s2grid" style="position:absolute;left:960px;top:520px;width:820px;display:grid;grid-template-columns:repeat(11,46px);gap:18px 26px"></div>
+  <div id="s2lbl" style="position:absolute;left:960px;top:880px;font-size:28px;color:#4A5263">Each square is one order this credit paid.</div>
+</section>
+
+<!-- S3: rebuilt by hand -->
+<section class="scene" id="s3">
+  <img class="photo" id="s3img" src="PHOTO/px-accountant-files.jpg" style="object-position:center 40%">
+  <div class="panel" id="s3panel" style="left:auto;right:0">
+    <div class="disp h2" id="s3h">
+      <span class="line"><span>So every month</span></span><span class="line"><span>is rebuilt</span></span><span class="line"><span>by hand.</span></span>
+    </div>
+    <div class="sub" id="s3s">A bank PDF. A payout file per gateway. One spreadsheet that never quite foots.</div>
+  </div>
+</section>
+
+<!-- S4: RAMZA, the real screen -->
+<section class="scene night" id="s4a">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <svg class="mark" id="s4mark" viewBox="0 0 28 28" style="width:110px;height:110px"><rect width="28" height="28" rx="8" fill="#fff"/><rect id="b1" x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect id="b2" x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <div class="disp" id="s4h" style="font-size:84px;line-height:1.06;margin-top:50px">
+      <span class="line"><span>RAMZA traces every bank credit</span></span><span class="line"><span>to its payout and its orders.</span></span>
+    </div>
+  </div>
+</section>
+<section class="scene mist" id="s4">
+  <div class="win" id="win"><div class="cam" id="cam"><img src="SHOT/omnia-sep-full.png"></div></div>
+  <div class="callout" id="c1" style="left:120px;top:60px"><b>AED 1.42m</b>sales money in the bank, September</div>
+  <div class="callout" id="c2" style="left:120px;top:60px"><b>89% matched</b>to orders, by the bank's own figures</div>
+  <div class="callout" id="c3" style="left:120px;top:60px"><b>7 gateways</b>in one close</div>
+  <div class="callout" id="c4" style="left:120px;top:60px"><b>3 steps</b>left between you and a closed month</div>
+</section>
+
+<!-- S5: three steps -->
+<section class="scene white" id="s5">
+  <div style="position:absolute;left:150px;top:140px">
+    <div class="eyebrow">How a month closes in RAMZA</div>
+    <div class="disp h2" id="s5h" style="margin-top:26px"><span class="line"><span>Three steps. Then one close pack.</span></span></div>
+  </div>
+  <svg style="position:absolute;left:0;top:0" width="1920" height="1080"><path id="s5line" d="M400 580 H1700" stroke="#0B1533" stroke-width="3" fill="none"/></svg>
+  <div class="step card" id="st1" style="left:150px"><div class="n">01</div><div class="t">Bank statement in</div><div class="d">PDF, CSV or Excel, read as it is.</div><div class="f">145 credits read</div></div>
+  <div class="step card" id="st2" style="left:710px"><div class="n">02</div><div class="t">Payout files matched</div><div class="d">Each credit to its payout and its orders.</div><div class="f">137 payout files matched</div></div>
+  <div class="step card" id="st3" style="left:1270px"><div class="n">03</div><div class="t">Differences reviewed</div><div class="d">Only what doesn't foot is left to check.</div><div class="f" style="color:#B42318">23 to check</div></div>
+  <div id="s5pack" class="chip" style="position:absolute;left:150px;top:830px;font-size:28px;padding:18px 26px"><b style="font-weight:600">Close pack</b>&nbsp;· one workbook for your accountant</div>
+</section>
+
+<!-- S6: the offer -->
+<section class="scene night" id="s6">
+  <div style="position:absolute;left:150px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center">
+    <div class="eyebrow" id="s6e">The RAMZA promise</div>
+    <div class="disp" id="s6h" style="font-size:118px;line-height:1.02;margin-top:36px">
+      <span class="line"><span>You pay only when</span></span><span class="line"><span>RAMZA saves you</span></span><span class="line"><span id="s6key">time or money.</span></span>
+    </div>
+    <svg width="900" height="20" style="margin-top:10px"><path id="s6u" d="M4 10 H860" stroke="#B3A6FF" stroke-width="6" fill="none"/></svg>
+  </div>
+</section>
+
+<!-- S7: logos, then end card -->
+<section class="scene white" id="s7">
+  <div style="position:absolute;left:150px;top:140px">
+    <div class="eyebrow">Works with what you already use</div>
+    <div class="disp h2" id="s7h" style="margin-top:26px"><span class="line"><span>Connect once. Close every month.</span></span></div>
+  </div>
+  <div id="s7grid" style="position:absolute;left:150px;top:420px;width:1620px;display:grid;grid-template-columns:repeat(5,1fr);gap:28px"></div>
+</section>
+<section class="scene night" id="s8">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <svg viewBox="0 0 28 28" style="width:120px;height:120px" id="s8mark"><rect width="28" height="28" rx="8" fill="#fff"/><rect x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <div class="disp" id="s8h" style="font-size:96px;margin-top:44px;letter-spacing:.12em"><span class="line"><span>RAMZA</span></span></div>
+    <div id="s8s" style="font-size:34px;color:#C3CADB;margin-top:20px">Free readiness check · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E;
+const $ = (s) => document.querySelector(s);
+
+/* S1 0–5 */
+E.scene("#s1", 0, 5.6);
+E.kenBurns($("#s1img"), 0, 5.6, { from: 1.18, to: 1.04 });
+tl.fromTo("#s1panel", { xPercent: -100 }, { xPercent: 0, duration: 1.1, ease: "expo.out" }, 0.3); E.sfx("whoosh", 0.3);
+tl.fromTo("#s1e", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .6 }, 0.9);
+E.lines("#s1h", 1.0); E.sfx("pop", 1.1);
+
+/* S2 5–11.6 */
+E.wipe("#s2", 5.0);
+E.lines("#s2h", 5.6, { stagger: .14 }); E.sfx("pop", 5.7);
+tl.fromTo("#s2card", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: "expo.out" }, 6.0);
+E.count($("#s2amt"), 6.3, 47938.67, { dur: 1.6, fmt: (v) => "AED " + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+const grid = $("#s2grid");
+for (let i = 0; i < 44; i++) { const d = document.createElement("div"); d.className = "sq"; grid.appendChild(d); }
+tl.fromTo("#s2grid .sq", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: .35, ease: "back.out(2)", stagger: { each: 0.045, from: "start" } }, 7.4);
+for (let i = 0; i < 44; i += 4) E.sfx("blip", 7.4 + i * 0.045, { vol: 0.35 });
+tl.fromTo("#s2lbl", { opacity: 0 }, { opacity: 1, duration: .6 }, 9.6);
+E.scene("#s2", 5.0, 12.2);
+
+/* S3 11.6–16.4 */
+E.wipe("#s3", 11.6, 0.9, "right");
+E.kenBurns($("#s3img"), 11.6, 5.4, { from: 1.15, to: 1.02, x: -3 });
+tl.fromTo("#s3panel", { xPercent: 100 }, { xPercent: 0, duration: 1.0, ease: "expo.out" }, 11.9);
+E.lines("#s3h", 12.4);
+tl.fromTo("#s3s", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .7 }, 13.4);
+E.scene("#s3", 11.6, 17.1);
+
+/* S4a 16.4–19.2: brand line */
+E.wipe("#s4a", 16.4, 0.8, "up");
+tl.fromTo("#b1", { x: -14, opacity: 0 }, { x: 0, opacity: 1, duration: .7, ease: "expo.out" }, 16.9);
+tl.fromTo("#b2", { x: 14, opacity: 0 }, { x: 0, opacity: 1, duration: .7, ease: "expo.out" }, 17.05); E.sfx("chime", 17.0);
+E.lines("#s4h", 17.4, { stagger: .12 });
+E.scene("#s4a", 16.4, 20.0);
+
+/* S4 19.2–30: the real screen, camera moves */
+E.wipe("#s4", 19.2, 0.9, "up");
+tl.fromTo("#win", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 1.1, ease: "expo.out" }, 19.5);
+const cam = $("#cam");
+// camera keyframes: [time, scale, x, y] — x/y = top-left of the visible area in screen px
+const K = [[20.6, 1, 0, 0], [22.2, 2.1, -250, -150], [24.6, 2.1, -250, -150], [25.6, 2.2, -690, -215], [27.6, 2.2, -690, -215], [28.6, 2.3, -905, -150], [30.4, 2.3, -905, -150], [31.3, 1, 0, 0]];
+tl.set(cam, { scale: 1, x: 0, y: 0 }, 19.2);
+for (let i = 1; i < K.length; i++) {
+  const [t0] = K[i - 1]; const [t1, s, x, y] = K[i];
+  if (K[i - 1][1] === s && K[i - 1][2] === x) continue;
+  tl.to(cam, { scale: s, x: x * s, y: y * s, duration: t1 - t0, ease: "power3.inOut" }, t0);
+  E.sfx("swish", t0 + 0.1);
+}
+const call = (id, a, b, pos) => {
+  tl.set(id, pos, a);
+  tl.fromTo(id, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: .5, ease: "expo.out" }, a);
+  tl.to(id, { opacity: 0, y: -16, duration: .35 }, b);
+  E.sfx("pop", a + 0.05);
+};
+call("#c1", 22.4, 24.4, { left: 1180, top: 760 });
+call("#c2", 23.2, 24.4, { left: 1180, top: 900 });
+call("#c3", 25.8, 27.4, { left: 130, top: 800 });
+call("#c4", 28.8, 30.3, { left: 130, top: 800 });
+E.scene("#s4", 19.2, 32.0);
+
+/* S5 31.3–38.6 */
+E.wipe("#s5", 31.3);
+E.lines("#s5h", 31.9);
+E.draw($("#s5line"), 32.3, 1.6);
+["#st1", "#st2", "#st3"].forEach((s, i) => { tl.fromTo(s, { y: 70, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: "expo.out" }, 32.5 + i * 0.5); E.sfx("blip", 32.55 + i * 0.5, { vol: .8 }); });
+tl.fromTo("#s5pack", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: "expo.out" }, 34.8); E.sfx("chime", 34.9);
+E.scene("#s5", 31.3, 39.4);
+
+/* S6 38.6–45 */
+E.wipe("#s6", 38.6, 0.9, "up");
+tl.fromTo("#s6e", { opacity: 0 }, { opacity: 1, duration: .6 }, 39.2);
+E.lines("#s6h", 39.4, { stagger: .16, dur: 1.0 });
+E.draw($("#s6u"), 40.6, 0.9); E.sfx("rise", 40.3);
+E.scene("#s6", 38.6, 45.8);
+
+/* S7 45–50.4 */
+E.wipe("#s7", 45.0);
+E.lines("#s7h", 45.5);
+const L = [["GW/shopify.svg", "Shopify"], ["LG/woocommerce.svg", "WooCommerce"], ["LG/zoho-books.svg", "Zoho Books"], ["LG/gmail.svg", "Gmail"], ["LG/telegram.svg", "Telegram"], ["GW/tabby.png", "Tabby"], ["GW/tamara.png", "Tamara"], ["GW/stripe.png", "Stripe"], ["GW/telr.png", "Telr"], ["GW/checkout.svg", "Checkout.com"]];
+const g7 = $("#s7grid");
+L.forEach(([src, name]) => { const d = document.createElement("div"); d.innerHTML = `<div class="logo-tile"><img src="${src}" style="${name === "WooCommerce" ? "height:110px" : ""}"></div><div style="margin-top:12px;font-size:22px;color:#6B7385">${name}</div>`; g7.appendChild(d); });
+tl.fromTo("#s7grid > div", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: .6, ease: "expo.out", stagger: .07 }, 45.9);
+for (let i = 0; i < 10; i += 2) E.sfx("blip", 45.95 + i * .07, { vol: .4 });
+E.scene("#s7", 45.0, 51.2);
+
+/* S8 50.4–55 end card */
+E.wipe("#s8", 50.4, 0.9, "up");
+tl.fromTo("#s8mark", { scale: .7, opacity: 0 }, { scale: 1, opacity: 1, duration: .8, ease: "expo.out" }, 50.9); E.sfx("chime", 51.0);
+E.lines("#s8h", 51.2);
+tl.fromTo("#s8s", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .7 }, 51.8);
+E.scene("#s8", 50.4, null);
+tl.set({}, {}, 55);
+window.__DUR = 55;
+</script>
+</body></html>

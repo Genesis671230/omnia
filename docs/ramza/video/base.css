@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Urbanist:wght@500;600;700&display=block');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#050B1F}
+body{font-family:'IBM Plex Sans',sans-serif;color:#14131C;-webkit-font-smoothing:antialiased}
+.stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#050B1F}
+.scene{position:absolute;inset:0;overflow:hidden;visibility:hidden}
+.navy{background:#0B1533;color:#fff}
+.night{background:#050B1F;color:#fff}
+.white{background:#fff;color:#14131C}
+.mist{background:#F6F7F9;color:#14131C}
+.disp{font-family:'Urbanist',sans-serif;letter-spacing:-0.03em;font-weight:600}
+.eyebrow{font-size:24px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:#7A8294}
+.night .eyebrow,.navy .eyebrow{color:#9AA6C4}
+.line{display:block;overflow:hidden;padding-bottom:.08em}
+.line>span{display:inline-block;will-change:transform}
+.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;will-change:transform}
+.shade{position:absolute;inset:0;background:#050B1F}
+.card{background:#fff;border:1px solid #E3E7F0;border-radius:10px}
+.hair{height:1px;background:#E3E7F0}
+.mono{font-family:'IBM Plex Mono',monospace}
+.num{font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:12px;padding:12px 18px;border:1px solid #E3E7F0;border-radius:8px;background:#fff;font-size:24px}
+.tag{display:inline-block;font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:8px 14px;border:1.5px solid currentColor;border-radius:6px}
+.logo-tile{display:flex;align-items:center;justify-content:center;height:120px;border:1px solid #E3E7F0;border-radius:10px;background:#fff;padding:0 30px}
+.logo-tile img{height:62px;width:auto;object-fit:contain}
+.mark{width:72px;height:72px}

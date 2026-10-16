@@ -209,5 +209,13 @@
       "_decided": "Rescue fee AED 4,999 one-off — founder decision 2026-09-28"
     },
     "model": "transaction-based: billable txn = bank lines + ceil(gateway lines / gateway_lines_per_txn), priced by tier"
+  },
+  "offer": {
+    "pay_on_savings": {
+      "headline": "You pay only when RAMZA saves you time or money.",
+      "_decided": "founder decision 2026-10-17",
+      "terms": null,
+      "VERIFY": "founder to define how savings are measured (hours or AED against a baseline month), the period, and what is charged if nothing is saved — publish those terms before this line runs in paid ads"
+    }
   }
 }

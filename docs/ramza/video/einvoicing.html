@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="rules.js"></script>
+<style>
+  .panel{position:absolute;top:0;bottom:0;left:0;width:880px;background:#0B1533;color:#fff;padding:120px 96px;display:flex;flex-direction:column;justify-content:center}
+  .h1{font-size:100px;line-height:1.0}
+  .h2{font-size:76px;line-height:1.05}
+  .sub{font-size:30px;line-height:1.45;color:#C3CADB;margin-top:34px}
+  .src{position:absolute;left:150px;bottom:56px;font-size:20px;color:#8A93A5}
+  .mk{position:absolute;width:22px;height:22px;border-radius:4px;background:#0B1533;transform:translate(-50%,-50%)}
+  .mk.alt{background:#fff;border:3px solid #0B1533}
+  .lbl{position:absolute;transform:translateX(-50%);text-align:center;white-space:nowrap}
+  .lbl .d{font-family:'Urbanist';font-size:40px;font-weight:600;letter-spacing:-.02em}
+  .lbl .w{font-size:23px;color:#4A5263;margin-top:4px}
+  .node{position:absolute;width:300px;padding:28px;transform:translate(-50%,-50%);text-align:center}
+  .node .t{font-family:'Urbanist';font-size:34px;font-weight:600;letter-spacing:-.01em}
+  .node .s{font-size:21px;color:#6B7385;margin-top:6px}
+  .doc{position:absolute;width:120px;height:150px;border-radius:6px;background:#fff;border:2px solid #0B1533;transform:translate(-50%,-50%);padding:16px}
+  .doc i{display:block;height:8px;border-radius:2px;background:#C9CFDA;margin-bottom:10px}
+  .pen{position:absolute;top:360px;width:760px}
+  .pen .v{font-family:'Urbanist';font-size:150px;font-weight:600;letter-spacing:-.04em;line-height:1}
+  .pen .u{font-size:34px;color:#C3CADB;margin-top:16px}
+  .pen .x{font-size:28px;color:#fff;margin-top:26px;padding-top:24px;border-top:1px solid rgba(255,255,255,.18);line-height:1.4}
+  .item{display:flex;gap:30px;padding:30px 0;border-top:1px solid #E3E7F0}
+  .item .n{font-family:'Urbanist';font-size:30px;font-weight:600;color:#8A93A5;min-width:50px}
+  .item .t{font-size:36px;font-weight:600;line-height:1.2}
+  .item .s{font-size:26px;color:#4A5263;margin-top:8px;line-height:1.4}
+</style></head>
+<body><div class="stage">
+
+<section class="scene" id="s1">
+  <img class="photo" id="s1img" src="PHOTO/bb-business-bay-dusk.jpg">
+  <div class="panel" id="s1panel">
+    <div class="eyebrow" id="s1e">UAE e-invoicing</div>
+    <div class="disp h1" id="s1h" style="margin-top:34px"><span class="line"><span>Every B2B invoice</span></span><span class="line"><span>is going</span></span><span class="line"><span>electronic.</span></span></div>
+    <div class="sub" id="s1s">Through an accredited provider, with the tax data reported as it happens.</div>
+  </div>
+</section>
+
+<section class="scene white" id="s2">
+  <div style="position:absolute;left:150px;top:130px">
+    <div class="eyebrow">When it applies</div>
+    <div class="disp h2" id="s2h" style="margin-top:24px"><span class="line"><span>Two dates for every business.</span></span></div>
+  </div>
+  <div id="row1lbl" style="position:absolute;left:150px;top:418px;font-size:26px;font-weight:600">Revenue of <span id="rev"></span> or more</div>
+  <div id="row2lbl" style="position:absolute;left:150px;top:688px;font-size:26px;font-weight:600">All other businesses in scope</div>
+  <svg style="position:absolute;left:0;top:0" width="1920" height="1080">
+    <path id="ax1" d="M150 520 H1770" stroke="#D9DEE8" stroke-width="3" fill="none"/>
+    <path id="ax2" d="M150 790 H1770" stroke="#D9DEE8" stroke-width="3" fill="none"/>
+    <path id="f1" d="M150 520 H1770" stroke="#0B1533" stroke-width="3" fill="none"/>
+    <path id="f2" d="M150 790 H1770" stroke="#0B1533" stroke-width="3" fill="none"/>
+  </svg>
+  <div id="marks"></div>
+  <div class="src" id="s2src"></div>
+</section>
+
+<section class="scene mist" id="s3">
+  <div style="position:absolute;left:150px;top:120px">
+    <div class="eyebrow">How an e-invoice travels</div>
+    <div class="disp h2" id="s3h" style="margin-top:24px"><span class="line"><span>Through two accredited providers.</span></span></div>
+  </div>
+  <svg style="position:absolute;left:0;top:0" width="1920" height="1080">
+    <path id="p1" d="M380 760 H1540" stroke="#0B1533" stroke-width="3" fill="none"/>
+    <path id="p2" d="M770 690 V520 H960" stroke="#0B1533" stroke-width="3" stroke-dasharray="0" fill="none"/>
+    <path id="p3" d="M1150 690 V520 H960" stroke="#0B1533" stroke-width="3" fill="none"/>
+  </svg>
+  <div class="node card" id="n1" style="left:380px;top:760px"><div class="t">Your business</div><div class="s">issues the invoice</div></div>
+  <div class="node card" id="n2" style="left:770px;top:760px"><div class="t">Your provider</div><div class="s">accredited (ASP)</div></div>
+  <div class="node card" id="n3" style="left:1150px;top:760px"><div class="t">Buyer's provider</div><div class="s">accredited (ASP)</div></div>
+  <div class="node card" id="n4" style="left:1540px;top:760px"><div class="t">Your buyer</div><div class="s">receives it</div></div>
+  <div class="node card" id="n5" style="left:960px;top:470px;background:#0B1533;color:#fff;border-color:#0B1533"><div class="t">Tax authority</div><div class="s" style="color:#9AA6C4">receives the tax data</div></div>
+  <div class="doc" id="doc" style="left:380px;top:600px"><i style="width:60%"></i><i></i><i></i><i style="width:70%"></i><i style="width:40%;background:#0B1533"></i></div>
+</section>
+
+<section class="scene navy" id="s4">
+  <div style="position:absolute;left:150px;top:120px">
+    <div class="eyebrow">What a late start costs</div>
+    <div class="disp h2" id="s4h" style="margin-top:24px"><span class="line"><span>Penalties start on day one.</span></span></div>
+  </div>
+  <div class="pen" id="pa" style="left:150px"><div class="v num" id="va">AED 0</div><div class="u">per month</div><div class="x">for not appointing an accredited provider on time</div></div>
+  <div class="pen" id="pb" style="left:1010px"><div class="v num" id="vb">AED 0</div><div class="u">per invoice not issued electronically</div><div class="x" id="capx"></div></div>
+  <div class="src" id="s4src" style="color:#7A8294"></div>
+</section>
+
+<section class="scene white" id="s5">
+  <img class="photo" id="s5img" src="PHOTO/px-accountant-review.jpg" style="left:auto;right:0;width:760px;object-position:center 30%">
+  <div style="position:absolute;left:150px;top:120px;width:920px">
+    <div class="eyebrow">What RAMZA does</div>
+    <div class="disp h2" id="s5h" style="margin-top:24px"><span class="line"><span>Ready before</span></span><span class="line"><span>the deadline.</span></span></div>
+    <div id="items" style="margin-top:44px">
+      <div class="item"><div class="n">01</div><div><div class="t">Close the invoice backlog</div><div class="s">Every open invoice matched to the payment behind it.</div></div></div>
+      <div class="item"><div class="n">02</div><div><div class="t">Clean the data a provider needs</div><div class="s">Customer TRNs, VAT and credit notes checked.</div></div></div>
+      <div class="item"><div class="n">03</div><div><div class="t">Connect an accredited provider</div><div class="s">We line it up and hand over clean data. RAMZA itself is not an ASP.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="scene night" id="s6">
+  <div style="position:absolute;left:150px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center">
+    <div class="eyebrow" id="s6e">The RAMZA promise</div>
+    <div class="disp" id="s6h" style="font-size:118px;line-height:1.02;margin-top:36px"><span class="line"><span>You pay only when</span></span><span class="line"><span>RAMZA saves you</span></span><span class="line"><span>time or money.</span></span></div>
+    <svg width="900" height="20" style="margin-top:10px"><path id="s6u" d="M4 10 H860" stroke="#B3A6FF" stroke-width="6" fill="none"/></svg>
+  </div>
+</section>
+
+<section class="scene night" id="s7">
+  <img class="photo" id="s7img" src="PHOTO/bb-difc-towers-night.jpg" style="opacity:.28">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <svg viewBox="0 0 28 28" style="width:120px;height:120px" id="s7mark"><rect width="28" height="28" rx="8" fill="#fff"/><rect x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <div class="disp" id="s7h" style="font-size:96px;margin-top:44px;letter-spacing:.12em"><span class="line"><span>RAMZA</span></span></div>
+    <div id="s7s" style="font-size:34px;color:#C3CADB;margin-top:20px">Free e-invoicing readiness check · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E;
+const $ = (s) => document.querySelector(s);
+const R = window.RULES.einvoicing, P = R.penalties;
+const aed = (n) => "AED " + n.toLocaleString("en-US");
+const day = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+$("#rev").textContent = aed(R.large.revenue_gte_aed / 1e6) .replace(/(\d+)$/, "$1m").replace("AED ", "AED ");
+$("#rev").textContent = `AED ${R.large.revenue_gte_aed / 1e6}m`;
+$("#s2src").textContent = `B2B and B2G invoices. Dates from the Ministry of Finance timeline, checked ${day(R.verified_on)}.`;
+$("#capx").textContent = `capped at ${aed(P.invoice_cap_aed_per_month)} a month, and the same again for credit notes`;
+$("#s4src").textContent = `${P.legal_basis}.`;
+
+/* S1 0–6 */
+E.scene("#s1", 0, 6.6);
+E.kenBurns($("#s1img"), 0, 6.6, { from: 1.2, to: 1.05, x: 2 });
+tl.fromTo("#s1panel", { xPercent: -100 }, { xPercent: 0, duration: 1.1, ease: "expo.out" }, 0.3); E.sfx("whoosh", 0.3);
+tl.fromTo("#s1e", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .6 }, 0.9);
+E.lines("#s1h", 1.0); E.sfx("pop", 1.1);
+tl.fromTo("#s1s", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .7 }, 2.4);
+
+/* S2 6–16: timeline. Axis spans 1 Oct 2026 → 31 Jul 2027 */
+E.wipe("#s2", 6.0);
+E.lines("#s2h", 6.6);
+tl.fromTo(["#row1lbl", "#row2lbl"], { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: .6, stagger: .3 }, 7.0);
+const t0 = Date.parse("2026-10-01"), t1 = Date.parse("2027-07-31");
+const X = (iso) => 150 + (Date.parse(iso) - t0) / (t1 - t0) * 1620;
+E.draw($("#f1"), 7.4, 2.2); E.draw($("#f2"), 7.8, 2.4);
+const marks = $("#marks");
+const M = [
+  [R.large.asp_by, 520, "Appoint a provider", 8.2, false], [R.large.go_live, 520, "Go live", 8.9, true],
+  [R.sme.asp_by, 790, "Appoint a provider", 9.5, false], [R.sme.go_live, 790, "Go live", 10.2, true],
+];
+M.forEach(([iso, y, what, at, alt], i) => {
+  const m = document.createElement("div"); m.className = "mk" + (alt ? " alt" : ""); m.style.left = X(iso) + "px"; m.style.top = y + "px"; marks.appendChild(m);
+  const l = document.createElement("div"); l.className = "lbl"; l.style.left = Math.min(1700, Math.max(260, X(iso))) + "px"; l.style.top = (y + 26) + "px";
+  l.innerHTML = `<div class="d">${day(iso)}</div><div class="w">${what}</div>`; marks.appendChild(l);
+  tl.fromTo(m, { scale: 0 }, { scale: 1, duration: .45, ease: "back.out(3)" }, at);
+  tl.fromTo(l, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .5, ease: "expo.out" }, at + 0.1);
+  E.sfx("blip", at, { vol: .8 });
+});
+tl.fromTo("#s2src", { opacity: 0 }, { opacity: 1, duration: .6 }, 11.2);
+E.scene("#s2", 6.0, 16.8);
+
+/* S3 16–26: five-corner flow */
+E.wipe("#s3", 16.0, 0.9, "up");
+E.lines("#s3h", 16.6);
+["#n1", "#n2", "#n3", "#n4"].forEach((n, i) => { tl.fromTo(n, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 17.0 + i * .2); });
+E.draw($("#p1"), 17.4, 1.2);
+tl.fromTo("#doc", { opacity: 0, scale: .6 }, { opacity: 1, scale: 1, duration: .5, ease: "back.out(2)" }, 18.6); E.sfx("pop", 18.6);
+[[770, 19.4], [1150, 20.5], [1540, 21.6]].forEach(([x, at]) => { tl.to("#doc", { left: x, duration: .9, ease: "power3.inOut" }, at); E.sfx("swish", at + 0.1); });
+tl.fromTo("#n5", { y: -30, opacity: 0 }, { y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 20.0); E.sfx("chime", 20.1);
+E.draw($("#p2"), 20.2, .8); E.draw($("#p3"), 21.0, .8);
+E.scene("#s3", 16.0, 26.8);
+
+/* S4 26–33: penalties */
+E.wipe("#s4", 26.0, 0.9, "up");
+E.lines("#s4h", 26.6);
+tl.fromTo(["#pa", "#pb"], { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: .7, ease: "expo.out", stagger: .4 }, 27.0);
+E.count($("#va"), 27.2, P.asp_late_aed_per_month, { dur: 1.3, fmt: (v) => aed(Math.round(v)) });
+E.count($("#vb"), 27.7, P.invoice_not_issued_aed, { dur: 1.1, fmt: (v) => aed(Math.round(v)) });
+tl.fromTo("#s4src", { opacity: 0 }, { opacity: 1, duration: .6 }, 29.4);
+E.scene("#s4", 26.0, 33.8);
+
+/* S5 33–42: what RAMZA does */
+E.wipe("#s5", 33.0);
+E.kenBurns($("#s5img"), 33.0, 9.6, { from: 1.12, to: 1.0 });
+E.lines("#s5h", 33.6);
+tl.fromTo("#items .item", { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: .7, ease: "expo.out", stagger: .55 }, 34.4);
+[34.4, 34.95, 35.5].forEach((t) => E.sfx("blip", t, { vol: .8 }));
+E.scene("#s5", 33.0, 42.8);
+
+/* S6 42–48: the offer */
+E.wipe("#s6", 42.0, 0.9, "up");
+tl.fromTo("#s6e", { opacity: 0 }, { opacity: 1, duration: .6 }, 42.6);
+E.lines("#s6h", 42.8, { stagger: .16, dur: 1.0 });
+E.draw($("#s6u"), 44.0, 0.9); E.sfx("rise", 43.7);
+E.scene("#s6", 42.0, 48.8);
+
+/* S7 48–53 end */
+E.wipe("#s7", 48.0, 0.9, "up");
+E.kenBurns($("#s7img"), 48.0, 5, { from: 1.1, to: 1.0 });
+tl.fromTo("#s7mark", { scale: .7, opacity: 0 }, { scale: 1, opacity: 1, duration: .8, ease: "expo.out" }, 48.5); E.sfx("chime", 48.6);
+E.lines("#s7h", 48.8);
+tl.fromTo("#s7s", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .7 }, 49.4);
+E.scene("#s7", 48.0, null);
+tl.set({}, {}, 53);
+window.__DUR = 53;
+</script>
+</body></html>
