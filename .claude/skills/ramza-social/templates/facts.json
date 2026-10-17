@@ -1,0 +1,11 @@
+{
+  "_source": "Omnia (RAMZA's founding company and first user), captured from the live RAMZA app on 2026-10-17 by ramza-daily-video/scripts/capture.mjs. Re-capture before reusing in a later month.",
+  "as_of": "2026-10-17",
+  "close_month": "September 2026",
+  "close_credits": 145,
+  "close_matched_pct": 89,
+  "close_files_missing": 2,
+  "ledger_to_close_aed": 1247427,
+  "bank_lines_not_in_zoho": 157,
+  "bank_lines_not_in_zoho_aed": 1550000
+}
