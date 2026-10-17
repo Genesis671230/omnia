@@ -66,7 +66,7 @@
 <!-- S4: RAMZA, the real screen -->
 <section class="scene night" id="s4a">
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-    <svg class="mark" id="s4mark" viewBox="0 0 28 28" style="width:110px;height:110px"><rect width="28" height="28" rx="8" fill="#fff"/><rect id="b1" x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect id="b2" x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <svg viewBox="0 0 64 64" id="s4mark" style="width:110px;height:110px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="b1" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="b2" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
     <div class="disp" id="s4h" style="font-size:84px;line-height:1.06;margin-top:50px">
       <span class="line"><span>RAMZA traces every bank credit</span></span><span class="line"><span>to its payout and its orders.</span></span>
     </div>
@@ -114,7 +114,7 @@
 </section>
 <section class="scene night" id="s8">
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-    <svg viewBox="0 0 28 28" style="width:120px;height:120px" id="s8mark"><rect width="28" height="28" rx="8" fill="#fff"/><rect x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <svg viewBox="0 0 64 64" id="s8mark" style="width:120px;height:120px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="s8a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="s8b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
     <div class="disp" id="s8h" style="font-size:96px;margin-top:44px;letter-spacing:.12em"><span class="line"><span>RAMZA</span></span></div>
     <div id="s8s" style="font-size:34px;color:#C3CADB;margin-top:20px">Free readiness check · ramza.ai</div>
   </div>
@@ -154,8 +154,8 @@ E.scene("#s3", 11.6, 17.1);
 
 /* S4a 16.4–19.2: brand line */
 E.wipe("#s4a", 16.4, 0.8, "up");
-tl.fromTo("#b1", { x: -14, opacity: 0 }, { x: 0, opacity: 1, duration: .7, ease: "expo.out" }, 16.9);
-tl.fromTo("#b2", { x: 14, opacity: 0 }, { x: 0, opacity: 1, duration: .7, ease: "expo.out" }, 17.05); E.sfx("chime", 17.0);
+tl.fromTo("#b1", { x: -14, y: -14, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .7, ease: "expo.out" }, 16.9);
+tl.fromTo("#b2", { x: 14, y: 14, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .7, ease: "expo.out" }, 17.05); E.sfx("impact", 17.2, { vol: .55 });
 E.lines("#s4h", 17.4, { stagger: .12 });
 E.scene("#s4a", 16.4, 20.0);
 
@@ -211,7 +211,7 @@ E.scene("#s7", 45.0, 51.2);
 
 /* S8 50.4–55 end card */
 E.wipe("#s8", 50.4, 0.9, "up");
-tl.fromTo("#s8mark", { scale: .7, opacity: 0 }, { scale: 1, opacity: 1, duration: .8, ease: "expo.out" }, 50.9); E.sfx("chime", 51.0);
+tl.fromTo("#s8a", { x: -16, y: -16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 50.9); tl.fromTo("#s8b", { x: 16, y: 16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 50.9); E.sfx("impact", 51.25, { vol: .6 });
 E.lines("#s8h", 51.2);
 tl.fromTo("#s8s", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .7 }, 51.8);
 E.scene("#s8", 50.4, null);

@@ -109,7 +109,7 @@
 <section class="scene night" id="s7">
   <img class="photo" id="s7img" src="PHOTO/bb-difc-towers-night.jpg" style="opacity:.28">
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-    <svg viewBox="0 0 28 28" style="width:120px;height:120px" id="s7mark"><rect width="28" height="28" rx="8" fill="#fff"/><rect x="6" y="9.5" width="12" height="3.2" rx="1.6" fill="#B3A6FF"/><rect x="10" y="15.3" width="12" height="3.2" rx="1.6" fill="#0B1533"/></svg>
+    <svg viewBox="0 0 64 64" id="s7mark" style="width:120px;height:120px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="s7a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="s7b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
     <div class="disp" id="s7h" style="font-size:96px;margin-top:44px;letter-spacing:.12em"><span class="line"><span>RAMZA</span></span></div>
     <div id="s7s" style="font-size:34px;color:#C3CADB;margin-top:20px">Free e-invoicing readiness check · ramza.ai</div>
   </div>
@@ -197,7 +197,7 @@ E.scene("#s6", 42.0, 48.8);
 /* S7 48–53 end */
 E.wipe("#s7", 48.0, 0.9, "up");
 E.kenBurns($("#s7img"), 48.0, 5, { from: 1.1, to: 1.0 });
-tl.fromTo("#s7mark", { scale: .7, opacity: 0 }, { scale: 1, opacity: 1, duration: .8, ease: "expo.out" }, 48.5); E.sfx("chime", 48.6);
+tl.fromTo("#s7a", { x: -16, y: -16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 48.5); tl.fromTo("#s7b", { x: 16, y: 16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 48.5); E.sfx("impact", 48.85, { vol: .6 });
 E.lines("#s7h", 48.8);
 tl.fromTo("#s7s", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .7 }, 49.4);
 E.scene("#s7", 48.0, null);

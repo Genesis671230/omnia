@@ -1,0 +1,230 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="rules.js"></script>
+<script src="sheetdata.js"></script>
+<style>
+  .panel{position:absolute;top:0;bottom:0;left:0;width:860px;background:#0B1533;color:#fff;padding:120px 96px;display:flex;flex-direction:column;justify-content:center}
+  .h1{font-size:100px;line-height:1.0}
+  .h2{font-size:72px;line-height:1.05}
+  .persp{position:absolute;inset:0;perspective:2200px;perspective-origin:50% 40%}
+  /* spreadsheet */
+  .xl{position:absolute;left:210px;top:150px;width:1500px;height:860px;background:#fff;border:1px solid #C9CFDA;border-radius:8px;overflow:hidden;transform-origin:50% 50%;box-shadow:0 40px 90px -40px rgba(11,21,51,.55)}
+  .xl .bar{height:44px;background:#F3F4F7;border-bottom:1px solid #D9DEE8;display:flex;align-items:center;gap:14px;padding:0 18px;font-size:17px;color:#4A5263}
+  .xl .fx{height:40px;border-bottom:1px solid #D9DEE8;display:flex;align-items:center;font-family:'IBM Plex Mono';font-size:17px;color:#14131C}
+  .xl .fx b{width:70px;text-align:center;color:#8A93A5;font-weight:500;border-right:1px solid #D9DEE8;height:100%;display:flex;align-items:center;justify-content:center}
+  .xl .fx span{padding-left:14px}
+  .grid{display:grid;grid-template-columns:48px 130px 520px 140px 110px 130px 120px 120px 160px;font-size:16px}
+  .grid div{height:31px;border-right:1px solid #E6E8EE;border-bottom:1px solid #E6E8EE;padding:0 8px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;color:#14131C}
+  .grid .hd{background:#F3F4F7;color:#6B7385;justify-content:center;font-size:14px}
+  .grid .rn{background:#F3F4F7;color:#8A93A5;justify-content:center;font-size:13px}
+  .grid .r{justify-content:flex-end;font-variant-numeric:tabular-nums}
+  .grid .th{font-weight:600;background:#FAFAFB}
+  .grid .neg{color:#B42318}
+  .grid .na{color:#B42318;font-family:'IBM Plex Mono';font-size:14px}
+  .grid .q{background:#FFF6D6}
+  .hl{position:absolute;border:3px solid #B42318;border-radius:3px;pointer-events:none}
+  .note{position:absolute;background:#FFF6D6;border:1px solid #E8D48A;color:#5C4A00;font-size:22px;padding:12px 16px;border-radius:4px;box-shadow:0 8px 20px -10px rgba(0,0,0,.35);max-width:420px;line-height:1.3}
+  .tab{position:absolute;left:0;right:0;bottom:0;height:40px;background:#F3F4F7;border-top:1px solid #D9DEE8;display:flex;align-items:center;gap:2px;padding-left:60px;font-size:16px;color:#6B7385}
+  .tab span{padding:8px 18px}
+  .tab span.on{background:#fff;color:#14131C;border-bottom:3px solid #1F7A4D}
+  .tally{position:absolute;right:120px;top:52px;background:#0B1533;color:#fff;border-radius:8px;padding:18px 26px;font-size:24px}
+  .tally b{display:block;font-family:'Urbanist';font-size:56px;font-weight:600;letter-spacing:-.02em}
+  .win{position:absolute;left:160px;top:120px;width:1600px;height:1000px;border:1px solid #D9DEE8;border-radius:12px;overflow:hidden;background:#fff;transform-origin:50% 30%;box-shadow:0 40px 90px -40px rgba(11,21,51,.5)}
+  .cam{position:absolute;left:0;top:0;width:1600px;height:1000px;transform-origin:0 0}
+  .cam img{width:1600px;height:1000px;display:block}
+  .callout{position:absolute;background:#0B1533;color:#fff;border-radius:8px;padding:16px 22px;font-size:28px;font-weight:500;white-space:nowrap}
+  .callout b{font-family:'Urbanist';font-size:44px;font-weight:600;display:block;letter-spacing:-.02em}
+  .shot{position:absolute;border:1px solid #D9DEE8;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 30px 70px -40px rgba(11,21,51,.5)}
+  .shot img{display:block;width:100%}
+</style></head>
+<body><div class="stage">
+
+<section class="scene" id="s1">
+  <img class="photo" id="s1img" src="PHOTO/px-statements-calculator.jpg" style="object-position:center 50%">
+  <div class="panel" id="s1panel">
+    <div class="eyebrow" id="s1e">Month end, the usual way</div>
+    <div class="disp h1" id="s1h" style="margin-top:34px"><span class="line"><span>Four files.</span></span><span class="line"><span>One spreadsheet.</span></span><span class="line"><span>A week gone.</span></span></div>
+  </div>
+</section>
+
+<section class="scene mist" id="s2">
+  <div class="persp"><div class="xl" id="xl">
+    <div class="bar"><b style="color:#14131C;font-weight:600">Sep payouts FINAL v3 (2).xlsx</b><span>· edited by 3 people</span></div>
+    <div class="fx"><b id="cellref">I3</b><span id="formula"></span></div>
+    <div class="grid" id="grid"></div>
+    <div class="hl" id="hl1"></div><div class="hl" id="hl2"></div><div class="hl" id="hl3"></div>
+    <div class="note" id="n1">Stripe or Shopify? Both arrive as "Network International".</div>
+    <div class="note" id="n2">A refund inside the payout. Which order?</div>
+    <div class="note" id="n3">#N/A again. The order ref has a different format.</div>
+    <div class="tab"><span class="on">Bank Sep</span><span>Stripe export</span><span>Tamara</span><span>Tabby</span><span>COD vouchers</span><span>Sheet7</span></div>
+  </div></div>
+  <div class="tally" id="tally"><b id="tallyN">0</b>orders to tick off by hand</div>
+</section>
+
+<section class="scene white" id="s3">
+  <div style="position:absolute;left:150px;top:120px">
+    <div class="eyebrow">Meanwhile, in Zoho Books · Omnia, live data</div>
+    <div class="disp h2" id="s3h" style="margin-top:24px"><span class="line"><span>The books still don't close.</span></span></div>
+  </div>
+  <div class="persp"><div class="shot" id="z1" style="left:120px;top:330px;width:1060px"><img src="SHOT/zoho-remaining.png"></div>
+  <div class="shot" id="z2" style="left:860px;top:560px;width:940px"><img src="SHOT/zoho-checklist.png"></div></div>
+</section>
+
+<section class="scene night" id="s4">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <svg viewBox="0 0 64 64" style="width:180px;height:180px;overflow:visible"><rect id="m-bg" width="64" height="64" rx="12" fill="#FFFFFF"/><path id="m-a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="m-b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
+    <div class="disp" id="s4h" style="font-size:96px;margin-top:50px"><span class="line"><span>Or close it in RAMZA.</span></span></div>
+  </div>
+</section>
+
+<section class="scene mist" id="s5">
+  <div class="persp"><div class="win" id="win"><div class="cam" id="cam"><img src="SHOT/omnia-sep-full.png"></div></div></div>
+  <div class="callout" id="c1"><b>145 credits read</b>straight from the bank statement</div>
+  <div class="callout" id="c2"><b>89% matched</b>to payouts and orders</div>
+  <div class="callout" id="c3"><b>2 files missing</b>named, with the amount</div>
+</section>
+
+<section class="scene night" id="s6">
+  <div style="position:absolute;left:150px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center">
+    <div class="eyebrow">The RAMZA promise</div>
+    <div class="disp" id="s6h" style="font-size:118px;line-height:1.02;margin-top:36px"><span class="line"><span>You pay only when</span></span><span class="line"><span>RAMZA saves you</span></span><span class="line"><span>time or money.</span></span></div>
+    <svg width="900" height="20" style="margin-top:10px"><path id="s6u" d="M4 10 H860" stroke="#B3A6FF" stroke-width="6" fill="none"/></svg>
+  </div>
+</section>
+
+<section class="scene night" id="s7">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <div style="display:flex;align-items:center;gap:36px">
+      <svg viewBox="0 0 64 64" style="width:150px;height:150px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="e-a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="e-b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
+      <div style="text-align:left"><div class="disp" id="s7h" style="font-size:110px;letter-spacing:.14em;line-height:1"><span class="line"><span>RAMZA</span></span></div>
+      <div style="font-family:'IBM Plex Sans Arabic','IBM Plex Sans';font-size:30px;color:#9AA6C4;margin-top:8px" id="s7ar">رمز · month end, closed</div></div>
+    </div>
+    <div id="s7s" style="font-size:34px;color:#C3CADB;margin-top:56px">Free readiness check · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E;
+const $ = (s) => document.querySelector(s);
+const money = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* build the sheet from Omnia's real September rows */
+const G = $("#grid");
+const cell = (t, cls = "") => `<div class="${cls}">${t}</div>`;
+let html = ["", "A", "B", "C", "D", "E", "F", "G", "H"].map((c) => cell(c, "hd")).join("");
+html += cell("1", "rn") + ["Date", "Bank narration", "Credit", "Gateway?", "Gross", "Fee", "Net", "Matched?"].map((t) => cell(t, "th")).join("");
+const S = window.SHEET;
+S.bank.slice(0, 22).forEach((b, i) => {
+  const r = i + 2;
+  const tx = S.tx[i];
+  const gw = /NETWORK/.test(b.n) ? "Stripe??" : b.p;
+  const lookup = i % 4 === 1 ? "#N/A" : i % 5 === 3 ? "check" : i % 3 === 0 ? "✓" : "";
+  html += cell(r, "rn") + cell(b.d.slice(8) + "/09") + cell(b.n) + cell(money(b.a), "r") + cell(gw, /\?\?/.test(gw) ? "q" : "")
+    + cell(tx ? money(tx.g) : "", "r" + (tx && tx.g < 0 ? " neg" : "")) + cell(tx ? money(tx.f) : "", "r") + cell(tx ? money(tx.g - tx.f) : "", "r")
+    + cell(lookup, lookup === "#N/A" ? "na" : lookup === "check" ? "q" : "");
+});
+G.innerHTML = html;
+// cell geometry inside .xl: header bars 84px, rows 31px; columns from the grid template
+const COLS = [48, 130, 520, 140, 110, 130, 120, 120, 160];
+const colX = (c) => COLS.slice(0, c).reduce((a, b) => a + b, 0);
+const rowY = (r) => 84 + r * 31; // r: 0 = header letters row
+
+/* S1 0–4.6 */
+E.scene("#s1", 0, 5.2);
+E.kenBurns($("#s1img"), 0, 5.2, { from: 1.2, to: 1.05 });
+tl.fromTo("#s1panel", { xPercent: -100 }, { xPercent: 0, duration: 1.0, ease: "expo.out" }, 0.25); E.sfx("whoosh", 0.25);
+tl.fromTo("#s1e", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .6 }, 0.8);
+E.lines("#s1h", 0.9, { stagger: .22 });
+
+/* S2 4.6–15: the spreadsheet, tilted like a look over someone's shoulder */
+E.wipe("#s2", 4.6, 0.8, "up");
+const xl = $("#xl");
+tl.fromTo(xl, { rotationY: 24, rotationX: 10, z: -260, x: 220 }, { rotationY: 10, rotationX: 5, z: -60, x: 60, duration: 3.2, ease: "power2.out" }, 4.8);
+E.sfx("typing", 5.4);
+const fx = $("#formula"); const fxText = "=VLOOKUP(B3,'Stripe export'!A:D,4,FALSE)";
+const tObj = { n: 0 };
+tl.to(tObj, { n: fxText.length, duration: 1.6, ease: "none", onUpdate: () => { fx.textContent = fxText.slice(0, Math.round(tObj.n)); } }, 5.4);
+// tally of orders to tick by hand (real: 1,173 orders traced in September)
+tl.fromTo("#tally", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: .5 }, 6.0);
+E.count($("#tallyN"), 6.0, 1173, { dur: 2.2 });
+// push in: the camera moves to the problem cells, a red box and a note each time
+// camera: bring a sheet point (px,py) to the middle of the frame at scale s
+const focus = (at, s, px, py, rx, ry) => {
+  tl.to(xl, { scale: s, x: s * (750 - px), y: s * (430 - py) - 40, rotationY: ry, rotationX: rx, z: 0, duration: 1.1, ease: "power3.inOut" }, at);
+  E.sfx("swish", at + .05);
+};
+// a red box on cells (sheet coords) and its note
+const mark = (id, nid, at, x, y, w, nx, ny) => {
+  tl.set(id, { left: x - 3, top: y - 3, width: w + 6, height: 37 }, at);
+  tl.fromTo(id, { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: .35, ease: "back.out(2)" }, at);
+  tl.set(nid, { left: nx, top: ny }, at);
+  tl.fromTo(nid, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: .45, ease: "expo.out" }, at + .15);
+  E.sfx("pop", at);
+};
+tl.set(["#hl1", "#hl2", "#hl3", "#n1", "#n2", "#n3"], { opacity: 0 }, 0);
+focus(8.0, 1.45, 563, 210, 3, 5);
+mark("#hl1", "#n1", 9.2, colX(2), rowY(3), 770, colX(2) + 20, rowY(3) + 50);
+focus(11.0, 1.55, 1180, 190, 2, -4);
+mark("#hl2", "#n2", 12.2, colX(5), rowY(2), 370, colX(5) - 330, rowY(2) + 50);
+focus(13.6, 1.45, 1300, 330, 2, -6);
+mark("#hl3", "#n3", 14.6, colX(8), rowY(7), 160, colX(8) - 300, rowY(7) + 50);
+E.scene("#s2", 4.6, 17.0);
+
+/* S3 16.2–22: Zoho, live */
+E.wipe("#s3", 16.2);
+E.lines("#s3h", 16.8);
+tl.fromTo("#z1", { rotationY: 18, z: -200, opacity: 0, x: -80 }, { rotationY: 6, z: 0, opacity: 1, x: 0, duration: 1.1, ease: "expo.out" }, 17.1); E.sfx("swish", 17.1);
+tl.fromTo("#z2", { rotationY: -18, z: -200, opacity: 0, x: 80 }, { rotationY: -6, z: 0, opacity: 1, x: 0, duration: 1.1, ease: "expo.out" }, 17.7); E.sfx("swish", 17.7);
+tl.to("#z2", { scale: 1.12, x: -60, duration: 2.6, ease: "power2.inOut" }, 19.0);
+E.scene("#s3", 16.2, 22.8);
+
+/* S4 22–25.6: the logo snaps shut — the turn */
+E.wipe("#s4", 22.0, 0.6, "up");
+tl.fromTo("#m-a", { x: -14, y: -14, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .55, ease: "expo.out" }, 22.4);
+tl.fromTo("#m-b", { x: 14, y: 14, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .55, ease: "expo.out" }, 22.4);
+E.sfx("impact", 22.75);
+E.lines("#s4h", 23.0);
+E.scene("#s4", 22.0, 26.4);
+
+/* S5 25.6–35.4: the same month, in RAMZA — tilt flattens as the camera settles */
+E.wipe("#s5", 25.6, 0.8, "up");
+const win = $("#win"), cam = $("#cam");
+tl.fromTo(win, { rotationX: 18, rotationY: -14, z: -320, y: 80 }, { rotationX: 0, rotationY: 0, z: 0, y: 0, duration: 1.8, ease: "expo.out" }, 25.8);
+E.sfx("sparkle", 26.4);
+const K = [[27.8, 1, 0, 0], [29.0, 2.1, -250, -150], [30.6, 2.1, -250, -150], [31.6, 2.3, -905, -150], [33.6, 2.3, -905, -150], [34.6, 1, 0, 0]];
+tl.set(cam, { scale: 1, x: 0, y: 0 }, 25.6);
+for (let i = 1; i < K.length; i++) {
+  const [t0] = K[i - 1]; const [t1, s, x, y] = K[i];
+  if (K[i - 1][1] === s && K[i - 1][2] === x) continue;
+  tl.to(cam, { scale: s, x: x * s, y: y * s, duration: t1 - t0, ease: "power3.inOut" }, t0);
+  E.sfx("swish", t0 + .1);
+}
+const call = (id, a, b, pos) => { tl.set(id, pos, a); tl.fromTo(id, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: .5, ease: "expo.out" }, a); tl.to(id, { opacity: 0, y: -16, duration: .35 }, b); E.sfx("pop", a + .05); };
+call("#c1", 28.2, 30.4, { left: 1180, top: 760 });
+call("#c2", 29.2, 30.4, { left: 1180, top: 900 });
+call("#c3", 32.0, 33.5, { left: 130, top: 860 });
+E.scene("#s5", 25.6, 36.2);
+
+/* S6 35.4–41.4 */
+E.wipe("#s6", 35.4, 0.9, "up");
+E.lines("#s6h", 36.0, { stagger: .16, dur: 1.0 });
+E.draw($("#s6u"), 37.2, .9); E.sfx("chime", 37.3);
+E.scene("#s6", 35.4, 42.2);
+
+/* S7 41.4–47 */
+E.wipe("#s7", 41.4, 0.9, "up");
+tl.fromTo("#e-a", { x: -16, y: -16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 41.9);
+tl.fromTo("#e-b", { x: 16, y: 16, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: .6, ease: "expo.out" }, 41.9);
+E.sfx("impact", 42.3, { vol: .6 });
+E.lines("#s7h", 42.2);
+tl.fromTo("#s7ar", { opacity: 0 }, { opacity: 1, duration: .6 }, 42.8);
+tl.fromTo("#s7s", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .7 }, 43.3);
+E.scene("#s7", 41.4, null);
+tl.set({}, {}, 47);
+window.__DUR = 47;
+</script>
+</body></html>
