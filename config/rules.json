@@ -216,6 +216,18 @@
       "_decided": "founder decision 2026-10-17",
       "terms": null,
       "VERIFY": "founder to define how savings are measured (hours or AED against a baseline month), the period, and what is charged if nothing is saved — publish those terms before this line runs in paid ads"
+    },
+    "free_trial": {
+      "days": 7,
+      "headline": "Give the RAMZA agent 7 days. It closes last month for you, free.",
+      "includes": [
+        "last month's bank statement matched to gateway payouts",
+        "open-invoice and missing-fee report",
+        "e-invoicing readiness check"
+      ],
+      "access": "read-only; revocable at any time",
+      "_decided": "founder decision 2026-10-20",
+      "VERIFY": "founder: confirm day-8 behaviour (no auto-charge vs auto-convert), exact data scope (statement upload vs live read-only connections), and data deletion on cancel, before this runs in paid ads"
     }
   }
 }
