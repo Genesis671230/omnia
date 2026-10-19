@@ -1,0 +1,157 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  #a_ph{left:150px;top:420px;width:780px;height:1560px}
+  .calc .disp2{top:250px}
+  .calc .keys{bottom:auto;top:620px}
+  .calc .k{font-size:58px}
+  .capnote{font-size:34px;color:#FF9F0A;margin-top:18px;font-weight:600}
+  .doc{position:absolute;left:190px;width:700px;height:820px;top:470px;perspective:1600px}
+  .doc .f{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;border:1px solid var(--line);background:#fff;box-shadow:0 30px 60px -36px rgba(11,21,51,.35);padding:44px}
+  .doc .pdf .tg{display:inline-block;background:var(--red);color:#fff;font-weight:700;font-size:28px;padding:8px 16px;border-radius:6px}
+  .doc .pdf i{display:block;height:16px;border-radius:8px;background:#E3E7F0;margin-top:30px}
+  .doc .data{transform:rotateY(180deg);font-family:'IBM Plex Mono';font-size:28px;line-height:1.75;color:var(--ink)}
+  .doc .data b{color:var(--blue);font-weight:500}
+  .doc .data .tg{display:inline-block;background:var(--navy);color:#fff;font-family:'IBM Plex Sans';font-weight:700;font-size:28px;padding:8px 16px;border-radius:6px;margin-bottom:20px}
+  .datecard{position:absolute;left:72px;right:72px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:36px 40px}
+  .datecard .k{font-size:28px;color:var(--slate);font-weight:600}
+  .datecard .v{font-family:'Urbanist';font-weight:800;font-size:120px;letter-spacing:-.04em;color:var(--navy);line-height:1;margin-top:10px}
+  .inv{position:absolute;left:72px;right:72px;top:800px;background:#fff;border-radius:16px;padding:10px 0}
+  .inv .r{display:flex;justify-content:space-between;align-items:center;padding:24px 32px;border-top:1px solid var(--line);font-size:30px;color:var(--ink)}
+  .inv .r:first-child{border-top:0}
+  .inv .r .pill{position:relative}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 calculator app -->
+<section class="scene night">
+  <div class="phone" id="a_ph"><div class="island"></div><div class="scr" style="background:#000">
+    <div class="calc">
+      <div class="disp2"><div class="ex" id="a_ex">per e-invoice not issued</div><div class="rs num" id="a_rs"></div><div class="capnote" id="a_cap"></div></div>
+      <div class="keys">${KEYS}</div>
+    </div>
+  </div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 1 PDF → data file -->
+<section class="scene mist">
+  <div class="doc"><div class="f pdf" id="b_pdf"><span class="tg">PDF</span><i style="width:60%"></i><i></i><i style="width:80%"></i><i></i><i style="width:45%"></i><i></i><i style="width:70%"></i><i></i><i style="width:55%"></i></div>
+    <div class="f data" id="b_data"><span class="tg">The invoice</span><br>
+      <span>invoice_no</span>: <b>INV-2027-0142</b><br><span>seller_trn</span>: <b>1000•••••••0003</b><br><span>buyer_trn</span>: <b>1002•••••••0001</b><br><span>buyer_name</span>: <b>legal name</b><br><span>line_1.vat</span>: <b>standard 5%</b><br><span>total</span>: <b>12,600.00 AED</b><br><span>status</span>: <b>validated</b></div></div>
+  <div class="illus" style="top:1300px">Illustrative fields.</div>
+</section>
+
+<!-- 2 the route of an e-invoice -->
+<section class="scene navy">
+  <svg class="flow" width="1080" height="1920"><path id="c_p1" d="M540 610 V700" stroke="#fff" stroke-width="4" fill="none"/><path id="c_p2" d="M540 830 V920" stroke="#fff" stroke-width="4" fill="none"/><path id="c_p3" d="M540 1050 V1140" stroke="#fff" stroke-width="4" fill="none"/><path id="c_p4" d="M710 765 H860 V880" stroke="#B3A6FF" stroke-width="4" fill="none" stroke-dasharray="10 10"/></svg>
+  <div class="box" id="c_b1" style="left:290px;top:470px;width:500px">You<small>issue the invoice</small></div>
+  <div class="box" id="c_b2" style="left:370px;top:700px;width:340px">Your provider<small>accredited</small></div>
+  <div class="box" id="c_b3" style="left:290px;top:920px;width:500px">Customer's provider<small>accredited</small></div>
+  <div class="box" id="c_b4" style="left:290px;top:1140px;width:500px">Your customer<small>receives the data file</small></div>
+  <div class="box" id="c_b5" style="left:740px;top:880px;width:280px;border-style:dashed;font-size:30px">Tax authority<small>a copy is reported</small></div>
+</section>
+
+<!-- 3 go-live dates -->
+<section class="scene mist">
+  <div class="datecard" id="d_c1" style="top:470px"><div class="k" id="d_k1"></div><div class="v" id="d_v1"></div></div>
+  <div class="datecard" id="d_c2" style="top:800px"><div class="k">Everyone else</div><div class="v" id="d_v2"></div></div>
+</section>
+
+<!-- 4 the agent checks the invoices -->
+<section class="scene navy">
+  <div class="agent" id="e_ag" style="left:390px;top:420px;width:300px;height:375px"></div>
+  <div class="inv" id="e_inv">
+    <div class="r"><span>Customer tax number</span><span style="position:relative;width:200px;height:44px"><span class="pill r" id="e_r1" style="position:absolute;right:0">Missing</span><span class="pill g" id="e_g1" style="position:absolute;right:0;opacity:0">Fixed</span></span></div>
+    <div class="r"><span>Customer legal name</span><span style="position:relative;width:200px;height:44px"><span class="pill r" id="e_r2" style="position:absolute;right:0">Freehand</span><span class="pill g" id="e_g2" style="position:absolute;right:0;opacity:0">Fixed</span></span></div>
+    <div class="r"><span>VAT treatment per line</span><span style="position:relative;width:200px;height:44px"><span class="pill r" id="e_r3" style="position:absolute;right:0">Wrong</span><span class="pill g" id="e_g3" style="position:absolute;right:0;opacity:0">Fixed</span></span></div>
+  </div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">READY</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px">Free e-invoicing readiness check</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, EI = R.einvoicing, P = EI.penalties;
+const dd = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const n = (v) => Math.round(v).toLocaleString("en-US");
+document.querySelector(".keys").innerHTML = ["AC", "±", "%", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+"]
+  .map((k, i) => `<div class="k ${i < 3 ? "l" : i % 4 === 3 ? "o" : ""}" id="key${k === "×" ? "x" : k === "+" ? "p" : ""}">${k}</div>`).join("");
+$("#a_rs").textContent = "AED " + n(P.invoice_not_issued_aed);
+$("#d_k1").textContent = `Revenue AED ${EI.large.revenue_gte_aed / 1e6}m or more`;
+$("#d_v1").textContent = dd(EI.large.go_live);
+$("#d_v2").textContent = dd(EI.sme.go_live);
+$("#e_ag").innerHTML = KIT.body("#000");
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+RL.build();
+
+/* 0: frame 0 shows AED 100; then × 50 invoices = the monthly cap */
+const cnt = P.invoice_cap_aed_per_month / P.invoice_not_issued_aed;
+tl.fromTo("#a_ph", { y: 50, scale: 1.04 }, { y: 0, scale: 1, duration: 0.8, ease: "expo.out" }, 0);
+const k1 = RL.w(0, "e-invoice");
+tl.to("#keyx", { backgroundColor: "#fff", color: "#FF9F0A", duration: 0.1, yoyo: true, repeat: 1 }, k1 - 0.3); E.sfx("click", k1 - 0.3);
+tl.set("#a_ex", { textContent: `${n(P.invoice_not_issued_aed)} × ${cnt} invoices` }, k1 - 0.2);
+E.count($("#a_rs"), k1, P.invoice_cap_aed_per_month, { dur: 0.9, from: P.invoice_not_issued_aed, fmt: (v) => "AED " + n(v) });
+tl.set("#a_cap", { textContent: "= the monthly cap, every month" }, RL.w(0, "live"));
+KIT.punch("#a_rs", RL.w(0, "live"), 1.06); E.sfx("impact", RL.w(0, "live"));
+
+/* 1: the PDF flips into the data file */
+const s1 = RL.seg(1).start;
+tl.fromTo(".doc", { y: 100, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, s1 + 0.2);
+const fl = RL.w(1, "data") - 0.4;
+tl.to("#b_pdf", { rotationY: -180, duration: 0.7, ease: "expo.inOut" }, fl);
+tl.fromTo("#b_data", { rotationY: 180 }, { rotationY: 0, duration: 0.7, ease: "expo.inOut" }, fl); E.sfx("whoosh", fl);
+KIT.punch("#b_pdf", RL.w(1, "PDF"), 1.04);
+
+/* 2: the five-corner route draws itself */
+const s2 = RL.seg(2).start;
+tl.set(".box", { opacity: 0 }, 0);
+tl.fromTo("#c_b1", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35 }, s2 + 0.2);
+E.draw($("#c_p1"), RL.w(2, "provider") - 0.4, 0.3);
+tl.fromTo("#c_b2", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35 }, RL.w(2, "provider") - 0.1); E.sfx("pop", RL.w(2, "provider"));
+E.draw($("#c_p2"), RL.w(2, "customer's") - 0.3, 0.3);
+tl.fromTo("#c_b3", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35 }, RL.w(2, "customer's")); E.sfx("pop", RL.w(2, "customer's") + 0.1);
+E.draw($("#c_p3"), RL.w(2, "copy") - 0.3, 0.3);
+tl.fromTo("#c_b4", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35 }, RL.w(2, "copy"));
+E.draw($("#c_p4"), RL.w(2, "reported") - 0.2, 0.4);
+tl.fromTo("#c_b5", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(2)" }, RL.w(2, "reported")); E.sfx("chime", RL.w(2, "reported"));
+
+/* 3 */
+tl.fromTo("#d_c1", { x: -100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, "go") - 0.4); E.sfx("click", RL.w(3, "go"));
+tl.fromTo("#d_c2", { x: 100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, "Everyone") - 0.2); E.sfx("click", RL.w(3, "Everyone"));
+
+/* 4: the agent lands and each red flag turns green on its word */
+const s4 = RL.seg(4).start;
+KIT.dropIn($("#e_ag"), s4 + 0.1);
+tl.fromTo("#e_inv", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, s4 + 0.6);
+[["numbers", 1], ["names", 2], ["treatment", 3]].forEach(([w, i]) => tl.fromTo(`#e_r${i}`, { scale: 0.6 }, { scale: 1, duration: 0.3, ease: "back.out(2.4)" }, RL.w(4, w) - 0.1));
+[1, 2, 3].forEach((i) => {
+  const t = RL.w(4, "Fixed") + (i - 1) * 0.18;
+  tl.to(`#e_r${i}`, { opacity: 0, duration: 0.12 }, t);
+  tl.fromTo(`#e_g${i}`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t); E.sfx("pop", t);
+});
+
+/* 5 */
+const s5 = RL.seg(5).start;
+KIT.startAt("#f_ag", s5 - 0.6);
+tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s5 + 0.1);
+tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "READY") - 0.1); E.sfx("impact", RL.w(5, "READY"));
+</script>
+</body></html>

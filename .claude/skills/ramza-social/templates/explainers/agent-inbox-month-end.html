@@ -1,0 +1,173 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  #a_ph{left:150px;top:440px;width:780px;height:1560px}
+  .mav{width:64px;height:64px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;font-family:'Urbanist';font-weight:800;font-size:22px;color:var(--navy)}
+  .mav img{width:44px;height:44px;object-fit:contain}
+  .mrow{grid-template-columns:64px 1fr auto}
+  .sheet{position:absolute;left:72px;right:72px;top:820px;background:#fff;border:1px solid #CBD2DE;border-radius:8px;overflow:hidden;font-family:'IBM Plex Mono';font-size:24px}
+  .sheet .r{display:grid;grid-template-columns:60px 1fr 1fr 1fr;border-top:1px solid #E3E7F0}
+  .sheet .r span{padding:14px 12px;border-left:1px solid #E3E7F0;white-space:nowrap;overflow:hidden}
+  .sheet .r.h{background:#F1F3F7;color:var(--slate);border-top:0}
+  .sheet .bad{background:#FBE9E7;color:var(--red)}
+  .daytag{position:absolute;right:72px;top:440px;background:var(--red);color:#fff;font-family:'Urbanist';font-weight:800;font-size:56px;padding:10px 26px;border-radius:10px;z-index:3}
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:150px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+  .h{font-size:96px;color:#fff}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 the inbox fills up -->
+<section class="scene mist">
+  <div class="phone" id="a_ph"><div class="island"></div><div class="scr" style="background:#fff">
+    <div class="mail">
+      <div class="top"><h3>Inbox</h3><span class="badge num" id="a_bd">0</span></div>
+      <div id="a_rows"></div>
+    </div>
+  </div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 1 the spreadsheet -->
+<section class="scene">
+  <img class="photo" id="b_ph" src="HD/founder-stress.jpg" style="object-position:50% 30%">
+  <div class="daytag" id="b_day">Day 1</div>
+  <div class="sheet" id="b_sh"></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 2 the agent takes over: chips fly into it -->
+<section class="scene navy">
+  <div class="body"><div class="eyebrow">Month end, handed over</div>
+    <div class="disp h" style="margin-top:20px"><span class="line"><span>The agent</span></span><span class="line"><span class="accent">takes over.</span></span></div></div>
+  <div class="agent" id="c_ag" style="left:20px;top:820px;width:1040px;height:460px"></div>
+</section>
+
+<!-- 3 the RAMZA app: rows turn matched -->
+<section class="scene mist">
+  <div class="appwin" id="d_w" style="top:440px">
+    <div class="ah" id="d_ic"><span class="t">Month close</span><span class="s" id="d_mo"></span></div>
+    <div class="prog"><b id="d_pb"></b></div>
+    <div class="pk"><span>Bank credits matched</span><span class="num" id="d_pc">0%</span></div>
+    <div class="trow h"><span>Gateway</span><span>Bank line</span><span style="text-align:right">Amount</span><span style="text-align:right">Status</span></div>
+    <div id="d_rows"></div>
+  </div>
+  <div class="stamp" id="d_st" style="left:560px;top:1150px">INVOICES CLOSED</div>
+  <div class="illus" style="top:1300px">Illustrative rows from the RAMZA app.</div>
+</section>
+
+<!-- 4 proof -->
+<section class="scene night">
+  <div class="body"><div class="eyebrow" id="e_e"></div>
+    <div class="disp h" style="margin-top:20px"><span class="line"><span>Our own books.</span></span></div>
+    <div style="margin-top:60px">
+      <div class="stat" id="e_s1"><span class="k">Bank credits</span><span class="v num" id="e_v1">0</span></div>
+      <div class="stat" id="e_s2"><span class="k">Matched to payouts<br>and orders</span><span class="v num" id="e_v2">0%</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:36px;line-height:1.45">Omnia is RAMZA's founding company and first user.<br>Figures from the live RAMZA app.</div>
+  </div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">RECON</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px">Free month-end check</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const F = window.FACTS;
+const MAILS = [
+  ["Tabby", "LG/tabby-mark.png", "Settlement report", "Your payout has been sent · CSV attached", "09:02"],
+  ["Tamara", "LG/tamara-mark.png", "Payout summary", "Settlement batch, net of fees", "09:14"],
+  ["Stripe", "LG/stripe-mark.png", "Your payout is on its way", "Expected to arrive in 2 business days", "09:20"],
+  ["Telr", "LG/telr-mark.png", "Settlement statement", "AED, SAR, KWD transactions", "09:31"],
+  ["Courier", null, "COD remittance", "Cash collected, less shipping and COD fees", "09:40"],
+  ["Bank", null, "Credit advice", "NETWORK INTL · amount matches no order", "09:44"],
+];
+$("#a_rows").innerHTML = MAILS.map(([fr, logo, sb, pv, tm], i) => `<div class="mrow${i === 5 ? " hot" : ""}" id="a_m${i}">
+  <div class="mav">${logo ? `<img src="${logo}">` : fr === "Bank" ? "BANK" : "COD"}</div>
+  <div><div class="fr">${fr}</div><div class="sb">${sb}</div><div class="pv">${pv}</div></div><div class="tm">${tm}</div></div>`).join("");
+$("#b_sh").innerHTML = `<div class="r h"><span></span><span>A order</span><span>B payout</span><span>C bank</span></div>` +
+  [["1041", "1,240.00", "1,198.62", "?"], ["1042", "389.00", "—", "#N/A"], ["1043", "2,105.50", "2,034.71", "?"], ["1044", "640.00", "#REF!", "#N/A"], ["1045", "915.25", "884.40", "?"]]
+    .map((r, i) => `<div class="r"><span>${i + 2}</span>${r.map((c) => `<span class="${/[#?—]/.test(c) ? "bad" : ""}">${c}</span>`).join("")}</div>`).join("");
+const ROWS = [["LG/tabby-mark.png", "TABBY FZ LLC", "18,420.50"], ["LG/tamara-mark.png", "TAMARA PAYOUT", "9,870.00"], ["LG/stripe-mark.png", "NETWORK INTL", "12,306.18"], ["LG/telr-mark.png", "TELR SETTLEMENT", "6,215.40"], [null, "COURIER COD", "4,980.00"]];
+$("#d_rows").innerHTML = ROWS.map(([lg, nm, amt], i) => `<div class="trow" id="d_r${i}"><span>${lg ? `<img src="${lg}">` : `<b style="font-family:Urbanist">COD</b>`}</span><span class="d">${nm}</span><span class="m">${amt}</span>
+  <span class="st"><span class="pill a" id="d_pa${i}">Pending</span><span class="pill g" id="d_pg${i}" style="opacity:0">Matched</span></span></div>`).join("");
+$("#d_ic").insertAdjacentHTML("afterbegin", KIT.mark(true));
+$("#d_mo").textContent = F.close_month;
+$("#c_ag").innerHTML = KIT.feed("#000");
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+RL.build();
+
+/* 0: frame 0 shows the inbox with the first mail; the rest land on their names */
+const at0 = [0, RL.w(0, "Tamara"), RL.w(0, "Stripe"), RL.w(0, "Telr"), RL.w(0, "cash"), RL.w(0, "bank")];
+tl.fromTo("#a_ph", { y: 60, scale: 1.04 }, { y: 0, scale: 1, duration: 0.8, ease: "expo.out" }, 0);
+at0.forEach((t, i) => {
+  tl.fromTo(`#a_m${i}`, { y: -40, opacity: 0 }, { y: 0, opacity: i === 0 ? 1 : 1, duration: 0.35, ease: "back.out(1.8)" }, Math.max(0, t - 0.1));
+  tl.set("#a_bd", { textContent: String(i + 1) }, Math.max(0, t - 0.05));
+  if (i) E.sfx("pop", t);
+});
+tl.set("#a_m0", { opacity: 1, y: 0 }, 0);
+KIT.punch("#a_m5", RL.w(0, "none"), 1.04); E.sfx("impact", RL.w(0, "none"));
+
+/* 1: days tick by while the sheet fills with errors */
+const s1 = RL.seg(1).start;
+E.kenBurns("#b_ph", s1, RL.seg(1).end - s1, { from: 1.1, to: 1.0 });
+tl.fromTo("#b_sh", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(1, "spreadsheet") - 0.2);
+tl.fromTo("#b_sh .r:not(.h)", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.25, stagger: 0.25 }, RL.w(1, "matching"));
+["Day 1", "Day 2", "Day 3", "Day 4"].forEach((d, i) => tl.set("#b_day", { textContent: d }, RL.w(1, "Line") + i * 0.45));
+KIT.punch("#b_day", RL.w(1, "days"), 1.12); E.sfx("click", RL.w(1, "days"));
+
+/* 2: the agent; its payout-feed loop starts with the scene */
+const s2 = RL.seg(2).start;
+E.lines(".scene:nth-of-type(3) .disp", s2 + 0.3);
+KIT.startAt("#c_ag", s2 + 0.1);
+tl.fromTo("#c_ag", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2)" }, s2 + 0.2); E.sfx("impact", s2 + 0.3);
+
+/* 3: rows flip to matched, the bar fills, invoices closed */
+const s3 = RL.seg(3).start;
+tl.fromTo("#d_w", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, s3 + 0.2);
+const f0 = RL.w(3, "matches"), f1 = RL.w(3, "Zoho");
+ROWS.forEach((_, i) => {
+  const t = f0 + ((f1 - f0) * i) / ROWS.length;
+  tl.to(`#d_pa${i}`, { opacity: 0, duration: 0.15 }, t);
+  tl.fromTo(`#d_pg${i}`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t); E.sfx("pop", t);
+});
+tl.fromTo("#d_pb", { scaleX: 0 }, { scaleX: 1, duration: f1 - f0, ease: "none" }, f0);
+E.count($("#d_pc"), f0, 100, { dur: f1 - f0, fmt: (v) => Math.round(v) + "%" });
+tl.fromTo("#d_st", { scale: 2.2, opacity: 0, rotation: -8 }, { scale: 1, opacity: 1, rotation: -8, duration: 0.35, ease: "power4.in" }, RL.w(3, "Books")); E.sfx("impact", RL.w(3, "Books") + 0.3);
+
+/* 4 */
+const s4 = RL.seg(4).start;
+$("#e_e").textContent = `${F.close_month} close · Omnia`;
+E.lines(".scene:nth-of-type(5) .disp", s4 + 0.3);
+const c1 = RL.w(4, String(F.close_credits)), c2 = RL.w(4, F.close_matched_pct + "%");
+tl.fromTo("#e_s1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c1 - 0.3);
+E.count($("#e_v1"), c1 - 0.2, F.close_credits, { dur: 1.0 });
+tl.fromTo("#e_s2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c2 - 0.3);
+E.count($("#e_v2"), c2 - 0.2, F.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+E.sfx("chime", RL.w(4, "matched"));
+
+/* 5 */
+const s5 = RL.seg(5).start;
+KIT.startAt("#f_ag", s5 - 0.6);
+tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s5 + 0.1);
+tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "RECON") - 0.1); E.sfx("impact", RL.w(5, "RECON"));
+</script>
+</body></html>

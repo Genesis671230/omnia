@@ -43,4 +43,16 @@ const E = {
   },
 };
 window.E = E;
-window.__seek = (t) => { E.tl.seek(t, false); };
+/* CSS keyframe animations (the agent logo, agent.css) are driven by the same clock: paused
+ * and set to the frame time, offset by the nearest ancestor's data-t0 (seconds) so an
+ * animation can start when its scene does. */
+window.__seek = (t) => {
+  E.tl.seek(t, false);
+  for (const a of document.getAnimations()) {
+    if (typeof CSSAnimation === "undefined" || !(a instanceof CSSAnimation)) continue;
+    const host = a.effect?.target?.closest?.("[data-t0]");
+    const t0 = host ? +host.dataset.t0 : 0;
+    a.pause();
+    a.currentTime = Math.max(0, t - t0) * 1000;
+  }
+};

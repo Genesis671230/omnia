@@ -1,0 +1,143 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  .hook{position:absolute;left:72px;right:72px;top:440px;z-index:3}
+  .hook .n{font-family:'Urbanist';font-weight:800;font-size:250px;letter-spacing:-.05em;line-height:.9;color:var(--navy)}
+  .hook .s{font-size:44px;font-weight:600;color:var(--ink);margin-top:14px;line-height:1.2}
+  #p0{left:180px;top:340px;width:720px;height:1440px;transform:scale(.42) rotate(4deg)}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 top-down desk: the phone lights up -->
+<section class="scene mist">
+  <div class="desk" id="a_desk">
+    <div class="grain"></div>
+    <div class="laptop"><i></i><b></b></div>
+    <div class="note"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cup"></div>
+    <div class="pen"></div>
+    <div class="phone" id="p0"><div class="island"></div><div class="scr">
+      <div class="lock-date" id="a_date"></div>
+      <div class="lock-time">09:41</div>
+      <div class="notifs mid">
+        <div class="notif" id="a_n1"><div class="ic" id="a_ic"></div><div><div class="app">RAMZA agent</div><div class="ti" id="a_t1"></div><div class="bd" id="a_b1"></div></div><div class="tm">now</div></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="hook" id="a_hook"><div class="n" id="a_n"></div><div class="s">to appoint an e-invoicing provider</div></div>
+</section>
+
+<!-- 1 Noor: the monthly penalty -->
+<section class="scene">
+  <img class="photo" id="b_ph" src="HD/noor-einv.jpg" style="object-position:50% 20%">
+  <div class="aitag">AI presenter · Noor</div>
+  <div class="bigcard" id="b_c" style="top:930px"><div class="k">Late appointment</div><div class="v num" id="b_v">AED 0</div><div class="s">for every month, or part of a month</div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 2 portal view (illustration) -->
+<section class="scene mist">
+  <div class="portal" id="c_w" style="top:440px">
+    <div class="bar"><i></i><i></i><i></i><div class="url">tax portal · illustration</div></div>
+    <div class="head"><span class="t">E-invoicing</span><span class="u">Status</span></div>
+    <div class="grid">
+      <div class="rw" id="c_r1"><span>Accredited provider</span><span><span class="pill r">Not appointed</span></span></div>
+      <div class="rw" id="c_r2"><span>Go-live</span><span id="c_gl"></span></div>
+      <div class="rw" id="c_r3"><span>E-invoices not issued</span><span class="num" id="c_cnt" style="font-family:'IBM Plex Mono'">0</span></div>
+    </div>
+    <div class="meter"><div class="k">Penalty this month</div><div class="v num" id="c_v">AED 0</div><div style="margin-top:14px"><span class="pill a" id="c_cap">Monthly cap reached</span></div></div>
+  </div>
+  <div class="illus" style="top:1290px">Illustration — not a government screen.</div>
+</section>
+
+<!-- 3 the agent takes over -->
+<section class="scene navy">
+  <div class="agent" id="d_ag" style="left:390px;top:430px;width:300px;height:375px"></div>
+  <div class="body" style="top:840px">
+    <div class="check">
+      <div class="ck" id="d_k1"><div class="bx"></div><div><div class="t">Map invoices</div><div class="s">every place an invoice is created</div></div></div>
+      <div class="ck" id="d_k2"><div class="bx"></div><div><div class="t">Accredited provider</div><div class="s">appointed through our partner</div></div></div>
+      <div class="ck" id="d_k3"><div class="bx"></div><div><div class="t">One real test</div><div class="s">an e-invoice, end to end</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 CTA -->
+<section class="scene navy">
+  <div class="agent" id="e_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="e_kw" style="margin-top:30px"><span class="kw">READY</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px">Free e-invoicing readiness checklist</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, EI = R.einvoicing, P = EI.penalties;
+const dd = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const left = Math.round((Date.parse(EI.large.asp_by) - Date.parse(today)) / 864e5);
+const aed = (v) => "AED " + Math.round(v).toLocaleString("en-US");
+$("#a_n").textContent = `${left} days`;
+$("#a_date").textContent = new Date(today + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+$("#a_ic").innerHTML = KIT.mark(true);
+$("#a_t1").textContent = `${left} days left: e-invoicing provider`;
+$("#a_b1").textContent = `Revenue AED ${EI.large.revenue_gte_aed / 1e6}m+: appoint by ${dd(EI.large.asp_by)}`;
+$("#c_gl").textContent = dd(EI.large.go_live);
+$("#d_ag").innerHTML = KIT.body("#000");
+$("#e_ag").innerHTML = KIT.sticker("#FF6A1A");
+document.querySelectorAll(".ck .bx").forEach((b) => (b.innerHTML = KIT.tick));
+RL.build();
+
+/* 0: frame 0 already shows the number; the notification lands, then the camera drops onto the phone */
+tl.fromTo("#a_desk", { scale: 1.06, rotation: -1.5 }, { scale: 1, rotation: 0, duration: 2.2, ease: "power2.out" }, 0);
+KIT.punch("#a_n", RL.w(0, "days"), 1.05);
+tl.fromTo("#a_n1", { y: -60, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, 0.5); E.sfx("pop", 0.5);
+const z0 = RL.w(0, "appoint") - 0.2;
+tl.to("#a_hook", { opacity: 0, y: -40, duration: 0.3 }, z0 - 0.1);
+tl.set("#a_desk", { transformOrigin: "540px 1060px" }, 0);
+tl.to("#a_desk", { scale: 2.38, rotation: -4, duration: 0.7, ease: "expo.inOut" }, z0); E.sfx("whoosh", z0);
+KIT.punch("#a_n1", RL.w(0, "October") , 1.05);
+
+/* 1 */
+const s1 = RL.seg(1).start;
+E.kenBurns("#b_ph", s1, RL.seg(1).end - s1, { from: 1.08, to: 1.0 });
+tl.fromTo("#b_c", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(1, "penalty") - 0.3);
+E.count($("#b_v"), RL.w(1, "penalty"), P.asp_late_aed_per_month, { dur: 0.9, fmt: aed });
+KIT.punch("#b_c", RL.w(1, "part"), 1.04); E.sfx("click", RL.w(1, "part"));
+
+/* 2: the meter climbs to the monthly cap */
+const s2 = RL.seg(2).start;
+tl.fromTo("#c_w", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, s2 + 0.2);
+const m0 = RL.w(2, "each") - 0.1, m1 = RL.w(2, "month") - 0.1;
+const per = P.invoice_not_issued_aed, cap = P.invoice_cap_aed_per_month, n = cap / per;
+E.count($("#c_cnt"), m0, n, { dur: m1 - m0 });
+E.count($("#c_v"), m0, cap, { dur: m1 - m0, fmt: aed });
+tl.fromTo("#c_cap", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(2.4)" }, m1); E.sfx("impact", m1);
+
+/* 3: the agent drops in and ticks the plan */
+const s3 = RL.seg(3).start;
+KIT.dropIn($("#d_ag"), s3 + 0.15);
+tl.set(".ck", { opacity: 0 }, 0);
+KIT.checkRow($("#d_k1"), RL.w(3, "maps"));
+KIT.checkRow($("#d_k2"), RL.w(3, "accredited"));
+KIT.checkRow($("#d_k3"), RL.w(3, "test"));
+E.sfx("chime", RL.w(3, "test") + 0.3);
+
+/* 4 */
+const s4 = RL.seg(4).start;
+KIT.startAt("#e_ag", s4 - 0.6);
+tl.fromTo("#e_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s4 + 0.1);
+tl.fromTo("#e_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(4, "READY") - 0.1); E.sfx("impact", RL.w(4, "READY"));
+</script>
+</body></html>

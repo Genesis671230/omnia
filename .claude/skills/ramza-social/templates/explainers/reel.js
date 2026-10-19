@@ -28,8 +28,10 @@ const RL = {
     const scenes = [...document.querySelectorAll(".scene")];
     const chrome = document.createElement("div");
     chrome.id = "chrome";
-    chrome.innerHTML = `<img class="lock" id="lockInk" src="BRAND/ramza-lockup-ink.png"><img class="lock" id="lockW" src="BRAND/ramza-lockup-white.png" style="opacity:0">
-      <div class="site">ramza.ai</div><div id="bars">${segs.map(() => "<i><b></b></i>").join("")}</div>`;
+    /* The agent logo (eyes blink and turn into "=", agent.css) + wordmark, one element that
+       recolours with the scene. Sits inside Instagram's 4:5 feed crop (y 285–1635). */
+    chrome.innerHTML = `<div class="lock" id="lock"><svg viewBox="20 20 160 160" class="ra-motion"><rect x="20" y="20" width="160" height="160" rx="54" fill="#3A55E6"/><rect class="ra-eye ra-idle-l" x="68" y="72" width="22" height="50" rx="11" fill="#fff"/><rect class="ra-eye ra-idle-r" x="110" y="72" width="22" height="50" rx="11" fill="#fff"/></svg><span>ramza</span></div>
+      <div id="bars">${segs.map(() => "<i><b></b></i>").join("")}</div>`;
     const caps = document.createElement("div"); caps.id = "caps";
     const disc = document.createElement("div"); disc.id = "disc"; disc.textContent = window.DISCLAIMER || "";
     const stage = document.querySelector(".stage");
@@ -46,8 +48,6 @@ const RL = {
         E.sfx("swish", s.start);
       }
       tl.set(chrome, { attr: { class: s.dark ? "dark" : "" } }, s.start + 0.25);
-      tl.set("#lockInk", { opacity: s.dark ? 0 : 1 }, s.start + 0.25);
-      tl.set("#lockW", { opacity: s.dark ? 1 : 0 }, s.start + 0.25);
       tl.fromTo(bars[i], { scaleX: 0 }, { scaleX: 1, duration: s.end - s.start, ease: "none" }, s.start);
       RL.chunks(s.tokens).forEach((ch, j, all) => {
         const el = document.createElement("div");

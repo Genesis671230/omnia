@@ -1,0 +1,169 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  .hook{position:absolute;left:72px;right:72px;top:440px;z-index:3}
+  .hook .n{font-family:'Urbanist';font-weight:800;font-size:170px;letter-spacing:-.05em;line-height:.92;color:var(--navy)}
+  .hook .s{font-size:42px;font-weight:600;color:var(--ink);margin-top:14px}
+  #p0{left:180px;top:340px;width:720px;height:1440px;transform:scale(.42) rotate(4deg)}
+  .months{display:grid;grid-template-columns:repeat(13,1fr);gap:6px;padding:0 32px 30px;background:#FAFBFC}
+  .months i{height:44px;border-radius:5px;background:#E3E7F0;transform-origin:bottom}
+  .months i.on{background:var(--red)}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:140px;background:#fff;color:var(--navy);padding:18px 50px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 top-down desk: an email lands -->
+<section class="scene mist">
+  <div class="desk" id="a_desk">
+    <div class="grain"></div>
+    <div class="laptop"><i></i><b></b></div>
+    <div class="note"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cup"></div>
+    <div class="pen"></div>
+    <div class="phone" id="p0"><div class="island"></div><div class="scr">
+      <div class="lock-date" id="a_date"></div>
+      <div class="lock-time">09:41</div>
+      <div class="notifs mid">
+        <div class="notif" id="a_n1"><div class="ic" style="background:#EEF1F7;color:var(--navy);font-family:Urbanist;font-weight:800;font-size:30px">@</div><div><div class="app">Mail · Your accountant</div><div class="ti" id="a_t1"></div><div class="bd" id="a_b1"></div></div><div class="tm">now</div></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="hook" id="a_hook"><div class="n" id="a_n"></div><div class="s">Corporate Tax return, December year-ends</div></div>
+</section>
+
+<!-- 1 portal: the meter -->
+<section class="scene mist">
+  <div class="portal" id="b_w" style="top:440px">
+    <div class="bar"><i></i><i></i><i></i><div class="url">tax portal · illustration</div></div>
+    <div class="head"><span class="t" id="b_t"></span><span class="u">Return</span></div>
+    <div class="grid">
+      <div class="rw"><span>Due date</span><span id="b_due"></span></div>
+      <div class="rw"><span>Status</span><span><span class="pill r">Not filed</span></span></div>
+      <div class="rw"><span>Months late</span><span class="num" id="b_m" style="font-family:'IBM Plex Mono'">0</span></div>
+    </div>
+    <div class="meter"><div class="k">Estimated late-filing penalty</div><div class="v num" id="b_v">AED 0</div></div>
+    <div class="months" id="b_ms"></div>
+  </div>
+  <div class="illus" style="top:1300px">Illustration — not a government screen. Estimate only.</div>
+</section>
+
+<!-- 2 Noor: interest -->
+<section class="scene">
+  <img class="photo" id="c_ph" src="HD/noor-overdue.jpg" style="object-position:50% 20%">
+  <div class="aitag">AI presenter · Noor</div>
+  <div class="bigcard" id="c_c" style="top:930px"><div class="k">Unpaid tax</div><div class="v num" id="c_v"></div><div class="s">a year, charged monthly</div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 3 agent: books → statements → filed -->
+<section class="scene navy">
+  <div class="agent" id="d_ag" style="left:390px;top:430px;width:300px;height:375px"></div>
+  <div class="body" style="top:840px">
+    <div class="check">
+      <div class="ck" id="d_k1"><div class="bx"></div><div><div class="t">Books closed</div><div class="s">the whole year, bank to ledger</div></div></div>
+      <div class="ck" id="d_k2"><div class="bx"></div><div><div class="t">Statements prepared</div><div class="s">ready for the return</div></div></div>
+      <div class="ck" id="d_k3"><div class="bx"></div><div><div class="t">Filed</div><div class="s" id="d_p"></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 Noor: the offer -->
+<section class="scene">
+  <img class="photo" id="e_ph" src="HD/noor-helps.jpg" style="object-position:50% 20%">
+  <div class="aitag">AI presenter · Noor</div>
+  <div class="bigcard" id="e_c" style="top:880px"><div class="k">Late-filer rescue</div><div class="v num" id="e_v"></div><div class="s">one-off · books, statements, filing</div><div style="margin-top:18px"><span class="pill r" id="e_until"></span></div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">RESCUE</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px">or message us on WhatsApp</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, CT = R.ct, lf = CT.late_filing_penalty, due = CT.deadlines[0];
+const dd = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const aed = (v) => "AED " + Math.round(v).toLocaleString("en-US");
+$("#a_n").textContent = `Due ${dd(due.due)}`;
+$("#a_date").textContent = new Date(today + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+$("#a_t1").textContent = `FY ${due.fy_end.slice(0, 4)} Corporate Tax return`;
+$("#a_b1").textContent = `The due date was ${dd(due.due)}. Shall we start?`;
+$("#b_t").textContent = `Corporate Tax · FY ${due.fy_end.slice(0, 4)}`;
+$("#b_due").textContent = dd(due.due);
+$("#b_ms").innerHTML = Array.from({ length: 13 }, () => "<i></i>").join("");
+$("#c_v").textContent = Math.round(CT.late_payment.rate_pa * 100) + "%";
+$("#e_v").textContent = aed(R.pricing.one_off.late_filing_rescue_aed);
+$("#e_until").textContent = `Offer until ${dd(R.campaign.rescue_mode_until)}`;
+$("#d_p").textContent = `by ${R.partner.filing_partner}, our licensed partner`;
+$("#d_ag").innerHTML = KIT.body("#000");
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+document.querySelectorAll(".ck .bx").forEach((b) => (b.innerHTML = KIT.tick));
+RL.build();
+
+/* 0 */
+tl.fromTo("#a_desk", { scale: 1.06, rotation: -1.5 }, { scale: 1, rotation: 0, duration: 2.2, ease: "power2.out" }, 0);
+tl.fromTo("#a_n1", { y: -60, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, 0.5); E.sfx("pop", 0.5);
+const z0 = RL.w(0, "return") - 0.2;
+tl.to("#a_hook", { opacity: 0, y: -40, duration: 0.3 }, z0 - 0.1);
+tl.set("#a_desk", { transformOrigin: "540px 1060px" }, 0);
+tl.to("#a_desk", { scale: 2.38, rotation: -4, duration: 0.7, ease: "expo.inOut" }, z0); E.sfx("whoosh", z0);
+
+/* 1: months light up one by one; the penalty steps up, and doubles per month from 13 */
+const s1 = RL.seg(1).start;
+tl.fromTo("#b_w", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, s1 + 0.2);
+const m0 = RL.w(1, "penalty"), m1 = RL.w(1, "thirteen");
+const bars = document.querySelectorAll("#b_ms i");
+for (let m = 1; m <= 13; m++) {
+  const t = m0 + ((m1 - m0) * (m - 1)) / 12;
+  const total = Math.min(m, 12) * lf.months_1_12_aed + Math.max(0, m - 12) * lf.month_13_plus_aed;
+  tl.set(bars[m - 1], { className: "on" }, t);
+  tl.fromTo(bars[m - 1], { scaleY: 0.3 }, { scaleY: 1, duration: 0.2, ease: "back.out(3)" }, t);
+  tl.set("#b_m", { textContent: String(m) }, t);
+  tl.set("#b_v", { textContent: aed(total) }, t);
+  if (m % 3 === 1) E.sfx("click", t);
+}
+KIT.punch("#b_v", m1, 1.08); E.sfx("impact", m1);
+
+/* 2 */
+const s2 = RL.seg(2).start;
+E.kenBurns("#c_ph", s2, RL.seg(2).end - s2, { from: 1.08, to: 1.0 });
+tl.fromTo("#c_c", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(2, "adds") - 0.2);
+KIT.punch("#c_c", RL.w(2, "monthly"), 1.04);
+
+/* 3 */
+const s3 = RL.seg(3).start;
+KIT.dropIn($("#d_ag"), s3 + 0.15);
+tl.set(".ck", { opacity: 0 }, 0);
+KIT.checkRow($("#d_k1"), RL.w(3, "books"));
+KIT.checkRow($("#d_k2"), RL.w(3, "statements"));
+KIT.checkRow($("#d_k3"), RL.w(3, "files"));
+E.sfx("chime", RL.w(3, "files") + 0.3);
+
+/* 4 */
+const s4 = RL.seg(4).start;
+E.kenBurns("#e_ph", s4, RL.seg(4).end - s4, { from: 1.08, to: 1.0 });
+tl.fromTo("#e_c", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, s4 + 0.4);
+tl.fromTo("#e_until", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "back.out(2.4)" }, RL.w(4, "until")); E.sfx("pop", RL.w(4, "until"));
+
+/* 5 */
+const s5 = RL.seg(5).start;
+KIT.startAt("#f_ag", s5 - 0.6);
+tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s5 + 0.1);
+tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "RESCUE") - 0.1); E.sfx("impact", RL.w(5, "RESCUE"));
+</script>
+</body></html>

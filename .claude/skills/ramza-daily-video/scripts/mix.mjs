@@ -2,6 +2,8 @@
  * real sound effects (Pixabay, sfx/CREDITS.md), placed at the cues the page
  * logged. Effects are quiet on purpose: they should feel like UI, never like
  * an alarm. Usage: node mix.mjs <outDir> <file.mp4> [music-file] [music-vol]
+ * Video: H.264 High@4.2, 30 fps, CRF 14 capped at 24 Mbps, BT.709 tagged — Instagram and
+ * Facebook re-encode everything, and a high-bitrate source is what keeps text sharp after.
  * Media comes from ../media (scripts/fetch-media.sh) or $RAMZA_MEDIA. */
 import fs from "node:fs";
 import { execSync } from "node:child_process";
@@ -55,5 +57,5 @@ cues.forEach((c, i) => {
 f.push(`${labels.join("")}amix=inputs=${labels.length}:normalize=0:duration=first,alimiter=limit=0.9,aformat=sample_rates=48000:channel_layouts=stereo[out]`);
 fs.writeFileSync(`${dir}/fc.txt`, f.join(";\n"));
 execSync(`ffmpeg -y -loglevel error ${inputs.join(" ")} -filter_complex_script ${dir}/fc.txt -map "[out]" -t ${dur} ${dir}/audio.wav`, { stdio: "inherit" });
-execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/frames/f%05d.jpg -i ${dir}/audio.wav -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart ${dir}/${outName}`, { stdio: "inherit" });
+execSync(`ffmpeg -y -loglevel error -framerate 30 -i ${dir}/frames/f%05d.jpg -i ${dir}/audio.wav -c:v libx264 -preset slow -crf 14 -profile:v high -level 4.2 -pix_fmt yuv420p -r 30 -g 60 -bf 2 -maxrate 24M -bufsize 48M -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a aac -b:a 192k -ar 48000 -ac 2 -shortest -movflags +faststart ${dir}/${outName}`, { stdio: "inherit" });
 console.log("ok", outName, cues.length, "cues");

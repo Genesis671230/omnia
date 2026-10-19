@@ -29,7 +29,13 @@ body{font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smooth
 
 /* chrome */
 #chrome{position:absolute;inset:0;z-index:50;pointer-events:none}
-#chrome .lock{position:absolute;left:72px;top:96px;height:46px}
+#chrome .lock{position:absolute;left:72px;top:96px;height:46px;display:flex;align-items:center;gap:14px}
+#chrome .lock svg{width:46px;height:46px}
+#chrome .lock span{font-family:'Urbanist';font-weight:700;font-size:40px;letter-spacing:-.03em;color:var(--ink)}
+#chrome.dark .lock span{color:#fff}
+/* body.safe: chrome and bars inside the 4:5 feed crop, content from y 420 */
+body.safe #chrome .lock{top:300px}
+body.safe #bars{top:372px}
 #chrome .site{position:absolute;right:72px;top:104px;font-size:26px;font-weight:500;color:var(--slate)}
 #chrome.dark .site{color:#9AA3BC}
 #bars{position:absolute;left:72px;right:72px;top:176px;display:flex;gap:8px}

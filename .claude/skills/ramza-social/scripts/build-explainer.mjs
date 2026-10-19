@@ -88,7 +88,7 @@ segs[segs.length - 1].end = total;
 for (const f of fs.readdirSync(TPL)) if (/\.(css|js)$/.test(f)) fs.copyFileSync(`${TPL}/${f}`, `${dir}/${f}`);
 fs.copyFileSync(`${TPL}/${id}.html`, `${dir}/video.html`);
 fs.copyFileSync(`${VIDEO}/scripts/engine.js`, `${dir}/engine.js`);
-for (const [ln, to] of [["PHOTO", "public/ramza/photos"], ["BRAND", "public/ramza/brand"], ["LG", "public/ramza/logos"], ["GW", "public/gateways"]]) {
+for (const [ln, to] of [["PHOTO", "public/ramza/photos"], ["BRAND", "public/ramza/brand"], ["LG", "public/ramza/logos"], ["GW", "public/gateways"], ["HD", ".claude/skills/ramza-social/templates/photos/hd"]]) {
   fs.rmSync(`${dir}/${ln}`, { force: true });
   fs.symlinkSync(`${REPO}/${to}`, `${dir}/${ln}`);
 }

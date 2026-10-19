@@ -1,0 +1,152 @@
+/* Reel kit (2026-10-20): app-style UI pieces for the 5 "agent" reels. Flat surfaces, hairlines,
+   ink type; colour only for state (amber pending, green matched, red overdue). Government-style
+   screens are a neutral, unbranded "tax portal" and always carry an "Illustration" label. */
+@import url("agent.css");
+
+body.safe .body{top:440px}
+
+/* ---- top-down desk (camera looks straight down) ---- */
+.desk{position:absolute;inset:0;background:#E7E9EE;transform-origin:540px 960px;will-change:transform}
+.desk .grain{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,rgba(20,19,28,.025) 0 2px,transparent 2px 9px)}
+.desk .laptop{position:absolute;left:90px;top:520px;width:560px;height:380px;border-radius:22px;background:#C9CDD6;box-shadow:0 18px 30px -18px rgba(11,21,51,.45);transform:rotate(-8deg)}
+.desk .laptop i{position:absolute;left:34px;right:34px;top:34px;bottom:120px;border-radius:10px;background:repeating-linear-gradient(90deg,#B8BCC6 0 34px,#C9CDD6 34px 40px)}
+.desk .laptop b{position:absolute;left:190px;right:190px;bottom:28px;height:70px;border-radius:10px;background:#BDC1CB}
+.desk .note{position:absolute;left:690px;top:300px;width:300px;height:400px;background:#fff;border-radius:6px;box-shadow:0 14px 26px -16px rgba(11,21,51,.4);transform:rotate(6deg)}
+.desk .note i{display:block;height:2px;background:#E3E7F0;margin:46px 30px 0}
+.desk .cup{position:absolute;left:150px;top:1080px;width:190px;height:190px;border-radius:50%;background:#fff;box-shadow:0 14px 24px -14px rgba(11,21,51,.45)}
+.desk .cup:after{content:"";position:absolute;inset:26px;border-radius:50%;background:#6B4A33}
+.desk .pen{position:absolute;left:720px;top:1360px;width:260px;height:16px;border-radius:8px;background:#0B1533;transform:rotate(-24deg)}
+.desk .hands{position:absolute;left:0;right:0;top:1640px;height:280px;background:#D8DBE2}
+.desk .phone{left:440px;top:820px;width:300px;height:600px;border-radius:44px;transform:rotate(4deg);box-shadow:0 22px 36px -18px rgba(11,21,51,.55)}
+.desk .phone .scr{border-radius:36px;inset:8px}
+.camtag{position:absolute;left:72px;top:440px;font-size:24px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);z-index:3}
+
+/* ---- phone ---- */
+.phone{position:absolute;background:#0E0F14;border-radius:84px;overflow:hidden}
+.phone .scr{position:absolute;inset:16px;border-radius:70px;background:#0B1533;overflow:hidden;color:#fff}
+.phone .island{position:absolute;left:50%;top:22px;width:34%;height:5.4%;margin-left:-17%;border-radius:40px;background:#000;z-index:5}
+.lock-time{position:absolute;left:0;right:0;top:11%;text-align:center;font-family:'Urbanist';font-weight:600;font-size:200px;letter-spacing:-.03em;line-height:1}
+.lock-date{position:absolute;left:0;right:0;top:8%;text-align:center;font-size:34px;font-weight:500;color:#C4CAD9}
+.notifs{position:absolute;left:28px;right:28px;bottom:120px;display:flex;flex-direction:column;gap:16px}
+.notif{background:rgba(255,255,255,.94);color:var(--ink);border-radius:34px;padding:24px 26px;display:grid;grid-template-columns:70px 1fr auto;gap:18px;align-items:start}
+.notif .ic{width:70px;height:70px;border-radius:18px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.notif .ic svg{width:70px;height:70px}
+.notif .app{font-size:23px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.06em}
+.notif .ti{font-size:31px;font-weight:600;line-height:1.2;margin-top:4px}
+.notif .bd{font-size:27px;color:var(--slate);line-height:1.3;margin-top:4px}
+.notif .tm{font-size:23px;color:var(--mute)}
+
+/* ---- mail app ---- */
+.mail{position:absolute;inset:0;background:#fff;color:var(--ink)}
+.mail .top{padding:120px 40px 18px;display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line)}
+.mail .top h3{font-family:'Urbanist';font-size:64px;font-weight:700;letter-spacing:-.03em}
+.mail .badge{font-size:26px;font-weight:600;background:var(--red);color:#fff;border-radius:20px;padding:6px 16px}
+.mrow{display:grid;grid-template-columns:22px 1fr auto;gap:16px;padding:24px 40px;border-bottom:1px solid var(--line);align-items:start}
+.mrow .dot{width:16px;height:16px;border-radius:50%;background:var(--indigo);margin-top:12px}
+.mrow .fr{font-size:30px;font-weight:700}
+.mrow .sb{font-size:28px;font-weight:500;margin-top:2px}
+.mrow .pv{font-size:25px;color:var(--slate);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:640px}
+.mrow .tm{font-size:24px;color:var(--mute)}
+.mrow.hot{background:#FFF6F5}
+.mrow.hot .fr{color:var(--red)}
+
+/* ---- email opened (big card) ---- */
+.email{position:absolute;left:72px;right:72px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -36px rgba(11,21,51,.35)}
+.email .hd{padding:30px 36px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:76px 1fr auto;gap:20px;align-items:center}
+.email .av{width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Urbanist';font-weight:800;font-size:34px;color:#fff;background:var(--navy);overflow:hidden}
+.email .av svg{width:76px;height:76px}
+.email .fr{font-size:30px;font-weight:700}
+.email .to{font-size:24px;color:var(--mute);margin-top:2px}
+.email .tm{font-size:24px;color:var(--mute)}
+.email .sj{padding:30px 36px 0;font-family:'Urbanist';font-size:50px;font-weight:700;letter-spacing:-.02em;line-height:1.1;color:var(--navy)}
+.email .bx{padding:22px 36px 36px;font-size:30px;line-height:1.45;color:var(--slate)}
+.email .bx b{color:var(--ink)}
+.email .btn{display:inline-block;margin-top:22px;background:var(--navy);color:#fff;font-weight:600;font-size:28px;padding:18px 30px;border-radius:10px}
+.pill{display:inline-block;font-size:24px;font-weight:600;padding:8px 16px;border-radius:999px;letter-spacing:.02em}
+.pill.r{background:#FBE9E7;color:var(--red)}
+.pill.a{background:#FFF3DC;color:#8A5A00}
+.pill.g{background:#E3F4EA;color:var(--green)}
+.pill.n{background:#EEF1F7;color:var(--slate)}
+
+/* ---- generic tax portal (illustration, unbranded) ---- */
+.portal{position:absolute;left:56px;right:56px;background:#fff;border:1px solid #D7DBE3;border-radius:14px;overflow:hidden;box-shadow:0 30px 60px -36px rgba(11,21,51,.35)}
+.portal .bar{height:64px;background:#ECEEF2;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid #D7DBE3}
+.portal .bar i{width:16px;height:16px;border-radius:50%;background:#C6CBD5}
+.portal .bar .url{margin-left:18px;flex:1;height:38px;border-radius:8px;background:#fff;border:1px solid #D7DBE3;font-size:22px;color:var(--mute);display:flex;align-items:center;padding:0 16px}
+.portal .head{padding:28px 32px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.portal .head .t{font-size:32px;font-weight:600;color:#3A4152}
+.portal .head .u{font-size:24px;color:var(--mute)}
+.portal .grid{display:grid;grid-template-columns:1fr auto;gap:0}
+.portal .rw{display:contents}
+.portal .rw>span{padding:26px 32px;border-bottom:1px solid var(--line);font-size:29px;color:#3A4152;display:flex;align-items:center}
+.portal .rw>span:last-child{justify-content:flex-end}
+.portal .meter{padding:30px 32px;background:#FAFBFC}
+.portal .meter .k{font-size:24px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);font-weight:600}
+.portal .meter .v{font-family:'Urbanist';font-weight:800;font-size:120px;letter-spacing:-.04em;color:var(--red);line-height:1;margin-top:8px}
+.illus{position:absolute;left:72px;right:72px;font-size:22px;color:var(--mute);text-align:center}
+
+/* ---- RAMZA app walkthrough ---- */
+.appwin{position:absolute;left:56px;right:56px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -36px rgba(11,21,51,.35)}
+.appwin .ah{display:flex;align-items:center;gap:16px;padding:24px 28px;border-bottom:1px solid var(--line)}
+.appwin .ah svg{width:44px;height:44px}
+.appwin .ah .t{font-family:'Urbanist';font-weight:700;font-size:36px;letter-spacing:-.02em}
+.appwin .ah .s{margin-left:auto;font-size:24px;color:var(--mute)}
+.appwin .prog{height:10px;background:#EEF1F7;margin:0 28px 0;border-radius:5px;overflow:hidden;margin-top:22px}
+.appwin .prog b{display:block;height:100%;background:var(--green);transform-origin:left;transform:scaleX(0)}
+.appwin .pk{display:flex;justify-content:space-between;padding:14px 28px 6px;font-size:24px;color:var(--slate)}
+.trow{display:grid;grid-template-columns:96px 1fr 210px 170px;gap:14px;padding:22px 28px;border-top:1px solid var(--line);align-items:center;font-size:26px}
+.trow img{height:34px;width:auto}
+.trow .d{color:var(--slate);font-size:24px}
+.trow .m{font-family:'IBM Plex Mono';font-size:25px;text-align:right}
+.trow .st{position:relative;height:42px}
+.trow .st .pill{position:absolute;right:0;top:0}
+.trow.h{font-size:21px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);background:#F6F7FA;padding:14px 28px}
+
+/* ---- checklist ---- */
+.check{display:flex;flex-direction:column;gap:20px}
+.ck{display:grid;grid-template-columns:72px 1fr;gap:24px;align-items:center;padding:28px 32px;background:#fff;border:1px solid var(--line);border-radius:14px}
+.ck .bx{width:72px;height:72px;border-radius:12px;border:3px solid #C6CBD5;position:relative}
+.ck .bx svg{position:absolute;inset:6px}
+.ck .t{font-family:'Urbanist';font-weight:700;font-size:44px;letter-spacing:-.02em;color:var(--navy)}
+.ck .s{font-size:27px;color:var(--slate);margin-top:4px}
+.navy .ck{background:#111D42;border-color:#1D2645}
+.navy .ck .t{color:#fff}
+.navy .ck .s{color:#C4CAD9}
+
+/* ---- calculator app ---- */
+.calc{position:absolute;inset:0;background:#000;color:#fff}
+.calc .disp2{position:absolute;right:50px;left:50px;top:300px;text-align:right}
+.calc .ex{font-size:56px;color:#8E8E93}
+.calc .rs{font-family:'Urbanist';font-weight:500;font-size:190px;letter-spacing:-.03em;line-height:1}
+.calc .keys{position:absolute;left:36px;right:36px;bottom:70px;display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.calc .k{aspect-ratio:1;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:62px}
+.calc .k.o{background:#FF9F0A}
+.calc .k.l{background:#A5A5A5;color:#000}
+
+/* ---- bank app ---- */
+.bankapp{position:absolute;inset:0;background:#F4F5F8;color:var(--ink)}
+.bankapp .hdr{padding:130px 40px 30px;font-size:30px;color:var(--slate)}
+.bankapp .bal{padding:0 40px;font-family:'Urbanist';font-weight:800;font-size:110px;letter-spacing:-.04em}
+.bankapp .cards{margin:40px 30px 0;background:#fff;border-radius:28px;padding:10px 0}
+.bankapp .tx{display:flex;justify-content:space-between;padding:24px 30px;border-bottom:1px solid var(--line);font-size:28px}
+.bankapp .tx:last-child{border-bottom:0}
+.bankapp .tx .a{font-family:'IBM Plex Mono';color:var(--green)}
+
+/* ---- photo scenes ---- */
+.capband{position:absolute;left:0;right:0;top:1330px;height:340px;background:#fff;opacity:.94}
+.navy .capband,.night .capband{background:var(--navy)}
+.aitag{position:absolute;left:72px;top:440px;z-index:3;background:#fff;color:var(--navy);font-size:24px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:10px 18px;border-radius:6px}
+.bigcard{position:absolute;left:72px;right:72px;background:#fff;border-radius:18px;padding:34px 40px;box-shadow:0 30px 60px -30px rgba(11,21,51,.5)}
+.bigcard .k{font-size:26px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);font-weight:600}
+.bigcard .v{font-family:'Urbanist';font-weight:800;font-size:130px;letter-spacing:-.045em;line-height:1;color:var(--navy);margin-top:8px}
+.bigcard .s{font-size:30px;color:var(--slate);margin-top:8px}
+
+/* ---- agent character ---- */
+.agent{position:absolute;overflow:visible}
+.stamp{position:absolute;font-family:'Urbanist';font-weight:800;font-size:64px;letter-spacing:.04em;color:var(--green);border:6px solid var(--green);border-radius:14px;padding:6px 26px;transform:rotate(-8deg)}
+.flow{position:absolute;left:0;top:0}
+.box{position:absolute;background:#fff;border:2px solid var(--navy);border-radius:14px;padding:22px 26px;font-family:'Urbanist';font-weight:700;font-size:36px;color:var(--navy);text-align:center}
+.box small{display:block;font-family:'IBM Plex Sans';font-weight:500;font-size:22px;color:var(--slate);margin-top:4px}
+.navy .box{background:#111D42;border-color:#3A4A7A;color:#fff}
+.navy .box small{color:#C4CAD9}
+.notifs.mid{bottom:auto;top:31%}

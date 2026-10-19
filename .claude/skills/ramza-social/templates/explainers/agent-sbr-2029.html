@@ -1,0 +1,148 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  #a_ph{left:150px;top:420px;width:780px;height:1560px}
+  .gauge{margin:36px 30px 0;background:#fff;border-radius:28px;padding:30px}
+  .gauge .k{font-size:26px;color:var(--slate);font-weight:600}
+  .gauge .tr{position:relative;height:28px;border-radius:14px;background:#EEF1F7;margin-top:22px;overflow:visible}
+  .gauge .fill{position:absolute;left:0;top:0;bottom:0;border-radius:14px;background:var(--green);transform-origin:left}
+  .gauge .lim{position:absolute;top:-14px;bottom:-14px;width:4px;background:var(--navy);left:80%}
+  .gauge .ll{position:absolute;left:80%;top:44px;transform:translateX(-50%);font-size:24px;font-weight:600;color:var(--navy);white-space:nowrap}
+  .xcard{position:absolute;left:72px;right:72px;display:grid;grid-template-columns:90px 1fr;gap:26px;align-items:center;background:#111D42;border:1px solid #1D2645;border-radius:16px;padding:32px 36px}
+  .xcard .x{width:90px;height:90px;border-radius:14px;background:#3A1620;color:#FF8A80;font-family:'Urbanist';font-weight:800;font-size:60px;display:flex;align-items:center;justify-content:center}
+  .xcard .t{font-family:'Urbanist';font-weight:700;font-size:46px;color:#fff;letter-spacing:-.02em}
+  .xcard .s{font-size:27px;color:#C4CAD9;margin-top:4px}
+  .h{font-size:92px;color:#fff}
+  .months{position:absolute;left:72px;right:72px;top:830px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .months div{background:#111D42;border:1px solid #1D2645;border-radius:12px;padding:20px 0;text-align:center;font-size:30px;font-weight:600;color:#C4CAD9;position:relative}
+  .months div.on{background:#E3F4EA;color:var(--green);border-color:#E3F4EA}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 banking app -->
+<section class="scene mist">
+  <div class="phone" id="a_ph"><div class="island"></div><div class="scr" style="background:#F4F5F8">
+    <div class="bankapp">
+      <div class="hdr">Illustration · revenue this year</div>
+      <div class="bal num" id="a_bal">AED 2,400,000</div>
+      <div class="gauge" id="a_g"><div class="k" id="a_gk"></div><div class="tr"><div class="fill" id="a_fill" style="width:64%"></div><div class="lim"></div><div class="ll" id="a_ll"></div></div><div style="height:50px"></div></div>
+      <div class="cards">
+        <div class="tx"><span>Card settlement</span><span class="a">+ 18,420.50</span></div>
+        <div class="tx"><span>Transfer in</span><span class="a">+ 6,215.40</span></div>
+        <div class="tx"><span>Payout</span><span class="a">+ 9,870.00</span></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 1 Noor: extended -->
+<section class="scene">
+  <img class="photo" id="b_ph" src="HD/noor-sbr.jpg" style="object-position:50% 20%">
+  <div class="aitag">AI presenter · Noor</div>
+  <div class="bigcard" id="b_c" style="top:900px"><div class="k">Small Business Relief</div><div class="v" id="b_v"></div><div class="s">tax periods ending on or before this date</div></div>
+  <div class="capband"></div>
+</section>
+
+<!-- 2 who it doesn't cover -->
+<section class="scene navy">
+  <div class="body"><div class="eyebrow">Not covered</div>
+    <div class="disp h" style="margin-top:20px"><span class="line"><span>Two exceptions.</span></span></div></div>
+  <div class="xcard" id="c_x1" style="top:720px"><div class="x">×</div><div><div class="t">Qualifying free zone persons</div><div class="s">taxed under the free zone rules</div></div></div>
+  <div class="xcard" id="c_x2" style="top:940px"><div class="x">×</div><div><div class="t">Multinational group members</div><div class="s">part of an MNE group</div></div></div>
+</section>
+
+<!-- 3 portal: still register, still file -->
+<section class="scene mist">
+  <div class="portal" id="d_w" style="top:440px">
+    <div class="bar"><i></i><i></i><i></i><div class="url">tax portal · illustration</div></div>
+    <div class="head"><span class="t">Corporate Tax</span><span class="u">Small business</span></div>
+    <div class="grid">
+      <div class="rw"><span>Registration</span><span><span class="pill a" id="d_p1">Required</span></span></div>
+      <div class="rw"><span>Annual return</span><span><span class="pill a" id="d_p2">Required</span></span></div>
+      <div class="rw"><span>Small Business Relief</span><span><span class="pill g" id="d_p3">Claimed in the return</span></span></div>
+    </div>
+  </div>
+  <div class="illus" style="top:1050px">Illustration — not a government screen.</div>
+</section>
+
+<!-- 4 the agent closes every month -->
+<section class="scene navy">
+  <div class="agent" id="e_ag" style="left:390px;top:420px;width:300px;height:375px"></div>
+  <div class="months" id="e_ms"></div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">RELIEF</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px">and we'll check if you qualify</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, SBR = R.ct.small_business_relief;
+const dd = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+$("#a_gk").textContent = `Small Business Relief limit: AED ${SBR.revenue_lte_aed / 1e6}m`;
+$("#a_ll").textContent = `AED ${SBR.revenue_lte_aed / 1e6}m`;
+$("#b_v").textContent = dd(SBR.periods_end_on_or_before);
+$("#e_ms").innerHTML = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => `<div>${m}</div>`).join("");
+$("#e_ag").innerHTML = KIT.body("#000");
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+RL.build();
+
+/* 0: frame 0 shows the revenue against the line; the bar grows to just under it */
+tl.fromTo("#a_ph", { y: 50, scale: 1.04 }, { y: 0, scale: 1, duration: 0.8, ease: "expo.out" }, 0);
+tl.fromTo("#a_fill", { scaleX: 0.5 }, { scaleX: 1, duration: 1.4, ease: "power3.out" }, 0.3);
+KIT.punch("#a_g", RL.w(0, "relief"), 1.04); E.sfx("click", RL.w(0, "relief"));
+KIT.punch("#a_bal", RL.w(0, "extended"), 1.05); E.sfx("impact", RL.w(0, "extended"));
+
+/* 1 */
+const s1 = RL.seg(1).start;
+E.kenBurns("#b_ph", s1, RL.seg(1).end - s1, { from: 1.08, to: 1.0 });
+tl.fromTo("#b_c", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(1, "covers") - 0.2);
+KIT.punch("#b_c", RL.w(1, "2029") , 1.04); E.sfx("chime", RL.w(1, "2029"));
+
+/* 2 */
+const s2 = RL.seg(2).start;
+E.lines(".scene:nth-of-type(3) .disp", s2 + 0.3);
+tl.fromTo("#c_x1", { x: -100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, RL.w(2, "qualifying") - 0.2); E.sfx("pop", RL.w(2, "qualifying"));
+tl.fromTo("#c_x2", { x: 100, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, RL.w(2, "multinational") - 0.2); E.sfx("pop", RL.w(2, "multinational"));
+
+/* 3 */
+const s3 = RL.seg(3).start;
+tl.fromTo("#d_w", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, s3 + 0.15);
+tl.fromTo("#d_p1", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(2.4)" }, RL.w(3, "register")); E.sfx("pop", RL.w(3, "register"));
+tl.fromTo("#d_p2", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(2.4)" }, RL.w(3, "file")); E.sfx("pop", RL.w(3, "file"));
+tl.fromTo("#d_p3", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(2.4)" }, RL.w(3, "claim")); E.sfx("chime", RL.w(3, "claim"));
+
+/* 4: the agent lands, months close one after another */
+const s4 = RL.seg(4).start;
+KIT.dropIn($("#e_ag"), s4 + 0.1);
+const mm = document.querySelectorAll("#e_ms div"), q0 = RL.w(4, "books"), q1 = RL.w(4, "ready");
+mm.forEach((el, i) => {
+  const t = q0 + ((q1 - q0) * i) / 12;
+  tl.fromTo(el, { scale: 0.85 }, { scale: 1, duration: 0.2, ease: "back.out(3)" }, t);
+  tl.set(el, { className: "on" }, t);
+  if (i % 3 === 0) E.sfx("pop", t);
+});
+
+/* 5 */
+const s5 = RL.seg(5).start;
+KIT.startAt("#f_ag", s5 - 0.6);
+tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s5 + 0.1);
+tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "RELIEF") - 0.1); E.sfx("impact", RL.w(5, "RELIEF"));
+</script>
+</body></html>
