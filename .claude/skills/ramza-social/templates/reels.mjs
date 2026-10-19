@@ -27,6 +27,8 @@ const sayAED = (n) => `${words(n)} dirhams`;
 const aed = (n) => "AED " + Number(n).toLocaleString("en-US");
 const aedM = (n) => "AED " + String(+(n / 1e6).toFixed(2)) + "m";
 
+export { words, ordinal, sayDate, showDate, sayAED, aed, aedM };
+
 export function reels(R, F) {
   const E = R.einvoicing, P = E.penalties, CT = R.ct, lf = CT.late_filing_penalty;
   return [

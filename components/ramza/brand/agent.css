@@ -1,0 +1,96 @@
+/* RAMZA agent logo animations (2026-10-19), ported from "RAMZA Logo
+ * Directions": a blue squircle whose two eyes blink, look around and rotate
+ * into an equals sign — books = bank. Every class is ra- prefixed so the
+ * keyframes can't collide with the app's. Geometry is the 200-unit head from
+ * the source file; translate values are in those units. */
+
+.ra-fill { transform-box: fill-box; transform-origin: center; }
+
+/* --- eyes: shared loops ---------------------------------------------------- */
+
+/* idle (nav/footer mark): blink, glance, equals, back. 6s */
+.ra-eye { transform-box: fill-box; transform-origin: center; animation-duration: 6s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.34,1.4,.64,1); }
+.ra-idle-l { animation-name: ra-idle-l; }
+.ra-idle-r { animation-name: ra-idle-r; }
+@keyframes ra-idle-l { 0%,12%,18%{transform:translate(0,0) rotate(0) scaleY(1)} 15%{transform:translate(0,0) rotate(0) scaleY(.1)} 28%,34%{transform:translate(9px,0) rotate(0) scaleY(1)} 40%,44%{transform:translate(-9px,0) rotate(0) scaleY(1)} 50%{transform:translate(0,0) rotate(0) scaleY(1)} 58%,84%{transform:translate(21px,-15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+@keyframes ra-idle-r { 0%,12%,18%{transform:translate(0,0) rotate(0) scaleY(1)} 15%{transform:translate(0,0) rotate(0) scaleY(.1)} 28%,34%{transform:translate(9px,0) rotate(0) scaleY(1)} 40%,44%{transform:translate(-9px,0) rotate(0) scaleY(1)} 50%{transform:translate(0,0) rotate(0) scaleY(1)} 58%,84%{transform:translate(-21px,15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+
+/* 1 — Spring drop */
+.ra-sp-head { transform-box: fill-box; transform-origin: 50% 100%; animation: ra-sp-head 6s ease-in-out infinite; }
+@keyframes ra-sp-head { 0%{transform:translateY(-90px) scale(1,1);opacity:0} 5%{opacity:1} 9%{transform:translateY(0) scale(1.18,.8)} 13%{transform:translateY(-14px) scale(.94,1.07)} 17%{transform:translateY(0) scale(1.04,.96)} 20%,55%{transform:translateY(0) scale(1,1)} 58%{transform:translateY(0) scale(1.1,.9)} 62%{transform:translateY(-22px) scale(.95,1.06)} 67%{transform:translateY(0) scale(1.05,.95)} 71%,90%{transform:translateY(0) scale(1,1);opacity:1} 95%{transform:translateY(-6px) scale(.96,1.05)} 100%{transform:translateY(-90px) scale(1,1);opacity:0} }
+.ra-sp-sh { transform-box: fill-box; transform-origin: center; animation: ra-sp-sh 6s ease-in-out infinite; }
+@keyframes ra-sp-sh { 0%{transform:scaleX(.3);opacity:0} 9%{transform:scaleX(1.2);opacity:.16} 13%{transform:scaleX(.85);opacity:.1} 17%,55%{transform:scaleX(1);opacity:.14} 62%{transform:scaleX(.75);opacity:.08} 67%{transform:scaleX(1.08);opacity:.15} 71%,90%{transform:scaleX(1);opacity:.14} 100%{transform:scaleX(.3);opacity:0} }
+
+/* 2 — Aurora glow */
+.ra-au-glow { transform-box: fill-box; transform-origin: center; animation: ra-au-glow 6s ease-in-out infinite; }
+@keyframes ra-au-glow { 0%,50%{transform:scale(.92);opacity:.55} 25%{transform:scale(1.04);opacity:.75} 60%,84%{transform:scale(1.28);opacity:1} 100%{transform:scale(.92);opacity:.55} }
+.ra-au-head { animation: ra-au-head 3s ease-in-out infinite alternate; }
+@keyframes ra-au-head { 0%{transform:translateY(0)} 100%{transform:translateY(-7px)} }
+.ra-au-orbit { transform-box: view-box; transform-origin: 100px 100px; animation: ra-au-orbit 6s linear infinite; }
+@keyframes ra-au-orbit { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+
+/* 3 — Payout feed: eyes track four chips, then equals. 8s */
+.ra-f-l, .ra-f-r { transform-box: fill-box; transform-origin: center; animation-duration: 8s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.34,1.3,.64,1); }
+.ra-f-l { animation-name: ra-f-l; } .ra-f-r { animation-name: ra-f-r; }
+@keyframes ra-f-l { 0%,2%{transform:translate(0,0) rotate(0) scaleY(1)} 5%,11%{transform:translate(-9px,0) rotate(0) scaleY(1)} 15%,21%{transform:translate(9px,0) rotate(0) scaleY(1)} 25%,31%{transform:translate(-9px,0) rotate(0) scaleY(1)} 35%,41%{transform:translate(9px,0) rotate(0) scaleY(1)} 46%,48%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 50%{transform:translate(0,0) rotate(0) scaleY(.1)} 58%,84%{transform:translate(21px,-15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+@keyframes ra-f-r { 0%,2%{transform:translate(0,0) rotate(0) scaleY(1)} 5%,11%{transform:translate(-9px,0) rotate(0) scaleY(1)} 15%,21%{transform:translate(9px,0) rotate(0) scaleY(1)} 25%,31%{transform:translate(-9px,0) rotate(0) scaleY(1)} 35%,41%{transform:translate(9px,0) rotate(0) scaleY(1)} 46%,48%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 50%{transform:translate(0,0) rotate(0) scaleY(.1)} 58%,84%{transform:translate(-21px,15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+.ra-f-head { transform-box: fill-box; transform-origin: 50% 100%; animation: ra-f-head 8s ease-in-out infinite; }
+@keyframes ra-f-head { 0%,4%,10%,14%,20%,24%,30%,34%,40%,54%,70%,100%{transform:translateY(0) scale(1,1)} 7%,17%,27%,37%{transform:translateY(0) scale(1.05,.95)} 58%{transform:translateY(-18px) scale(.96,1.05)} 63%{transform:translateY(0) scale(1.06,.94)} }
+.ra-ch { transform-box: fill-box; transform-origin: center; opacity: 0; animation-duration: 8s; animation-iteration-count: infinite; }
+.ra-ch-l1 { animation-name: ra-ch-l1; } .ra-ch-r1 { animation-name: ra-ch-r1; } .ra-ch-l2 { animation-name: ra-ch-l2; } .ra-ch-r2 { animation-name: ra-ch-r2; }
+@keyframes ra-ch-l1 { 0%,2%{transform:translate(0,0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.4)} 4%,11%{opacity:1} 14%,100%{transform:translate(200px,36px) scale(.2);opacity:0} }
+@keyframes ra-ch-r1 { 0%,12%{transform:translate(0,0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.4)} 14%,21%{opacity:1} 24%,100%{transform:translate(-151px,-38px) scale(.2);opacity:0} }
+@keyframes ra-ch-l2 { 0%,22%{transform:translate(0,0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.4)} 24%,31%{opacity:1} 34%,100%{transform:translate(211px,-38px) scale(.2);opacity:0} }
+@keyframes ra-ch-r2 { 0%,32%{transform:translate(0,0) scale(1);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.4)} 34%,41%{opacity:1} 44%,100%{transform:translate(-151px,38px) scale(.2);opacity:0} }
+
+/* 4 — Wordmark reveal. 7s */
+.ra-rv-head { animation: ra-rv-head 7s cubic-bezier(.34,1.3,.64,1) infinite; }
+@keyframes ra-rv-head { 0%{transform:translateX(var(--ra-rv-x,136px)) scale(0)} 6%{transform:translateX(var(--ra-rv-x,136px)) scale(1.15)} 10%{transform:translateX(var(--ra-rv-x,136px)) scale(.95)} 13%,36%{transform:translateX(var(--ra-rv-x,136px)) scale(1);opacity:1} 46%,88%{transform:translateX(0) scale(1);opacity:1} 96%,100%{transform:translateX(0) scale(0);opacity:0} }
+.ra-rv-word { animation: ra-rv-word 7s cubic-bezier(.2,.8,.2,1) infinite; }
+@keyframes ra-rv-word { 0%,42%{transform:translateX(-110%);opacity:0} 52%,88%{transform:translateX(0);opacity:1} 94%,100%{transform:translateX(0);opacity:0} }
+.ra-rv-tag { animation: ra-rv-tag 7s ease-out infinite; }
+@keyframes ra-rv-tag { 0%,54%{transform:translateY(10px);opacity:0} 62%,88%{transform:translateY(0);opacity:1} 94%,100%{transform:translateY(0);opacity:0} }
+.ra-rv-l, .ra-rv-r { transform-box: fill-box; transform-origin: center; animation-duration: 7s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.34,1.4,.64,1); }
+.ra-rv-l { animation-name: ra-rv-l; } .ra-rv-r { animation-name: ra-rv-r; }
+@keyframes ra-rv-l { 0%,14%,18%{transform:translate(0,0) rotate(0) scaleY(1)} 16%{transform:translate(0,0) rotate(0) scaleY(.1)} 24%,40%{transform:translate(21px,-15px) rotate(90deg) scaleY(1)} 48%,70%,74%,100%{transform:translate(0,0) rotate(0) scaleY(1)} 72%{transform:translate(0,0) rotate(0) scaleY(.1)} }
+@keyframes ra-rv-r { 0%,14%,18%{transform:translate(0,0) rotate(0) scaleY(1)} 16%{transform:translate(0,0) rotate(0) scaleY(.1)} 24%,40%{transform:translate(-21px,15px) rotate(90deg) scaleY(1)} 48%,70%,74%,100%{transform:translate(0,0) rotate(0) scaleY(1)} 72%{transform:translate(0,0) rotate(0) scaleY(.1)} }
+
+/* 5 — Books + Bank merge. 8s */
+.ra-mg-ink, .ra-mg-blue { transform-box: fill-box; transform-origin: center; animation-duration: 8s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.5,0,.2,1); }
+.ra-mg-ink { animation-name: ra-mg-ink; } .ra-mg-blue { animation-name: ra-mg-blue; }
+@keyframes ra-mg-ink { 0%,36%{transform:translateX(-82px) scale(.66);opacity:1} 48%{transform:translateX(0) scale(1);opacity:1} 52%,90%{transform:translateX(0) scale(1);opacity:0} 97%,100%{transform:translateX(-82px) scale(.66);opacity:1} }
+@keyframes ra-mg-blue { 0%,36%{transform:translateX(82px) translateY(0) scale(.66)} 48%{transform:translateX(0) translateY(0) scale(1)} 54%{transform:translateX(0) translateY(-16px) scale(1)} 58%,90%{transform:translateX(0) translateY(0) scale(1)} 97%,100%{transform:translateX(82px) translateY(0) scale(.66)} }
+.ra-mi, .ra-mb-l, .ra-mb-r { transform-box: fill-box; transform-origin: center; animation-duration: 8s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.34,1.4,.64,1); }
+.ra-mi { animation-name: ra-mi; }
+@keyframes ra-mi { 0%,4%{transform:translateX(0) scaleY(1)} 8%,16%,20%,34%{transform:translateX(9px) scaleY(1)} 18%{transform:translateX(9px) scaleY(.1)} 26%{transform:translateX(9px) scaleY(.55)} 40%,100%{transform:translateX(0) scaleY(1)} }
+.ra-mb-l { animation-name: ra-mb-l; } .ra-mb-r { animation-name: ra-mb-r; }
+@keyframes ra-mb-l { 0%,4%{transform:translate(0,0) rotate(0) scaleY(1)} 8%,20%,24%,34%{transform:translate(-9px,0) rotate(0) scaleY(1)} 22%{transform:translate(-9px,0) rotate(0) scaleY(.1)} 28%{transform:translate(-9px,0) rotate(0) scaleY(1.2)} 40%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 58%,86%{transform:translate(21px,-15px) rotate(90deg) scaleY(1)} 93%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+@keyframes ra-mb-r { 0%,4%{transform:translate(0,0) rotate(0) scaleY(1)} 8%,20%,24%,34%{transform:translate(-9px,0) rotate(0) scaleY(1)} 22%{transform:translate(-9px,0) rotate(0) scaleY(.1)} 28%{transform:translate(-9px,0) rotate(0) scaleY(1.2)} 40%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 58%,86%{transform:translate(-21px,15px) rotate(90deg) scaleY(1)} 93%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+.ra-lb { position: absolute; top: 0; opacity: 0; font-weight: 600; letter-spacing: -0.01em; }
+.ra-lb-a { left: 26%; animation: ra-lb-a 8s ease-in-out infinite; }
+.ra-lb-b { right: 27%; animation: ra-lb-a 8s ease-in-out infinite; }
+.ra-lb-c { left: 0; right: 0; text-align: center; animation: ra-lb-c 8s ease-in-out infinite; }
+@keyframes ra-lb-a { 0%,2%{opacity:0} 6%,34%{opacity:1} 40%,100%{opacity:0} }
+@keyframes ra-lb-c { 0%,52%{opacity:0;transform:translateY(8px)} 58%,86%{opacity:1;transform:translateY(0)} 92%,100%{opacity:0} }
+
+/* 6 — Sticker. 6s */
+.ra-st-wob { transform-box: fill-box; transform-origin: center; animation: ra-st-wob 6s cubic-bezier(.34,1.4,.64,1) infinite; }
+@keyframes ra-st-wob { 0%{transform:rotate(-5deg) scale(1)} 25%{transform:rotate(4deg) scale(1)} 50%{transform:rotate(-3deg) scale(1)} 58%{transform:rotate(6deg) scale(1.07)} 64%{transform:rotate(-2deg) scale(1)} 80%{transform:rotate(3deg) scale(1)} 100%{transform:rotate(-5deg) scale(1)} }
+.ra-st-l { animation-name: ra-st-l; } .ra-st-r { animation-name: ra-st-r; }
+@keyframes ra-st-l { 0%,12%,18%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 15%{transform:translate(0,0) rotate(0) scaleY(.1)} 58%,84%{transform:translate(21px,-15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+@keyframes ra-st-r { 0%,12%,18%,29%,35%,52%{transform:translate(0,0) rotate(0) scaleY(1)} 15%,32%{transform:translate(0,0) rotate(0) scaleY(.1)} 58%,84%{transform:translate(-21px,15px) rotate(90deg) scaleY(1)} 92%,100%{transform:translate(0,0) rotate(0) scaleY(1)} }
+.ra-st-pill { transform-box: fill-box; transform-origin: center; animation: ra-st-pill 6s cubic-bezier(.34,1.6,.64,1) infinite; }
+@keyframes ra-st-pill { 0%,56%{transform:rotate(-8deg) scale(0)} 62%,84%{transform:rotate(-8deg) scale(1)} 90%,100%{transform:rotate(-8deg) scale(0)} }
+.ra-st-spk { transform-box: fill-box; transform-origin: center; animation: ra-st-spk 1.8s ease-in-out infinite alternate; }
+.ra-st-spk2 { animation-delay: -.9s; }
+@keyframes ra-st-spk { 0%{transform:scale(.4) rotate(0)} 100%{transform:scale(1) rotate(45deg)} }
+
+/* Motion is a nicety, never the message: everything rests on its first frame,
+ * which is the plain mark (or the full lockup) by construction. */
+@media (prefers-reduced-motion: reduce) {
+  .ra-motion, .ra-motion * { animation: none !important; }
+  .ra-motion .ra-ch, .ra-motion .ra-lb-a, .ra-motion .ra-lb-b, .ra-motion .ra-mg-ink { opacity: 0 !important; }
+  .ra-motion .ra-st-pill { transform: rotate(-8deg) !important; }
+  .ra-motion .ra-lb-c, .ra-motion .ra-rv-word, .ra-motion .ra-rv-tag { opacity: 1 !important; transform: none !important; }
+  .ra-motion .ra-rv-head { transform: none !important; }
+}

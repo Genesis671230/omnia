@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RAMZA editorial posts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Urbanist:wght@500;600;700;800&display=block" rel="stylesheet">
+<style>
+/* Editorial 4:5 formats studied 2026-10-18: (a) centred white "skills" carousel — numbered tag over a
+   big headline, one small UI object, one takeaway, "Save this." end card; (b) numbered tips over
+   full-bleed photos; (c) single hero word + CTA pill. RAMZA bar still applies: white/navy, flat
+   washes only (no gradients, glows, glass, stock "AI" art, emoji). */
+:root{--navy:#0B1533;--night:#050B1F;--ink:#14131C;--slate:#5B6478;--mute:#8A92A6;--line:#E3E7F0;
+  --paper:#F6F7FA;--indigo:#4F35E8;--lilac:#B3A6FF;--red:#C2362B;--green:#1F7A4D;--blue:#2B3F8F}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#C9CED8;font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;gap:40px;padding:40px 0}
+[data-post]{display:flex;flex-direction:column;gap:40px}
+.s{width:1080px;height:1350px;position:relative;overflow:hidden;background:#fff;display:flex;flex-direction:column;align-items:center;text-align:center}
+.s.navy{background:var(--navy);color:#fff}
+.disp{font-family:'Urbanist',sans-serif;letter-spacing:-0.035em;font-weight:700;line-height:.98}
+.num{font-variant-numeric:tabular-nums}
+.top{position:absolute;left:64px;right:64px;top:56px;display:flex;justify-content:space-between;align-items:center;z-index:3}
+.top img{height:40px}
+.top .pg{font-size:22px;color:var(--mute);font-variant-numeric:tabular-nums}
+.photo-s .top .pg,.navy .top .pg{color:#C4CAD9}
+.wrap{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;padding:170px 90px 90px;position:relative;z-index:2}
+.push{margin-top:auto!important}
+
+/* (a) editorial */
+.tagx{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:22px;letter-spacing:.08em;color:var(--slate);background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 14px;transform:rotate(-3deg);position:relative;z-index:2;margin-bottom:-14px}
+.hed{font-family:'Urbanist';font-weight:600;font-size:100px;letter-spacing:-.04em;line-height:1;color:var(--navy)}
+.sub{font-size:34px;line-height:1.4;color:var(--slate);margin-top:28px;max-width:860px}
+.take{font-size:34px;line-height:1.4;color:var(--ink);font-weight:500;max-width:860px}
+.src{font-size:20px;color:var(--mute);margin-top:22px;max-width:860px;line-height:1.4}
+.obj{margin-top:90px;display:flex;align-items:center;justify-content:center;gap:36px}
+.cal{width:350px;border:1.5px solid var(--navy);border-radius:12px;overflow:hidden;background:#fff;color:var(--navy);box-shadow:0 1px 0 var(--line)}
+.cal .t{background:var(--navy);color:#fff;font-size:24px;font-weight:600;letter-spacing:.16em;padding:12px 0}
+.cal .d{font-family:'Urbanist';font-weight:800;font-size:180px;line-height:1.04;letter-spacing:-.04em;padding-top:6px}
+.cal .y{font-size:24px;color:var(--slate);padding:0 0 18px}
+.cal.blue{border-color:var(--blue)}.cal.blue .t{background:var(--blue)}.cal.blue .d{color:var(--blue)}
+.pills{display:flex;flex-direction:column;gap:16px;align-items:flex-start;text-align:left}
+.pill{display:flex;align-items:center;gap:14px;font-size:29px;max-width:520px;font-weight:500;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 22px}
+.pill i{width:12px;height:12px;border-radius:3px;background:var(--navy);flex:none}
+.pill.red{color:var(--red)}.pill.red i{background:var(--red)}
+.pill.blue i{background:var(--blue)}
+.ghost{position:absolute;left:0;right:0;top:330px;font-family:'Urbanist';font-weight:800;font-size:620px;letter-spacing:-.06em;line-height:1;color:#F3F5F9;z-index:0}
+.rec{width:100%;text-align:left;margin-top:56px}
+.rec .r{display:grid;grid-template-columns:230px 1fr;gap:26px;padding:22px 0;border-top:1px solid var(--line);align-items:baseline}
+.rec .r:last-child{border-bottom:1px solid var(--line)}
+.rec .dd{font-family:'Urbanist';font-weight:700;font-size:38px;color:var(--navy);letter-spacing:-.02em}
+.rec .w{font-size:27px;color:var(--ink);line-height:1.3}
+.rec .w small{display:block;font-size:22px;color:var(--slate);margin-top:4px}
+.rec .r.past .dd,.rec .r.past .w{color:var(--mute)}
+.flow{display:flex;align-items:center;gap:22px;margin-top:70px}
+.flow .b{border:1.5px solid var(--navy);border-radius:12px;padding:26px 30px;font-size:28px;font-weight:600;color:var(--navy);background:#fff}
+.flow .b.red{border-color:var(--red);color:var(--red)}
+.flow svg{flex:none}
+.kw{font-family:'IBM Plex Mono';font-weight:500;background:var(--navy);color:#fff;padding:4px 16px;border-radius:6px}
+.navy .kw{background:#fff;color:var(--navy)}
+
+/* (b) photo tips */
+.photo-s{color:#fff}
+.photo-s .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.photo-s .wash{position:absolute;inset:0;background:var(--night);opacity:.5;z-index:1}
+.photo-s .band{position:absolute;left:0;right:0;top:0;height:560px;background:var(--night);opacity:.38;z-index:1}
+.nt{font-family:'IBM Plex Mono';font-weight:500;font-size:24px;color:#fff;border:1.5px solid rgba(255,255,255,.7);border-radius:6px;padding:6px 14px;margin-bottom:22px}
+.tip{font-family:'Urbanist';font-weight:800;font-size:92px;letter-spacing:-.03em;line-height:.98;text-transform:uppercase}
+.tipsub{font-size:36px;line-height:1.35;margin-top:22px;color:#E6E9F2;max-width:820px}
+
+/* (c) hero */
+.cta{display:inline-flex;align-items:center;gap:22px;background:#fff;color:var(--navy);font-weight:600;font-size:34px;padding:22px 24px 22px 40px;border-radius:999px}
+.cta b{width:58px;height:58px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px}
+.dchip{display:inline-flex;flex-direction:column;align-items:flex-start;gap:6px;border:1.5px solid rgba(255,255,255,.55);border-radius:12px;padding:20px 26px;text-align:left}
+.dchip span{font-size:22px;letter-spacing:.12em;text-transform:uppercase;color:#C4CAD9;font-weight:600}
+.dchip b{font-family:'Urbanist';font-weight:700;font-size:44px;letter-spacing:-.02em}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const R = window.RULES, F = window.FACTS || {}, C = window.CONTACT || {};
+const BRAND = "../../../../public/ramza/brand/", PHOTO = "../../../../public/ramza/photos/";
+const n = (x) => Number(x).toLocaleString("en-US");
+const aed = (x) => "AED " + n(x);
+const aedM = (x) => "AED " + String(+(x / 1e6).toFixed(2)) + "m";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const d = (iso) => { const [y, m, dd] = iso.split("-").map(Number); return { day: dd, mon: MON[m - 1], yr: y, full: `${dd} ${MON[m - 1]} ${y}` }; };
+const dubaiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const daysTo = (iso) => Math.round((Date.parse(iso) - Date.parse(dubaiToday())) / 864e5);
+const E = R.einvoicing, P = E.penalties, CT = R.ct, lf = CT.late_filing_penalty, sbr = CT.small_business_relief;
+const rescue = R.pricing.one_off.late_filing_rescue_aed;
+const site = C.site || "ramza.ai";
+
+const topbar = (dark, i, total) => `<div class="top"><img src="${BRAND}${dark ? "ramza-lockup-white.png" : "ramza-lockup-ink.png"}"><span class="pg">${total > 1 ? `${i}/${total}` : ""}</span></div>`;
+const slide = (cls, inner, i, total) => `<section class="s ${cls}" data-slide>${topbar(/navy|photo-s/.test(cls), i, total)}${inner}</section>`;
+const post = (id, slides, caption) => `<div data-post="${id}">${slides.map((s, i) => slide(s[0], s[1], i + 1, slides.length)).join("")}<template data-caption>${caption}</template></div>`;
+const cal = (iso, cls = "") => { const x = d(iso); return `<div class="cal ${cls}"><div class="t">${x.mon.toUpperCase()}</div><div class="d num">${x.day}</div><div class="y">${x.yr}</div></div>`; };
+const arrow = `<svg width="60" height="24" viewBox="0 0 60 24"><path d="M0 12 H54 M44 3 L56 12 L44 21" stroke="#0B1533" stroke-width="3" fill="none"/></svg>`;
+const posts = [];
+
+/* 7 ─ The UAE tax calendar (editorial carousel) */
+const ctNote = (i) => `Return and payment due ${CT.filing_months_after_period_end} months after the year end`;
+const ev = [
+  { iso: E.large.asp_by, tag: "Appoint your e-invoicing provider", who: `UAE businesses with revenue ${aedM(E.large.revenue_gte_aed)}+`,
+    pills: [["red", `Late: ${aed(P.asp_late_aed_per_month)} a month`], ["", "Accredited service provider"]],
+    take: "The penalty counts from this date, for every month or part of a month.", src: P.legal_basis },
+  { iso: CT.deadlines[1].due, tag: "Corporate tax return", who: `Businesses with a ${d(CT.deadlines[1].fy_end).full} year end`,
+    pills: [["", ctNote()], ["red", `Late filing: ${aed(lf.months_1_12_aed)} a month`]],
+    take: "Books closed first. The return is built from them.", src: lf.legal_basis },
+  { iso: E.large.go_live, cls: "blue", tag: "E-invoicing goes live", who: `Revenue ${aedM(E.large.revenue_gte_aed)}+ · B2B and B2G invoices`,
+    pills: [["red", `${aed(P.invoice_not_issued_aed)} per e-invoice not issued`], ["", `Capped at ${aed(P.invoice_cap_aed_per_month)} a month`]],
+    take: "Send one real test invoice through your provider before this day.", src: P.legal_basis },
+  { iso: E.sme.asp_by, tag: "Two deadlines, one day", who: `E-invoicing provider for revenue below ${aedM(E.large.revenue_gte_aed)}, and CT returns for ${d(CT.deadlines[2].fy_end).full} year ends`,
+    pills: [["red", `Provider late: ${aed(P.asp_late_aed_per_month)} a month`], ["red", `CT late filing: ${aed(lf.months_1_12_aed)} a month`]],
+    take: "If both apply to you, don't leave either to March.", src: `${P.legal_basis}; ${lf.legal_basis}`,
+    check: CT.deadlines[2].due === E.sme.asp_by },
+  { iso: E.sme.go_live, cls: "blue", tag: "E-invoicing for everyone else", who: `Businesses in scope with revenue below ${aedM(E.large.revenue_gte_aed)}`,
+    pills: [["red", `${aed(P.invoice_not_issued_aed)} per e-invoice not issued`], ["", "B2B and B2G invoices"]],
+    take: "Same rules as phase 1. Six months more to get there.", src: P.legal_basis },
+  { iso: sbr.periods_end_on_or_before, tag: "Small Business Relief ends", who: `Revenue at or under ${aedM(sbr.revenue_lte_aed)} in the period`,
+    pills: [["", "Covers periods ending on or before this date"], ["", "You still register and file every year"]],
+    take: "Relief isn't an exemption from filing. The return is still due.", src: sbr.legal_basis },
+].filter((e) => daysTo(e.iso) > 0 && e.check !== false).sort((a, b) => a.iso.localeCompare(b.iso));
+const past = CT.deadlines.find((x) => daysTo(x.due) <= 0);
+const yrs = `${dubaiToday().slice(0, 4)}–${ev[ev.length - 1].iso.slice(0, 4)}`;
+const calSlides = [
+  ["photo-s", `<img class="bg" src="${PHOTO}px-founder-bright.jpg" style="object-position:50% 40%"><div class="wash" style="opacity:.42"></div>
+    <div class="wrap" style="justify-content:flex-end;padding-bottom:120px">
+      <div class="disp" style="font-size:64px;font-weight:600">The</div>
+      <div class="disp" style="font-size:190px;font-weight:800;letter-spacing:-.05em;line-height:.9">UAE TAX</div>
+      <div class="disp" style="font-size:190px;font-weight:800;letter-spacing:-.05em;line-height:.9">CALENDAR</div>
+      <div style="font-size:34px;margin-top:34px;color:#E6E9F2">Every date to save, ${yrs}</div>
+      <div style="font-size:24px;margin-top:40px;color:#C4CAD9;letter-spacing:.14em;text-transform:uppercase">Swipe →</div>
+    </div>`],
+  ["", `<div class="wrap">
+      <div class="hed" style="font-size:84px">Many UAE penalties<br>aren't about <span style="color:var(--blue)">how much.</span></div>
+      <div class="sub">They're about <b style="color:var(--navy)">when.</b> Miss a date and a monthly charge starts, even if you owe no tax.</div>
+      <div class="flow"><div class="b">A date passes</div>${arrow}<div class="b">Every month late</div>${arrow}<div class="b red">AED, again</div></div>
+      <div class="take push">Here are the ${ev.length} dates that matter from now to ${ev[ev.length - 1].iso.slice(0, 4)}, in order.</div>
+    </div>`],
+  ...ev.map((e, i) => ["", `<div class="ghost num">${String(i + 1).padStart(2, "0")}</div><div class="wrap">
+      <span class="tagx">DATE ${String(i + 1).padStart(2, "0")}</span>
+      <div class="hed">${d(e.iso).full}</div>
+      <div class="sub" style="margin-top:22px"><b style="color:var(--navy)">${e.tag}.</b><br>${e.who}</div>
+      <div class="obj">${cal(e.iso, e.cls)}<div class="pills">${e.pills.map(([c, t]) => `<div class="pill ${c}"><i></i>${t}</div>`).join("")}</div></div>
+      <div class="push"><div class="take">${e.take}</div><div class="src">${e.src}.</div></div>
+    </div>`]),
+  ...(past ? [["", `<div class="wrap">
+      <span class="tagx">ALREADY PASSED</span>
+      <div class="hed" style="color:var(--mute)">${d(past.due).full}</div>
+      <div class="sub" style="margin-top:22px"><b style="color:var(--navy)">Corporate tax return.</b><br>Businesses with a ${d(past.fy_end).full} year end</div>
+      <div class="obj"><div class="pills"><div class="pill red"><i></i>${aed(lf.months_1_12_aed)} for every month, or part of one</div><div class="pill red"><i></i>${aed(lf.month_13_plus_aed)} a month from month 13</div><div class="pill"><i></i>Late-filer rescue: ${aed(rescue)} one-off</div></div></div>
+      <div class="push"><div class="take">Not filed yet? Comment <span class="kw">RESCUE</span>. The sooner, the fewer months on the meter.</div>
+      <div class="src">Estimates from ${lf.legal_basis}. RAMZA is not a registered tax agent; returns are filed by ${R.partner.filing_partner}.</div></div>
+    </div>`]] : []),
+  ["", `<div class="wrap">
+      <div class="hed" style="font-size:84px">All of it,<br><span style="color:var(--blue)">on one page.</span></div>
+      <div class="rec">${past ? `<div class="r past"><div class="dd">${d(past.due).full}</div><div class="w">CT return, ${d(past.fy_end).mon} year ends<small>passed</small></div></div>` : ""}
+        ${ev.map((e) => `<div class="r"><div class="dd">${d(e.iso).full}</div><div class="w">${e.tag}<small>${e.who}</small></div></div>`).join("")}</div>
+      <div class="src push">Dates: Ministry of Finance e-invoicing timeline; corporate tax: ${CT.filing_months_after_period_end} months after the period end.</div>
+    </div>`],
+  ["", `<div class="wrap" style="justify-content:center">
+      <img src="${BRAND}ramza-mark.svg" style="width:120px;height:120px">
+      <div class="hed" style="font-size:150px;margin-top:50px">Save this.</div>
+      <div class="sub">Share it with someone who runs a UAE business.</div>
+      <div class="take" style="margin-top:80px">Want us to check which dates apply to you?<br>Comment <span class="kw">READY</span> or WhatsApp us${C.whatsapp ? ` · ${C.whatsapp}` : ""}.</div>
+      <div class="src" style="margin-top:60px">RAMZA is not a registered tax agent or an accredited service provider. Filing and e-invoicing go through licensed and accredited partners.</div>
+    </div>`],
+];
+posts.push(post("07-uae-tax-calendar", calSlides, `The UAE tax calendar: every date to save, ${yrs}. 📌
+
+${ev.map((e) => `${d(e.iso).full}: ${e.tag}`).join("\n")}
+${past ? `\nAlready passed: ${d(past.due).full}, CT returns for ${d(past.fy_end).mon} year ends. Every month late adds ${aed(lf.months_1_12_aed)}.\n` : ""}
+Save this, and comment READY if you want us to check which dates apply to your business.
+
+Sources: ${P.legal_basis}; ${lf.legal_basis}; ${sbr.legal_basis}. RAMZA is not a registered tax agent or an accredited service provider.
+
+#UAEBusiness #DubaiBusiness #UAECorporateTax #UAEeInvoicing #Compliance #SME`.replace(" 📌", "")));
+
+/* 8 ─ 7 ways money hides in e-commerce payouts (numbered tips over photos) */
+const tips = [
+  ["px-statements-calculator", "Shared bank names", "Two gateways can settle under one narration. The line won't say which paid."],
+  ["parcels", "Netted refunds", "A refund comes out of next week's payout, so the credit matches no order."],
+  ["px-card-terminal", "Fees before landing", "Gateway fee plus VAT on it, gone before the bank sees a dirham."],
+  ["in-ecommerce-packing", "Batched payouts", "One credit can cover dozens of orders from several days."],
+  ["tap-to-pay", "Currency gaps", "SAR orders, AED bank, and an exchange difference nobody booked."],
+  ["in-logistics-courier", "COD remittances", "The courier pays you minus delivery charges, in one transfer."],
+  ["px-accountant-files", "Missing payout files", "No payout file, no match. The credit just sits there."],
+];
+posts.push(post("08-seven-ways-payouts-hide-money", [
+  ["photo-s", `<img class="bg" src="${PHOTO}px-studio-packing.jpg" style="object-position:50% 35%"><div class="wash" style="opacity:.46"></div>
+    <div class="wrap" style="justify-content:flex-end;padding-bottom:120px">
+      <div class="disp" style="font-size:230px;font-weight:800;letter-spacing:-.05em;line-height:.85">${tips.length} WAYS</div>
+      <div style="font-size:44px;margin-top:22px;font-weight:500">money hides in your payouts</div>
+      <div style="font-size:24px;margin-top:40px;color:#C4CAD9;letter-spacing:.14em;text-transform:uppercase">For e-commerce brands · swipe →</div>
+    </div>`],
+  ...tips.map(([img, h, s], i) => ["photo-s", `<img class="bg" src="${PHOTO}${img}.jpg"><div class="wash" style="opacity:.5"></div>
+    <div class="wrap"><span class="nt">${String(i + 1).padStart(2, "0")}</span><div class="tip">${h}.</div><div class="tipsub">${s}</div></div>`]),
+  ["", `<div class="wrap" style="justify-content:center">
+      <img src="${BRAND}ramza-mark.svg" style="width:120px;height:120px">
+      <div class="hed" style="font-size:150px;margin-top:50px">Save this.</div>
+      <div class="sub">Send it to whoever closes your month.</div>
+      <div class="card" style="margin-top:70px;border:1px solid var(--line);border-radius:12px;padding:36px 44px;text-align:left;width:100%">
+        <div style="font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);font-weight:600">${F.close_month} · our own books</div>
+        <div style="display:flex;gap:60px;margin-top:18px">
+          <div><div class="disp num" style="font-size:96px;color:var(--navy)">${n(F.close_credits)}</div><div style="font-size:26px;color:var(--slate)">bank credits</div></div>
+          <div><div class="disp num" style="font-size:96px;color:var(--blue)">${F.close_matched_pct}%</div><div style="font-size:26px;color:var(--slate)">matched by RAMZA</div></div>
+        </div>
+      </div>
+      <div class="take" style="margin-top:60px">Comment <span class="kw">RECON</span> for a free month-end check.</div>
+      <div class="src" style="margin-top:30px">Omnia is RAMZA's founding company and first user. Figures from the live RAMZA app, ${F.as_of}.</div>
+    </div>`],
+], `${tips.length} ways money hides in your e-commerce payouts:
+
+${tips.map(([, h, s], i) => `${i + 1}. ${h}: ${s}`).join("\n")}
+
+RAMZA starts from the bank and works back to every payout, order, refund and fee. ${F.close_month}, our own books: ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched.
+
+Comment RECON for a free month-end check.
+
+Omnia is RAMZA's founding company and first user.
+
+#Ecommerce #Shopify #Stripe #Tabby #UAEBusiness #Reconciliation #Accounting`));
+
+/* 9 ─ Hero single: e-invoicing */
+const left = daysTo(E.large.asp_by);
+posts.push(post("09-hero-einvoicing", [
+  ["photo-s", `<img class="bg" src="${PHOTO}bb-difc-towers-night.jpg" style="object-position:50% 0%;transform:scale(1.45);transform-origin:50% 0%"><div class="wash" style="opacity:.62"></div>
+    <div class="wrap" style="justify-content:center">
+      <div style="font-size:30px;letter-spacing:.16em;text-transform:uppercase;color:var(--lilac);font-weight:600">${left > 0 ? `${left} days left · ` : ""}revenue ${aedM(E.large.revenue_gte_aed)}+</div>
+      <div class="disp" style="font-size:64px;font-weight:600;margin-top:40px">Get your business ready for</div>
+      <div class="disp" style="font-size:158px;font-weight:800;letter-spacing:-.05em;line-height:.9;margin-top:16px;white-space:nowrap">E&#8209;INVOICING</div>
+      <div style="display:flex;gap:22px;margin-top:60px">
+        <div class="dchip"><span>Appoint a provider</span><b>${d(E.large.asp_by).full}</b></div>
+        <div class="dchip"><span>Go live</span><b>${d(E.large.go_live).full}</b></div>
+      </div>
+    </div>
+    <div style="position:absolute;left:64px;right:64px;bottom:64px;z-index:3;display:flex;justify-content:space-between;align-items:flex-end">
+      <span class="cta">Free readiness check <b>›</b></span>
+      <span style="font-size:19px;color:#C4CAD9;max-width:330px;text-align:right;line-height:1.4">RAMZA is not an accredited service provider; e-invoices go through an accredited partner.</span>
+    </div>`],
+], `${left > 0 ? `${left} days` : "Days"} to appoint your e-invoicing provider (UAE businesses with revenue ${aedM(E.large.revenue_gte_aed)}+).
+
+${d(E.large.asp_by).full}: appoint an accredited service provider.
+${d(E.large.go_live).full}: e-invoicing goes live.
+Late appointment: ${aed(P.asp_late_aed_per_month)} for every month or part of a month.
+
+Comment READY for the free readiness check.
+
+RAMZA is not an accredited service provider; e-invoices go through an accredited partner. Source: ${P.legal_basis}.
+
+#UAEeInvoicing #eInvoicingUAE #UAEBusiness #DubaiBusiness #Compliance`));
+
+document.getElementById("root").innerHTML = posts.join("");
+</script>
+</body>
+</html>

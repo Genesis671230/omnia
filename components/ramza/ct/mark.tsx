@@ -1,8 +1,18 @@
-/* RAMZA mark (2026-10-17): two brackets that close a square — the books
- * close. White + lilac on navy, or navy + indigo on white. Files in
- * public/ramza/brand/. */
+/* RAMZA mark. Since 2026-10-19 this is the agent logo — a blue squircle whose
+ * eyes blink and turn into an equals sign (components/ramza/brand/agent.tsx).
+ * `tone` is the surface: "ink" = sits on white/light (the default, kept for
+ * existing call sites), "light" = sits on the navy footer.
+ *
+ * The previous bracket mark (2026-10-17) is kept as RamzaBracketMark; its
+ * files are still in public/ramza/brand/ramza-mark*.svg. */
 
-export function RamzaMark({ size = 28, tone = "ink" }: { size?: number; tone?: "ink" | "light" }) {
+import { RamzaAgentMark } from "@/components/ramza/brand/agent";
+
+export function RamzaMark({ size = 28, tone = "ink", animated = true }: { size?: number; tone?: "ink" | "light"; animated?: boolean }) {
+  return <RamzaAgentMark size={size} tone={tone === "ink" ? "light" : "dark"} animated={animated} />;
+}
+
+export function RamzaBracketMark({ size = 28, tone = "ink" }: { size?: number; tone?: "ink" | "light" }) {
   const bg = tone === "ink" ? "#0B1533" : "#FFFFFF";
   const top = tone === "ink" ? "#FFFFFF" : "#0B1533";
   const bottom = tone === "ink" ? "#B3A6FF" : "#4F35E8";

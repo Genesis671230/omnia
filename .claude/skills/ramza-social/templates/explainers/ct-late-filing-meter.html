@@ -1,0 +1,158 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<style>
+  .h{font-size:92px;color:var(--navy)}
+  .navy .h,.night .h{color:#fff}
+  .cal{width:520px;border:2px solid #fff;border-radius:14px;background:#fff;color:var(--navy);position:relative}
+  .cal .top{border-radius:12px 12px 0 0;background:#1D2645;color:#fff;font-size:36px;font-weight:600;letter-spacing:.16em;text-align:center;padding:20px 0}
+  .cal .day{font-family:'Urbanist';font-weight:800;font-size:260px;text-align:center;line-height:1.02;letter-spacing:-.04em;padding-top:10px}
+  .cal .yr{text-align:center;font-size:36px;color:var(--slate);padding:0 0 30px}
+  .stamp{position:absolute;right:-60px;bottom:70px;font-family:'Urbanist';font-weight:800;font-size:76px;letter-spacing:.06em;color:var(--red);border:6px solid var(--red);border-radius:10px;padding:6px 26px;transform:rotate(-10deg);background:#fff}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .mt{height:150px;border-radius:10px;border:1.5px solid #2A3766;background:#111D45;display:flex;flex-direction:column;justify-content:space-between;padding:16px 18px}
+  .mt .m{font-size:22px;color:#8E97B3;font-weight:500}
+  .mt .v{font-family:'Urbanist';font-weight:700;font-size:44px;color:#fff;letter-spacing:-.02em}
+  .mt.hi{border-color:var(--lilac)}
+  .mt.hi .v{color:var(--lilac)}
+  .pct{font-family:'Urbanist';font-weight:800;font-size:330px;letter-spacing:-.06em;line-height:.9;color:var(--navy)}
+  .step{display:flex;gap:44px;align-items:center;padding:58px 0;border-top:1px solid var(--line)}
+  .step:last-child{border-bottom:1px solid var(--line)}
+  .step .n{width:140px;height:140px;border-radius:12px;background:var(--navy);color:#fff;font-family:'Urbanist';font-weight:800;font-size:60px;display:flex;align-items:center;justify-content:center;flex:none}
+  .step .t{font-family:'Urbanist';font-weight:700;font-size:76px;color:var(--navy);letter-spacing:-.02em;line-height:1.05}
+  .step .s{font-size:36px;color:var(--slate);margin-top:10px;line-height:1.35}
+  .price{font-family:'Urbanist';font-weight:800;font-size:200px;letter-spacing:-.05em;line-height:1;color:#fff}
+  .chk{display:flex;gap:26px;align-items:center;padding:34px 0;border-top:1px solid #1D2645;font-size:38px;color:#fff}
+  .chk:last-child{border-bottom:1px solid #1D2645}
+  .chk i{width:56px;height:56px;border-radius:8px;border:3px solid var(--lilac);display:flex;align-items:center;justify-content:center;font-style:normal;color:var(--lilac);font-weight:700;font-size:34px;flex:none}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body><div class="stage">
+
+<!-- 0 due date -->
+<section class="scene night">
+  <div class="body" style="top:300px">
+    <div class="eyebrow" id="a_e"></div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>The return</span></span><span class="line"><span class="accent">was due.</span></span></div>
+    <div class="cal" id="a_cal" style="margin:90px auto 0"><div class="top" id="a_m"></div><div class="day num" id="a_d"></div><div class="yr" id="a_y"></div><div class="stamp" id="a_st">DUE</div></div>
+  </div>
+</section>
+
+<!-- 1 meter -->
+<section class="scene navy">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Late filing penalty</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Every month,</span></span><span class="line"><span class="accent">or part of one.</span></span></div>
+    <div class="grid" id="b_g" style="margin-top:64px"></div>
+    <div style="font-size:26px;color:#8E97B3;margin-top:28px">AED per month after the due date. Estimate from the published schedule.</div>
+  </div>
+</section>
+
+<!-- 2 late payment -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Unpaid tax</div>
+    <div style="display:flex;align-items:flex-end;gap:24px;margin-top:50px"><div class="pct num" id="c_p">0%</div><div class="disp" style="font-size:80px;color:var(--blue);padding-bottom:30px">a year</div></div>
+    <div style="font-size:38px;color:var(--slate);margin-top:30px">charged monthly on the tax still unpaid</div>
+    <svg width="936" height="360" style="margin-top:60px;display:block">
+      <path d="M0 340 H936" stroke="#E3E7F0" stroke-width="3"/>
+      <path id="c_st" d="" stroke="#0B1533" stroke-width="6" fill="none" stroke-linejoin="round"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:24px;color:var(--mute);margin-top:12px"><span>Month 1</span><span>Month 12</span></div>
+  </div>
+</section>
+
+<!-- 3 fix -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">The fix</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Books first.</span></span></div>
+    <div style="margin-top:56px">
+      <div class="step" id="d_1"><div class="n">01</div><div><div class="t">Close the books</div><div class="s">every bank line booked, every payout matched</div></div></div>
+      <div class="step" id="d_2"><div class="n">02</div><div><div class="t">Statements</div><div class="s">the figures the return is built from</div></div></div>
+      <div class="step" id="d_3"><div class="n">03</div><div><div class="t">File and pay</div><div class="s">by a licensed tax agent</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 offer -->
+<section class="scene night">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Late-filer rescue</div>
+    <div class="price num" id="e_v" style="margin-top:50px">AED 0</div>
+    <div style="font-size:40px;color:#C4CAD9;margin-top:16px">one-off, for the return</div>
+    <div style="margin-top:70px">
+      <div class="chk" id="e_1"><i>✓</i>Books closed for the year</div>
+      <div class="chk" id="e_2"><i>✓</i>Financial statements prepared</div>
+      <div class="chk" id="e_3"><i>✓</i><span>Return filed by <span id="e_pt"></span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="body" style="top:330px;text-align:center">
+    <svg viewBox="0 0 64 64" style="width:150px;height:150px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="g_a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="g_b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
+    <div class="eyebrow" style="margin-top:60px">Late-filer rescue</div>
+    <div class="disp" style="font-size:84px;margin-top:30px;color:#fff">Comment</div>
+    <div id="g_kw" style="margin-top:40px"><span class="kw">RESCUE</span></div>
+    <div style="font-size:36px;color:#C4CAD9;margin-top:50px;line-height:1.4">Or WhatsApp us · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, CT = R.ct, lf = CT.late_filing_penalty;
+const n = (x) => Number(x).toLocaleString("en-US"), aed = (x) => "AED " + n(x);
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+RL.build();
+
+/* 0 */
+const due = CT.deadlines[0].due.split("-").map(Number);
+$("#a_e").textContent = `Corporate tax · Dec ${CT.deadlines[0].fy_end.slice(0, 4)} year ends`;
+$("#a_m").textContent = MON[due[1] - 1]; $("#a_d").textContent = due[2]; $("#a_y").textContent = due[0];
+E.lines(".scene:nth-of-type(1) .disp", 0.3);
+tl.fromTo("#a_cal", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "expo.out" }, 0.6);
+tl.fromTo("#a_st", { scale: 2.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: "power4.in" }, RL.w(0, "due") - 0.1);
+E.sfx("impact", RL.w(0, "due") + 0.15, { vol: 0.8 });
+
+/* 1 */
+$("#b_g").innerHTML = Array.from({ length: 16 }, (_, i) => `<div class="mt ${i >= 12 ? "hi" : ""}"><span class="m">Month ${i + 1}</span><span class="v num">${i >= 12 ? n(lf.month_13_plus_aed) : n(lf.months_1_12_aed)}</span></div>`).join("");
+E.lines(".scene:nth-of-type(2) .disp", RL.seg(1).start + 0.3);
+tl.fromTo("#b_g .mt:nth-child(-n+12)", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, stagger: 0.09, ease: "back.out(2)" }, RL.w(1, "AED") - 0.1);
+tl.fromTo("#b_g .mt:nth-child(n+13)", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, stagger: 0.1, ease: "back.out(2)" }, RL.w(1, n(lf.month_13_plus_aed)) - 0.1);
+E.sfx("click", RL.w(1, "AED")); E.sfx("pop", RL.w(1, n(lf.month_13_plus_aed)));
+
+/* 2 */
+const p = Math.round(CT.late_payment.rate_pa * 100);
+let d = "M0 340"; for (let m = 0; m < 12; m++) { const x = (m + 1) * 78, y = 340 - (m + 1) * 26; d += ` H${x} V${y}`; }
+$("#c_st").setAttribute("d", d);
+E.count($("#c_p"), RL.w(2, "%") - 0.2, p, { dur: 0.9, fmt: (v) => Math.round(v) + "%" });
+E.draw($("#c_st"), RL.w(2, "monthly") - 0.6, 1.4); E.sfx("rise", RL.w(2, "monthly") - 0.6);
+
+/* 3 */
+E.lines(".scene:nth-of-type(4) .disp", RL.seg(3).start + 0.3);
+[["#d_1", "books"], ["#d_2", "statements"], ["#d_3", "file"]].forEach(([s, w]) => {
+  tl.fromTo(s, { x: 90, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, w) - 0.2);
+  tl.fromTo(`${s} .n`, { scale: 0.6 }, { scale: 1, duration: 0.4, ease: "back.out(3)" }, RL.w(3, w) - 0.1);
+  E.sfx("click", RL.w(3, w));
+});
+
+/* 4 */
+$("#e_pt").textContent = R.partner.filing_partner;
+E.count($("#e_v"), RL.seg(4).start + 0.4, R.pricing.one_off.late_filing_rescue_aed, { dur: 1.0, fmt: (v) => aed(Math.round(v)) });
+["#e_1", "#e_2", "#e_3"].forEach((s, i) => tl.fromTo(s, { x: -60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, RL.w(4, "one-off") + i * 0.35));
+E.sfx("chime", RL.w(4, "licensed"));
+
+/* 5 */
+const g0 = RL.seg(5).start + 0.3;
+tl.fromTo("#g_a", { x: -10, y: -10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0);
+tl.fromTo("#g_b", { x: 10, y: 10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0); E.sfx("impact", g0 + 0.1);
+tl.fromTo("#g_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "RESCUE") - 0.1);
+</script>
+</body></html>

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RAMZA Noor photo posts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Urbanist:wght@600;700;800;900&family=Geist:wght@600;700&display=block" rel="stylesheet">
+<style>
+/* Noor photo posts (2026-10-18), after the Dubai accounting-firm references: photoreal scene with
+   Noor, a big navy headline in the photo's empty space, a flat white fact panel at the bottom.
+   No website on any slide (founder: "just useful info"). Bar: navy + white, flat washes, hairline
+   rules, numbers instead of icons, radii ≤ 8px, no gradients, glows or icon bubbles. */
+:root{--navy:#0B1533;--night:#050B1F;--ink:#14131C;--slate:#4A5366;--mute:#7C859A;--line:#DCE1EB;--red:#B42318;--blue:#2B3F8F}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#C9CED8;font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;gap:40px;padding:40px 0}
+[data-post]{display:flex;flex-direction:column;gap:40px}
+.s{width:1080px;height:1350px;position:relative;overflow:hidden;background:#fff}
+.s.navy{background:var(--navy);color:#fff}
+.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0}
+.hairline{position:absolute;left:0;right:0;height:1px;background:var(--line);z-index:3}
+.top{position:absolute;left:64px;right:64px;top:56px;display:flex;justify-content:space-between;align-items:center;z-index:5}
+.top img{height:40px}
+.top .pg{font-size:22px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ai{position:absolute;right:64px;top:110px;z-index:5;font-size:17px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#fff;background:rgba(11,21,51,.82);padding:7px 11px;border-radius:4px}
+.navy .top .pg{color:#AEB6C8}
+.hd{position:absolute;left:64px;right:64px;top:130px;z-index:4}
+.kick{font-size:26px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--blue)}
+.h1{font-family:'Urbanist';font-weight:900;font-size:118px;line-height:.92;letter-spacing:-.035em;color:var(--navy);text-transform:uppercase;margin-top:14px}
+.h1 em{font-style:normal;color:var(--blue)}
+.h2{font-family:'Urbanist';font-weight:700;font-size:50px;line-height:1.05;letter-spacing:-.02em;color:var(--navy);margin-top:18px}
+.rule{width:84px;height:6px;background:var(--navy);margin-top:26px}
+.panel{position:absolute;left:40px;right:40px;bottom:40px;z-index:4;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 36px 0}
+.row{display:grid;grid-template-columns:var(--k,74px) 1fr;gap:20px;padding:22px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.row b{font-family:'Urbanist';font-weight:800;font-size:40px;color:var(--blue);font-variant-numeric:tabular-nums}
+.row div{font-size:30px;line-height:1.3;color:var(--ink)}
+.row div strong{font-weight:700;color:var(--navy)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 0 22px;font-size:24px;color:var(--slate)}
+.foot .bad{color:var(--red);font-weight:700}
+.src{font-size:17px;color:var(--mute);line-height:1.35}
+/* carousel inner slides */
+.in{position:absolute;inset:0;padding:170px 90px 90px;display:flex;flex-direction:column;justify-content:center;gap:0}
+.big{font-family:'Urbanist';font-weight:800;font-size:220px;line-height:.9;letter-spacing:-.05em;color:var(--blue)}
+.navy .big{color:#fff}
+.t1{font-family:'Urbanist';font-weight:800;font-size:88px;line-height:1;letter-spacing:-.03em;color:var(--navy);margin-top:26px}
+.navy .t1{color:#fff}
+.p{font-size:38px;line-height:1.42;color:var(--slate);margin-top:28px;max-width:880px}
+.navy .p{color:#C9D0DF}
+.bx{margin-top:64px;border:1px solid var(--line);border-radius:8px;padding:26px 30px;font-size:29px;line-height:1.4;color:var(--ink);background:#F6F7FA}
+.bx b{color:var(--navy)}
+.navy .bx{background:transparent;border-color:#2A3658;color:#E4E8F1}.navy .bx b{color:#fff}
+.tl{margin-top:50px;border-top:1px solid var(--line)}
+.tl .r{display:grid;grid-template-columns:300px 1fr;gap:26px;padding:26px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.tl .r b{font-family:'Urbanist';font-weight:800;font-size:44px;color:var(--navy);letter-spacing:-.02em}
+.tl .r div{font-size:33px;line-height:1.35;color:var(--ink)}
+.tl .r.past b{color:var(--mute);text-decoration:line-through}
+.noorbar{position:absolute;left:0;right:0;bottom:0;height:300px;display:flex;align-items:flex-end;gap:30px;padding:0 90px 70px}
+.noorbar img{width:190px;height:230px;object-fit:cover;object-position:50% 12%;border-radius:6px;border:1px solid #2A3658}
+.noorbar div{font-size:27px;line-height:1.4;color:#C9D0DF;padding-bottom:6px}
+.noorbar b{display:block;color:#fff;font-size:30px}
+.ba{margin-top:64px;display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.ba div{padding:24px 28px;font-size:28px;line-height:1.4}
+.ba small{display:block;font-size:19px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.ba .no{background:#FBF3F2;color:#5A1D17}.ba .no small{color:var(--red)}
+.ba .yes{background:#F2F6F3;color:#163D2A}.ba .yes small{color:#1F7A4D}
+</style>
+</head>
+<body>
+<script>
+const R = window.RULES;
+const BRAND = "../../../../public/ramza/brand/", PH = "photos/";
+const n = (x) => Number(x).toLocaleString("en-US");
+const aed = (x) => "AED " + n(x);
+const aedM = (x) => "AED " + String(+(x / 1e6).toFixed(2)) + "m";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const d = (iso) => { const [y, m, dd] = iso.split("-").map(Number); return `${dd} ${MON[m - 1]} ${y}`; };
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const daysTo = (iso) => Math.round((Date.parse(iso) - Date.parse(today)) / 864e5);
+const pct = (x) => `${+(x * 100).toFixed(2)}%`;
+const E = R.einvoicing, P = E.penalties, CT = R.ct, sbr = CT.small_business_relief, V = R.vat;
+
+/* the RAMZA bot mark (2026-10-19 logo direction): blue squircle, two pill eyes; eq=true turns the eyes into "=" (books = bank) */
+const bot = (size, eq = false) => `<svg width="${size}" height="${size}" viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" rx="24" fill="#3B56E5"/>${eq ? '<rect x="33" y="39" width="34" height="9" rx="4.5" fill="#fff"/><rect x="33" y="52" width="34" height="9" rx="4.5" fill="#fff"/>' : '<rect x="37" y="34" width="9" height="26" rx="4.5" fill="#fff"/><rect x="56" y="34" width="9" height="26" rx="4.5" fill="#fff"/>'}</svg>`;
+const topbar = (dark, i, total) => `<div class="top"><span style="display:flex;align-items:center;gap:12px">${bot(46)}<b style="font-family:Geist;font-weight:700;font-size:30px;color:${dark ? "#fff" : "#0B1533"}">RAMZA</b></span><span class="pg">${total > 1 ? `${i}/${total}` : ""}</span></div>`;
+const slide = (cls, inner, i, total) => `<section class="s ${cls}" data-slide>${topbar(/navy/.test(cls), i, total)}${inner}</section>`;
+const post = (id, slides, caption) => `<div data-post="${id}">${slides.map((s, i) => slide(s[0], s[1], i + 1, slides.length)).join("")}<template data-caption>${caption}</template></div>`;
+const AI = `<div class="ai">AI presenter</div>`;
+/* split layout: solid white header band (headline) above the photo, so type never crosses Noor's face */
+const photo = (file, drop = 400, pos = "50% 0", tag = "AI presenter") => `<img class="bg" src="${PH}${file}" style="top:${drop}px;height:${1350 - drop}px;object-position:${pos}"><div class="hairline" style="top:${drop}px"></div>${AI.replace('class="ai"', `class="ai" style="top:${drop + 24}px"`).replace("AI presenter", tag)}`;
+const rows = (list) => list.map(([k, v], i) => `<div class="row"><b>${k ?? String(i + 1).padStart(2, "0")}</b><div>${v}</div></div>`).join("");
+const DISC = "Noor is RAMZA's AI presenter. General information, not tax advice. RAMZA is not a registered tax agent.";
+const posts = [];
+
+/* 10 ─ E-invoicing: who appoints a provider when */
+const einvLeft = daysTo(E.large.asp_by);
+posts.push(post("10-noor-einvoicing", [["", `${photo("noor-einv.jpg", 450)}
+  <div class="hd">
+    <div class="kick">UAE e-invoicing</div>
+    <div class="h1">E-<em>invoicing</em></div>
+    <div class="h2">Two deadlines. Which one is yours?</div>
+    <div class="rule"></div>
+  </div>
+  <div class="panel">
+    ${rows([
+      [null, `Revenue <strong>${aedM(E.large.revenue_gte_aed)}+</strong>: appoint an accredited provider by <strong>${d(E.large.asp_by)}</strong>, live on <strong>${d(E.large.go_live)}</strong>`],
+      [null, `Below ${aedM(E.large.revenue_gte_aed)}: appoint by <strong>${d(E.sme.asp_by)}</strong>, live on <strong>${d(E.sme.go_live)}</strong>`],
+    ])}
+    <div class="foot"><span class="bad">Late provider: ${aed(P.asp_late_aed_per_month)} a month</span><span class="src">${P.legal_basis.replace(/ on violations.*/, "")}</span></div>
+  </div>`]],
+  `${einvLeft > 0 ? `${einvLeft} days left for UAE businesses with revenue of ${aedM(E.large.revenue_gte_aed)} or more to appoint an accredited e-invoicing provider.` : "UAE e-invoicing: two phases, two provider deadlines."}
+
+📌 Revenue ${aedM(E.large.revenue_gte_aed)}+ → provider by ${d(E.large.asp_by)}, go-live ${d(E.large.go_live)}
+📌 Below ${aedM(E.large.revenue_gte_aed)} → provider by ${d(E.sme.asp_by)}, go-live ${d(E.sme.go_live)}
+
+Late appointment: ${aed(P.asp_late_aed_per_month)} for every month or part of a month (${P.legal_basis.replace(/ on violations.*/, "")}).
+
+Save this and send it to whoever runs your invoicing.
+
+${DISC}
+#UAEeinvoicing #einvoicing #UAEbusiness #DubaiBusiness #UAEtax #FTA`));
+
+/* 11 ─ Small Business Relief extended */
+posts.push(post("11-noor-sbr-2029", [["", `${photo("noor-sbr.jpg", 480, "50% 92%")}
+  <div class="hd">
+    <div class="kick">Corporate tax · Small Business Relief</div>
+    <div class="h1">Extended to <em>${sbr.periods_end_on_or_before.slice(0, 4)}</em></div>
+    <div class="h2">Revenue ${aedM(sbr.revenue_lte_aed)} or less? Read this first.</div>
+  </div>
+  <div class="panel">
+    ${rows([
+      [null, `Covers tax periods ending on or before <strong>${d(sbr.periods_end_on_or_before)}</strong>`],
+      [null, `Revenue at or under <strong>${aedM(sbr.revenue_lte_aed)}</strong> in the period`],
+      [null, `You <strong>still register and file</strong> a return every year`],
+      [null, `Not for Qualifying Free Zone Persons or members of a multinational group`],
+    ])}
+    <div class="foot"><span>Relief is not an exemption from filing.</span><span class="src">${sbr.legal_basis}</span></div>
+  </div>`]],
+  `Small Business Relief now covers tax periods ending on or before ${d(sbr.periods_end_on_or_before)}.
+
+If revenue is ${aedM(sbr.revenue_lte_aed)} or less in the period, the business can elect relief. But it still has to register and file a corporate tax return every year. Qualifying Free Zone Persons and members of multinational groups can't use it.
+
+Source: ${sbr.legal_basis}.
+
+Follow for one clear UAE tax rule a day.
+
+${DISC}
+#UAEcorporatetax #SmallBusinessRelief #UAEsme #DubaiStartup #corporatetax`));
+
+/* 12 ─ VAT registration thresholds */
+posts.push(post("12-noor-vat-threshold", [["", `${photo("noor-vat.jpg", 390, "50% 80%")}
+  <div class="hd">
+    <div class="kick">UAE VAT</div>
+    <div class="h1" style="font-size:100px">When must you <em>register?</em></div>
+  </div>
+  <div class="panel" style="--k:190px">
+    ${rows([
+      [aed(V.registration.mandatory_over_aed).replace("AED ", ""), `<strong>Must register</strong> once taxable supplies and imports pass ${aed(V.registration.mandatory_over_aed)}`],
+      [aed(V.registration.voluntary_over_aed).replace("AED ", ""), `<strong>May register</strong> voluntarily above ${aed(V.registration.voluntary_over_aed)}`],
+    ].map(([k, v]) => [`<span style="font-size:30px">${k}</span>`, v]))}
+    <div class="foot"><span>Measured over the past 12 months, or expected in the next 30 days.</span></div>
+  </div>`]],
+  `UAE VAT registration, in two numbers:
+
+• Over ${aed(V.registration.mandatory_over_aed)} of taxable supplies and imports → registration is mandatory.
+• Over ${aed(V.registration.voluntary_over_aed)} → you may register voluntarily.
+
+Both are measured over the past 12 months, or what you expect in the next 30 days. Track it monthly so the threshold doesn't sneak up on you.
+
+${DISC}
+#UAEVAT #VATregistration #DubaiBusiness #UAEsme #bookkeeping`));
+
+/* 13 ─ Overdue invoices (the pain from the reel) */
+posts.push(post("13-noor-overdue", [["", `${photo("noor-overdue.jpg", 450, "50% 96%")}
+  <div class="hd">
+    <div class="kick">Cash flow</div>
+    <div class="h1">Who owes <em>you?</em></div>
+    <div class="h2">If it takes longer than 10 seconds to answer, it's a books problem.</div>
+  </div>
+  <div class="panel">
+    ${rows([
+      [null, `One overdue list: <strong>invoice, customer, days late, amount</strong>`],
+      [null, `Match every payment to its invoice <strong>the day it lands</strong>`],
+      [null, `Send the first reminder on <strong>day one</strong>, not day thirty`],
+    ])}
+    <div class="foot"><span>Cash you've earned but not collected is still a loan to your customer.</span></div>
+  </div>`]],
+  `"Who still owes us money?" should take 10 seconds to answer.
+
+If it takes an afternoon of spreadsheets, the problem isn't cash. It's the books.
+
+1. Keep one overdue list: invoice, customer, days late, amount.
+2. Match every payment to its invoice the day it lands in the bank.
+3. Send the first reminder on day one.
+
+Save this for your next month-end.
+
+${DISC}
+#cashflow #overdueinvoices #UAEbusiness #DubaiEntrepreneur #bookkeeping`));
+
+/* 14 ─ Corporate tax 0% / 9% (typographic, Noor portrait) */
+posts.push(post("14-ct-rate", [["navy", `
+  <div class="in">
+    <div class="kick" style="color:#AEB6C8">UAE corporate tax, in one line</div>
+    <div style="display:flex;gap:60px;align-items:flex-end;margin-top:40px">
+      <div><div class="big">0%</div><div class="p" style="margin-top:10px">on taxable income up to <b style="color:#fff">${aed(CT.rate.zero_rate_up_to_aed)}</b></div></div>
+      <div><div class="big">${pct(CT.rate.rate_above)}</div><div class="p" style="margin-top:10px">on the part above it</div></div>
+    </div>
+    <div class="bx" style="margin-top:70px">A business with <b>${aed(CT.rate.zero_rate_up_to_aed + 100000)}</b> of taxable income pays ${pct(CT.rate.rate_above)} on <b>${aed(100000)}</b> only: <b>${aed(100000 * CT.rate.rate_above)}</b>.</div>
+  </div>
+  <div class="noorbar"><img src="${PH}noor-desk.png"><div><b>Noor · AI presenter</b>The 0% band still needs a return filed on time.<br><span style="font-size:20px;color:#7C859A">${CT.rate.legal_basis}</span></div></div>`]],
+  `UAE corporate tax in one line: 0% on taxable income up to ${aed(CT.rate.zero_rate_up_to_aed)}, ${pct(CT.rate.rate_above)} on the part above it.
+
+Example: ${aed(CT.rate.zero_rate_up_to_aed + 100000)} of taxable income → ${pct(CT.rate.rate_above)} on ${aed(100000)} → ${aed(100000 * CT.rate.rate_above)}.
+
+The 0% band still needs a return, filed on time.
+
+${DISC}
+#UAEcorporatetax #corporatetax #DubaiBusiness #UAEsme`));
+
+/* 15 ─ Carousel: "Is your accountant a detective?" */
+const habits = [
+  ["Photograph the receipt the day you pay", "A receipt in a wallet for three months is a receipt your accountant has to hunt for.", "Receipts in a drawer until quarter end", "Photo in the shared folder, same day"],
+  ["Keep one bank account for the business only", "Personal coffee on the business card turns every statement line into a question.", "One card for home and business", "A business account, nothing personal on it"],
+  ["Put the invoice number in the transfer reference", "Then a payment matches its invoice in seconds instead of by guesswork.", "Reference: \"payment\"", "Reference: \"INV-1042\""],
+  ["Record gateway payouts with their fees", "The deposit is never the sale. The difference is fees and VAT, and both belong in the books.", "Book the deposit as the sale", "Book the sale, the fee and its VAT"],
+  ["Close each month before the next one is old", "Reconciling October in March means remembering October in March.", "Catch up once a year", "Reconcile in the first week of each month"],
+];
+posts.push(post("15-carousel-accountant-detective", [
+  ["", `${photo("noor-vat.jpg", 480, "50% 80%")}
+    <div class="hd"><div class="kick">5 habits</div><div class="h1" style="font-size:100px">Is your accountant a <em>detective?</em></div></div>
+    <div class="panel"><div class="foot" style="font-size:30px;color:var(--ink);padding:26px 0">Five habits that end the hunt for missing receipts. <b style="color:var(--blue)">Swipe →</b></div></div>`],
+  ...habits.map(([t, p, no, yes], i) => ["", `<div class="in"><div class="big">${String(i + 1).padStart(2, "0")}</div><div class="t1">${t}</div><div class="p">${p}</div>
+    <div class="ba"><div class="no"><small>Instead of</small>${no}</div><div class="yes"><small>Do this</small>${yes}</div></div></div>`]),
+  ["navy", `<div class="in"><div class="t1" style="font-size:96px">Save this.</div><div class="p">Send it to whoever does your books. They'll know why.</div></div>
+    <div class="noorbar"><img src="${PH}noor-desk.png"><div><b>Noor · AI presenter</b>One clear bookkeeping habit a day.</div></div>`],
+],
+  `Is your accountant a detective? 🔍
+
+If they spend half the month hunting for receipts, these five habits fix most of it:
+
+1. Photograph the receipt the day you pay
+2. One bank account for the business only
+3. Invoice number in every transfer reference
+4. Record gateway payouts with their fees
+5. Close each month before the next one is old
+
+Save it. Send it to whoever does your books.
+
+${DISC}
+#bookkeeping #UAEbusiness #DubaiSME #accountingtips #smallbusinesstips`));
+
+/* 16 ─ Carousel: UAE e-invoicing in 6 slides */
+const tl = [
+  [E.large.asp_by, `Revenue ${aedM(E.large.revenue_gte_aed)}+: appoint an accredited provider`],
+  [E.large.go_live, `Revenue ${aedM(E.large.revenue_gte_aed)}+: e-invoicing goes live`],
+  [E.sme.asp_by, `Everyone else in scope: appoint a provider`],
+  [E.sme.go_live, `Everyone else in scope: goes live`],
+];
+posts.push(post("16-carousel-einvoicing", [
+  ["", `${photo("noor-einv.jpg", 500)}
+    <div class="hd"><div class="kick">6 slides</div><div class="h1">E-invoicing, <em>explained</em></div><div class="h2">What changes for UAE businesses, and when.</div></div>
+    <div class="panel"><div class="foot" style="font-size:30px;color:var(--ink);padding:26px 0">Dates, penalties and a 4-step plan. <b style="color:var(--blue)">Swipe →</b></div></div>`],
+  ["", `<div class="in"><div class="kick">What changes</div><div class="t1">Invoices go through an accredited provider</div>
+    <div class="p">B2B and B2G invoices are issued as structured e-invoices through an accredited service provider, not as a PDF sent by email.</div>
+    <div class="bx"><b>Scope:</b> ${E.scope.replace(/;.*/, "")} invoices.</div></div>`],
+  ["", `<div class="in"><div class="kick">The dates</div><div class="t1">Four dates to put in the calendar</div>
+    <div class="tl">${tl.map(([iso, t]) => `<div class="r ${daysTo(iso) < 0 ? "past" : ""}"><b>${d(iso)}</b><div>${t}</div></div>`).join("")}</div></div>`],
+  ["", `<div class="in"><div class="kick">The penalties</div><div class="big" style="font-size:180px">${aed(P.asp_late_aed_per_month).replace("AED ", "")}</div><div class="t1">AED a month for appointing a provider late</div>
+    <div class="p">Plus ${aed(P.invoice_not_issued_aed)} for each e-invoice not issued, capped at ${aed(P.invoice_cap_aed_per_month)} a month.</div>
+    <div class="bx" style="font-size:22px;color:var(--mute)">${P.legal_basis}</div></div>`],
+  ["", `<div class="in"><div class="kick">The plan</div><div class="t1">Get ready in four steps</div>
+    <div class="tl">${["List every place an invoice is created today", "Clean customer records: legal name and TRN", "Appoint an accredited provider before your deadline", "Send one real test invoice end to end"].map((t, i) => `<div class="r" style="grid-template-columns:90px 1fr"><b style="color:var(--blue)">${String(i + 1).padStart(2, "0")}</b><div>${t}</div></div>`).join("")}</div></div>`],
+  ["navy", `<div class="in"><div class="t1" style="font-size:96px">Save this.</div><div class="p">Send it to your finance team before the provider deadline.</div></div>
+    <div class="noorbar"><img src="${PH}noor-desk.png"><div><b>Noor · AI presenter</b>One clear UAE rule a day.</div></div>`],
+],
+  `UAE e-invoicing, explained in 6 slides 👉
+
+📅 ${d(E.large.asp_by)}: revenue ${aedM(E.large.revenue_gte_aed)}+ appoint an accredited provider
+📅 ${d(E.large.go_live)}: they go live
+📅 ${d(E.sme.asp_by)}: everyone else in scope appoints a provider
+📅 ${d(E.sme.go_live)}: they go live
+
+Late appointment: ${aed(P.asp_late_aed_per_month)} a month. Each e-invoice not issued: ${aed(P.invoice_not_issued_aed)}, capped at ${aed(P.invoice_cap_aed_per_month)} a month.
+
+Save it and share it with your finance team.
+
+${DISC}
+#UAEeinvoicing #einvoicing #UAEtax #DubaiBusiness #finance`));
+
+/* 18 ─ Pain → fix: the January 2027 PDF penalty (photoreal pair) */
+posts.push(post("18-pain-fix-pdf-penalty", [
+  ["", `${photo("founder-stress.jpg", 430, "50% 100%", "AI-generated image")}
+    <div class="hd"><div class="kick" style="color:var(--red)">January 2027 · revenue ${aedM(E.large.revenue_gte_aed)}+</div><div class="h1" style="font-size:104px">Still sending <em style="color:var(--red)">PDF</em> invoices?</div></div>
+    <div class="panel">${rows([
+      [null, `<strong>${aed(P.invoice_not_issued_aed)}</strong> for each e-invoice not issued, up to <strong>${aed(P.invoice_cap_aed_per_month)}</strong> a month`],
+      [null, `No accredited provider appointed: <strong>${aed(P.asp_late_aed_per_month)}</strong> every month`],
+    ])}<div class="foot"><span class="bad">That's up to ${aed(P.invoice_cap_aed_per_month + P.asp_late_aed_per_month)} a month.</span><b style="color:var(--blue)">The fix →</b></div></div>`],
+  ["", `${photo("noor-helps.jpg", 430, "50% 100%")}
+    <div class="hd"><div class="kick">The fix</div><div class="h1" style="font-size:104px">Books <em>=</em> bank. Then e-invoice.</div></div>
+    <div class="panel">${rows([
+      [null, `Match every payment to its invoice, <strong>daily</strong>`],
+      [null, `Clean customer records: <strong>legal name and TRN</strong>`],
+      [null, `Appoint an accredited provider <strong>before ${d(E.large.asp_by)}</strong>`],
+    ])}<div class="foot"><span style="display:flex;align-items:center;gap:14px">${bot(54, true)}<b style="font-family:Geist;font-size:28px;color:var(--navy)">books = bank</b></span><span class="src">${P.legal_basis.replace(/ on violations.*/, "")}</span></div></div>`],
+],
+  `Sent your invoices as PDFs, like always? From ${d(E.large.go_live)}, for UAE businesses with revenue of ${aedM(E.large.revenue_gte_aed)}+, that's not the tax invoice anymore.
+
+❌ ${aed(P.invoice_not_issued_aed)} for each e-invoice not issued (capped at ${aed(P.invoice_cap_aed_per_month)} a month)
+❌ ${aed(P.asp_late_aed_per_month)} a month with no accredited provider appointed
+
+✅ The fix: match every payment to its invoice, clean customer TRNs, appoint an accredited provider before ${d(E.large.asp_by)}.
+
+Books = bank. Then e-invoice.
+
+${DISC} The founder pictured is AI-generated. RAMZA is not an accredited e-invoicing provider.
+#UAEeinvoicing #einvoicing #DubaiBusiness #UAEtax #bookkeeping`));
+
+document.body.innerHTML = posts.join("");
+</script>
+</body>
+</html>

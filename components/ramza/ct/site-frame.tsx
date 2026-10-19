@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { RamzaShell } from "@/components/ramza/ramza-shell";
 import { AttributionInit } from "@/components/ramza/attribution-init";
 import { CT_MORE, CT_NAV, CT_PENALTY_LINKS, whatsappHref } from "@/lib/ramza/ct-site";
+import { CT_LEARN } from "@/lib/ramza/ct-learn";
 import { RAMZA_EMAIL, RAMZA_LEGAL_LINE } from "@/lib/ramza/site";
 import { CtNav } from "./nav";
 import { Pixels } from "./pixels";
@@ -26,7 +27,7 @@ export function CtSiteFrame({ children }: { children: ReactNode }) {
         <main>{children}</main>
 
         <footer className={ct.sectionDark}>
-          <div className={`${ct.container} grid gap-10 py-16 md:grid-cols-[1.3fr_1fr_1fr]`}>
+          <div className={`${ct.container} grid gap-10 py-16 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]`}>
             <div>
               <Link href="/ramza" className="inline-flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[19px] font-bold tracking-[0.16em]">
                 <RamzaMark tone="light" /> RAMZA
@@ -40,6 +41,12 @@ export function CtSiteFrame({ children }: { children: ReactNode }) {
               <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">Corporate Tax</div>
               <ul className="mt-4 space-y-2.5 text-[14px] text-[#E6E4EA]">
                 {[...CT_NAV, ...CT_PENALTY_LINKS].map((l) => <li key={l.href}><Link href={l.href} className="hover:text-white">{l.label}</Link></li>)}
+              </ul>
+            </div>
+            <div>
+              <div className="text-[12px] font-medium uppercase tracking-[0.16em] text-[#CBC3FF]">Guides</div>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-[#E6E4EA]">
+                {CT_LEARN.map((l) => <li key={l.href}><Link href={l.href} className="hover:text-white">{l.label}</Link></li>)}
               </ul>
             </div>
             <div>

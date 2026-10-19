@@ -1,0 +1,186 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<style>
+  .h{font-size:92px;color:var(--navy)}
+  .navy .h,.night .h{color:#fff}
+  .stmt{font-family:'IBM Plex Mono';font-size:28px;overflow:hidden}
+  .stmt .ln{display:grid;grid-template-columns:120px 1fr 230px;gap:18px;padding:28px 30px;border-top:1px solid var(--line);align-items:center;color:var(--mute)}
+  .stmt .ln:first-child{border-top:0}
+  .stmt .hdr{font-family:'IBM Plex Sans';font-size:22px;letter-spacing:.12em;text-transform:uppercase;background:var(--paper)}
+  .stmt .amt{text-align:right}
+  .stmt .hot{color:var(--ink);background:#fff;position:relative}
+  .stmt .hot .amt{color:var(--green)}
+  .flag{font-family:'IBM Plex Sans';font-size:30px;font-weight:600;color:var(--red);letter-spacing:.06em;display:block;margin-top:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+  .chip{font-size:28px;font-weight:600;padding:14px 22px;border-radius:8px;border:1.5px solid var(--navy);color:var(--navy);background:#fff}
+  .chip.r{border-color:var(--red);color:var(--red)}
+  .chip.f{border-color:var(--mute);color:var(--slate)}
+  .gw{display:flex;align-items:center;justify-content:center;height:190px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 40px}
+  .gw img{height:84px;width:auto}
+  .wf{display:flex;align-items:flex-end;gap:26px;height:640px;border-bottom:2px solid #1D2645}
+  .wf .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;position:relative}
+  .wf .bar{border-radius:8px 8px 0 0;transform-origin:bottom}
+  .wf .lb{position:absolute;left:0;right:0;bottom:-74px;text-align:center;font-size:26px;color:#C4CAD9;font-weight:500}
+  .node{position:absolute;left:72px;right:72px;padding:34px 40px;display:flex;align-items:center;gap:30px}
+  .node .t{font-family:'Urbanist';font-weight:700;font-size:48px;color:var(--navy);letter-spacing:-.02em}
+  .node .s{font-size:28px;color:var(--slate);margin-top:6px}
+  .node .ix{width:84px;height:84px;border-radius:10px;background:var(--navy);color:#fff;font-family:'Urbanist';font-weight:800;font-size:40px;display:flex;align-items:center;justify-content:center;flex:none}
+  .logos{display:flex;gap:16px;margin-left:auto}
+  .logos img{height:40px;width:auto}
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:150px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body><div class="stage">
+
+<!-- 0 one line -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">A bank statement</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>One line.</span></span><span class="line"><span class="accent">A whole week.</span></span></div>
+    <div class="card stmt" id="a_st" style="margin-top:60px">
+      <div class="ln hdr"><span>Date</span><span>Narration</span><span class="amt">Credit</span></div>
+      <div class="ln"><span>01 Sep</span><span>CARD SETTLEMENT</span><span class="amt">+ •,•••.••</span></div>
+      <div class="ln hot" id="a_hot"><span>02 Sep</span><span>NETWORK INTERNATIONAL</span><span class="amt">+ ••,•••.••</span></div>
+      <div class="ln"><span>03 Sep</span><span>TRANSFER</span><span class="amt">+ •••.••</span></div>
+    </div>
+    <div class="chips" id="a_ch" style="margin-top:50px"></div>
+  </div>
+</section>
+
+<!-- 1 same name -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Which gateway paid?</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Two gateways.</span></span><span class="line"><span class="accent">One bank name.</span></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:90px">
+      <div class="gw" id="b_g1"><img src="LG/stripe.svg"></div>
+      <div class="gw" id="b_g2"><img src="LG/shopify.svg"></div>
+    </div>
+    <svg width="936" height="190" style="display:block"><path id="b_p1" d="M234 10 V90 H468 V180" stroke="#0B1533" stroke-width="4" fill="none"/><path id="b_p2" d="M702 10 V90 H468 V180" stroke="#0B1533" stroke-width="4" fill="none"/></svg>
+    <div class="card stmt" id="b_st">
+      <div class="ln hot"><span>02 Sep</span><span>NETWORK INTERNATIONAL<span class="flag" id="b_fl">STRIPE? SHOPIFY?</span></span><span class="amt">+ ••,•••.••</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 waterfall -->
+<section class="scene navy">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Inside one payout</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Netted before</span></span><span class="line"><span class="accent">it lands.</span></span></div>
+    <div class="wf" style="margin-top:70px">
+      <div class="col"><div class="bar" id="c_b1" style="height:100%;background:#fff"></div><div class="lb">Orders</div></div>
+      <div class="col"><div style="height:0%"></div><div class="bar" id="c_b2" style="height:16%;background:var(--red);margin-bottom:auto;margin-top:0;position:absolute;top:0;left:0;right:0;border-radius:0 0 8px 8px;transform-origin:top"></div><div class="lb">Refunds</div></div>
+      <div class="col"><div class="bar" id="c_b3" style="height:6%;background:var(--lilac);position:absolute;top:16%;left:0;right:0;border-radius:0 0 8px 8px;transform-origin:top"></div><div class="lb">Fees</div></div>
+      <div class="col"><div class="bar" id="c_b4" style="height:2.5%;background:#8E97B3;position:absolute;top:22%;left:0;right:0;border-radius:0 0 8px 8px;transform-origin:top"></div><div class="lb">VAT on fees</div></div>
+      <div class="col"><div class="bar" id="c_b5" style="height:75.5%;background:transparent;border:4px solid #fff;border-bottom:0"></div><div class="lb" style="color:#fff;font-weight:600">Payout</div></div>
+    </div>
+    <div style="font-size:24px;color:#7F89A6;margin-top:110px">Illustrative proportions.</div>
+  </div>
+</section>
+
+<!-- 3 how RAMZA matches -->
+<section class="scene mist">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">What RAMZA does</div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Start from the bank.</span></span><span class="line"><span class="accent">Work back.</span></span></div>
+  </div>
+  <svg style="position:absolute;left:0;top:0" width="1080" height="1920"><path id="d_l1" d="M156 790 V860" stroke="#0B1533" stroke-width="4" fill="none"/><path id="d_l2" d="M156 1030 V1100" stroke="#0B1533" stroke-width="4" fill="none"/></svg>
+  <div class="node card" id="d_n1" style="top:620px"><div class="ix">1</div><div><div class="t">Bank credit</div><div class="s">NETWORK INTERNATIONAL</div></div></div>
+  <div class="node card" id="d_n2" style="top:860px"><div class="ix">2</div><div><div class="t">Payout file</div><div class="s">same amount, to the fils</div></div>
+    <div class="logos"><img src="LG/stripe-mark.png"><img src="LG/tabby-mark.png"><img src="LG/tamara-mark.png"><img src="LG/telr-mark.png"></div></div>
+  <div class="node card" id="d_n3" style="top:1100px;border:2px solid var(--navy)"><div class="ix" style="background:var(--green)">3</div><div><div class="t">Orders, refunds, fees</div><div class="s">booked once, ready for Zoho</div></div></div>
+</section>
+
+<!-- 4 proof -->
+<section class="scene night">
+  <div class="body" style="top:300px">
+    <div class="eyebrow" id="e_e"></div>
+    <div class="disp h" style="margin-top:24px"><span class="line"><span>Our own books.</span></span></div>
+    <div style="margin-top:70px">
+      <div class="stat" id="e_s1"><span class="k">Bank credits</span><span class="v num" id="e_v1">0</span></div>
+      <div class="stat" id="e_s2"><span class="k">Matched to payouts<br>and orders</span><span class="v num" id="e_v2">0%</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:40px;line-height:1.45">Omnia is RAMZA's founding company and first user.<br>Figures from the live RAMZA app.</div>
+  </div>
+</section>
+
+<!-- 5 CTA -->
+<section class="scene navy">
+  <div class="body" style="top:330px;text-align:center">
+    <svg viewBox="0 0 64 64" style="width:150px;height:150px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="g_a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="g_b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
+    <div class="eyebrow" style="margin-top:60px">Free month-end check</div>
+    <div class="disp" style="font-size:84px;margin-top:30px;color:#fff">Comment</div>
+    <div id="g_kw" style="margin-top:40px"><span class="kw">RECON</span></div>
+    <div style="font-size:36px;color:#C4CAD9;margin-top:50px;line-height:1.4">Stripe · Shopify · Tabby · Tamara · Telr<br>Or WhatsApp us · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const F = window.FACTS;
+RL.build();
+
+/* 0 */
+E.lines(".scene:nth-of-type(1) .disp", 0.3);
+tl.fromTo("#a_st", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, 0.6);
+tl.fromTo("#a_hot", { boxShadow: "inset 6px 0 0 #0B1533" }, { boxShadow: "inset 6px 0 0 #0B1533", duration: 0.01 }, 0);
+tl.fromTo("#a_hot", { scale: 1 }, { scale: 1.04, duration: 0.35, ease: "back.out(2)" }, RL.w(0, "line")); E.sfx("click", RL.w(0, "line"));
+$("#a_ch").innerHTML = [..."OOOOOROOOOFOOOOOROOOOFOOOOOOFOOOO"].map((c) => `<span class="chip ${c === "R" ? "r" : c === "F" ? "f" : ""}">${c === "R" ? "Refund" : c === "F" ? "Fee" : "Order"}</span>`).join("");
+tl.fromTo("#a_ch .chip", { y: -120, opacity: 0, scale: 0.6 }, { y: 0, opacity: 1, scale: 1, duration: 0.4, stagger: 0.035, ease: "back.out(1.8)" }, RL.w(0, "dozens") - 0.1);
+E.sfx("swish", RL.w(0, "dozens"));
+
+/* 1 */
+const s1 = RL.seg(1).start;
+E.lines(".scene:nth-of-type(2) .disp", s1 + 0.3);
+tl.fromTo("#b_g1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(1, "Stripe") - 0.1);
+tl.fromTo("#b_g2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(1, "Shopify") - 0.1);
+tl.fromTo("#b_st", { opacity: 0 }, { opacity: 1, duration: 0.3 }, RL.w(1, "same") - 0.5);
+E.draw($("#b_p1"), RL.w(1, "same") - 0.3, 0.6); E.draw($("#b_p2"), RL.w(1, "same") - 0.3, 0.6);
+tl.fromTo("#b_fl", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.35 }, RL.w(1, "gateway")); E.sfx("pop", RL.w(1, "gateway"));
+
+/* 2 */
+const s2 = RL.seg(2).start;
+E.lines(".scene:nth-of-type(3) .disp", s2 + 0.3);
+tl.fromTo("#c_b1", { scaleY: 0 }, { scaleY: 1, duration: 0.7, ease: "expo.out" }, s2 + 0.5);
+tl.fromTo("#c_b2", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "expo.out" }, RL.w(2, "netted") - 0.1); E.sfx("click", RL.w(2, "netted"));
+tl.fromTo("#c_b3", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "expo.out" }, RL.w(2, "Fees") - 0.1); E.sfx("click", RL.w(2, "Fees"));
+tl.fromTo("#c_b4", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "expo.out" }, RL.w(2, "VAT") - 0.1);
+tl.fromTo("#c_b5", { scaleY: 0 }, { scaleY: 1, duration: 0.7, ease: "expo.out" }, RL.w(2, "lands") - 0.1); E.sfx("pop", RL.w(2, "lands"));
+
+/* 3 */
+const s3 = RL.seg(3).start;
+E.lines(".scene:nth-of-type(4) .disp", s3 + 0.3);
+tl.fromTo("#d_n1", { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, "bank") - 0.1); E.sfx("click", RL.w(3, "bank"));
+E.draw($("#d_l1"), RL.w(3, "reads"), 0.4);
+tl.fromTo("#d_n2", { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, "payout") - 0.1); E.sfx("click", RL.w(3, "payout"));
+tl.fromTo("#d_n2 .logos img", { scale: 0 }, { scale: 1, duration: 0.3, stagger: 0.08, ease: "back.out(2)" }, RL.w(3, "payout") + 0.2);
+E.draw($("#d_l2"), RL.w(3, "exactly") - 0.4, 0.4);
+tl.fromTo("#d_n3", { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(3, "exactly")); E.sfx("chime", RL.w(3, "exactly") + 0.1);
+
+/* 4 */
+const s4 = RL.seg(4).start;
+$("#e_e").textContent = `${F.close_month} close · Omnia`;
+E.lines(".scene:nth-of-type(5) .disp", s4 + 0.3);
+tl.fromTo("#e_s1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(4, String(F.close_credits)) - 0.3);
+E.count($("#e_v1"), RL.w(4, String(F.close_credits)) - 0.2, F.close_credits, { dur: 1.0 });
+tl.fromTo("#e_s2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(4, F.close_matched_pct + "%") - 0.3);
+E.count($("#e_v2"), RL.w(4, F.close_matched_pct + "%") - 0.2, F.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+E.sfx("chime", RL.w(4, "matched"));
+
+/* 5 */
+const g0 = RL.seg(5).start + 0.3;
+tl.fromTo("#g_a", { x: -10, y: -10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0);
+tl.fromTo("#g_b", { x: 10, y: 10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0); E.sfx("impact", g0 + 0.1);
+tl.fromTo("#g_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(5, "RECON") - 0.1);
+</script>
+</body></html>

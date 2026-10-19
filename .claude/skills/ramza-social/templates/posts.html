@@ -105,7 +105,7 @@ const aedM = (x) => "AED " + String(+(x / 1e6).toFixed(2)) + "m";
 const pct = (x) => Math.round(x * 100) + "%";
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const d = (iso) => { const [y, m, dd] = iso.split("-").map(Number); return { day: dd, mon: MON[m - 1], yr: y, full: `${dd} ${MON[m - 1]} ${y}` }; };
-const dubaiToday = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Dubai" })).toISOString().slice(0, 10);
+const dubaiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
 const daysTo = (iso) => Math.round((Date.parse(iso) - Date.parse(dubaiToday())) / 864e5);
 
 const E = R.einvoicing, CT = R.ct, P = R.einvoicing.penalties;

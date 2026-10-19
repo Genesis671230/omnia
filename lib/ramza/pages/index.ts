@@ -3,7 +3,11 @@ import { GATEWAYS } from "./gateways";
 import { COMPARISONS } from "./comparisons";
 import { MARKETS } from "./markets";
 import { GUIDES } from "./guides";
+import { TAX_GUIDES } from "./tax-guides";
+import { HUBS } from "./hubs";
 import type { PageFamily, RamzaPage } from "./types";
+
+export { HUBS, getHub, hubFor, type Hub } from "./hubs";
 
 export type { RamzaPage, PageFamily, PageSection, Citation } from "./types";
 
@@ -15,6 +19,7 @@ export const ALL_PAGES: RamzaPage[] = [
   ...COMPARISONS,
   ...MARKETS,
   ...GUIDES,
+  ...TAX_GUIDES,
 ];
 
 const BY_PATH = new Map(ALL_PAGES.map((p) => [p.path, p]));
@@ -37,7 +42,7 @@ export function relatedPages(page: RamzaPage): RamzaPage[] {
 
 /* Route params for generateStaticParams — the catch-all segment array. */
 export function allPageParams(): { slug: string[] }[] {
-  return ALL_PAGES.map((p) => ({ slug: p.path.split("/") }));
+  return [...ALL_PAGES.map((p) => p.path), ...HUBS.map((h) => h.path)].map((path) => ({ slug: path.split("/") }));
 }
 
 export function pageUrl(page: RamzaPage): string {
@@ -75,6 +80,11 @@ export function registryProblems(): string[] {
   const inbound = new Set<string>();
   for (const page of ALL_PAGES) {
     for (const rel of page.related) inbound.add(rel);
+  }
+  const hubFamilies = new Set(HUBS.map((h) => h.family));
+  for (const page of ALL_PAGES) {
+    if (hubFamilies.has(page.family)) inbound.add(page.path);
+    else problems.push(`no hub for family "${page.family}": ${page.path}`);
   }
   for (const page of ALL_PAGES) {
     if (!inbound.has(page.path)) {

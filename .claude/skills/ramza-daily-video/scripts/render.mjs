@@ -1,5 +1,6 @@
 /* Render a GSAP timeline page frame by frame. Usage:
  *   node render.mjs page.html outDir [fps] [t1,t2,...]   (times = PNG check frames only)
+ * SIZE=1080x1920 renders a vertical reel (default 1920x1080).
  * Full renders write JPEG frames; delete them after mix.mjs (≈250 MB per minute). */
 import { chromium } from "playwright";
 import { existsSync } from "node:fs";
@@ -10,10 +11,11 @@ import fs from "node:fs";
 import path from "node:path";
 const [html, outDir, fpsArg = "30", only] = process.argv.slice(2);
 const fps = +fpsArg;
+const [W, H] = (process.env.SIZE ?? "1920x1080").split("x").map(Number);
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(`${outDir}/frames`, { recursive: true });
 const browser = await chromium.launch({ ...(CHROME ? { executablePath: CHROME } : {}) });
-const page = await (await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 })).newPage();
+const page = await (await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 })).newPage();
 page.on("pageerror", (e) => console.error("PAGE ERROR", e.message));
 await page.goto("file://" + path.resolve(html), { waitUntil: "load" });
 await page.evaluate(() => document.fonts.ready);

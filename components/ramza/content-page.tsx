@@ -5,7 +5,7 @@ import { Nav } from "./nav";
 import { Footer } from "./footer";
 import { CtaLink } from "./ui/cta-button";
 import { PageSections } from "./page-sections";
-import { relatedPages } from "@/lib/ramza/pages";
+import { hubFor, pagesInFamily, relatedPages, type Hub } from "@/lib/ramza/pages";
 import type { RamzaPage } from "@/lib/ramza/pages/types";
 import { ramzaPath, RAMZA_EMAIL, RAMZA_LEGAL_LINE } from "@/lib/ramza/site";
 import { CTA_PRIMARY, CTA_SECONDARY } from "@/lib/ramza/copy";
@@ -25,6 +25,7 @@ export function ContentPage({
   whatsappHref: string;
 }) {
   const related = relatedPages(page);
+  const hub = hubFor(page.family);
 
   return (
     <RamzaShell>
@@ -34,6 +35,12 @@ export function ContentPage({
         <nav aria-label="Breadcrumb" className="r-crumbs">
           <Link href={ramzaPath("")}>RAMZA</Link>
           <ChevronRight size={13} aria-hidden />
+          {hub && (
+            <>
+              <Link href={ramzaPath(hub.path)}>{hub.crumb}</Link>
+              <ChevronRight size={13} aria-hidden />
+            </>
+          )}
           <span aria-current="page">{page.crumb}</span>
         </nav>
 
@@ -117,6 +124,66 @@ export function ContentPage({
         )}
 
         <p className="r-updated r-nums">Last reviewed {page.updated}</p>
+      </main>
+
+      <Footer whatsappHref={whatsappHref} email={RAMZA_EMAIL} legalLine={RAMZA_LEGAL_LINE} />
+    </RamzaShell>
+  );
+}
+
+/* A family index: every page in the family, with its description as the
+   link's supporting text — descriptive anchors, not "read more". */
+export function HubPage({ hub, whatsappHref }: { hub: Hub; whatsappHref: string }) {
+  const pages = pagesInFamily(hub.family);
+  const latest = pages.map((p) => p.updated).sort().at(-1);
+
+  return (
+    <RamzaShell>
+      <Nav whatsappHref={whatsappHref} />
+
+      <main className="mx-auto w-full max-w-3xl px-5 pb-24 pt-10 sm:pt-16">
+        <nav aria-label="Breadcrumb" className="r-crumbs">
+          <Link href={ramzaPath("")}>RAMZA</Link>
+          <ChevronRight size={13} aria-hidden />
+          <span aria-current="page">{hub.crumb}</span>
+        </nav>
+
+        <header className="mt-6">
+          <h1 className="r-h1">{hub.h1}</h1>
+          <p className="r-lead mt-5" style={{ color: "var(--ink-60)" }}>
+            {hub.lead}
+          </p>
+        </header>
+
+        <section className="r-pagesection">
+          <ul className="r-related mt-4">
+            {pages.map((p) => (
+              <li key={p.path}>
+                <Link href={ramzaPath(p.path)}>
+                  <span className="r-related-t">{p.h1}</span>
+                  <span className="r-related-d">{p.description}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="r-pagecta">
+          <h2 className="r-h3">See it against your own month</h2>
+          <p className="r-steps-b mt-2">
+            Send one month of payout files and a bank statement. We reconcile it and
+            show you what did not tie out, before you decide anything.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <CtaLink href={`${ramzaPath("")}#audit`}>{CTA_PRIMARY}</CtaLink>
+            <CtaLink href={whatsappHref} variant="outline" target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="size-4" />
+              {CTA_SECONDARY}
+            </CtaLink>
+          </div>
+        </section>
+
+        {latest && <p className="r-updated r-nums">Last reviewed {latest}</p>}
       </main>
 
       <Footer whatsappHref={whatsappHref} email={RAMZA_EMAIL} legalLine={RAMZA_LEGAL_LINE} />

@@ -242,8 +242,8 @@ export function BooksExplorer({ org }: { org: string }) {
                     <tr><td colSpan={COLS.length} className="px-4 py-8 text-center text-[#5E6B85]"><Loader2 size={16} className="mx-auto animate-spin" /></td></tr>
                   ) : rows.length === 0 ? (
                     <tr><td colSpan={COLS.length} className="px-4 py-8 text-center text-[#5E6B85]">No records{q ? ` for “${q}”` : ""}.</td></tr>
-                  ) : rows.map((r, i) => (
-                    <tr key={String(r[ent?.idField ?? ""] ?? i)} onClick={() => void openRecord(r)} className={`cursor-pointer border-t border-[#F1F4FA] hover:bg-[#F7F9FE] ${open && ent && open[ent.idField] === r[ent.idField] ? "bg-[#EEF3FF]" : ""}`}>
+                  ) : rows.map((r, inew) => (
+                    <tr key={String(r[ent?.idField ?? ""] ?? inew)} onClick={() => void openRecord(r)} className={`cursor-pointer border-t border-[#F1F4FA] hover:bg-[#F7F9FE] ${open && ent && open[ent.idField] === r[ent.idField] ? "bg-[#EEF3FF]" : ""}`}>
                       {COLS.map((c) => { const k = pickKey(r, c.keys); return <td key={c.title} className={`px-4 py-2.5 ${c.align === "right" ? "text-right tabular-nums" : ""} ${c === COLS[0] ? "font-medium text-[#0F1B3D]" : "text-[#46546F]"}`}>{k ? show(r[k]) : "—"}</td>; })}
                     </tr>
                   ))}

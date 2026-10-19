@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BRAND, RAMZA_EMAIL, RAMZA_ORIGIN, absoluteUrl, ramzaPath } from "./site";
 import type { RamzaPage } from "./pages/types";
+import { hubFor, pagesInFamily, type Hub } from "./pages";
 
 /* Metadata and structured data for every RAMZA page, derived rather than
    hand-written, so canonical tags and schema cannot drift from the content. */
@@ -11,6 +12,15 @@ import type { RamzaPage } from "./pages/types";
    both brands the SERP listing wrong and pushes the title past the ~60
    characters Google will render. `absolute` is the documented opt-out and every
    RAMZA page must use it. */
+/* The per-page social card (app/ramza/og/[...slug]/route.tsx). */
+export function ogImagePath(path: string): string {
+  return `/ramza/og/${path.replace(/^\/+|\/+$/g, "")}.png`;
+}
+
+function ogImages(path: string, alt: string) {
+  return [{ url: ogImagePath(path), width: 1200, height: 630, alt }];
+}
+
 function absoluteTitle(title: string): Metadata["title"] {
   return { absolute: title };
 }
@@ -57,12 +67,32 @@ export function pageMetadata(page: RamzaPage): Metadata {
     openGraph: {
       title: page.title,
       description: page.description,
-      type: page.family === "guide" ? "article" : "website",
       url,
       siteName: BRAND.name,
       locale: "en_AE",
+      images: ogImages(page.path, page.h1),
+      ...(page.family === "guide"
+        ? { type: "article" as const, modifiedTime: page.updated, publishedTime: page.updated }
+        : { type: "website" as const }),
     },
-    twitter: { card: "summary_large_image", title: page.title, description: page.description },
+    twitter: { card: "summary_large_image", title: page.title, description: page.description, images: [ogImagePath(page.path)] },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+    },
+  };
+}
+
+export function hubMetadata(hub: Hub): Metadata {
+  const url = absoluteUrl(ramzaPath(hub.path));
+  return {
+    metadataBase: new URL(RAMZA_ORIGIN),
+    title: absoluteTitle(hub.title),
+    description: hub.description,
+    alternates: { canonical: ramzaPath(hub.path) },
+    openGraph: { title: hub.title, description: hub.description, type: "website", url, siteName: BRAND.name, locale: "en_AE", images: ogImages(hub.path, hub.h1) },
+    twitter: { card: "summary_large_image", title: hub.title, description: hub.description, images: [ogImagePath(hub.path)] },
     robots: {
       index: true,
       follow: true,
@@ -85,6 +115,15 @@ export function organizationNode() {
     name: BRAND.name,
     legalName: BRAND.legalName,
     url: absoluteUrl(ramzaPath("")),
+    /* The agent mark. Google wants a square raster ≥112px for the knowledge
+       panel; SVG is not accepted there. */
+    logo: {
+      "@type": "ImageObject",
+      url: absoluteUrl("/ramza/brand/ramza-agent-512.png"),
+      width: 512,
+      height: 512,
+    },
+    image: absoluteUrl("/ramza/brand/ramza-agent-on-light-1024.png"),
     email: RAMZA_EMAIL,
     description:
       "Payout reconciliation for Gulf e-commerce. Matches gateway payouts to the bank and closes invoices in Zoho Books.",
@@ -143,9 +182,11 @@ export function faqNode(faq: { q: string; a: string }[]) {
 
 /* Breadcrumbs give Google the site hierarchy explicitly and render as the
    path line in results instead of a raw URL. */
-export function breadcrumbNode(page: RamzaPage) {
+export function breadcrumbNode(page: { crumb: string; path: string; family?: RamzaPage["family"] }) {
+  const hub = page.family ? hubFor(page.family) : undefined;
   const trail = [
     { name: BRAND.name, url: absoluteUrl(ramzaPath("")) },
+    ...(hub && hub.path !== page.path ? [{ name: hub.crumb, url: absoluteUrl(ramzaPath(hub.path)) }] : []),
     { name: page.crumb, url: absoluteUrl(ramzaPath(page.path)) },
   ];
 
@@ -172,18 +213,70 @@ export function pageJsonLd(page: RamzaPage) {
 
   if (page.faq.length) graph.push(faqNode(page.faq));
 
+  const url = absoluteUrl(ramzaPath(page.path));
   if (page.family === "guide") {
     graph.push({
       "@type": "Article",
+      "@id": `${url}#article`,
       headline: page.h1,
       description: page.description,
+      datePublished: page.updated,
       dateModified: page.updated,
+      image: absoluteUrl(ogImagePath(page.path)),
       author: { "@id": ORG_ID },
       publisher: { "@id": ORG_ID },
-      mainEntityOfPage: absoluteUrl(ramzaPath(page.path)),
+      isPartOf: { "@id": SITE_ID },
+      mainEntityOfPage: url,
+      inLanguage: "en",
+      ...(page.citations?.length ? { citation: page.citations.map((c) => c.url) } : {}),
+    });
+  } else {
+    graph.push({
+      "@type": "WebPage",
+      "@id": `${url}#webpage`,
+      url,
+      name: page.title,
+      description: page.description,
+      dateModified: page.updated,
+      isPartOf: { "@id": SITE_ID },
+      primaryImageOfPage: absoluteUrl(ogImagePath(page.path)),
       inLanguage: "en",
     });
   }
 
   return { "@context": "https://schema.org", "@graph": graph };
+}
+
+/* A hub is a CollectionPage whose ItemList is the family, in registry order —
+   the explicit "these pages belong together" signal for a topic cluster. */
+export function hubJsonLd(hub: Hub) {
+  const url = absoluteUrl(ramzaPath(hub.path));
+  const pages = pagesInFamily(hub.family);
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationNode(),
+      websiteNode(),
+      breadcrumbNode(hub),
+      {
+        "@type": "CollectionPage",
+        "@id": `${url}#webpage`,
+        url,
+        name: hub.title,
+        description: hub.description,
+        isPartOf: { "@id": SITE_ID },
+        inLanguage: "en",
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: pages.length,
+          itemListElement: pages.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            url: absoluteUrl(ramzaPath(p.path)),
+            name: p.crumb,
+          })),
+        },
+      },
+    ],
+  };
 }

@@ -1,0 +1,49 @@
+/* RAMZA explainer reels, 1080x1920. Founder bar: safety not luxury. White + navy, ink text,
+   hairlines, lilac only on dark, indigo only small. No gradients, glows, blobs, emoji.
+   Scene content lives between y=250 and y=1330; captions own 1360–1640; IG UI covers the rest. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Urbanist:wght@500;600;700;800&display=block');
+:root{--navy:#0B1533;--night:#050B1F;--ink:#14131C;--slate:#5B6478;--mute:#8A92A6;--line:#E3E7F0;
+  --paper:#F6F7FA;--indigo:#4F35E8;--lilac:#B3A6FF;--red:#C2362B;--green:#1F7A4D;--blue:#2B3F8F}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#fff}
+body{font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+.stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:#fff}
+.scene{position:absolute;inset:0;overflow:hidden;visibility:hidden;background:#fff}
+.scene.navy{background:var(--navy);color:#fff}
+.scene.night{background:var(--night);color:#fff}
+.scene.mist{background:var(--paper)}
+.disp{font-family:'Urbanist',sans-serif;letter-spacing:-0.035em;font-weight:700;line-height:.98}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:'IBM Plex Mono',monospace}
+.eyebrow{font-size:28px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--slate)}
+.navy .eyebrow,.night .eyebrow{color:var(--lilac)}
+.accent{color:var(--blue)}
+.navy .accent,.night .accent{color:var(--lilac)}
+.line{display:block;overflow:hidden;padding-bottom:.08em}
+.line>span{display:inline-block;will-change:transform}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--ink)}
+.tag{display:inline-block;font-size:24px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;border:2px solid currentColor;border-radius:6px}
+.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;will-change:transform}
+.wash{position:absolute;inset:0;background:var(--navy);opacity:.62}
+.body{position:absolute;left:72px;right:72px}
+
+/* chrome */
+#chrome{position:absolute;inset:0;z-index:50;pointer-events:none}
+#chrome .lock{position:absolute;left:72px;top:96px;height:46px}
+#chrome .site{position:absolute;right:72px;top:104px;font-size:26px;font-weight:500;color:var(--slate)}
+#chrome.dark .site{color:#9AA3BC}
+#bars{position:absolute;left:72px;right:72px;top:176px;display:flex;gap:8px}
+#bars i{flex:1;height:5px;border-radius:3px;background:#E3E7F0;overflow:hidden;position:relative}
+#chrome.dark #bars i{background:#1D2645}
+#bars i b{position:absolute;inset:0;background:var(--navy);transform-origin:left;transform:scaleX(0)}
+#chrome.dark #bars i b{background:#fff}
+
+/* captions */
+#caps{position:absolute;left:64px;right:64px;top:1360px;height:280px;z-index:51}
+.chunk{position:absolute;inset:0;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:0 22px;visibility:hidden;text-align:center}
+.chunk span{font-family:'Urbanist';font-weight:800;font-size:96px;line-height:1.06;letter-spacing:-.025em;color:var(--navy);display:inline-block;opacity:0}
+.chunk span.hl{color:var(--blue)}
+.chunk.dark span{color:#fff}
+.chunk.dark span.hl{color:var(--lilac)}
+#disc{position:absolute;left:72px;right:72px;top:1690px;font-size:23px;line-height:1.4;color:var(--slate);z-index:51;opacity:0;text-align:center}
+#disc.dark{color:#8E97B3}

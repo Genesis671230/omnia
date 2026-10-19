@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<style>
+  .big{font-family:'Urbanist';font-weight:800;font-size:560px;line-height:.82;letter-spacing:-.06em;color:#fff}
+  .days{display:grid;grid-template-columns:repeat(10,1fr);gap:14px;width:100%}
+  .days i{height:56px;border-radius:6px;background:var(--lilac)}
+  .days i.gone{background:#1D2645}
+  .cal{width:400px;border:2px solid var(--navy);border-radius:12px;overflow:hidden;background:#fff;color:var(--navy)}
+  .cal .top{background:var(--navy);color:#fff;font-size:30px;font-weight:600;letter-spacing:.16em;text-align:center;padding:16px 0}
+  .cal .day{font-family:'Urbanist';font-weight:800;font-size:200px;text-align:center;line-height:1.02;letter-spacing:-.04em;padding-top:10px}
+  .cal .yr{text-align:center;font-size:30px;color:var(--slate);padding:0 0 24px}
+  .when{font-size:40px;font-weight:600;color:var(--navy);line-height:1.2}
+  .when small{display:block;font-size:30px;font-weight:400;color:var(--slate);margin-top:8px}
+  .meter{font-family:'Urbanist';font-weight:800;font-size:170px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .mo{display:flex;align-items:center;gap:28px;padding:30px 34px;border:1px solid #1D2645;border-radius:12px;margin-top:20px}
+  .mo .k{font-size:34px;color:#C4CAD9;flex:1}
+  .mo .v{font-family:'Urbanist';font-weight:700;font-size:56px;color:var(--lilac)}
+  .docs{display:grid;grid-template-columns:repeat(5,1fr);gap:26px}
+  .doc{height:220px;border:2px solid var(--navy);border-radius:10px;background:#fff;padding:26px 22px;position:relative}
+  .doc i{display:block;height:12px;border-radius:3px;background:#D5DAE5;margin-bottom:16px}
+  .doc .st{position:absolute;left:12px;right:12px;bottom:18px;text-align:center;font-family:'Urbanist';font-weight:800;font-size:34px;color:var(--red);border:2.5px solid var(--red);border-radius:6px;padding:6px 0;transform:rotate(-6deg)}
+  .capbar{height:22px;border-radius:11px;background:var(--line);overflow:hidden;margin-top:24px}
+  .capbar b{display:block;height:100%;background:var(--navy);transform-origin:left;transform:scaleX(0)}
+  .ph{padding:44px 44px 48px;border-radius:14px}
+  .ph .d{font-family:'Urbanist';font-weight:800;font-size:76px;letter-spacing:-.03em;color:var(--navy);line-height:1}
+  .ph .l{font-size:30px;color:var(--slate);margin-top:10px}
+  .step{display:flex;gap:44px;align-items:center;padding:58px 0;border-top:1px solid var(--line)}
+  .step:last-child{border-bottom:1px solid var(--line)}
+  .step .n{width:140px;height:140px;border-radius:12px;background:var(--navy);color:#fff;font-family:'Urbanist';font-weight:800;font-size:60px;display:flex;align-items:center;justify-content:center;flex:none}
+  .step .t{font-family:'Urbanist';font-weight:700;font-size:76px;color:var(--navy);letter-spacing:-.02em;line-height:1.05}
+  .step .s{font-size:36px;color:var(--slate);margin-top:10px;line-height:1.35}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body><div class="stage">
+
+<!-- 0 hook: days left -->
+<section class="scene navy">
+  <div class="body" style="top:300px">
+    <div class="eyebrow" id="a_e">UAE e-invoicing · revenue <span id="a_rev"></span>+</div>
+    <div style="display:flex;align-items:flex-end;gap:30px;margin-top:60px">
+      <div class="big num" id="a_n">30</div>
+      <div class="disp" style="font-size:120px;color:var(--lilac);padding-bottom:30px">days</div>
+    </div>
+    <div class="disp" id="a_h" style="font-size:66px;margin-top:40px;color:#fff;line-height:1.05"><span class="line"><span>to appoint an accredited</span></span><span class="line"><span>e-invoicing provider.</span></span></div>
+    <div class="days" id="a_days" style="margin-top:70px"></div>
+  </div>
+</section>
+
+<!-- 1 two dates -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Phase 1 · two dates</div>
+    <div class="disp" style="font-size:96px;color:var(--navy);margin-top:24px"><span class="line"><span>Appoint, then</span></span><span class="line"><span class="accent">go live.</span></span></div>
+  </div>
+  <svg style="position:absolute;left:0;top:0" width="1080" height="1920"><path id="b_ln" d="M272 880 V980" stroke="#0B1533" stroke-width="4" fill="none" stroke-dasharray="10 12"/></svg>
+  <div id="b_c1" style="position:absolute;left:72px;top:640px;display:flex;gap:44px;align-items:center">
+    <div class="cal" style="width:400px"><div class="top" id="b_m1"></div><div class="day num" id="b_d1" style="font-size:150px"></div><div class="yr" id="b_y1"></div></div>
+    <div class="when">Appoint an accredited<br>service provider<small>the penalty counts from here</small></div>
+  </div>
+  <div id="b_c2" style="position:absolute;left:72px;top:990px;display:flex;gap:44px;align-items:center">
+    <div class="cal" style="width:400px;border-color:var(--blue)"><div class="top" id="b_m2" style="background:var(--blue)"></div><div class="day num" id="b_d2" style="font-size:150px;color:var(--blue)"></div><div class="yr" id="b_y2"></div></div>
+    <div class="when">E-invoicing becomes<br>mandatory<small>B2B and B2G invoices</small></div>
+  </div>
+</section>
+
+<!-- 2 penalty meter -->
+<section class="scene night">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Late appointment</div>
+    <div class="meter num" id="c_v" style="margin-top:40px">AED 0</div>
+    <div style="font-size:36px;color:#C4CAD9;margin-top:18px">per month, or part of a month</div>
+    <div id="c_rows" style="margin-top:70px"></div>
+    <div style="font-size:24px;color:#7F89A6;margin-top:30px">Illustration: three months late.</div>
+  </div>
+</section>
+
+<!-- 3 per invoice -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">After go-live</div>
+    <div class="disp" style="font-size:92px;color:var(--navy);margin-top:24px"><span class="line"><span>Every invoice</span></span><span class="line"><span class="accent">not issued.</span></span></div>
+    <div class="docs" id="d_docs" style="margin-top:70px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:56px">
+      <span style="font-size:34px;color:var(--slate)">Cap per month</span><span class="disp num" id="d_cap" style="font-size:64px;color:var(--navy)"></span>
+    </div>
+    <div class="capbar"><b id="d_bar"></b></div>
+    <div style="font-size:26px;color:var(--mute);margin-top:22px">The same again, separately, for e-credit notes.</div>
+  </div>
+</section>
+
+<!-- 4 phase 2 -->
+<section class="scene mist">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">Phase 2</div>
+    <div class="disp" style="font-size:92px;color:var(--navy);margin-top:24px"><span class="line"><span>Below <span id="e_rev"></span>?</span></span><span class="line"><span class="accent">Your dates.</span></span></div>
+    <div class="card ph" id="e_p1" style="margin-top:64px;border:2px solid var(--navy)">
+      <div class="tag" style="color:var(--navy)">Appoint a provider</div>
+      <div class="d num" id="e_d1" style="margin-top:28px"></div>
+    </div>
+    <div class="card ph" id="e_p2" style="margin-top:28px;border:2px solid var(--blue)">
+      <div class="tag" style="color:var(--blue)">Go live</div>
+      <div class="d num" id="e_d2" style="margin-top:28px;color:var(--blue)"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 three steps -->
+<section class="scene">
+  <div class="body" style="top:300px">
+    <div class="eyebrow">The fix</div>
+    <div class="disp" style="font-size:92px;color:var(--navy);margin-top:24px"><span class="line"><span>Three steps.</span></span></div>
+    <div style="margin-top:56px">
+      <div class="step" id="f_1"><div class="n">01</div><div><div class="t">Map</div><div class="s">where every invoice is created: Zoho, store, POS, PDFs</div></div></div>
+      <div class="step" id="f_2"><div class="n">02</div><div><div class="t">Sign</div><div class="s">an accredited service provider</div></div></div>
+      <div class="step" id="f_3"><div class="n">03</div><div><div class="t">Test</div><div class="s">one real invoice, end to end, before go-live</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 CTA -->
+<section class="scene navy">
+  <div class="body" style="top:330px;text-align:center">
+    <svg viewBox="0 0 64 64" style="width:150px;height:150px;overflow:visible"><rect width="64" height="64" rx="12" fill="#FFFFFF"/><path id="g_a" d="M14 38V14h24" stroke="#0B1533" stroke-width="7" fill="none" stroke-linecap="square"/><path id="g_b" d="M26 50h24V26" stroke="#4F35E8" stroke-width="7" fill="none" stroke-linecap="square"/></svg>
+    <div class="eyebrow" style="margin-top:60px">Free readiness check</div>
+    <div class="disp" style="font-size:84px;margin-top:30px;color:#fff">Comment</div>
+    <div id="g_kw" style="margin-top:40px"><span class="kw">READY</span></div>
+    <div style="font-size:36px;color:#C4CAD9;margin-top:50px;line-height:1.4">and we'll send the checklist.<br>Or WhatsApp us · ramza.ai</div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const R = window.RULES, EI = R.einvoicing, P = EI.penalties;
+const n = (x) => Number(x).toLocaleString("en-US"), aed = (x) => "AED " + n(x), aedM = (x) => "AED " + (x / 1e6) + "m";
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const dp = (iso) => { const [y, m, d] = iso.split("-").map(Number); return { y, m: MON[m - 1], d, full: `${d} ${MON[m - 1][0]}${MON[m - 1].slice(1).toLowerCase()} ${y}` }; };
+const dubaiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const left = Math.round((Date.parse(EI.large.asp_by) - Date.parse(dubaiToday())) / 864e5);
+
+RL.build();
+
+/* 0 hook */
+$("#a_rev").textContent = aedM(EI.large.revenue_gte_aed);
+const total = 30;
+$("#a_days").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < total - left ? "gone" : ""}"></i>`).join("");
+E.count($("#a_n"), 0.2, left, { from: total, dur: 1.6, fmt: (v) => String(Math.round(v)) });
+E.lines("#a_h", 1.0);
+tl.fromTo("#a_days i", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, stagger: 0.025, ease: "back.out(2)" }, 0.5);
+tl.to("#a_days i:not(.gone)", { backgroundColor: "#FFFFFF", duration: 0.2, stagger: 0.03 }, RL.w(0, "e-invoicing"));
+
+/* 1 dates */
+const a1 = dp(EI.large.asp_by), a2 = dp(EI.large.go_live);
+$("#b_m1").textContent = a1.m; $("#b_d1").textContent = a1.d; $("#b_y1").textContent = a1.y;
+$("#b_m2").textContent = a2.m; $("#b_d2").textContent = a2.d; $("#b_y2").textContent = a2.y;
+E.lines(".scene:nth-of-type(2) .disp", RL.seg(1).start + 0.35);
+tl.fromTo("#b_c1", { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, RL.w(1, "Oct") - 0.15); E.sfx("pop", RL.w(1, "Oct"));
+E.draw($("#b_ln"), RL.w(1, "live") - 0.4, 0.7);
+tl.fromTo("#b_c2", { x: -80, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, RL.w(1, "Jan") - 0.15); E.sfx("pop", RL.w(1, "Jan"));
+
+/* 2 meter */
+$("#c_rows").innerHTML = [1, 2, 3].map((m) => `<div class="mo" id="c_r${m}"><span class="k">Month ${m}</span><span class="v num">+ ${aed(P.asp_late_aed_per_month)}</span></div>`).join("");
+const c0 = RL.w(2, "AED");
+E.count($("#c_v"), c0 - 0.1, P.asp_late_aed_per_month, { dur: 0.7, fmt: (v) => aed(Math.round(v / 100) * 100) });
+tl.fromTo("#c_r1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, c0); E.sfx("click", c0);
+const c2 = RL.w(2, "every") , c3 = RL.w(2, "part");
+E.count($("#c_v"), c2, P.asp_late_aed_per_month * 2, { from: P.asp_late_aed_per_month, dur: 0.5, fmt: (v) => aed(Math.round(v / 100) * 100) });
+tl.fromTo("#c_r2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, c2); E.sfx("click", c2);
+E.count($("#c_v"), c3, P.asp_late_aed_per_month * 3, { from: P.asp_late_aed_per_month * 2, dur: 0.5, fmt: (v) => aed(Math.round(v / 100) * 100) });
+tl.fromTo("#c_r3", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, c3); E.sfx("click", c3);
+
+/* 3 per invoice */
+$("#d_docs").innerHTML = Array.from({ length: 10 }, () => `<div class="doc"><i style="width:60%"></i><i></i><i style="width:80%"></i><div class="st">${aed(P.invoice_not_issued_aed)}</div></div>`).join("");
+$("#d_cap").textContent = aed(P.invoice_cap_aed_per_month);
+E.lines(".scene:nth-of-type(4) .disp", RL.seg(3).start + 0.35);
+tl.fromTo("#d_docs .doc", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, stagger: 0.06, ease: "expo.out" }, RL.seg(3).start + 0.5);
+tl.fromTo("#d_docs .st", { scale: 1.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.22, stagger: 0.08, ease: "power3.in" }, RL.w(3, "AED"));
+E.sfx("pop", RL.w(3, "AED") + 0.2);
+tl.to("#d_bar", { scaleX: 1, duration: 1.1, ease: "power2.inOut" }, RL.w(3, "capped"));
+
+/* 4 phase 2 */
+$("#e_rev").textContent = aedM(EI.large.revenue_gte_aed);
+$("#e_d1").textContent = dp(EI.sme.asp_by).full; $("#e_d2").textContent = dp(EI.sme.go_live).full;
+E.lines(".scene:nth-of-type(5) .disp", RL.seg(4).start + 0.35);
+tl.fromTo("#e_p1", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, ease: "expo.out" }, RL.w(4, "Mar") - 0.15); E.sfx("pop", RL.w(4, "Mar"));
+tl.fromTo("#e_p2", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55, ease: "expo.out" }, RL.w(4, "Jul") - 0.15); E.sfx("pop", RL.w(4, "Jul"));
+
+/* 5 steps */
+E.lines(".scene:nth-of-type(6) .disp", RL.seg(5).start + 0.3);
+[["#f_1", "Map"], ["#f_2", "Sign"], ["#f_3", "test"]].forEach(([s, w]) => {
+  tl.fromTo(s, { x: 90, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, RL.w(5, w) - 0.2);
+  tl.fromTo(`${s} .n`, { scale: 0.6 }, { scale: 1, duration: 0.4, ease: "back.out(3)" }, RL.w(5, w) - 0.1);
+  E.sfx("click", RL.w(5, w));
+});
+
+/* 6 CTA */
+const g0 = RL.seg(6).start + 0.3;
+tl.fromTo("#g_a", { x: -10, y: -10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0);
+tl.fromTo("#g_b", { x: 10, y: 10 }, { x: 0, y: 0, duration: 0.6, ease: "expo.out" }, g0); E.sfx("impact", g0 + 0.1);
+tl.fromTo("#g_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, RL.w(6, "READY") - 0.1);
+</script>
+</body></html>

@@ -230,21 +230,23 @@ export function AdminMoney() {
           <button className="adm-icon" title="Refresh from the latest payouts" onClick={() => load(true)} disabled={loading}>
             {loading ? <Loader2 size={14} className="adm-spin" /> : <RefreshCw size={14} />}
           </button>
-          <button className="adm-btn" disabled={!view || exporting === "all"} onClick={() => view && exportXlsx("all", `from=${view.from}&to=${view.to}`, `omnia-admin-money-${view.from}_${view.to}.xlsx`)}>
+          <button className="adm-btn " disabled={!view || exporting === "all"} onClick={() => view && exportXlsx("all", `from=${view.from}&to=${view.to}`, `omnia-admin-money-${view.from}_${view.to}.xlsx`)}>
             {exporting === "all" ? <Loader2 size={13} className="adm-spin" /> : <Download size={13} />} Excel
           </button>
         </RangePicker>
       </div>
 
       {error && <div className="adm-err"><AlertTriangle size={14} /> {error}</div>}
-      {!view && loading && <div className="adm-loading"><Loader2 size={16} className="adm-spin" /> Loading the money…</div>}
+      {!view && loading && <div className="adm-loading"><Loader2 size={16} className="adm-spin" /> Loading the stats...</div>}
 
       {view && t && (
         <div style={{ opacity: loading ? 0.6 : 1, transition: "opacity .15s", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* curve + donut, like the reference's Spent summary / Financial record */}
           <div className="adm-hero-grid">
             <section className="adm-card">
-              <header><h2>Sales summary</h2><span>gross sales and what reached the bank, per day · AED</span></header>
+              <header><h2>Sales summary</h2>
+
+              </header>
               <SalesCurve days={view.days} />
             </section>
             <section className="adm-card">

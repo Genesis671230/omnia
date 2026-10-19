@@ -18,6 +18,7 @@ export const CT_PENALTY_LINKS = [
 
 export const CT_MORE = [
   { href: "/ramza/contact", label: "Contact" },
+  { href: "/ramza/brand", label: "Brand kit" },
   { href: "/ramza/payout-reconciliation", label: "Payout reconciliation" },
   { href: "/privacy", label: "Privacy" },
 ] as const;

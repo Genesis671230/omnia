@@ -13,6 +13,10 @@ export function ctMetadata(path: string, title: string, description: string): Me
     alternates: { canonical: url },
     openGraph: { title, description, type: "website", url, siteName: "RAMZA", locale: "en_AE" },
     twitter: { card: "summary_large_image", title, description },
-    robots: { index: true, follow: true },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+    },
   };
 }
