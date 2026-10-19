@@ -28,7 +28,10 @@ const N = times ? times.length : Math.ceil(dur * fps);
 for (let i = 0; i < N; i++) {
   const t = times ? times[i] : i / fps;
   await page.evaluate((t) => window.__seek(t), t);
-  await page.screenshot({ path: `${outDir}/frames/f${String(i).padStart(5, "0")}.${times ? "png" : "jpg"}`, ...(times ? { type: "png" } : { type: "jpeg", quality: +(process.env.JPEG_Q ?? 97) }) });
+  /* ALPHA=1: transparent PNG frames, for an overlay composited onto real footage */
+  const alpha = process.env.ALPHA === "1";
+  await page.screenshot({ path: `${outDir}/frames/f${String(i).padStart(5, "0")}.${times || alpha ? "png" : "jpg"}`,
+    ...(times || alpha ? { type: "png", omitBackground: alpha } : { type: "jpeg", quality: +(process.env.JPEG_Q ?? 97) }) });
   if (!times && i % 150 === 0) console.log("frame", i, "/", N);
 }
 await browser.close();

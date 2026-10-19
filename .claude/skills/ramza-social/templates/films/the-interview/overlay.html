@@ -1,0 +1,217 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* overlay on live footage: everything transparent except the graphics */
+  html,body,.stage{background:transparent!important}
+  .ov{position:absolute;opacity:0}
+  .hire{left:72px;right:72px;top:1010px;background:#fff;border-radius:16px;padding:26px 34px;box-shadow:0 30px 60px -30px rgba(0,0,0,.55)}
+  .hire .k{font-size:26px;font-weight:700;letter-spacing:.18em;color:var(--red)}
+  .hire .t{font-family:'Urbanist';font-weight:800;font-size:76px;letter-spacing:-.035em;color:var(--navy);line-height:1;margin-top:6px}
+  .hire .c{display:flex;align-items:center;gap:16px;margin-top:16px;font-size:32px;color:var(--slate)}
+  .hire .c s{color:var(--red);text-decoration-thickness:4px}
+  .hire .c #candmark{display:inline-flex;width:58px;height:58px}.hire .c svg{width:58px;height:58px}
+  .tagai{left:72px;top:300px;background:#fff;color:var(--navy);font-size:24px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:10px 18px;border-radius:6px}
+  .jd{left:64px;right:64px;top:330px;display:flex;flex-direction:column;gap:10px}
+  .jd .hd{background:var(--navy);color:#fff;border-radius:14px;padding:22px 30px;font-size:26px;font-weight:700;letter-spacing:.16em}
+  .jd .hd b{display:block;font-family:'Urbanist';font-size:54px;letter-spacing:-.02em;margin-top:4px}
+  .jd .r{display:grid;grid-template-columns:56px 1fr;gap:20px;padding:22px 28px;background:#fff;border-radius:14px;align-items:center;opacity:0;box-shadow:0 20px 40px -24px rgba(0,0,0,.6)}
+  .jd .n{width:56px;height:56px;border-radius:10px;background:#EEF1F7;color:var(--navy);font-family:'Urbanist';font-weight:800;font-size:30px;display:flex;align-items:center;justify-content:center}
+  .jd .tx{font-family:'Urbanist';font-weight:700;font-size:40px;color:var(--navy);letter-spacing:-.02em;line-height:1.1}
+  .jd .lg{display:flex;gap:12px;margin-top:10px}.jd .lg img{height:36px}
+  .name{background:#fff;border-radius:10px;padding:12px 18px;font-size:26px;color:var(--ink);box-shadow:0 14px 30px -16px rgba(0,0,0,.6)}
+  .name b{display:block;font-family:'Urbanist';font-size:32px;color:var(--navy)}
+  .lower{left:72px;top:1190px;background:#fff;border-left:8px solid var(--indigo);border-radius:8px;padding:14px 22px;font-size:26px;color:var(--slate)}
+  .lower b{display:block;font-family:'Urbanist';font-size:38px;color:var(--navy)}
+  .cal{left:72px;right:72px;top:330px;background:#fff;border-radius:14px;padding:22px 26px;box-shadow:0 30px 60px -30px rgba(0,0,0,.6)}
+  .cal .k{font-size:24px;font-weight:700;letter-spacing:.14em;color:var(--slate)}
+  .cal .d{display:grid;grid-template-columns:repeat(15,1fr);gap:6px;margin-top:14px}
+  .cal .d i{height:34px;border-radius:5px;background:#EEF1F7}
+  .cal .d i.on{background:var(--red)}
+  .tv{overflow:hidden;background:#0B1533;border-radius:4px}
+  .tv .agentbox{position:absolute;left:50%;top:6%;width:30%;height:56%;margin-left:-15%}
+  .tv .rows{position:absolute;left:5%;right:5%;bottom:6%;display:flex;flex-direction:column;gap:6px}
+  .tv .rw{display:flex;justify-content:space-between;align-items:center;background:#111D42;border-radius:6px;padding:5px 12px;font-size:21px;font-family:"IBM Plex Mono";color:#C4CAD9;opacity:0}
+  .tv .rw .pill{font-size:14px;padding:3px 10px}
+  .chipfly{position:absolute;background:#fff;border-radius:999px;padding:8px 16px;display:flex;align-items:center;gap:8px;box-shadow:0 10px 20px -10px rgba(0,0,0,.6);opacity:0}
+  .chipfly img{height:28px}
+  .split{left:64px;right:64px;top:360px;display:flex;flex-direction:column;gap:18px}
+  .split .c{border-radius:16px;padding:28px 32px;opacity:0}
+  .split .c .k{font-size:24px;font-weight:700;letter-spacing:.16em}
+  .split .c .t{font-family:'Urbanist';font-weight:800;font-size:58px;letter-spacing:-.03em;line-height:1.02;margin-top:6px}
+  .split .c .s{font-size:28px;margin-top:8px}
+  .split .a{background:#3A55E6;color:#fff}.split .a .s{color:#DCE2FF}
+  .split .b{background:#fff;color:var(--navy)}.split .b .s{color:var(--slate)}
+  .free{left:72px;top:1180px;background:#3A55E6;color:#fff;border-radius:14px;padding:20px 30px}
+  .free .t{font-family:'Urbanist';font-weight:800;font-size:70px;letter-spacing:-.03em;line-height:1}
+  .free .s{font-size:26px;color:#DCE2FF;margin-top:6px}
+  .end{left:0;right:0;top:0;bottom:0;background:#0B1533}
+  .end .ag{position:absolute;left:300px;top:330px;width:480px;height:430px}
+  .end .body{top:820px;text-align:center}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:14px 54px;border-radius:14px}
+  .end .l{font-size:32px;color:#C4CAD9;margin-top:22px;line-height:1.45}
+  .end .l b{color:#fff}
+  .disc{position:absolute;left:72px;right:72px;top:1700px;font-size:21px;line-height:1.4;color:#8E97B3;text-align:center}
+  #caps{position:absolute;left:56px;right:56px;top:1400px;height:250px}
+  .cap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;visibility:hidden;text-align:center}
+  .cap .who{font-size:22px;font-weight:700;letter-spacing:.16em;color:#fff;background:#3A55E6;padding:6px 14px;border-radius:5px;margin-bottom:12px}
+  .cap .w{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .cap span{font-family:'Urbanist';font-weight:800;font-size:72px;line-height:1.08;letter-spacing:-.02em;color:#fff;background:#0B1533;padding:4px 16px;border-radius:10px;opacity:0}
+  .cap span.hl{background:#3A55E6}
+</style></head>
+<body><div class="stage">
+  <!-- 1 hook -->
+  <div class="ov tagai" id="tag1">AI presenter · Noor</div>
+  <div class="ov hire" id="hire"><div class="k">NOW HIRING</div><div class="t">Head of Operations</div>
+    <div class="c" id="cand" style="opacity:0"><span>Candidate:</span><s>human</s><span id="candmark"></span><b style="color:var(--navy)">RAMZA</b></div></div>
+  <!-- 2 job description -->
+  <div class="ov jd" id="jd"><div class="hd">THE JOB, EVERY MONTH<b>Head of Operations</b></div>
+    <div class="r" id="jd1"><div class="n">1</div><div><div class="tx">Match every payout to the bank</div><div class="lg"><img src="LG/tabby-mark.png"><img src="LG/tamara-mark.png"><img src="LG/stripe-mark.png"><img src="LG/telr-mark.png"></div></div></div>
+    <div class="r" id="jd2"><div class="n">2</div><div class="tx">Issue every invoice. Chase every one.</div></div>
+    <div class="r" id="jd3"><div class="n">3</div><div><div class="tx">E-invoicing ready</div><div id="jdpill" style="display:inline-block;margin-top:10px;font-size:26px;font-weight:700;color:#C2362B;background:#FBE9E7;border-radius:999px;padding:8px 18px"></div></div></div>
+  </div>
+  <!-- 3 names -->
+  <div class="ov name" id="n1"><b>Noor</b>AI presenter</div>
+  <div class="ov name" id="n2"><b>Omar</b>Operations</div>
+  <div class="ov name" id="n3"><b>Maya</b>Accountant</div>
+  <!-- 4 Omar -->
+  <div class="ov lower" id="low"><b>Omar</b>Operations executive</div>
+  <div class="ov cal" id="cal"><div class="k">MATCHING BY HAND · THIS MONTH</div><div class="d" id="cald"></div></div>
+  <!-- 5 TV takeover -->
+  <div class="ov tv" id="tv"><div class="agentbox" id="tvag"></div><div class="rows" id="tvrows"></div></div>
+  <!-- 6 split -->
+  <div class="split ov" id="split">
+    <div class="c a" id="sp1"><div class="k">OPERATIONS</div><div class="t">→ RAMZA</div><div class="s">payouts · bank · invoices · e-invoicing</div></div>
+    <div class="c b" id="sp2"><div class="k">FINANCE</div><div class="t">→ your accountant</div><div class="s">VAT · Corporate Tax · advice · sign-off</div></div>
+  </div>
+  <!-- 7 close -->
+  <div class="ov tagai" id="tag2">AI presenter · Noor</div>
+  <div class="ov free" id="free"><div class="t">7 days free</div><div class="s">read-only access · cancel any time</div></div>
+  <!-- 8 end card -->
+  <div class="ov end" id="end"><div class="ag" id="endag"></div>
+    <div class="body"><div class="disp" style="font-size:72px;color:#fff">Comment</div>
+      <div style="margin-top:24px"><span class="kw">HIRE</span></div>
+      <div class="l"><b>7 days free</b> · free e-invoicing readiness check<br>Accountants: send us a client</div></div>
+    <div class="disc" id="disc"></div></div>
+  <div id="caps"></div>
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s);
+const FILM = window.FILM, R = window.RULES, V = FILM.voices, S = FILM.segs;
+const dd = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/* time a word is spoken, estimated by its character position in the line */
+const at = (i, word) => { const v = V[i], k = v.text.toLowerCase().indexOf(word.toLowerCase()); return v.at + 0.12 + (Math.max(0, k) / v.text.length) * (v.len - 0.25); };
+const seg = (i) => S[i].start, end = (i) => S[i].start + S[i].dur;
+const show = (sel, t0, t1, from = { y: 40 }) => {
+  tl.fromTo(sel, { opacity: 0, ...from }, { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.45, ease: "expo.out" }, t0);
+  if (t1 != null) tl.to(sel, { opacity: 0, duration: 0.2 }, t1 - 0.2);
+};
+
+/* captions: three-word chunks, timed by characters across the line */
+const caps = $("#caps");
+V.forEach((v, i) => {
+  const words = v.text.split(/\s+/), chunks = [];
+  for (let j = 0; j < words.length; j += 3) chunks.push(words.slice(j, j + 3));
+  let c0 = 0;
+  chunks.forEach((ch, j) => {
+    const txt = ch.join(" "), t0 = v.at + 0.1 + (c0 / v.text.length) * v.len;
+    c0 += txt.length + 1;
+    const t1 = j + 1 < chunks.length ? v.at + 0.1 + (c0 / v.text.length) * v.len : v.at + v.len + 0.25;
+    const el = document.createElement("div");
+    el.className = "cap";
+    el.innerHTML = `${j === 0 ? `<div class="who">${v.who.toUpperCase()}</div>` : ""}<div class="w">${ch.map((w) => `<span class="${/HIRE|RAMZA|operations|finance|free|seven|human/i.test(w) ? "hl" : ""}">${w}</span>`).join("")}</div>`;
+    caps.append(el);
+    tl.set(el, { visibility: "visible" }, t0 - 0.05);
+    tl.set(el, { visibility: "hidden" }, t1 - 0.05);
+    tl.fromTo(el.querySelectorAll("span"), { opacity: 0, y: 20, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.18, stagger: 0.08, ease: "back.out(2)" }, t0 - 0.05);
+  });
+});
+
+/* 1 hook: hiring card slams in, then "human" is struck through and the agent takes the line */
+$("#candmark").innerHTML = KIT.mark(true);
+show("#tag1", 0.1, end(0));
+tl.fromTo("#hire", { opacity: 0, scale: 1.25, rotation: -2 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.35, ease: "power4.in" }, 0.15); E.sfx("impact", 0.45);
+tl.fromTo("#cand", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.35 }, at(0, "candidate") - 0.1); E.sfx("pop", at(0, "isn't"));
+tl.fromTo("#candmark svg", { scale: 0 }, { scale: 1, duration: 0.35, ease: "back.out(3)" }, at(0, "human")); E.sfx("sparkle", at(0, "human"));
+KIT.startAt("#candmark", at(0, "human") - 3.4); // eyes reach "=" as the line lands
+tl.to("#hire", { opacity: 0, y: -40, duration: 0.25 }, end(0) - 0.25);
+
+/* 2 job description */
+$("#jdpill").textContent = `Provider by ${dd(R.einvoicing.large.asp_by)} · AED ${R.einvoicing.large.revenue_gte_aed / 1e6}m+`;
+show("#jd", seg(1) + 0.2, end(1));
+[["#jd1", "every payout"], ["#jd2", "every invoice"], ["#jd3", "e-invoicing"]].forEach(([s, w]) => {
+  tl.fromTo(s, { opacity: 0, x: -50 }, { opacity: 1, x: 0, duration: 0.4, ease: "expo.out" }, at(1, w) - 0.1); E.sfx("click", at(1, w));
+});
+tl.fromTo("#jd1 img", { scale: 0 }, { scale: 1, duration: 0.3, stagger: 0.07, ease: "back.out(2.5)" }, at(1, "matched"));
+KIT.punch("#jdpill", at(1, "deadline"), 1.12); E.sfx("impact", at(1, "deadline"));
+
+/* 3 names over the wide shot (positions match the frame) */
+[["#n1", 70, 760], ["#n2", 600, 830], ["#n3", 760, 700]].forEach(([s, x, y], k) => {
+  tl.set(s, { left: x, top: y }, 0);
+  show(s, seg(2) + 0.15 + k * 0.15, end(2), { y: 20 });
+});
+
+/* 4 Omar: lower third + the month filling up with manual matching */
+show("#low", seg(3) + 0.2, end(3), { x: -40 });
+$("#cald").innerHTML = Array.from({ length: 30 }, () => "<i></i>").join("");
+show("#cal", at(3, "by hand") - 0.3, end(3));
+const days = document.querySelectorAll("#cald i"), d0 = at(3, "by hand"), d1 = at(3, "month") + 0.2;
+days.forEach((d, k) => tl.set(d, { className: k < 23 ? "on" : "" }, d0 + ((d1 - d0) * Math.min(k, 23)) / 23));
+E.sfx("rise", d0);
+
+/* 5 the TV switches on and the agent does the job */
+const TV = { left: 240, top: 312, width: 596, height: 336 };
+tl.set("#tv", TV, 0);
+$("#tvag").innerHTML = KIT.body("#000");
+$("#tvrows").innerHTML = [["tabby", "18,420.50"], ["stripe", "12,306.18"], ["tamara", "9,870.00"], ["telr", "6,215.40"]]
+  .map(([g, a]) => `<div class="rw"><span><img src="LG/${g}-mark.png" style="height:18px;vertical-align:middle"> ${a}</span><span class="pill a">Pending</span></div>`).join("");
+const on = at(4, "Ramza") + 0.25;
+tl.set("#tv", { opacity: 1 }, on);
+tl.fromTo("#tv", { filter: "brightness(3)" }, { filter: "brightness(1)", duration: 0.35 }, on); E.sfx("impact", on);
+KIT.dropIn($("#tvag"), on + 0.1);
+["tabby", "stripe", "tamara", "telr"].forEach((g, k) => {
+  const c = document.createElement("div"); c.className = "chipfly"; c.innerHTML = `<img src="LG/${g}-mark.png">`;
+  document.querySelector(".stage").append(c);
+  const t0 = on + 1.0 + k * 0.35;
+  tl.fromTo(c, { left: 700, top: 1150, opacity: 0, scale: 1 }, { opacity: 1, duration: 0.1 }, t0);
+  tl.to(c, { left: 500, top: 450, scale: 0.4, duration: 0.6, ease: "power2.in" }, t0 + 0.05);
+  tl.to(c, { opacity: 0, duration: 0.1 }, t0 + 0.6); E.sfx("swish", t0);
+});
+const rows = document.querySelectorAll("#tvrows .rw");
+rows.forEach((r, k) => {
+  const t0 = on + 1.6 + k * 0.35, t1 = on + 3.2 + k * 0.3;
+  tl.fromTo(r, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.25 }, t0);
+  tl.set(r.querySelector(".pill"), { className: "pill g", textContent: "Matched" }, t1); E.sfx("pop", t1);
+});
+tl.to("#tv", { opacity: 0, duration: 0.25 }, end(4) - 0.1);
+
+/* 6 the split */
+tl.set("#split", { opacity: 1 }, seg(5));
+show("#sp1", seg(5) + 0.1, end(5), { x: -80 }); E.sfx("whoosh", seg(5) + 0.1);
+show("#sp2", seg(5) + 0.45, end(5), { x: 80 });
+tl.set("#split", { opacity: 0 }, end(5));
+
+/* 7 Noor's close */
+show("#tag2", seg(6) + 0.1, end(6));
+tl.fromTo("#free", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2.4)" }, at(6, "seven")); E.sfx("chime", at(6, "seven"));
+tl.to("#free", { opacity: 0, duration: 0.2 }, end(6) - 0.2);
+
+/* 8 end card */
+$("#endag").innerHTML = KIT.sticker("#FF6A1A");
+$("#disc").textContent = "AI-generated people and scenes. Noor is RAMZA's AI presenter. RAMZA is not a registered tax agent or an accredited e-invoicing service provider; e-invoicing runs through an accredited partner and returns are filed by a licensed partner.";
+const ec = seg(7) + 1.0;
+KIT.startAt("#endag", ec - 0.5);
+tl.set("#end", { yPercent: 100 }, 0);
+tl.set("#end", { opacity: 1 }, ec);
+tl.fromTo("#end", { yPercent: 100 }, { yPercent: 0, duration: 0.6, ease: "expo.inOut" }, ec); E.sfx("whoosh", ec);
+tl.fromTo("#end .kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, at(7, "HIRE")); E.sfx("impact", at(7, "HIRE"));
+
+tl.set({}, {}, FILM.total);
+window.__DUR = FILM.total;
+</script>
+</body></html>

@@ -1,0 +1,104 @@
+{
+ "id": "ramza-the-interview",
+ "music": [
+  "the-upbeat-inspiring-corporate-142313.mp3",
+  0.12
+ ],
+ "overlay": "overlay.html",
+ "segments": [
+  {
+   "src": "clips/s1.mp4",
+   "in": 0,
+   "dur": 3.95,
+   "zoom": [
+    1.12,
+    1.0
+   ]
+  },
+  {
+   "src": "clips/s2.mp4",
+   "in": 0.2,
+   "dur": 9.8
+  },
+  {
+   "src": "clips/s4.mp4",
+   "in": 0,
+   "dur": 2.5
+  },
+  {
+   "src": "clips/s3.mp4",
+   "in": 0,
+   "dur": 5.55
+  },
+  {
+   "src": "clips/s4.mp4",
+   "in": 2.5,
+   "dur": 7.5
+  },
+  {
+   "src": "clips/s5.mp4",
+   "in": 0.8,
+   "dur": 2.5
+  },
+  {
+   "src": "clips/s6.mp4",
+   "in": 0,
+   "dur": 6.3
+  },
+  {
+   "src": "clips/s7.mp4",
+   "in": 0,
+   "dur": 5.0
+  }
+ ],
+ "voices": [
+  {
+   "src": "vo/l1.mp3",
+   "at": 0.0,
+   "who": "Noor \u00b7 AI",
+   "text": "We're hiring a Head of Operations. The candidate isn't human."
+  },
+  {
+   "src": "vo/l2.mp3",
+   "at": 4.1,
+   "who": "Noor \u00b7 AI",
+   "text": "The job: every payout, matched to the bank. Every invoice, issued and chased. And e-invoicing ready, before the deadline."
+  },
+  {
+   "src": "vo/l3.mp3",
+   "at": 13.85,
+   "who": "Noor \u00b7 AI",
+   "text": "Omar, what eats your week?"
+  },
+  {
+   "src": "vo/l4.mp3",
+   "at": 16.25,
+   "who": "Omar",
+   "text": "Matching Tabby and Stripe payouts to the bank. By hand. Most of the month."
+  },
+  {
+   "src": "vo/l5.mp3",
+   "at": 21.9,
+   "who": "Noor \u00b7 AI",
+   "text": "RAMZA. Show him."
+  },
+  {
+   "src": "vo/l6.mp3",
+   "at": 24.3,
+   "who": "Maya \u00b7 accountant",
+   "text": "Clean numbers on day two? I'll keep the VAT and the corporate tax."
+  },
+  {
+   "src": "vo/l7.mp3",
+   "at": 31.8,
+   "who": "Noor \u00b7 AI",
+   "text": "RAMZA runs your operations. Your accountant runs your finance. Hire it free, for seven days."
+  },
+  {
+   "src": "vo/l8.mp3",
+   "at": 39.0,
+   "who": "Noor \u00b7 AI",
+   "text": "Comment HIRE. Accountants, send us a client."
+  }
+ ]
+}
