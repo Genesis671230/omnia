@@ -1,0 +1,37 @@
+/* Money-flow diagram connectors: a hairline with a dot travelling along it,
+   horizontal on desktop, vertical on phones. Rests on the plain line under
+   prefers-reduced-motion. */
+.mf-link { position: relative; display: flex; align-items: center; justify-content: center; }
+.mf-link::before { content: ""; position: absolute; background: #C9D0DE; }
+.mf-link i { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #3A55E6; }
+.mf-link b { position: relative; z-index: 1; background: #fff; padding: 2px 6px; font-size: 10.5px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #7A8294; white-space: nowrap; }
+
+@media (max-width: 1023px) {
+  .mf-link { height: 44px; }
+  .mf-link::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+  .mf-link i { left: calc(50% - 4px); animation: mf-v 2.4s cubic-bezier(.5,0,.5,1) infinite; }
+}
+@media (min-width: 1024px) {
+  .mf-link { width: 100%; height: 100%; min-height: 40px; }
+  .mf-link::before { top: 50%; left: 0; right: 0; height: 1px; }
+  .mf-link i { top: calc(50% - 4px); animation: mf-h 2.4s cubic-bezier(.5,0,.5,1) infinite; }
+  .mf-link b { display: none; }
+}
+.mf-link:nth-of-type(4) i { animation-delay: .6s; }
+.mf-link:nth-of-type(6) i { animation-delay: 1.2s; }
+.mf-link:nth-of-type(8) i { animation-delay: 1.8s; }
+
+@keyframes mf-h { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; } }
+@keyframes mf-v { 0% { top: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { top: calc(100% - 8px); opacity: 0; } }
+
+/* the credit splitting inside the agent node */
+.mf-split > * { animation: mf-row 6s ease-in-out infinite; }
+.mf-split > *:nth-child(2) { animation-delay: .25s; }
+.mf-split > *:nth-child(3) { animation-delay: .5s; }
+.mf-split > *:nth-child(4) { animation-delay: .75s; }
+@keyframes mf-row { 0%, 8% { opacity: .25; transform: translateX(-6px); } 20%, 90% { opacity: 1; transform: none; } 100% { opacity: .25; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-link i { display: none; }
+  .mf-split > * { animation: none; }
+}

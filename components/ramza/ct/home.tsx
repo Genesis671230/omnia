@@ -16,6 +16,7 @@
  * Tracking: <TrackView> fires SectionView / ViewContent; forms fire FormStart + Lead. */
 
 import Image from "next/image";
+import { RamzaAgentMark } from "@/components/ramza/brand/agent";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, ReceiptText } from "lucide-react";
 import { ct } from "./brand";
@@ -389,10 +390,11 @@ export function FinalCta({ whatsappHref }: { whatsappHref: string }) {
       <TrackView section="final-cta" className={ct.container}>
         <div className={`${ct.island} px-6 py-12 sm:px-10 sm:py-16 lg:px-14`}>
           <Image src={`${P}/px-dubai-dusk.jpg`} alt="" fill sizes="(min-width:1200px) 1140px, 100vw" className="object-cover opacity-80" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#14131C]/95 via-[#14131C]/65 to-[#14131C]/10" />
+          <div className="pointer-events-none absolute inset-0 bg-[#14131C]/80" />
           <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_0.95fr]">
             <Reveal>
-              <span className={ct.eyebrowDark}>Don’t wait for the notice</span>
+              <RamzaAgentMark size={56} tone="dark" title="RAMZA" />
+              <span className={`${ct.eyebrowDark} mt-6 flex`}>Don’t wait for the notice</span>
               <h2 className={`${ct.h2} mt-4`}>File on time. Skip the penalty.</h2>
               <p className={`${ct.leadDark} mt-4 max-w-lg`}>Send us what you have today. We’ll tell you what’s needed, give you a fixed quote, and get your return filed.</p>
               <WhatsAppLink href={whatsappHref} placement="final" className={`${ct.btnGhostDark} mt-7`}>Or message us on WhatsApp</WhatsAppLink>
