@@ -33,6 +33,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  // The bare domain is the RAMZA landing page for every visitor who isn't
+  // signed in (founder rule 2026-10-20: "/" must never bounce to /login).
+  // Rewrite, not redirect, so the address bar stays on "/". Signed-in staff
+  // still get the dashboard here; the app's sign-in lives at /login.
+  if (!session && pathname === "/") {
+    return NextResponse.rewrite(new URL("/ramza", req.url));
+  }
   if (!session) {
     // An API call is made by fetch(), which follows the redirect and hands the
     // caller the /login PAGE. Every `.json()` in the app then dies on

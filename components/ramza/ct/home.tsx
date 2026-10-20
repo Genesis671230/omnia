@@ -17,6 +17,7 @@
 
 import Image from "next/image";
 import { RamzaAgentMark } from "@/components/ramza/brand/agent";
+import { BgVideo } from "./films";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, ReceiptText } from "lucide-react";
 import { ct } from "./brand";
@@ -389,7 +390,7 @@ export function FinalCta({ whatsappHref }: { whatsappHref: string }) {
     <section id="contact" className={`${ct.sectionLight} scroll-mt-24 pb-24 pt-8`}>
       <TrackView section="final-cta" className={ct.container}>
         <div className={`${ct.island} px-6 py-12 sm:px-10 sm:py-16 lg:px-14`}>
-          <Image src={`${P}/px-dubai-dusk.jpg`} alt="" fill sizes="(min-width:1200px) 1140px, 100vw" className="object-cover opacity-80" />
+          <BgVideo name="bg-night-office" />
           <div className="pointer-events-none absolute inset-0 bg-[#14131C]/80" />
           <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_0.95fr]">
             <Reveal>

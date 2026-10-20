@@ -3,13 +3,13 @@
  * Social proof from our own first user, disclosed as such. Every figure is
  * from Omnia's live September 2026 reconciliation (139 gateway bank credits,
  * AED 1.42m, 1,173 orders, 137 payout files, 7 gateways, 22 foreign-currency
- * payouts); the screenshot is the real screen, not a mock. Refresh both
- * together when a newer month is used. No time-saved claims until Omnia has
+ * payouts). Founder rule 2026-10-20: no screenshots of the Omnia dashboard
+ * on the landing page; the diagram and photos carry it. No time-saved claims until Omnia has
  * measured them.
  *
  * Layout (2026-10-20): a photo header (packing room under a flat navy wash,
- * the animated agent mark), the money-flow diagram, before/after photos, the
- * real screen, then what changed. Plain otherwise (design_quality_bar): white,
+ * the animated agent mark), the money-flow diagram, before/after photos, then
+ * what changed. Plain otherwise (design_quality_bar): white,
  * hairlines, small radii, ink figures. No gradients, glows or icon bubbles. */
 
 import Image from "next/image";
@@ -82,31 +82,16 @@ export function CaseStudySection() {
             </figcaption>
           </figure>
           <figure className="overflow-hidden rounded-[8px] border border-[#D9DEE8] bg-white">
-            <div className="relative aspect-[16/10] bg-[#F4F5F8]">
-              <Image src="/ramza/case-study/omnia-sep-to-check.jpg" alt="RAMZA showing the September credits still to check, each with its gateway and amount" fill sizes="(min-width:768px) 560px, 100vw" className="object-cover object-top" />
+            <div className="relative aspect-[16/10]">
+              <Image src="/ramza/photos/px-founder-bright.jpg" alt="Founder at a calm, bright desk with the month already closed" fill sizes="(min-width:768px) 560px, 100vw" className="object-cover" />
               <span className="absolute left-3 top-3 rounded-[4px] bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#1F8A5B]">After</span>
             </div>
             <figcaption className="p-4 text-[13.5px] leading-relaxed text-[#5B6475]">
-              <b className="text-[#14131C]">One screen.</b> Every credit with its payout file and orders; only the real differences left to check.
+              <b className="text-[#14131C]">One close, done for you.</b> Every credit explained by its payout file and orders; only the real differences come back to you.
             </figcaption>
           </figure>
         </div>
 
-        <figure className="mt-12">
-          <div className="overflow-hidden rounded-[8px] border border-[#D9DEE8] bg-white shadow-[0_1px_2px_rgba(11,21,51,0.04),0_20px_50px_-30px_rgba(11,21,51,0.35)]">
-            <Image
-              src="/ramza/case-study/omnia-sep-full.jpg"
-              alt="Omniastores' September 2026 month close in RAMZA: AED 1.42m of sales money in the bank, 89% matched to orders, broken down by gateway, with the three close steps."
-              width={2400}
-              height={1500}
-              sizes="(min-width: 1200px) 1140px, 100vw"
-              className="h-auto w-full"
-            />
-          </div>
-          <figcaption className="mt-3 text-[12.5px] text-[#7A8294]">
-            Omniastores&apos; real September 2026 close in RAMZA. Omniastores is RAMZA&apos;s founding company and first user.
-          </figcaption>
-        </figure>
 
         <ul className="mt-12 grid gap-px overflow-hidden rounded-[8px] border border-[#E3E7F0] bg-[#E3E7F0] sm:grid-cols-2 lg:grid-cols-4">
           {CHANGES.map(([title, body], i) => (

@@ -4,6 +4,7 @@ import { FinalCta, HOME_FAQ, HomeFaq, PenaltyBand, PeopleSection, ServicesGrid, 
 import { EInvoicingHero } from "@/components/ramza/ct/einv-hero";
 import { EInvoicingSection } from "@/components/ramza/ct/einvoicing";
 import { TestimonialsSection } from "@/components/ramza/ct/testimonials";
+import { FilmBand, NoorFilms, StickyFilm } from "@/components/ramza/ct/films";
 import { CaseStudySection, TrustLine } from "@/components/ramza/ct/case-study";
 import { PricingCounter } from "@/components/ramza/ct/pricing-counter";
 import { LogoMarquee } from "@/components/ramza/ct/partner-logos";
@@ -24,7 +25,10 @@ import { faqNode, organizationNode, websiteNode } from "@/lib/ramza/seo";
  *                     Telegram phones
  *   1b CaseStudySection  Omniastores' real September 2026 close: photo header,
  *                     money-flow diagram, before/after (social proof)
+ *   1a StickyFilm     pinned office video, three lines (pain → RAMZA → accountant)
  *   1c TestimonialsSection  Muhammad Akmal (co-founder) + animated agent
+ *   1d NoorFilms      The Interview + Bilal & Noor discussions (AI, labelled)
+ *   3b FilmBand       the intro film, full bleed
  *   2 StartSection    the offer: free readiness check form (#start)
  *   3 EInvoicing      5-corner model + the two go-live tracks
  *   4 ProcessFilm / IndustryLive / LiveUpdates / ToolsHub
@@ -51,10 +55,13 @@ export default function RamzaHome() {
       <IndustryProvider>
         <EInvoicingHero whatsappHref={wa} />
         <div className="border-b border-[#E3E7F0] bg-white py-6"><TrustLine /><LogoMarquee /></div>
+        <StickyFilm />
         <CaseStudySection />
         <TestimonialsSection />
+        <NoorFilms />
         <StartSection focus="einvoicing" />
         <EInvoicingSection />
+        <FilmBand />
         <ProcessFilm />
         <IndustryLive />
         <LiveUpdates />
