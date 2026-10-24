@@ -1,0 +1,104 @@
+{
+ "id": "ramza-brokers-aml",
+ "music": [
+  "inspired-ambient-141686.mp3",
+  0.08
+ ],
+ "overlay": "overlay.html",
+ "segments": [
+  {
+   "src": "clips/khalid.mp4",
+   "in": 0,
+   "dur": 5.15
+  },
+  {
+   "src": "clips/blank.mp4",
+   "in": 0,
+   "dur": 26.65
+  },
+  {
+   "src": "clips/noor.mp4",
+   "in": 0,
+   "dur": 6.13
+  },
+  {
+   "src": "clips/blank.mp4",
+   "in": 0,
+   "dur": 37.09
+  }
+ ],
+ "voices": [
+  {
+   "src": "vo/l1.mp3",
+   "at": 0.0,
+   "who": "Khalid \u00b7 AI founder",
+   "text": "I run a real-estate brokerage in Dubai. What's the mistake costing brokers the most right now?"
+  },
+  {
+   "src": "vo/l2.mp3",
+   "at": 5.75,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "In the first half of 2025, the Ministry of Economy found one thousand and sixty-three money-laundering compliance violations."
+  },
+  {
+   "src": "vo/l3.mp3",
+   "at": 14.18,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "Four hundred and ninety-five of them were real-estate brokerages."
+  },
+  {
+   "src": "vo/l4.mp3",
+   "at": 18.34,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "Eighteen and a half million dirhams in fines. In six months."
+  },
+  {
+   "src": "vo/l5.mp3",
+   "at": 22.4,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "And it's not new. In early 2023, brokerages were already a quarter of all violations."
+  },
+  {
+   "src": "vo/l6.mp3",
+   "at": 29.07,
+   "who": "Khalid \u00b7 AI founder",
+   "text": "But we're not a bank. Why brokers?"
+  },
+  {
+   "src": "vo/l7.mp3",
+   "at": 31.8,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "Because property is where big money moves fast. The Ministry classes real-estate agents as high-risk."
+  },
+  {
+   "src": "vo/l8.mp3",
+   "at": 38.23,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "And inspectors don't ask what you meant to do. They check your due diligence, your risk assessment, and how you report suspicious transactions."
+  },
+  {
+   "src": "vo/l9.mp3",
+   "at": 47.27,
+   "who": "Khalid \u00b7 AI founder",
+   "text": "So where does the proof live?"
+  },
+  {
+   "src": "vo/l10.mp3",
+   "at": 49.85,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "A lot of it lives in your books. Every payment in, tied to a named client and a deal. If that trail lives in a spreadsheet, it's a guess."
+  },
+  {
+   "src": "vo/l11.mp3",
+   "at": 59.16,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "RAMZA matches every incoming payment to its client and invoice, so the trail is ready before anyone asks. Your compliance officer still files the reports."
+  },
+  {
+   "src": "vo/l12.mp3",
+   "at": 68.94,
+   "who": "Noor \u00b7 AI presenter",
+   "text": "Free setup on your own transactions. Comment TRAIL."
+  }
+ ]
+}

@@ -1,0 +1,605 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* the office: one flat illustration per scene, a camera (.world) that moves over it */
+  .vp{position:absolute;left:0;right:0;top:405px;height:925px;overflow:hidden;background:#EEF1F6}
+  .world{position:absolute;left:0;top:0;width:1080px;height:925px;will-change:transform}
+  .world svg{position:absolute;inset:0;width:1080px;height:925px;overflow:visible}
+  .world text{font-family:'IBM Plex Sans';font-weight:600}
+  .dtag{position:absolute;left:72px;top:425px;z-index:6;background:#fff;color:var(--navy);font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;border-radius:6px;border:1px solid var(--line)}
+
+  /* manual loop on one accountant's monitor */
+  .mon{position:absolute;left:40px;right:40px;top:425px;height:890px;background:#121A30;border-radius:28px;padding:18px}
+  .mon .scr{position:relative;width:100%;height:100%;background:#fff;border-radius:14px;overflow:hidden}
+  .steps{display:flex;gap:10px;padding:26px 26px 0}
+  .stp{flex:1;text-align:center;font-size:24px;font-weight:600;padding:12px 6px;border:2px solid var(--line);border-radius:8px;color:var(--slate)}
+  .stp.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .stp.dn{border-color:#BFE3CD;color:var(--green)}
+  .ctr{display:flex;justify-content:space-between;align-items:center;padding:22px 30px 0;font-size:30px;color:var(--slate)}
+  .ctr b{font-family:'Urbanist';font-weight:800;font-size:44px;color:var(--navy)}
+  .pane{position:absolute;left:30px;right:30px;top:200px;opacity:0}
+  .pcard{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .pcard .ph{display:flex;align-items:center;gap:18px;padding:24px 28px;border-bottom:1px solid var(--line)}
+  .pcard .ph img{height:64px}
+  .pcard .ph .fr{font-size:36px;font-weight:700}
+  .pcard .ph .tm{margin-left:auto;font-size:24px;color:var(--mute)}
+  .pcard .pb{padding:28px 30px;font-size:33px;line-height:1.5;color:var(--slate)}
+  .att{display:inline-flex;align-items:center;gap:12px;font-family:'IBM Plex Mono';font-size:24px;color:var(--ink);border:1px solid #CBD2DE;border-radius:10px;padding:12px 16px;background:#fff}
+  .att i{font-style:normal;font-family:'IBM Plex Sans';font-weight:700;font-size:18px;color:#fff;border-radius:5px;padding:4px 8px;background:var(--green)}
+  .att i.pdf{background:var(--red)}
+  .xl{font-family:'IBM Plex Mono';font-size:29px;border:1px solid #CBD2DE;border-radius:8px;overflow:hidden}
+  .xl .r{display:grid;grid-template-columns:170px 1fr 1fr 1fr;border-top:1px solid #E3E7F0}
+  .xl .r span{padding:13px 14px;border-left:1px solid #E3E7F0}
+  .xl .r.h{background:#F1F3F7;color:var(--slate);border-top:0}
+  .xl .r.sel{background:#EAF0FF;outline:3px solid var(--blue);outline-offset:-3px}
+  .srch{display:flex;align-items:center;gap:16px;border:2px solid #CBD2DE;border-radius:12px;padding:22px 24px;font-size:36px;color:var(--ink)}
+  .srch svg{width:40px;height:40px;flex:none}
+  .gs svg{width:30px;height:30px;flex:none}
+  .caret{display:inline-block;width:3px;height:36px;background:var(--navy);vertical-align:middle;margin-left:2px}
+  .res{margin-top:22px;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:12px;padding:26px 28px}
+  .res .k{font-family:'Urbanist';font-weight:700;font-size:48px;color:var(--navy)}
+  .res .s{font-size:30px;color:var(--slate);margin-top:6px}
+  .bigtick{width:220px;height:220px;margin:40px auto 0;border-radius:50%;border:6px solid #BFE3CD;position:relative}
+  .bigtick svg{position:absolute;inset:30px}
+  .queue{position:absolute;left:30px;right:30px;bottom:28px;border-top:2px dashed #CBD2DE;padding-top:18px}
+  .queue .qh{display:flex;justify-content:space-between;font-size:24px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+  .queue .qr{display:grid;grid-template-columns:52px 1fr auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:27px;color:var(--slate)}
+  .queue .qr img{width:40px;height:40px;object-fit:contain}
+  .queue .qr .m{font-family:'IBM Plex Mono';font-size:25px}
+  .cursor{position:absolute;left:0;top:0;width:54px;height:54px;z-index:9}
+
+  /* Gmail pull */
+  .gw{position:absolute;left:56px;right:56px;top:440px;background:#fff;border-radius:18px;overflow:hidden;color:var(--ink)}
+  .gw .gh{display:flex;align-items:center;gap:18px;padding:24px 28px;border-bottom:1px solid var(--line)}
+  .gw .gh img{height:46px}
+  .gw .gh .t{font-family:'Urbanist';font-weight:700;font-size:38px}
+  .gw .gs{margin:18px 28px;display:flex;align-items:center;gap:14px;background:#F1F3F7;border-radius:12px;padding:16px 20px;font-family:'IBM Plex Mono';font-size:25px;color:var(--ink);min-height:68px}
+  .grow{display:grid;grid-template-columns:8px 64px 1fr auto;gap:18px;align-items:center;padding:16px 28px 16px 0;border-top:1px solid var(--line);opacity:0}
+  .grow .bar{width:8px;height:62px;background:var(--blue);transform:scaleY(0)}
+  .grow .lg{width:64px;height:64px;border-radius:14px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'Urbanist';font-weight:800;font-size:20px;color:var(--navy);overflow:hidden}
+  .grow .lg img{width:42px;height:42px;object-fit:contain}
+  .grow .fr{font-size:28px;font-weight:700}
+  .grow .sb{font-size:24px;color:var(--slate);margin-top:2px}
+  .fly{position:absolute;z-index:8}
+  .readct{position:absolute;left:680px;top:1190px;font-size:28px;color:#C4CAD9;line-height:1.3}
+  .readct b{display:block;font-family:'Urbanist';font-weight:800;font-size:72px;color:#fff;letter-spacing:-.03em}
+
+  /* app: matched + invoices */
+  .inv{font-size:22px;color:var(--mute);margin-top:4px;display:flex;align-items:center;gap:8px}
+  .ib{width:24px;height:24px;border-radius:6px;border:2px solid #C6CBD5;position:relative;display:inline-block}
+  .ib svg{position:absolute;inset:1px}
+  .chips{display:flex;flex-wrap:wrap;gap:14px;padding:22px 28px;border-top:1px solid var(--line)}
+  .chips .pill{font-size:27px;padding:12px 20px;opacity:0}
+
+  /* proof + CTA (as agent-inbox-month-end) */
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:150px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+  .hx{font-size:96px;color:#fff}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 the office: four accountants, one auditor, a rain of payouts -->
+<section class="scene mist" id="o1"></section>
+
+<!-- 1 one credit, five steps, by hand -->
+<section class="scene">
+  <div class="mon"><div class="scr" id="m_s">
+    <div class="steps" id="m_steps"></div>
+    <div class="ctr"><span>Credit <b id="m_n">1</b> of <span id="m_of"></span></span><span class="pill r">By hand</span></div>
+    <div class="pane" id="m_p0"><div class="pcard">
+      <div class="ph"><img src="LG/tabby-mark.png"><div><div class="fr">Tabby</div><div style="font-size:26px">Settlement report</div></div><span class="tm">09:02</span></div>
+      <div class="pb">Your payout has been sent to your bank account. The settlement file is attached.<div style="margin-top:26px"><span class="att" id="m_att"><i>CSV</i>settlement_0923.csv</span></div></div>
+    </div></div>
+    <div class="pane" id="m_p1"><div class="xl" id="m_xl"></div></div>
+    <div class="pane" id="m_p2"><div class="srch"><i class="sic"></i><span>Orders · <span id="m_q2"></span><i class="caret"></i></span></div>
+      <div class="res" id="m_r2"><div><div class="k">Order OS1042</div><div class="s">Paid · Tabby · 23 Sep</div></div><div class="k mono" style="font-size:34px">389.00</div></div></div>
+    <div class="pane" id="m_p3"><div class="srch"><i class="sic"></i><span>Invoices · <span id="m_q3"></span><i class="caret"></i></span></div>
+      <div class="res" id="m_r3"><div><div class="k">INV-1042</div><div class="s">Open · AED 389.00</div></div><span class="pill a">Open</span></div></div>
+    <div class="pane" id="m_p4"><div class="res" style="margin-top:0"><div><div class="k">INV-1042</div><div class="s">Payment recorded by hand</div></div><span class="pill g" id="m_paid">Paid</span></div>
+      <div class="bigtick" id="m_bt"><svg viewBox="0 0 60 60"><path id="m_tk" d="M12 31 L25 44 L48 17" stroke="#1F7A4D" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+    <div class="queue" id="m_qu"><div class="qh"><span>Still in the inbox</span><span id="m_left"></span></div></div>
+    <svg class="cursor" id="m_cu" viewBox="0 0 24 24"><path d="M4 2 L4 20 L9 15 L12.5 22 L15.5 20.6 L12 13.8 L19 13.8 Z" fill="#14131C" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </div></div>
+  <div class="dtag">Dramatization</div>
+</section>
+
+<!-- 2 the auditor re-checks; day one becomes day six -->
+<section class="scene mist" id="o2"></section>
+
+<!-- 3 the agent opens Gmail and reads the payout files -->
+<section class="scene navy">
+  <div class="gw" id="g_w">
+    <div class="gh"><img src="LG/gmail.svg"><span class="t">Inbox</span><span class="pill n" style="margin-left:auto">Read-only</span></div>
+    <div class="gs"><i class="sic"></i><span id="g_q"></span></div>
+    <div id="g_rows"></div>
+  </div>
+  <div class="agent" id="g_ag" style="left:390px;top:1060px;width:240px;height:300px"></div>
+  <div class="readct" id="g_rc">Payout files read<b id="g_n">0</b></div>
+  <div id="g_fly"></div>
+</section>
+
+<!-- 4 matched to the bank, invoices checked, one flagged -->
+<section class="scene mist">
+  <div class="appwin" id="d_w" style="top:440px">
+    <div class="ah" id="d_ic"><span class="t">Month close</span><span class="s" id="d_mo"></span></div>
+    <div class="prog"><b id="d_pb"></b></div>
+    <div class="pk"><span>Payouts matched to the bank</span><span class="num" id="d_pc">0 of 5</span></div>
+    <div class="trow h"><span>Gateway</span><span>Bank line · invoice</span><span style="text-align:right">Amount</span><span style="text-align:right">Status</span></div>
+    <div id="d_rows"></div>
+    <div class="chips"><span class="pill g" id="d_c1">Fees booked</span><span class="pill g" id="d_c2">VAT booked</span><span class="pill a" id="d_c3">1 flagged for you</span></div>
+  </div>
+  <div class="dtag" style="top:auto;bottom:600px;left:auto;right:72px">Illustration</div>
+</section>
+
+<!-- 5 proof -->
+<section class="scene night">
+  <div class="body"><div class="eyebrow" id="e_e"></div>
+    <div class="disp hx" style="margin-top:20px"><span class="line"><span>Our own books.</span></span></div>
+    <div style="margin-top:60px">
+      <div class="stat" id="e_s1"><span class="k">Bank credits</span><span class="v num" id="e_v1">0</span></div>
+      <div class="stat" id="e_s2"><span class="k">Matched to payouts<br>and orders</span><span class="v num" id="e_v2">0%</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:36px;line-height:1.45">Omnia is RAMZA's founding company and first user.<br>Figures from the live RAMZA app.</div>
+  </div>
+</section>
+
+<!-- 6 the same office: the stacks go, the team reviews exceptions -->
+<section class="scene mist" id="o3"></section>
+
+<!-- 7 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">AGENT</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px" id="f_sub"></div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const F = window.FACTS, R = window.RULES;
+const SEARCH = `<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5B6478" stroke-width="2.4"/><path d="M15 15 L21 21" stroke="#5B6478" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+const TICK = `<svg viewBox="0 0 60 60"><path d="M12 31 L25 44 L48 17" stroke="#1F7A4D" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+$("#m_steps").innerHTML = ["Email", "File", "Order", "Invoice", "Tick"].map((s, i) => `<div class="stp" id="m_st${i}">${i + 1} ${s}</div>`).join("");
+$$(".sic").forEach((i) => (i.outerHTML = SEARCH));
+
+/* ---------- the office illustration ---------- */
+const DESKS = [ // x, y (desk-top centre), scale, person
+  [290, 520, 0.92, { skin: "#C68B62", hair: "#46577F", style: "hijab", shirt: "#2E3B5E" }],
+  [790, 520, 0.92, { skin: "#8D5A3B", hair: "#1E1A18", style: "short", beard: true, shirt: "#5B7F6E" }],
+  [270, 810, 1.08, { skin: "#F1C9A5", hair: "#3A2418", style: "long", shirt: "#B85C4A" }],
+  [810, 810, 1.08, { skin: "#B07850", hair: "#2B1D14", style: "curly", glasses: true, shirt: "#4F6DA8" }],
+];
+const MOUTH = { sad: "M-12,-163 Q0,-171 12,-163", flat: "M-11,-166 L11,-166", happy: "M-15,-170 Q0,-154 15,-170" };
+const BROWS = { sad: ["M-27,-205 L-9,-212", "M9,-212 L27,-205"], calm: ["M-27,-209 L-9,-210", "M9,-210 L27,-209"] };
+function face(p, y = 0) { // head drawn around (0, -190 + y)
+  const hj = p.style === "hijab";
+  const Y = (v) => v + y;
+  return `<g class="hd">
+    ${hj ? `<circle cx="0" cy="${Y(-192)}" r="56" fill="${p.hair}"/>` : ""}
+    ${p.style === "long" ? `<path d="M-50,${Y(-200)} Q-54,${Y(-126)} -40,${Y(-118)} L40,${Y(-118)} Q54,${Y(-126)} 50,${Y(-200)} Z" fill="${p.hair}"/>` : ""}
+    <ellipse cx="0" cy="${Y(-190)}" rx="${hj ? 34 : 42}" ry="${hj ? 40 : 46}" fill="${p.skin}"/>
+    ${hj ? `<path d="M-55,${Y(-178)} C-58,${Y(-134)} -34,${Y(-122)} 0,${Y(-120)} C34,${Y(-122)} 58,${Y(-134)} 55,${Y(-178)} C44,${Y(-150)} 24,${Y(-146)} 0,${Y(-146)} C-24,${Y(-146)} -44,${Y(-150)} -55,${Y(-178)} Z" fill="${p.hair}"/>` : ""}
+    ${p.style === "short" ? `<path d="M-44,${Y(-196)} Q-46,${Y(-242)} 0,${Y(-242)} Q46,${Y(-242)} 44,${Y(-196)} Q40,${Y(-222)} 0,${Y(-224)} Q-38,${Y(-222)} -44,${Y(-196)} Z" fill="${p.hair}"/>` : ""}
+    ${p.style === "grey" ? `<path d="M-44,${Y(-190)} Q-48,${Y(-240)} 0,${Y(-240)} Q48,${Y(-240)} 44,${Y(-190)} L38,${Y(-206)} Q20,${Y(-226)} 0,${Y(-224)} Q-20,${Y(-226)} -38,${Y(-206)} Z" fill="${p.hair}"/>` : ""}
+    ${p.style === "long" ? `<path d="M-46,${Y(-188)} Q-48,${Y(-244)} 0,${Y(-244)} Q48,${Y(-244)} 46,${Y(-188)} Q34,${Y(-228)} 0,${Y(-228)} Q-34,${Y(-228)} -46,${Y(-188)} Z" fill="${p.hair}"/>` : ""}
+    ${p.style === "curly" ? [-34, -17, 0, 17, 34].map((x) => `<circle cx="${x}" cy="${Y(-228 + Math.abs(x) / 3)}" r="20" fill="${p.hair}"/>`).join("") : ""}
+    ${p.beard ? `<path d="M-41,${Y(-188)} Q-40,${Y(-140)} 0,${Y(-138)} Q40,${Y(-140)} 41,${Y(-188)} Q30,${Y(-158)} 0,${Y(-156)} Q-30,${Y(-158)} -41,${Y(-188)} Z" fill="${p.hair}"/>` : ""}
+    <path class="bl" d="${BROWS.sad[0]}" transform="translate(0,${y})" stroke="${p.style === "hijab" ? "#2A1E18" : p.hair}" stroke-width="5" stroke-linecap="round"/>
+    <path class="br" d="${BROWS.sad[1]}" transform="translate(0,${y})" stroke="${p.style === "hijab" ? "#2A1E18" : p.hair}" stroke-width="5" stroke-linecap="round"/>
+    <ellipse class="ey" cx="-15" cy="${Y(-190)}" rx="5" ry="6" fill="#1B1B22"/><ellipse class="ey" cx="15" cy="${Y(-190)}" rx="5" ry="6" fill="#1B1B22"/>
+    ${p.glasses ? `<g fill="none" stroke="#1B1B22" stroke-width="3"><circle cx="-16" cy="${Y(-190)}" r="14"/><circle cx="16" cy="${Y(-190)}" r="14"/><path d="M-2,${Y(-190)} L2,${Y(-190)}"/></g>` : ""}
+    <path class="mo" d="${MOUTH.sad}" transform="translate(0,${y})" fill="none" stroke="#6B3B2A" stroke-width="4" stroke-linecap="round"/>
+  </g>`;
+}
+function desk([x, y, s, p], i) {
+  const lines = Array.from({ length: 10 }, (_, k) => `<line x1="-52" x2="52" y1="${-9 * k}" y2="${-9 * k}" stroke="#D5DAE3" stroke-width="2"/>`).join("");
+  return `<g transform="translate(${x},${y}) scale(${s})"><g class="dk dk${i}">
+    <ellipse cx="0" cy="150" rx="250" ry="16" fill="#0B1533" fill-opacity=".08"/>
+    <path d="M-80,10 L-80,-84 Q-80,-128 -36,-132 L36,-132 Q80,-128 80,-84 L80,10 Z" fill="${p.shirt}"/>
+    <path d="M-16,-132 L0,-108 L16,-132 Z" fill="#fff" fill-opacity=".85"/>
+    <rect x="-15" y="-152" width="30" height="26" fill="${p.skin}"/>
+    ${face(p)}
+    <g class="mn"><rect x="112" y="-160" width="120" height="104" rx="8" fill="#26304A"/><circle cx="172" cy="-108" r="7" fill="#3A4766"/><rect x="164" y="-58" width="16" height="52" fill="#26304A"/><rect x="140" y="-10" width="64" height="8" rx="3" fill="#26304A"/></g>
+    <rect x="-216" y="-6" width="432" height="22" rx="4" fill="#D8C2A4"/>
+    <rect x="-200" y="16" width="400" height="128" fill="#C4A985"/>
+    <text x="0" y="90" text-anchor="middle" font-size="20" letter-spacing="4" fill="#6B5640">ACCOUNTANT</text>
+    <g class="stk" transform="translate(-150,-6)"><g class="sti"><rect x="-54" y="-92" width="108" height="92" fill="#fff" stroke="#CDD3DD" stroke-width="2"/>${lines}</g></g>
+    <rect x="-6" y="-12" width="104" height="8" fill="#fff" stroke="#DDE1E8" stroke-width="1.5"/>
+    <g class="mug" transform="translate(234,-6)"><rect x="-18" y="-40" width="36" height="40" rx="6" fill="#fff" stroke="#CDD3DD" stroke-width="2"/><path d="M18,-30 Q32,-28 30,-14 Q28,-6 18,-8" fill="none" stroke="#CDD3DD" stroke-width="4"/></g>
+    <g class="al"><line x1="-62" y1="-112" x2="-112" y2="-40" stroke="${p.shirt}" stroke-width="30" stroke-linecap="round"/><circle cx="-112" cy="-40" r="14" fill="${p.skin}"/></g>
+    <g class="ar"><line x1="62" y1="-112" x2="44" y2="-16" stroke="${p.shirt}" stroke-width="30" stroke-linecap="round"/><circle cx="44" cy="-16" r="14" fill="${p.skin}"/><line x1="44" y1="-16" x2="60" y2="-46" stroke="#0B1533" stroke-width="5" stroke-linecap="round"/></g>
+    <g class="chip" opacity="0"><rect x="-74" y="-310" width="148" height="46" rx="8" fill="#0B1533"/><text class="ct" x="0" y="-279" text-anchor="middle" font-size="22" letter-spacing="2" fill="#fff">${i + 1}</text></g>
+    <g class="ok" opacity="0" transform="translate(-150,-150)"><circle r="30" fill="#E3F4EA"/><path d="M-13,1 L-4,10 L13,-9" stroke="#1F7A4D" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </g></g>`;
+}
+const AUD = { skin: "#E2B48C", hair: "#8A8F99", style: "grey", glasses: true, shirt: "#2F3A57" };
+function auditor() {
+  return `<g transform="translate(540,705) scale(.95)"><g class="aud">
+    <ellipse cx="0" cy="4" rx="70" ry="10" fill="#0B1533" fill-opacity=".1"/>
+    <g class="lgL"><rect x="-32" y="-182" width="28" height="182" rx="10" fill="#232B3E"/><ellipse cx="-24" cy="-2" rx="24" ry="9" fill="#14131C"/></g>
+    <g class="lgR"><rect x="4" y="-182" width="28" height="182" rx="10" fill="#232B3E"/><ellipse cx="24" cy="-2" rx="24" ry="9" fill="#14131C"/></g>
+    <g class="up">
+      <path d="M-64,-168 L-64,-300 Q-64,-338 -28,-342 L28,-342 Q64,-338 64,-300 L64,-168 Z" fill="${AUD.shirt}"/>
+      <path d="M-18,-342 L0,-304 L18,-342 Z" fill="#fff"/><path d="M-6,-338 L6,-338 L9,-284 L0,-272 L-9,-284 Z" fill="#8C2F27"/>
+      <rect x="-15" y="-362" width="30" height="24" fill="${AUD.skin}"/>
+      <g class="ahd" transform="translate(0,-200)">${face(AUD)}</g>
+      <g class="clip"><line x1="-54" y1="-318" x2="-84" y2="-232" stroke="${AUD.shirt}" stroke-width="28" stroke-linecap="round"/>
+        <rect x="-138" y="-304" width="86" height="110" rx="6" fill="#B98A5A"/><rect x="-130" y="-290" width="70" height="90" fill="#fff"/>
+        ${[0, 1, 2, 3, 4].map((k) => `<line x1="-122" x2="-68" y1="${-276 + k * 16}" y2="${-276 + k * 16}" stroke="#CDD3DD" stroke-width="3"/>`).join("")}
+        <circle cx="-84" cy="-232" r="14" fill="${AUD.skin}"/></g>
+      <g class="mag"><line x1="54" y1="-318" x2="92" y2="-252" stroke="${AUD.shirt}" stroke-width="28" stroke-linecap="round"/><circle cx="92" cy="-252" r="14" fill="${AUD.skin}"/>
+        <line x1="96" y1="-258" x2="112" y2="-282" stroke="#0B1533" stroke-width="8" stroke-linecap="round"/><circle cx="126" cy="-302" r="26" fill="#DCE7F7" fill-opacity=".7" stroke="#0B1533" stroke-width="7"/></g>
+      <g class="chip" opacity="0"><rect x="-80" y="-500" width="160" height="46" rx="8" fill="#0B1533"/><text class="ct" x="0" y="-469" text-anchor="middle" font-size="22" letter-spacing="4" fill="#fff">AUDITOR</text></g>
+    </g>
+  </g></g>`;
+}
+function office(host, mode) {
+  const towers = [[70, 120, 50], [130, 90, 40], [182, 40, 14], [205, 110, 46], [262, 70, 40], [310, 130, 44]];
+  host.innerHTML = `<div class="vp"><div class="world"><svg viewBox="0 0 1080 925">
+    <rect x="-1200" y="-600" width="3480" height="930" fill="#EEF1F6"/>
+    <rect x="-1200" y="330" width="3480" height="1200" fill="#DCE1EA"/>
+    <rect x="-1200" y="322" width="3480" height="10" fill="#C9D0DC"/>
+    <g class="win"><rect x="50" y="56" width="330" height="200" rx="6" fill="#fff"/>
+      <rect class="sky" x="62" y="68" width="306" height="176" fill="#CFDCF2"/>
+      <circle class="sun" cx="320" cy="108" r="20" fill="#F2C14E"/>
+      ${towers.map(([x, h, w]) => `<rect class="tw" x="${x}" y="${244 - h}" width="${w}" height="${h}" fill="#9FB0D0"/>`).join("")}
+      <path class="tw" d="M189,${244 - 150} L192,${244 - 40} L180,${244 - 40} Z" fill="#9FB0D0"/>
+      <rect x="211" y="68" width="8" height="176" fill="#fff"/></g>
+    <g class="clk"><circle cx="540" cy="150" r="74" fill="#fff" stroke="#0B1533" stroke-width="8"/>
+      ${Array.from({ length: 12 }, (_, k) => `<line x1="540" y1="88" x2="540" y2="${k % 3 ? 96 : 102}" stroke="#0B1533" stroke-width="${k % 3 ? 3 : 5}" transform="rotate(${k * 30} 540 150)"/>`).join("")}
+      <line class="hh" x1="540" y1="150" x2="540" y2="112" stroke="#0B1533" stroke-width="8" stroke-linecap="round"/>
+      <line class="mh" x1="540" y1="150" x2="540" y2="94" stroke="#C2362B" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="540" cy="150" r="7" fill="#0B1533"/></g>
+    <g class="cal"><rect x="800" y="40" width="210" height="190" rx="10" fill="#fff" stroke="#CDD3DD" stroke-width="2"/>
+      <rect x="800" y="40" width="210" height="54" rx="10" fill="#C2362B"/><rect x="800" y="80" width="210" height="14" fill="#C2362B"/>
+      <text x="905" y="76" text-anchor="middle" font-size="22" letter-spacing="3" fill="#fff">MONTH END</text>
+      <text class="cd" x="905" y="186" text-anchor="middle" font-size="76" font-family="Urbanist" font-weight="800" fill="#0B1533" style="font-family:Urbanist;font-weight:800">DAY 1</text></g>
+    <g class="tv" opacity="0"><rect x="450" y="34" width="580" height="250" rx="12" fill="#0B1533"/>
+      <rect x="466" y="50" width="548" height="218" rx="6" fill="#fff"/>
+      <text x="488" y="92" font-size="24" letter-spacing="2" fill="#5B6478">EXCEPTIONS TO REVIEW</text>
+      ${[["NETWORK INTL · split payment", 0], ["COD remittance · short", 1], ["Refund netted in payout", 2]].map(([t, k]) => `<g class="ex ex${k}"><line x1="488" x2="992" y1="${112 + k * 50}" y2="${112 + k * 50}" stroke="#E3E7F0" stroke-width="2"/>
+        <text x="488" y="${146 + k * 50}" font-size="23" fill="#14131C" style="font-weight:500">${t}</text>
+        <rect class="pa" x="880" y="${122 + k * 50}" width="112" height="34" rx="17" fill="#FFF3DC"/><text class="pt" x="936" y="${145 + k * 50}" text-anchor="middle" font-size="20" fill="#8A5A00">Review</text></g>`).join("")}</g>
+    ${desk(DESKS[0], 0)}${desk(DESKS[1], 1)}
+    ${auditor()}
+    ${desk(DESKS[2], 2)}${desk(DESKS[3], 3)}
+    <g class="rain"></g>
+  </svg></div></div>
+  <div class="dtag">${mode === "calm" ? "Illustration" : "Dramatization"}</div>`;
+  const q = (s) => host.querySelector(s), qa = (s) => [...host.querySelectorAll(s)];
+  qa(".sti").forEach((s) => tl.set(s, { transformOrigin: "50% 100%", scaleY: mode === "start" ? 0.35 : 1 }, 0));
+  return { q, qa, world: q(".world") };
+}
+
+/* camera: centre world point (cx, cy) in the 1080x925 viewport at scale s */
+function cam(o, t, cx, cy, s, dur = 0.9, ease = "expo.inOut") {
+  const v = { x: 540 - s * cx, y: 462 - s * cy, scale: s, transformOrigin: "0 0" };
+  if (dur === 0) tl.set(o.world, v, t); else tl.to(o.world, { ...v, duration: dur, ease }, t);
+}
+/* deterministic "random" so every render is identical */
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+function work(o, t0, t1, { speed = 0.22, heads = 3 } = {}) {
+  o.qa(".ar").forEach((a, i) => {
+    tl.set(a, { transformOrigin: "100% 0%" }, 0);
+    const per = speed + i * 0.02, n = Math.max(1, Math.floor((t1 - t0) / per));
+    tl.fromTo(a, { rotation: 0 }, { rotation: -9, duration: per, yoyo: true, repeat: n - 1, ease: "sine.inOut" }, t0 + i * 0.07);
+  });
+  o.qa(".dk .hd").forEach((h, i) => {
+    tl.set(h, { transformOrigin: "50% 100%" }, 0);
+    const per = 0.8 + i * 0.13, n = Math.max(1, Math.floor((t1 - t0) / per));
+    tl.fromTo(h, { rotation: -heads }, { rotation: heads, duration: per, yoyo: true, repeat: n - 1, ease: "sine.inOut" }, t0 + i * 0.2);
+  });
+  blinks(o, t0, t1);
+}
+function blinks(o, t0, t1) {
+  o.qa(".ey").forEach((e, i) => tl.set(e, { transformOrigin: "50% 50%" }, 0));
+  const heads = o.qa(".hd");
+  heads.forEach((h) => {
+    for (let t = t0 + rnd() * 1.5; t < t1; t += 1.6 + rnd() * 2.2) {
+      const eyes = h.querySelectorAll(".ey");
+      tl.to(eyes, { scaleY: 0.1, duration: 0.06 }, t);
+      tl.to(eyes, { scaleY: 1, duration: 0.08 }, t + 0.1);
+    }
+  });
+}
+function walk(o, t0, t1, fromX, toX) {
+  const w = o.q(".aud"), L = o.q(".lgL"), Rg = o.q(".lgR"), up = o.q(".up");
+  tl.set([L, Rg], { transformOrigin: "50% 0%" }, 0);
+  tl.fromTo(w, { x: fromX }, { x: toX, duration: t1 - t0, ease: "power1.inOut" }, t0);
+  const steps = Math.max(2, Math.round((t1 - t0) / 0.28));
+  tl.fromTo(L, { rotation: 16 }, { rotation: -16, duration: 0.28, yoyo: true, repeat: steps - 1, ease: "sine.inOut" }, t0);
+  tl.fromTo(Rg, { rotation: -16 }, { rotation: 16, duration: 0.28, yoyo: true, repeat: steps - 1, ease: "sine.inOut" }, t0);
+  tl.fromTo(up, { y: 0 }, { y: -8, duration: 0.14, yoyo: true, repeat: steps * 2 - 1, ease: "sine.inOut" }, t0);
+  tl.to([L, Rg], { rotation: 0, duration: 0.15 }, t1);
+}
+function pop(el, t, sfx = "pop") {
+  tl.set(el, { transformOrigin: "50% 50%" }, 0);
+  tl.fromTo(el, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2.6)" }, t);
+  if (sfx) E.sfx(sfx, t);
+}
+function sky(o, t, night) {
+  tl.set(o.q(".sky"), { attr: { fill: night ? "#1E2A52" : "#CFDCF2" } }, t);
+  tl.set(o.qa(".tw"), { attr: { fill: night ? "#33406A" : "#9FB0D0" } }, t);
+  tl.set(o.q(".sun"), { attr: { fill: night ? "#E8ECF6" : "#F2C14E", cx: night ? 110 : 320 } }, t);
+}
+function spinClock(o, t, dur, turns) {
+  tl.to(o.q(".mh"), { rotation: `+=${360 * turns}`, svgOrigin: "540 150", duration: dur, ease: "none" }, t);
+  tl.to(o.q(".hh"), { rotation: `+=${30 * turns}`, svgOrigin: "540 150", duration: dur, ease: "none" }, t);
+}
+const STACKS = [[152, 415], [652, 415], [108, 685], [648, 685]]; // stack tops in world coords
+
+/* ---------- build the scenes' static parts ---------- */
+const O1 = office($("#o1"), "start"), O2 = office($("#o2"), "busy"), O3 = office($("#o3"), "calm");
+$("#m_of").textContent = String(F.close_credits);
+$("#m_left").textContent = `${F.close_credits - 1} to go`;
+$("#m_qu").insertAdjacentHTML("beforeend", [["LG/tamara-mark.png", "Tamara · Payout summary", "9,870.00"], ["LG/stripe-mark.png", "Stripe · Payout on its way", "12,306.18"], ["LG/telr-mark.png", "Telr · Settlement statement", "6,215.40"]]
+  .map(([lg, t, m]) => `<div class="qr">${lg ? `<img src="${lg}">` : `<b style="font-family:Urbanist;font-size:20px">COD</b>`}<span>${t}</span><span class="m">${m}</span></div>`).join(""));
+$("#m_xl").innerHTML = `<div class="r h" style="font-size:24px"><span>Order</span><span>Amount</span><span>Fee</span><span>Net</span></div>` +
+  [["OS1039", "1,240.00", "37.20", "1,202.80"], ["OS1040", "655.50", "19.67", "635.83"], ["OS1042", "389.00", "11.67", "377.33"], ["OS1043", "2,105.50", "63.17", "2,042.33"], ["OS1044", "915.25", "27.46", "887.79"]]
+    .map((r, i) => `<div class="r" id="m_xr${i}">${r.map((c) => `<span>${c}</span>`).join("")}</div>`).join("");
+const GM = [
+  ["Tabby", "LG/tabby-mark.png", "Settlement report", "CSV"],
+  ["Tamara", "LG/tamara-mark.png", "Payout summary", "XLSX"],
+  ["Stripe", "LG/stripe-mark.png", "Your payout is on its way", "CSV"],
+  ["Telr", "LG/telr-mark.png", "Settlement statement", "PDF"],
+  ["Courier", null, "COD remittance", "PDF"],
+];
+$("#g_rows").innerHTML = GM.map(([fr, lg, sb, ty], i) => `<div class="grow" id="g_r${i}"><i class="bar" id="g_b${i}"></i>
+  <div class="lg">${lg ? `<img src="${lg}">` : "COD"}</div><div><div class="fr">${fr}</div><div class="sb">${sb}</div></div>
+  <span class="att" id="g_a${i}"><i class="${ty === "PDF" ? "pdf" : ""}">${ty}</i>${fr.toLowerCase()}_0923</span></div>`).join("");
+const ROWS = [["LG/tabby-mark.png", "TABBY FZ LLC", "18,420.50", "INV-1042"], ["LG/tamara-mark.png", "TAMARA PAYOUT", "9,870.00", "INV-1057"], ["LG/stripe-mark.png", "NETWORK INTL", "12,306.18", "INV-1061"], ["LG/telr-mark.png", "TELR SETTLEMENT", "6,215.40", "INV-1066"], [null, "COURIER COD", "4,980.00", "INV-1070"]];
+$("#d_rows").innerHTML = ROWS.map(([lg, nm, amt, inv], i) => `<div class="trow" id="d_r${i}"><span>${lg ? `<img src="${lg}">` : `<b style="font-family:Urbanist">COD</b>`}</span>
+  <span class="d">${nm}<span class="inv"><i class="ib" id="d_ib${i}">${TICK}</i>${inv}</span></span><span class="m">${amt}</span>
+  <span class="st"><span class="pill a" id="d_pa${i}">Pending</span><span class="pill ${i === 4 ? "a" : "g"}" id="d_pg${i}" style="opacity:0">${i === 4 ? "Review" : "Matched"}</span></span></div>`).join("");
+$("#d_ic").insertAdjacentHTML("afterbegin", KIT.mark(true));
+$("#d_mo").textContent = F.close_month;
+$("#g_ag").innerHTML = KIT.body("#000");
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+$("#f_sub").textContent = `${R.offer.free_trial.days}-day free trial · read-only access`;
+$$(".ib path").forEach((p) => tl.set(p, { opacity: 0 }, 0));
+RL.build();
+
+/* ---------- 0: the office ---------- */
+{
+  const s = RL.seg(0), four = RL.w(0, "Four"), aud = RL.w(0, "auditor"), pay = RL.w(0, "payout"), by = RL.w(0, "by");
+  cam(O1, 0, 330, 420, 1.75, 0);
+  tl.to(O1.world, { scale: 1.82, x: 540 - 1.82 * 330, y: 462 - 1.82 * 420, duration: four - 0.15, ease: "none" }, 0);
+  cam(O1, four - 0.15, 540, 470, 1, 0.75);
+  work(O1, 0, s.end, { speed: 0.2 });
+  spinClock(O1, 0, s.end, 1.2);
+  walk(O1, aud - 0.6, aud + 0.9, 760, 0);
+  O1.qa(".dk .chip").forEach((c, i) => pop(c, four + 0.2 + i * 0.16));
+  pop(O1.q(".aud .chip"), aud + 0.2);
+  // payouts rain onto the four stacks, the stacks grow
+  const rain = O1.q(".rain");
+  for (let k = 0; k < 16; k++) {
+    const [sx, sy] = STACKS[k % 4], ns = "http://www.w3.org/2000/svg";
+    const r = document.createElementNS(ns, "rect");
+    Object.entries({ x: -40, y: -26, width: 80, height: 52, rx: 3, fill: "#fff", stroke: "#B9C1CF", "stroke-width": 2 }).forEach(([a, v]) => r.setAttribute(a, v));
+    rain.appendChild(r);
+    const t = pay - 0.2 + k * 0.09;
+    tl.fromTo(r, { x: sx + (rnd() - 0.5) * 260, y: -380, rotation: (rnd() - 0.5) * 160, opacity: 1 },
+      { x: sx, y: sy, rotation: (rnd() - 0.5) * 20, duration: 0.55, ease: "power2.in" }, t);
+    tl.to(r, { opacity: 0, duration: 0.08 }, t + 0.55);
+  }
+  O1.qa(".sti").forEach((st, i) => tl.to(st, { scaleY: 1.25, duration: 1.6, ease: "power1.out" }, pay));
+  E.sfx("whoosh", pay - 0.2);
+  O1.qa(".dk .ok").forEach((c, i) => pop(c, by + 0.15 + i * 0.32, "click"));
+}
+
+/* ---------- 1: the manual loop ---------- */
+{
+  const s = RL.seg(1);
+  const T = [RL.w(1, "Open"), RL.w(1, "Download"), RL.w(1, "order"), RL.w(1, "invoice"), RL.w(1, "Tick")], nx = RL.w(1, "Next");
+  tl.fromTo(".mon", { y: 90, scale: 1.08, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: "expo.out" }, s.start + 0.1);
+  const cu = $("#m_cu");
+  const CU = [[640, 470], [520, 560], [600, 380], [600, 380], [820, 300]];
+  tl.set(cu, { x: 880, y: 760 }, 0);
+  T.forEach((t, i) => {
+    if (i) { tl.to(`#m_p${i - 1}`, { opacity: 0, x: -50, duration: 0.2 }, t - 0.12); tl.set(`#m_st${i - 1}`, { attr: { class: "stp dn" } }, t - 0.1); }
+    tl.set(`#m_st${i}`, { attr: { class: "stp on" } }, t - 0.1);
+    tl.fromTo(`#m_p${i}`, { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 0.25, ease: "expo.out" }, t - 0.1);
+    tl.to(cu, { x: CU[i][0], y: CU[i][1], duration: 0.35, ease: "power2.inOut" }, t - 0.05);
+    tl.fromTo(cu, { scale: 1 }, { scale: 0.8, duration: 0.07, yoyo: true, repeat: 1 }, t + 0.32); E.sfx("click", t + 0.32);
+  });
+  KIT.punch("#m_att", T[0] + 0.32, 1.08);
+  tl.set("#m_xr2", { attr: { class: "r sel" } }, T[1] + 0.35);
+  ["OS1042", "INV-1042"].forEach((q, k) => {
+    const el = $(`#m_q${k + 2}`), t = T[k + 2];
+    for (let c = 1; c <= q.length; c++) tl.set(el, { textContent: q.slice(0, c) }, t + c * 0.045);
+    E.sfx("typing", t);
+    tl.fromTo(`#m_r${k + 2}`, { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "expo.out" }, t + q.length * 0.045 + 0.05);
+  });
+  E.draw($("#m_tk"), T[4] + 0.05, 0.3);
+  KIT.punch("#m_paid", T[4] + 0.3, 1.15); E.sfx("pop", T[4] + 0.3);
+  // Next: credit 2, then the whole loop again, faster and faster
+  tl.set("#m_n", { textContent: "2" }, nx); tl.set("#m_left", { textContent: `${F.close_credits - 2} to go` }, nx); KIT.punch("#m_n", nx, 1.35); E.sfx("impact", nx);
+  tl.to("#m_p4", { opacity: 0, duration: 0.12 }, nx);
+  const end = s.end;
+  let t = nx + 0.12, k = 0, n = 2;
+  while (t < end - 0.05) {
+    const i = k % 5;
+    tl.set($$(".stp"), { attr: { class: "stp" } }, t);
+    tl.set(`#m_st${i}`, { attr: { class: "stp on" } }, t);
+    tl.set($$(".pane"), { opacity: 0, x: 0 }, t);
+    tl.set(`#m_p${i}`, { opacity: 1 }, t);
+    if (i === 4) { n++; tl.set("#m_n", { textContent: String(n) }, t); tl.set("#m_left", { textContent: `${F.close_credits - n} to go` }, t); }
+    t += Math.max(0.07, 0.16 - k * 0.012); k++;
+  }
+}
+
+/* ---------- 2: the auditor, day one to day six ---------- */
+{
+  const s = RL.seg(2), ag = RL.w(2, "again"), d1 = RL.w(2, "Day"), d6 = RL.w(2, "six"), five = RL.w(2, "Five"), sp = RL.w(2, "spreadsheet");
+  cam(O2, 0, 470, 420, 1.9, 0);
+  work(O2, s.start, s.end, { speed: 0.24, heads: 5 });
+  // the auditor leans in with the magnifier over the clipboard
+  const mag = O2.q(".mag");
+  tl.set(mag, { transformOrigin: "0% 100%" }, 0);
+  tl.fromTo(mag, { x: 0, y: 0 }, { x: -150, y: 40, duration: 0.7, ease: "power2.inOut" }, s.start + 0.3);
+  tl.to(mag, { x: -190, y: 70, duration: 0.5, yoyo: true, repeat: 3, ease: "sine.inOut" }, s.start + 1.0);
+  const ns = "http://www.w3.org/2000/svg", up = O2.q(".up");
+  const ring = document.createElementNS(ns, "path");
+  ring.setAttribute("d", "M-138,-246 C-140,-262 -50,-262 -48,-246 C-46,-230 -136,-228 -138,-244");
+  Object.entries({ fill: "none", stroke: "#C2362B", "stroke-width": 6, "stroke-linecap": "round" }).forEach(([a, v]) => ring.setAttribute(a, v));
+  up.appendChild(ring);
+  E.draw(ring, ag - 0.1, 0.35); E.sfx("click", ag);
+  const stamp = document.createElementNS(ns, "g");
+  stamp.innerHTML = `<rect x="-230" y="-220" width="176" height="52" rx="8" fill="#fff" stroke="#C2362B" stroke-width="5"/><text x="-142" y="-185" text-anchor="middle" font-size="26" letter-spacing="2" fill="#C2362B" style="font-weight:700">RE-CHECK</text>`;
+  up.appendChild(stamp);
+  tl.set(stamp, { transformOrigin: "50% 50%", rotation: -8 }, 0);
+  tl.fromTo(stamp, { scale: 2.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power4.in" }, ag + 0.25); E.sfx("impact", ag + 0.5);
+  // pull out; the calendar runs day 1 → day 6, sky flips day/night, clock spins, stacks grow
+  cam(O2, d1 - 0.35, 540, 470, 1, 0.8);
+  const steps = 5, dt = (d6 - d1) / steps;
+  spinClock(O2, d1, d6 - d1 + 0.3, 12);
+  for (let k = 0; k <= steps; k++) {
+    const t = d1 + k * dt;
+    tl.set(O2.q(".cd"), { textContent: `DAY ${k + 1}` }, t);
+    tl.fromTo(O2.q(".cal"), { y: 0 }, { y: -10, duration: 0.08, yoyo: true, repeat: 1 }, t);
+    if (k) E.sfx("click", t);
+    if (k < steps) { sky(O2, t + dt * 0.5, true); sky(O2, t + dt * 0.95, false); }
+  }
+  O2.qa(".sti").forEach((st) => tl.fromTo(st, { scaleY: 1.25 }, { scaleY: 2.1, duration: d6 - d1 + 0.4, ease: "none" }, d1));
+  KIT.punch(O2.q(".cal"), d6, 1.12); E.sfx("impact", d6);
+  // five salaries
+  const chips = [...O2.qa(".dk .chip"), O2.q(".aud .chip")];
+  chips.forEach((c, i) => { tl.set(c.querySelector(".ct"), { textContent: "SALARY" }, 0); pop(c, five + i * 0.12, i ? "blip" : "pop"); });
+  tl.to(O2.world, { scale: 1.06, x: 540 - 1.06 * 540, y: 462 - 1.06 * 470, duration: 0.5, ease: "expo.out" }, sp);
+}
+
+/* ---------- 3: the agent reads Gmail ---------- */
+{
+  const s = RL.seg(3), ag = RL.w(3, "agent"), gm = RL.w(3, "Gmail"), fd = RL.w(3, "finds"), fl = RL.w(3, "files");
+  const st0 = $(".stage").getBoundingClientRect(), k0 = st0.width / 1080;
+  const AT = GM.map((_, i) => { const r = $(`#g_a${i}`).getBoundingClientRect(); return [(r.left - st0.left) / k0, (r.top - st0.top) / k0, r.width / k0, r.height / k0]; });
+  KIT.dropIn($("#g_ag"), ag - 0.2);
+  tl.fromTo("#g_w", { scale: 0.2, opacity: 0, y: 420, transformOrigin: "50% 100%" }, { scale: 1, opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.4)" }, gm - 0.15);
+  E.sfx("whoosh", gm - 0.15);
+  const q = "payout OR settlement has:attachment", qe = $("#g_q");
+  const qs = gm + 0.35, qd = Math.max(0.012, Math.min(0.03, (fd - qs - 0.1) / q.length));
+  for (let c = 1; c <= q.length; c++) tl.set(qe, { textContent: q.slice(0, c) }, qs + c * qd);
+  E.sfx("typing", qs);
+  GM.forEach((_, i) => {
+    const t = fd + i * 0.14;
+    tl.fromTo(`#g_r${i}`, { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, t);
+    tl.to(`#g_b${i}`, { scaleY: 1, duration: 0.2 }, t + 0.15);
+    E.sfx("blip", t);
+  });
+  // each attachment leaves its email and flies into the agent
+  const fly = $("#g_fly");
+  GM.forEach(([fr, , , ty], i) => {
+    const t = fl - 0.15 + i * 0.22;
+    const [left, top, w, h] = AT[i];
+    const el = document.createElement("span");
+    el.className = "att fly";
+    el.style.cssText = `right:${1080 - 996}px;top:${top}px`;
+    el.innerHTML = `<i class="${ty === "PDF" ? "pdf" : ""}">${ty}</i>${fr.toLowerCase()}_0923`;
+    fly.appendChild(el);
+    tl.set(el, { opacity: 0, transformOrigin: "100% 50%" }, 0);
+    tl.set(el, { opacity: 1 }, t);
+    tl.to(`#g_a${i}`, { opacity: 0.25, duration: 0.1 }, t);
+    tl.to(el, { x: 560 - 996, duration: 0.6, ease: "power1.out" }, t);
+    tl.to(el, { y: 1210 - top - h / 2, scale: 0.3, duration: 0.6, ease: "power3.in" }, t);
+    tl.to(el, { opacity: 0, duration: 0.08 }, t + 0.58);
+    tl.set("#g_n", { textContent: String(i + 1) }, t + 0.6);
+    KIT.punch("#g_ag", t + 0.6, 1.08);
+    E.sfx("pop", t + 0.6);
+  });
+  tl.fromTo("#g_rc", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.4 }, fl - 0.3);
+}
+
+/* ---------- 4: matched, invoices checked, one flagged ---------- */
+{
+  const s = RL.seg(4), mt = RL.w(4, "matches"), bk = RL.w(4, "bank"), ck = RL.w(4, "checks"), inv = RL.w(4, "invoice");
+  const fees = RL.w(4, "fees"), vat = RL.w(4, "VAT"), hm = RL.w(4, "human");
+  tl.fromTo("#d_w", { y: 120, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, s.start + 0.2);
+  for (let i = 0; i < 4; i++) {
+    const t = mt + ((ck - mt) * i) / 4;
+    tl.to(`#d_pa${i}`, { opacity: 0, duration: 0.15 }, t);
+    tl.fromTo(`#d_pg${i}`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t); E.sfx("pop", t);
+    tl.set("#d_pc", { textContent: `${i + 1} of 5` }, t);
+  }
+  tl.fromTo("#d_pb", { scaleX: 0 }, { scaleX: 0.8, duration: ck - mt, ease: "none" }, mt);
+  ROWS.forEach((_, i) => {
+    const t = ck + ((inv + 0.4 - ck) * i) / ROWS.length;
+    tl.to(`#d_ib${i}`, { borderColor: "#1F7A4D", duration: 0.1 }, t);
+    E.draw($(`#d_ib${i} path`), t, 0.2); tl.set(`#d_ib${i} path`, { opacity: 1 }, t);
+    E.sfx("blip", t);
+  });
+  pop("#d_c1", fees - 0.05); pop("#d_c2", vat - 0.05);
+  tl.to("#d_pa4", { opacity: 0, duration: 0.15 }, hm - 0.3);
+  tl.fromTo("#d_pg4", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, hm - 0.3);
+  KIT.punch("#d_r4", hm, 1.04); tl.to("#d_r4", { backgroundColor: "#FFF8EA", duration: 0.2 }, hm - 0.2);
+  pop("#d_c3", hm); E.sfx("impact", hm + 0.1);
+}
+
+/* ---------- 5: proof ---------- */
+{
+  const s5 = RL.seg(5).start;
+  $("#e_e").textContent = `${F.close_month} close · Omnia`;
+  E.lines(".scene:nth-of-type(6) .disp", s5 + 0.3);
+  const c1 = RL.w(5, String(F.close_credits)), c2 = RL.w(5, F.close_matched_pct + "%");
+  tl.fromTo("#e_s1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c1 - 0.3);
+  E.count($("#e_v1"), c1 - 0.2, F.close_credits, { dur: 1.0 });
+  tl.fromTo("#e_s2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c2 - 0.3);
+  E.count($("#e_v2"), c2 - 0.2, F.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+  E.sfx("chime", RL.w(5, "matched"));
+}
+
+/* ---------- 6: the same office, reviewing ---------- */
+{
+  const s = RL.seg(6), tk = RL.w(6, "ticking"), rv = RL.w(6, "reviewing"), mt = RL.w(6, "matters");
+  cam(O3, 0, 540, 470, 1.12, 0);
+  cam(O3, s.start, 540, 470, 1, 1.2, "power2.out");
+  work(O3, s.start, tk, { speed: 0.24 });
+  // the stacks lift off and leave
+  O3.qa(".stk").forEach((st, i) => {
+    tl.to(st, { y: -700, rotation: (i % 2 ? 1 : -1) * 25, opacity: 0, duration: 0.6, ease: "power3.in" }, tk + i * 0.08);
+  });
+  E.sfx("whoosh", tk);
+  tl.to(O3.qa(".ar"), { rotation: 0, duration: 0.2 }, tk + 0.1);
+  // the wall screen comes on; faces lift and smile
+  tl.to([O3.q(".clk"), O3.q(".cal")], { opacity: 0, duration: 0.2 }, rv - 0.2);
+  tl.fromTo(O3.q(".tv"), { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out" }, rv - 0.1);
+  O3.qa(".ex").forEach((e, i) => tl.fromTo(e, { opacity: 0 }, { opacity: 1, duration: 0.2 }, rv + 0.1 + i * 0.12));
+  E.sfx("chime", rv);
+  O3.qa(".hd").forEach((h) => {
+    tl.set(h, { transformOrigin: "50% 100%" }, 0);
+    tl.to(h, { rotation: 0, y: -6, duration: 0.4, ease: "back.out(2)" }, rv);
+  });
+  tl.set(O3.qa(".mo"), { attr: { d: MOUTH.happy } }, rv + 0.15);
+  tl.set(O3.qa(".bl"), { attr: { d: BROWS.calm[0] } }, rv + 0.15);
+  tl.set(O3.qa(".br"), { attr: { d: BROWS.calm[1] } }, rv + 0.15);
+  blinks(O3, tk, s.end);
+  // first exception approved
+  tl.set(O3.q(".ex0 .pa"), { attr: { fill: "#E3F4EA" } }, mt);
+  tl.set(O3.q(".ex0 .pt"), { attr: { fill: "#1F7A4D" }, textContent: "Done" }, mt);
+  E.sfx("pop", mt);
+  tl.to(O3.world, { scale: 1.08, x: 540 - 1.08 * 700, y: 462 - 1.08 * 330, duration: 1.4, ease: "power2.inOut" }, mt - 0.2);
+}
+
+/* ---------- 7: CTA ---------- */
+{
+  const s7 = RL.seg(7).start;
+  KIT.startAt("#f_ag", s7 - 0.6);
+  tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s7 + 0.1);
+  const kw = RL.w(7, "Comment", "t1");
+  tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, kw); E.sfx("impact", kw + 0.1);
+  tl.fromTo("#f_sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 }, RL.w(7, "free") - 0.2);
+}
+</script>
+</body></html>

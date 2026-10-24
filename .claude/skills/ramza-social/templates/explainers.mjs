@@ -23,6 +23,9 @@ export function explainers(R, F) {
   const ctDue = CT.deadlines[0];
   const rescue = R.pricing.one_off.late_filing_rescue_aed;
   const SBR = CT.small_business_relief;
+  /* worked example for agent-desk-one-payout: sales − fee − VAT on fee − refund = payout (balances) */
+  const EX = { sales: "10,000.00", fee: "330.00", vat: "16.50", refund: "241.13", payout: "9,412.37", orders: 12,
+    saySales: "ten thousand", sayPayout: "nine thousand, four hundred and twelve", gap: "587" };
   return [
     {
       id: "einvoicing-days-left",
@@ -155,6 +158,97 @@ Omnia is RAMZA's founding company and first user. Emails and screens are illustr
 #Ecommerce #Shopify #Tabby #Tamara #Stripe #UAEBusiness #Reconciliation #ZohoBooks`,
     },
     {
+      id: "agent-office-month-end",
+      title: "Five people, one spreadsheet. Or one agent.",
+      music: ["the-upbeat-inspiring-corporate-142313.mp3", 0.08],
+      segments: [
+        { say: `Month end. *Four* accountants. One *auditor.* And every *payout,* checked by hand, one by one.` },
+        { say: `Open the email. Download the *file.* Find the order. Find the *invoice.* Tick. *Next.*` },
+        { say: `Then the auditor checks it all *again.* Day one becomes day *six.* Five salaries, on one *spreadsheet.*` },
+        { dark: true, say: `Now hand it to the *agent.* RAMZA opens *Gmail,* finds every payout email, and reads the *files* inside.` },
+        { say: `It matches each payout to the *bank,* checks every *invoice,* books the fees and VAT, and flags only what needs a *human.*` },
+        { dark: true, say: `{${F.close_month}|${F.close_month.split(" ")[0]}}, on our own company's books. {*${n(F.close_credits)}*|${words(F.close_credits)}} bank credits. {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched.` },
+        { say: `Your team stops *ticking* rows, and starts *reviewing* what matters.` },
+        { dark: true, say: `Give the agent {*${R.offer.free_trial.days} days.*|${words(R.offer.free_trial.days)} days.} Comment *AGENT,* and it closes last month for you, *free.*` },
+      ],
+      disclaimer: `Office scenes are a dramatization. Omnia is RAMZA's founding company and first user; figures from the live RAMZA app, ${F.as_of}. Screens are illustrations. AI voiceover.`,
+      caption: `Month end: four accountants and an auditor, checking every payout by hand. Email, file, order, invoice, tick. Next.
+
+RAMZA's agent opens Gmail, reads every payout file, matches each payout to the bank, checks the invoices, books fees and VAT, and flags only what needs a human. Your team reviews exceptions instead of ticking rows.
+
+${F.close_month}, on our own books: ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched.
+
+${R.offer.free_trial.headline} Comment AGENT, or message us on WhatsApp.
+
+Office scenes are a dramatization. Omnia is RAMZA's founding company and first user. Screens are illustrations. Voiceover is AI-generated.
+
+#UAEBusiness #DubaiBusiness #Accounting #Ecommerce #Reconciliation #ZohoBooks #AIAgent`,
+    },
+    {
+      id: "news-month-end-bleed",
+      title: "This week's headlines, and where the money goes",
+      music: ["inspired-ambient-141686.mp3", 0.1],
+      segments: [
+        { dark: true, say: `This week's headlines. *Gulf News:* the UAE's e-invoicing deadline *nears.*` },
+        { dark: true, say: `Large UAE businesses must appoint a provider by {*${showDate(E.large.asp_by)}.*|${sayDate(E.large.asp_by)}.} Late, {*${aed(P.asp_late_aed_per_month)}*|${sayAED(P.asp_late_aed_per_month)}} a month.` },
+        { dark: true, say: `And *CFO* dot com: *half* of finance teams still take over a *week* to close the books.` },
+        { dark: true, say: `{*20 to 50 hours*|Twenty to fifty hours} a month, just on *reconciliation.*` },
+        { dark: true, say: `For an online store, here's where that week *goes.*` },
+        { dark: true, say: `Payouts land *net* of fees. Cash on delivery comes in *short.* Refunds hide *inside* the payout.` },
+        { dark: true, say: `So invoices stay *open,* and someone matches it all by *hand.*` },
+        { dark: true, say: `RAMZA's agent does the match. It reads every payout file, matches the *bank,* books fees and VAT, and closes the *invoices.*` },
+        { dark: true, say: `For e-invoicing, it *maps* where your invoices are made, and connects an *accredited* provider.` },
+        { dark: true, say: `On our own books, it found {*${n(F.bank_lines_not_in_zoho)}*|${words(F.bank_lines_not_in_zoho)}} bank lines, {*${aedM(F.bank_lines_not_in_zoho_aed)},*|${(F.bank_lines_not_in_zoho_aed / 1e6).toFixed(2).replace(/^(\d+)\.(\d)(\d)$/, (_, a, x, y) => `${words(+a)} point ${words(+x)} ${words(+y)}`)} million dirhams,} not yet in Zoho.` },
+        { dark: true, say: `Give the agent {*${R.offer.free_trial.days} days.*|${words(R.offer.free_trial.days)} days.} Comment *AGENT,* and it closes last month for you, *free.*` },
+      ],
+      disclaimer: `Headlines: Gulf News (updated 30 Sep 2026), Economy Middle East (22 Oct 2026), CFO.com (23 Apr 2025, Ledge survey), shown for commentary. Omnia is RAMZA's founding company and first user; figures from the live RAMZA app, ${F.as_of}. RAMZA is not an accredited e-invoicing service provider. Stock photos; screens are illustrations. AI voiceover.`,
+      caption: `This week's headlines: the UAE e-invoicing deadline nears, and half of finance teams still take over a week to close the books.
+
+UAE businesses with ${aedM(E.large.revenue_gte_aed)}+ revenue must appoint an accredited e-invoicing provider by ${showDate(E.large.asp_by)}. Late: ${aed(P.asp_late_aed_per_month)} per month or part of a month.
+
+For an online store, the close week goes on payouts that land net of fees, COD that comes in short, refunds hidden inside payouts, and invoices that stay open until someone matches them by hand.
+
+RAMZA's agent reads every payout file, matches the bank, books fees and VAT, and closes the invoices. For e-invoicing it maps where your invoices are made and connects an accredited provider.
+
+On our own books, it found ${n(F.bank_lines_not_in_zoho)} bank lines worth ${aedM(F.bank_lines_not_in_zoho_aed)} not yet in Zoho.
+
+${R.offer.free_trial.headline} Comment AGENT, or message us on WhatsApp.
+
+Sources: Gulf News, Economy Middle East, CFO.com (Ledge survey). Omnia is RAMZA's founding company and first user. RAMZA is not an accredited e-invoicing service provider. Stock photos; screens are illustrations. Voiceover is AI-generated.
+
+#UAEBusiness #DubaiBusiness #EInvoicing #Ecommerce #Accounting #Reconciliation #AIAgent`,
+    },
+    {
+      id: "agent-building-one-payout",
+      title: "One payout. Five people. Six days.",
+      music: ["motivational-day-112790.mp3", 0.09],
+      segments: [
+        { say: `One payout. *Five* people. *Six* days. Watch it travel through a company at *month* end.` },
+        { say: `It lands in the *inbox.* Someone downloads the file, and *prints* it.` },
+        { say: `Down to *finance.* Four accountants check the *order,* the *fee,* the *VAT,* and the *invoice.* By hand.` },
+        { say: `Then the *auditor* checks it all *again,* and sends it back *up.*` },
+        { say: `And the owner waits for one answer. Did the *money* arrive?` },
+        { say: `Now, the *agent.* RAMZA reads the payout files in *Gmail,* matches each one to the *bank,* and checks every *invoice.*` },
+        { say: `Your team reviews only what it *flags.* And the owner sees the *answer,* on one screen.` },
+        { dark: true, say: `{${F.close_month}|${F.close_month.split(" ")[0]}}, on our own company's books. {*${n(F.close_credits)}*|${words(F.close_credits)}} bank credits. {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched.` },
+        { dark: true, say: `Give the agent {*${R.offer.free_trial.days} days.*|${words(R.offer.free_trial.days)} days.} Comment *AGENT,* and it closes last month for you, *free.*` },
+      ],
+      disclaimer: `The company and its people are a dramatization. Omnia is RAMZA's founding company and first user; figures from the live RAMZA app, ${F.as_of}. Screens are illustrations. AI voiceover.`,
+      caption: `One payout. Five people. Six days.
+
+At month end, a single payout email gets printed, checked by four accountants (order, fee, VAT, invoice), re-checked by the auditor, and sent back up. The owner waits for one answer: did the money arrive?
+
+RAMZA's agent reads the payout files in Gmail, matches each one to the bank, and checks every invoice. Your team reviews only what it flags.
+
+${F.close_month}, on our own books: ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched.
+
+${R.offer.free_trial.headline} Comment AGENT, or message us on WhatsApp.
+
+The company shown is a dramatization. Omnia is RAMZA's founding company and first user. Screens are illustrations. Voiceover is AI-generated.
+
+#UAEBusiness #DubaiBusiness #Accounting #Ecommerce #Reconciliation #Finance #AIAgent`,
+    },
+    {
       id: "agent-ct-meter",
       title: "The return was due. The meter is running.",
       music: ["inspired-ambient-141686.mp3", 0.12],
@@ -227,6 +321,80 @@ Comment RELIEF and we'll check if you qualify.
 General information from ${SBR.legal_basis}. RAMZA is not a registered tax agent; returns are filed by ${R.partner.filing_partner}. Screens are illustrations. Noor is RAMZA's AI presenter and the voiceover is AI-generated.
 
 #UAECorporateTax #SmallBusinessRelief #UAEBusiness #DubaiBusiness #SME`,
+    },
+    {
+      /* launch film (Skale-style grammar, ramza-director/direction.md "Launch-film grammar"): no caption
+         bar, the words are the picture; one accent (agent blue); own page, not RL. */
+      id: "launch-film",
+      title: "Meet RAMZA",
+      voice: "nPczCjzI2devNBz1zQrb", // Brian
+      music: ["the-upbeat-inspiring-corporate-142313.mp3", 0.12],
+      data: { ...EX, close_month: F.close_month, close_credits: F.close_credits, close_matched_pct: F.close_matched_pct },
+      segments: [
+        { say: `You're selling *more* than ever.` },
+        { dark: true, say: `Orders. Refunds. Payouts. Every single day.` },
+        { say: `But your books are still kept like it's {*1920.*|nineteen twenty.}` },
+        { dark: true, say: `By hand. Line by line. Gateway by gateway.` },
+        { say: `The store sold {*${EX.sales.replace(".00", "")}.*|${EX.saySales}.} The bank got {*${EX.payout.split(".")[0]}.*|${EX.sayPayout}.} Where did {*${EX.gap}*|${words(+EX.gap)}} go?` },
+        { dark: true, say: `Meet *RAMZA.*` },
+        { say: `An AI agent that closes your month, starting from the *bank.*` },
+        { say: `The fee. VAT on the fee. One refund. {${EX.orders}|${upper(words(EX.orders))}} orders. Every dirham, *found.*` },
+        { dark: true, say: `One Dubai brand. ${F.close_month.split(" ")[0]}. {*${n(F.close_credits)}*|${words(F.close_credits)}} bank credits. {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched by the agent.` },
+        { say: `And nothing posts to Zoho, until *you* approve.` },
+        { dark: true, say: `You sell. *RAMZA* closes the books. Free setup. Pay once it closes your month.` },
+      ],
+      disclaimer: `Worked example, illustrative figures. Proof: a Dubai e-commerce brand RAMZA was built inside, live RAMZA app, ${F.as_of}. Nothing posts to Zoho without your approval. AI voiceover.`,
+      caption: `Your store runs on AI. Your books still run like it's 1920.
+
+Meet RAMZA, an AI accountant that closes your month starting from the bank:
+1. Reads every bank line
+2. Matches it to the gateway payout, to the fils
+3. Books the fee, the VAT on the fee and the refunds
+4. Marks every order's invoice paid
+5. Posts to Zoho only when you approve
+
+One Dubai brand, ${F.close_month}: ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched by the agent.
+
+Free setup on your own transactions. Pay only once it closes your month. Comment CLOSE.
+
+Worked example, illustrative figures. AI voiceover.
+
+#UAEBusiness #DubaiBusiness #Ecommerce #Bookkeeping #AIAccounting #MonthEndClose`,
+    },
+    {
+      id: "agent-desk-one-payout",
+      title: "Watch an AI agent close one payout",
+      music: ["motivational-day-112790.mp3", 0.09],
+      segments: [
+        { say: `{*${EX.gap}*|${upper(words(+EX.gap))}} dirhams vanished from *one* payout. Watch an *AI* agent find every fils.` },
+        { say: `The gateway kept its *fee,* plus *VAT* on the fee. One *refund* went back to a customer. What's left is the *payout.*` },
+        { say: `By hand, that's every *report,* every *order,* typed into the *books.* For every *gateway.*` },
+        { say: `The agent starts at the *bank.* It reads the line, and finds the payout file that *matches* it, to the fils.` },
+        { say: `It splits the payout into {*${EX.orders}*|${words(EX.orders)}} orders, and marks each *invoice* paid.` },
+        { say: `Then it writes the *journal.* Bank. Fee. *VAT* on the fee. The refund. Debits equal *credits.*` },
+        { say: `Nothing posts until you *approve.* One tap, and it's in *Zoho.*` },
+        { dark: true, say: `One Dubai brand, ${F.close_month.split(" ")[0]}. {*${n(F.close_credits)}*|${words(F.close_credits)}} bank credits. {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched by the agent.` },
+        { dark: true, say: `Free setup on your own transactions. Pay only once it closes your month. Comment *CLOSE.*` },
+      ],
+      disclaimer: `Worked example, illustrative figures. Proof: a Dubai e-commerce brand RAMZA was built inside, live RAMZA app, ${F.as_of}. Nothing posts to Zoho without your approval. AI voiceover.`,
+      caption: `The bank shows AED ${EX.payout}. The store sold AED ${EX.sales}. Where did the rest go?
+
+The gateway kept its fee (${EX.fee}) plus VAT on the fee (${EX.vat}), and one refund (${EX.refund}) went back to a customer.
+
+Here is what RAMZA's agent does with that payout:
+1. Reads the bank line
+2. Finds the payout file that matches it, to the fils
+3. Splits it into ${EX.orders} orders and marks each invoice paid
+4. Writes the journal: bank, fee, VAT on fee, refund. Debits equal credits
+5. Waits for your approval, then posts to Zoho
+
+${F.close_month}, one Dubai e-commerce brand: ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched by the agent.
+
+${R.offer.free_trial.free_setup.headline} Comment CLOSE.
+
+Worked example with illustrative figures. Voiceover is AI-generated.
+
+#UAEBusiness #DubaiBusiness #Ecommerce #Accounting #Bookkeeping #Reconciliation #AIAgent`,
     },
   ];
 }

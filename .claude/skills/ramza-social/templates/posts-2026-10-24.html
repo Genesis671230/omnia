@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RAMZA posts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Urbanist:wght@500;600;700;800&display=block" rel="stylesheet">
+<style>
+/* RAMZA social, 4:5. Founder bar: safety not luxury. White + navy, ink text, hairlines,
+   indigo only small, lilac only on dark. No gradients, glows, blobs, icon bubbles, emoji. */
+:root{--navy:#0B1533;--night:#050B1F;--ink:#14131C;--slate:#5B6478;--mute:#8A92A6;--line:#E3E7F0;
+  --paper:#F6F7FA;--indigo:#4F35E8;--lilac:#B3A6FF;--red:#C2362B;--green:#1F7A4D;--blue:#2B3F8F}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#C9CED8;font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;gap:40px;padding:40px 0}
+[data-post]{display:flex;flex-direction:column;gap:40px}
+.s{width:1080px;height:1350px;position:relative;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.s.persona .hd{position:relative;z-index:2;background:#fff;padding-bottom:28px}
+.s.dark{background:var(--night);color:#fff}
+.s.navy{background:var(--navy);color:#fff}
+.disp{font-family:'Urbanist',sans-serif;letter-spacing:-0.035em;font-weight:700;line-height:.98}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* header + footer (HSM pattern: brand top-left, site top-right, contact strip bottom) */
+.hd{display:flex;justify-content:space-between;align-items:center;padding:56px 72px 0}
+.hd img{height:44px}
+.hd .r{font-size:22px;color:var(--slate);text-align:right;line-height:1.35}
+.dark .hd .r,.navy .hd .r{color:#9AA3BC}
+.ft{margin-top:auto;display:flex;align-items:center;gap:28px;padding:30px 72px 48px;border-top:1px solid var(--line);font-size:24px;color:var(--slate)}
+.dark .ft,.navy .ft{border-color:#1D2645;color:#9AA3BC}
+.ft .wa{display:flex;align-items:center;gap:12px;color:var(--ink);font-weight:500}
+.dark .ft .wa,.navy .ft .wa{color:#fff}
+.ft .wa img{width:28px;height:28px}
+.ft .pg{margin-left:auto;font-variant-numeric:tabular-nums}
+.body{padding:0 72px}
+.main{flex:1;display:flex;flex-direction:column;padding-bottom:64px;min-height:0}
+.main>.body:last-child{flex:1;display:flex;flex-direction:column}
+.push{margin-top:auto!important}
+
+.eyebrow{font-size:24px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--slate)}
+.dark .eyebrow,.navy .eyebrow{color:var(--lilac)}
+.h1{font-size:112px;color:var(--navy)}
+.h2{font-size:84px;color:var(--navy)}
+.h3{font-size:60px;color:var(--navy)}
+.dark .h1,.dark .h2,.dark .h3,.navy .h1,.navy .h2,.navy .h3{color:#fff}
+.accent{color:var(--blue)}
+.dark .accent,.navy .accent{color:var(--lilac)}
+.lead{font-size:37px;line-height:1.38;color:var(--slate)}
+.dark .lead,.navy .lead{color:#C4CAD9}
+.small{font-size:24px;color:var(--mute);line-height:1.45}
+.dark .small,.navy .small{color:#7F89A6}
+
+/* objects */
+.card{background:#fff;border:1px solid var(--line);border-radius:12px}
+.cal{width:340px;border:1.5px solid var(--navy);border-radius:10px;overflow:hidden;background:#fff;color:var(--navy)}
+.cal .top{background:var(--navy);color:#fff;font-size:26px;font-weight:600;letter-spacing:.14em;text-align:center;padding:14px 0}
+.cal .day{font-family:'Urbanist';font-weight:800;font-size:170px;text-align:center;line-height:1.05;letter-spacing:-.04em;padding-top:8px}
+.cal .yr{text-align:center;font-size:26px;color:var(--slate);padding:0 0 22px}
+.photo{position:relative;overflow:hidden}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:baseline;gap:28px;padding:40px 0;border-top:1px solid var(--line)}
+.dark .row,.navy .row{border-color:#1D2645}
+.row:last-child{border-bottom:1px solid var(--line)}
+.dark .row:last-child,.navy .row:last-child{border-color:#1D2645}
+.row .k{font-size:35px;color:var(--slate);flex:1;line-height:1.3}
+.dark .row .k,.navy .row .k{color:#C4CAD9}
+.row .v{font-family:'Urbanist';font-weight:700;font-size:66px;letter-spacing:-.02em;color:var(--navy);white-space:nowrap}
+.dark .row .v,.navy .row .v{color:#fff}
+.row .v.red{color:var(--red)}
+.step{display:flex;gap:34px;padding:42px 0;border-top:1px solid var(--line)}
+.step:last-child{border-bottom:1px solid var(--line)}
+.step .n{font-family:'Urbanist';font-weight:800;font-size:64px;color:var(--indigo);width:70px;line-height:1}
+.step .t{font-size:44px;font-weight:600;color:var(--navy);line-height:1.2}
+.step .d{font-size:31px;color:var(--slate);margin-top:10px;line-height:1.4}
+.tag{display:inline-block;font-size:20px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:8px 14px;border:1.5px solid currentColor;border-radius:6px}
+.btn{display:inline-flex;align-items:center;gap:16px;background:#fff;color:var(--navy);font-weight:600;font-size:32px;padding:24px 34px;border-radius:10px}
+.navy .btn,.dark .btn{background:#fff;color:var(--navy)}
+.kw{font-family:'IBM Plex Mono';font-weight:500;background:#fff;color:var(--navy);padding:4px 16px;border-radius:6px}
+.bank{font-family:'IBM Plex Mono';font-size:25px}
+.bank .ln{display:grid;grid-template-columns:150px 1fr 190px;gap:20px;padding:22px 28px;border-top:1px solid var(--line);align-items:center}
+.bank .ln:first-child{border-top:0}
+.bank .hdr{font-family:'IBM Plex Sans';font-size:20px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);background:var(--paper)}
+.bank .amt{text-align:right;color:var(--green)}
+.bank .who{color:var(--ink)}
+.flag{font-family:'IBM Plex Sans';font-size:20px;font-weight:600;color:var(--red);letter-spacing:.06em}
+.note{background:var(--paper);border-left:4px solid var(--navy);padding:26px 30px;font-size:26px;line-height:1.45;color:var(--ink);border-radius:0 8px 8px 0}
+.ai{position:absolute;left:72px;top:170px;z-index:2;background:rgba(5,11,31,.82);color:#fff;font-size:20px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:9px 14px;border-radius:6px}
+.notepad{background:#FFFDF6;border:1px solid #E9E4D4;border-radius:12px;padding:56px 60px;font-size:34px;line-height:1.55;color:#2A2A2A}
+.notepad .ttl{font-weight:600;font-size:40px;margin-bottom:22px}
+.notepad .ln{display:flex;justify-content:space-between;border-bottom:1px dashed #E1DAC5;padding:10px 0}
+.notepad .ln b{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const R = window.RULES, F = window.FACTS || {}, C = window.CONTACT || {};
+const BRAND = "../../../../public/ramza/brand/", PHOTO = "../../../../public/ramza/photos/",
+      LOGO = "../../../../public/ramza/logos/", PERSONA = "../../../../public/ramza/persona/";
+const n = (x) => Number(x).toLocaleString("en-US");
+const aed = (x) => "AED " + n(x);
+const aedM = (x) => "AED " + String(+(x / 1e6).toFixed(2)) + "m";
+const pct = (x) => Math.round(x * 100) + "%";
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const d = (iso) => { const [y, m, dd] = iso.split("-").map(Number); return { day: dd, mon: MON[m - 1], yr: y, full: `${dd} ${MON[m - 1]} ${y}` }; };
+const dubaiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const daysTo = (iso) => Math.round((Date.parse(iso) - Date.parse(dubaiToday())) / 864e5);
+
+const E = R.einvoicing, CT = R.ct, P = R.einvoicing.penalties;
+const asp = d(E.large.asp_by), live = d(E.large.go_live), aspS = d(E.sme.asp_by), liveS = d(E.sme.go_live);
+const ctDue = d(CT.deadlines[0].due), ctNext = CT.deadlines.find((x) => daysTo(x.due) > 0);
+const rescue = R.pricing.one_off.late_filing_rescue_aed;
+const sbr = CT.small_business_relief;
+
+const header = (dark) => `<div class="hd"><img src="${BRAND}${dark ? "ramza-lockup-white.png" : "ramza-lockup-ink.png"}"><div class="r">UAE · Accounting, books &amp; tax</div></div>`;
+const footer = (i, total, dark) => `<div class="ft">${C.whatsapp ? `<span class="wa"><img src="${LOGO}whatsapp.svg">${C.whatsapp}</span>` : ""}<span class="pg">${total > 1 ? `${i}/${total}` : ""}</span></div>`;
+const slide = (cls, inner, i, total) => `<section class="s ${cls}" data-slide>${header(/dark|navy/.test(cls))}<div class="main">${inner}</div>${footer(i, total, /dark|navy/.test(cls))}</section>`;
+const post = (id, slides, caption) => `<div data-post="${id}">${slides.map((s, i) => slide(s[0], s[1], i + 1, slides.length)).join("")}<template data-caption>${caption}</template></div>`;
+
+const posts = [];
+/* Friday 24 Oct 2026 — Tax free · Books · Accounting. No website on slides or captions (founder rule 2026-10-18). */
+const CTR = CT.rate, VR = R.vat, VAT = Math.round(VR.standard_rate * 100), LF = CT.late_filing_penalty;
+const disc = `RAMZA is not a registered tax agent. Returns are filed by our licensed partner, ${R.partner.filing_partner}.`;
+const extra = `<style>
+.mythq{font-family:'Urbanist';font-weight:800;font-size:96px;letter-spacing:-.04em;line-height:1;color:var(--navy)}
+.strike{position:relative;display:inline-block}
+.strike:after{content:"";position:absolute;left:-8px;right:-8px;top:52%;height:12px;background:var(--red);transform:rotate(-3deg);border-radius:6px}
+.hlm{background:linear-gradient(transparent 0,transparent 0);box-shadow:inset 0 -0.42em 0 #FFE14D}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.vs .c{border:1.5px solid var(--line);border-radius:12px;padding:36px 34px}
+.vs .c .k{font-size:22px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--slate)}
+.vs .c .v{font-family:'Urbanist';font-weight:800;font-size:120px;letter-spacing:-.04em;line-height:1;margin-top:14px;color:var(--navy)}
+.vs .c .d{font-size:28px;color:var(--slate);margin-top:10px;line-height:1.35}
+.vs .c.on{background:var(--navy);border-color:var(--navy)}.vs .c.on .k{color:var(--lilac)}.vs .c.on .v{color:#fff}.vs .c.on .d{color:#C4CAD9}
+.paperx{background:#FBFAF6;border:1px solid #E6E3DA;border-radius:6px;box-shadow:0 22px 40px -22px rgba(40,25,5,.45)}
+.stmt{font-family:'IBM Plex Mono';font-size:25px}
+.stmt .l{display:grid;grid-template-columns:120px 1fr 200px;gap:16px;padding:18px 28px;border-top:1px solid #E6E3DA;align-items:center}
+.stmt .l:first-child{border-top:0}
+.stmt .l .a{text-align:right}
+.stmt .l.y{background:#FFE14D66}
+.stmt .l .f{grid-column:1/-1;font-family:'IBM Plex Sans';font-size:20px;font-weight:600;letter-spacing:.06em;color:var(--red);margin-top:-6px}
+.jv{background:#ECF4E4;border:1px solid #B9D5A9;border-radius:6px;overflow:hidden;font-family:'IBM Plex Mono';font-size:30px}
+.jv .r{display:grid;grid-template-columns:1fr 190px 190px;padding:20px 30px;border-top:1px solid #B9D5A9}
+.jv .r span:nth-child(n+2){text-align:right}
+.jv .h{font-family:'IBM Plex Sans';font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:#4F6B4F;border-top:0;background:#F6FAF1}
+.jv .t{font-weight:600;color:var(--green)}
+.exg{position:absolute;right:72px;top:150px;font-size:20px;font-weight:700;letter-spacing:.12em;color:var(--navy);border:1.5px solid var(--line);padding:8px 14px;border-radius:6px;background:#fff}
+</style>`;
+
+/* 10 ─ "Dubai is tax-free." */
+posts.push(post("10-tax-free-myth", [
+  ["", `${extra}<div class="body" style="padding-top:60px">
+      <div class="eyebrow">UAE business tax · 2026</div>
+      <div class="mythq" style="margin-top:30px">“Dubai is<br><span class="strike">tax-free.</span>”</div>
+      <div class="h2 disp" style="margin-top:34px"><span class="accent">Your salary is.</span><br>Your company isn't.</div>
+    </div>
+    <div class="photo push" style="margin:50px 72px 0;height:400px;border-radius:12px"><img src="${PHOTO}bb-business-bay-dusk.jpg" style="object-position:50% 60%"></div>`],
+  ["", `<div class="body" style="padding-top:60px">
+      <div class="eyebrow">What a UAE company pays</div>
+      <div class="h2 disp" style="margin-top:22px">Two taxes.<br><span class="accent">One threshold to know.</span></div>
+      <div class="vs push" style="margin-top:50px">
+        <div class="c"><div class="k">Corporate tax</div><div class="v">0%</div><div class="d">on taxable income up to ${aed(CTR.zero_rate_up_to_aed)}</div></div>
+        <div class="c on"><div class="k">Corporate tax</div><div class="v">${Math.round(CTR.rate_above * 100)}%</div><div class="d">on taxable income above ${aed(CTR.zero_rate_up_to_aed)}</div></div>
+        <div class="c"><div class="k">VAT</div><div class="v">${VAT}%</div><div class="d">on most sales, once you're registered</div></div>
+        <div class="c"><div class="k">VAT registration</div><div class="v" style="font-size:76px;margin-top:34px">${aed(VR.registration.mandatory_over_aed)}</div><div class="d">taxable supplies a year makes it mandatory</div></div>
+      </div>
+      <p class="small" style="margin-top:26px">${CTR.legal_basis}. ${VR.legal_basis}.</p>
+    </div>`],
+  ["", `<div class="body" style="padding-top:60px">
+      <div class="eyebrow">The part people miss</div>
+      <div class="h2 disp" style="margin-top:22px">Even at <span class="accent">0%,</span><br>you still file.</div>
+      <div class="rows push" style="margin-top:40px">
+        <div class="row"><span class="k">Corporate tax return due</span><span class="v num">${CT.filing_months_after_period_end} months</span></div>
+        <div class="row"><span class="k">Late return, each month (first year)</span><span class="v num red">${aed(LF.months_1_12_aed)}</span></div>
+        <div class="row"><span class="k">Small Business Relief (≤ ${aedM(sbr.revenue_lte_aed)}) still needs a return</span><span class="v">${CT.sbr_must_still_file ? "Yes" : "Check"}</span></div>
+        <div class="row"><span class="k">E-invoicing live for smaller businesses</span><span class="v num">${liveS.full}</span></div>
+      </div>
+      <p class="small" style="margin-top:22px">Return due ${CT.filing_months_after_period_end} months after the tax period ends. ${LF.legal_basis}.</p>
+    </div>`],
+  ["navy", `<div class="body" style="padding-top:80px">
+      <div class="eyebrow">Tax-free salaries · taxed companies</div>
+      <div class="h2 disp" style="margin-top:24px">The return is only<br>as good as<br><span class="accent">the books behind it.</span></div>
+      <p class="lead" style="margin-top:40px;max-width:880px">${R.offer.free_trial.free_setup.headline}</p>
+      <div style="margin-top:54px;font-size:36px;color:#fff">Comment <span class="kw">TAX</span> for the checklist.</div>
+      <p class="small push" style="margin-top:40px">${disc}</p>
+    </div>`],
+], `"Dubai is tax-free." Your salary is. Your company isn't.
+
+UAE companies pay corporate tax: 0% on taxable income up to ${aed(CTR.zero_rate_up_to_aed)}, ${Math.round(CTR.rate_above * 100)}% above it. VAT is ${VAT}%, and registration is mandatory once taxable supplies pass ${aed(VR.registration.mandatory_over_aed)} a year.
+
+Even at 0% you still file a corporate tax return, ${CT.filing_months_after_period_end} months after your year ends. Small Business Relief still needs a return. E-invoicing goes live for smaller businesses on ${liveS.full}.
+
+Save this. Comment TAX for the checklist.
+
+Sources: ${CTR.legal_basis}; ${VR.legal_basis}; ${LF.legal_basis}. ${disc}
+
+#UAETax #CorporateTax #VAT #DubaiBusiness #UAEBusiness #SME`));
+
+/* 11 ─ Books: AED 1.55m in the bank, not in the books */
+posts.push(post("11-bank-not-books", [
+  ["", `<div class="body" style="padding-top:56px">
+      <div class="eyebrow">A Dubai e-commerce brand · ${F.close_month}</div>
+      <div class="h1 disp" style="margin-top:24px;font-size:104px"><span class="hlm">${aedM(F.bank_lines_not_in_zoho_aed)}</span><br>in the bank.<br><span class="accent">Not in the books.</span></div>
+      <div class="paperx stmt push" style="margin-top:46px">
+        <div class="l y"><span>02 SEP</span><span>TABBY PAYOUT</span><span class="a">4,180.20</span><span class="f">NOT IN THE BOOKS</span></div>
+        <div class="l y"><span>04 SEP</span><span>STRIPE PAYOUT</span><span class="a">9,412.37</span><span class="f">NOT IN THE BOOKS</span></div>
+        <div class="l y"><span>06 SEP</span><span>NETWORK CR 88213</span><span class="a">6,214.00</span><span class="f">NOT IN THE BOOKS</span></div>
+        <div class="l"><span>…</span><span>${n(F.bank_lines_not_in_zoho)} lines like these</span><span class="a"></span></div>
+      </div>
+      <p class="small" style="margin-top:22px">Real totals from the live RAMZA app, ${F.as_of}, for the brand RAMZA was built inside. Lines shown are examples.</p>
+    </div>`],
+  ["", `<div class="body" style="padding-top:60px">
+      <div class="eyebrow">Why the bank and the books drift</div>
+      <div class="h2 disp" style="margin-top:22px">Three reasons.<br><span class="accent">None of them is fraud.</span></div>
+      <div class="push" style="margin-top:40px">
+        <div class="step"><div class="n">1</div><div><div class="t">Payouts arrive net</div><div class="d">The gateway keeps its fee and ${VAT}% VAT on it before the money lands.</div></div></div>
+        <div class="step"><div class="n">2</div><div><div class="t">Refunds hide inside payouts</div><div class="d">A refund comes out of the next payout, not as its own bank line.</div></div></div>
+        <div class="step"><div class="n">3</div><div><div class="t">One bank name, many gateways</div><div class="d">Different gateways can settle under the same acquirer name.</div></div></div>
+      </div>
+    </div>`],
+  ["navy", `<div class="body" style="padding-top:70px">
+      <div class="eyebrow">Same brand · ${F.close_month}, with the RAMZA agent</div>
+      <div class="rows" style="margin-top:30px">
+        <div class="row"><span class="k">Bank credits</span><span class="v num">${n(F.close_credits)}</span></div>
+        <div class="row"><span class="k">Matched by the agent</span><span class="v num">${F.close_matched_pct}%</span></div>
+      </div>
+      <p class="lead" style="margin-top:40px">${R.offer.free_trial.free_setup.headline}</p>
+      <div style="margin-top:46px;font-size:36px;color:#fff">Comment <span class="kw">BOOKS</span>.</div>
+      <p class="small push" style="margin-top:36px">Nothing posts to your books without your approval.</p>
+    </div>`],
+], `${aedM(F.bank_lines_not_in_zoho_aed)} in the bank. Not in the books.
+
+That was ${n(F.bank_lines_not_in_zoho)} bank lines at a Dubai e-commerce brand (the one RAMZA was built inside). The reasons are ordinary: payouts land net of fees and VAT, refunds hide inside the next payout, and several gateways settle under one bank name.
+
+In ${F.close_month}, the RAMZA agent matched ${F.close_matched_pct}% of ${n(F.close_credits)} bank credits. Nothing posts without approval.
+
+Comment BOOKS. ${R.offer.free_trial.free_setup.headline}
+
+Figures: live RAMZA app, ${F.as_of}. Bank lines shown are examples.
+
+#Bookkeeping #Ecommerce #UAEBusiness #DubaiBusiness #Accounting`));
+
+/* 12 ─ Accounting: where did AED 587.63 go? (worked example, balances) */
+posts.push(post("12-where-did-587-go", [
+  ["", `<div class="exg">EXAMPLE</div><div class="body" style="padding-top:60px">
+      <div class="eyebrow">One payout · one store</div>
+      <div class="h1 disp" style="margin-top:24px;font-size:104px">Sales <span class="num">10,000.</span><br>Bank <span class="num">9,412.</span><br><span class="accent">Where did 587 go?</span></div>
+      <div class="vs push" style="margin-top:50px">
+        <div class="c"><div class="k">Store sales</div><div class="v num" style="font-size:80px">10,000.00</div><div class="d">12 orders</div></div>
+        <div class="c on"><div class="k">Bank received</div><div class="v num" style="font-size:80px">9,412.37</div><div class="d">one payout</div></div>
+      </div>
+    </div>`],
+  ["", `<div class="exg">EXAMPLE</div><div class="body" style="padding-top:60px">
+      <div class="eyebrow">The gap, line by line</div>
+      <div class="h2 disp" style="margin-top:22px">AED 587.63,<br><span class="accent">fully explained.</span></div>
+      <div class="rows push" style="margin-top:40px">
+        <div class="row"><span class="k">Gateway fee</span><span class="v num">330.00</span></div>
+        <div class="row"><span class="k">VAT on the fee (${VAT}%)</span><span class="v num">16.50</span></div>
+        <div class="row"><span class="k">Refund to a customer</span><span class="v num">241.13</span></div>
+        <div class="row"><span class="k"><b style="color:var(--navy)">Total gap</b></span><span class="v num red">587.63</span></div>
+      </div>
+    </div>`],
+  ["", `<div class="exg">EXAMPLE</div><div class="body" style="padding-top:60px">
+      <div class="eyebrow">The entry your accountant needs</div>
+      <div class="h2 disp" style="margin-top:22px">Debits <span class="accent">=</span> credits.</div>
+      <div class="jv push" style="margin-top:44px">
+        <div class="r h"><span>Account</span><span>Debit</span><span>Credit</span></div>
+        <div class="r"><span>Bank</span><span>9,412.37</span><span></span></div>
+        <div class="r"><span>Gateway fees</span><span>330.00</span><span></span></div>
+        <div class="r"><span>Input VAT ${VAT}%</span><span>16.50</span><span></span></div>
+        <div class="r"><span>Customer refunds</span><span>241.13</span><span></span></div>
+        <div class="r"><span>&nbsp;&nbsp;Gateway clearing</span><span></span><span>10,000.00</span></div>
+        <div class="r t"><span>Total</span><span>10,000.00</span><span>10,000.00</span></div>
+      </div>
+      <p class="small" style="margin-top:22px">The ${VAT}% VAT on the fee is input VAT: booked, it can be reclaimed.</p>
+    </div>`],
+  ["navy", `<div class="body" style="padding-top:80px">
+      <div class="eyebrow">Every payout, every gateway</div>
+      <div class="h2 disp" style="margin-top:24px">An AI agent writes<br>this entry.<br><span class="accent">You approve it.</span></div>
+      <p class="lead" style="margin-top:40px;max-width:880px">${R.offer.free_trial.free_setup.headline}</p>
+      <div style="margin-top:50px;font-size:36px;color:#fff">Comment <span class="kw">CLOSE</span>.</div>
+      <p class="small push" style="margin-top:40px">Worked example, illustrative figures. Nothing posts without your approval.</p>
+    </div>`],
+], `Sales 10,000. Bank 9,412.37. Where did AED 587.63 go?
+
+Gateway fee 330.00. VAT on the fee 16.50. One refund 241.13. Together: 587.63.
+
+The entry: Dr Bank 9,412.37, Dr Gateway fees 330.00, Dr Input VAT 16.50, Dr Customer refunds 241.13, Cr Gateway clearing 10,000.00. Booked, the VAT on fees is reclaimable input VAT.
+
+An AI agent can write this for every payout. You approve it. Comment CLOSE.
+
+Worked example with illustrative figures.
+
+#Accounting #Ecommerce #UAEVAT #Bookkeeping #DubaiBusiness`));
+
+document.getElementById("root").innerHTML = posts.join("");
+</script>
+</body>
+</html>

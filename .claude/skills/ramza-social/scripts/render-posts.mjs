@@ -3,12 +3,12 @@
  * The page receives window.RULES (config/rules.json), window.FACTS (facts.json next
  * to the page) and window.CONTACT (WhatsApp number from the repo .env) before it runs.
  * Slides are written as <outDir>/<post>/slide-N.png plus caption.txt from data-caption. */
-import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
+const { chromium } = createRequire(path.resolve(here, "../../ramza-daily-video/package.json"))("playwright");
 const repo = path.resolve(here, "../../../..");
 const [html, outDir, only] = process.argv.slice(2);
 if (!html || !outDir) { console.error("usage: render-posts.mjs posts.html outDir [postId]"); process.exit(1); }

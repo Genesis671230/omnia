@@ -1,5 +1,5 @@
 /* Frame for every RAMZA Corporate Tax page: fonts/tokens (RamzaShell),
-   first-party attribution, Meta Pixel, the nav and the footer. */
+   first-party attribution, the nav and the footer. */
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -9,7 +9,6 @@ import { CT_MORE, CT_NAV, CT_PENALTY_LINKS, whatsappHref } from "@/lib/ramza/ct-
 import { CT_LEARN } from "@/lib/ramza/ct-learn";
 import { RAMZA_EMAIL, RAMZA_LEGAL_LINE } from "@/lib/ramza/site";
 import { CtNav } from "./nav";
-import { Pixels } from "./pixels";
 import { WhatsAppLink } from "./tracked";
 import { ct } from "./brand";
 import { RamzaMark } from "./mark";
@@ -20,7 +19,6 @@ export function CtSiteFrame({ children }: { children: ReactNode }) {
   return (
     <RamzaShell>
       <AttributionInit />
-      <Pixels />
       {/* One white canvas; the home hero and dark islands carry the navy brand. */}
       <div className="relative bg-[#FFFFFF] font-[family-name:var(--font-plex)]">
         <CtNav whatsappHref={wa} />

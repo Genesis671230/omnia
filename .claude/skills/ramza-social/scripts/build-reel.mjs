@@ -35,12 +35,12 @@ const dur = (f) => +sh(`ffprobe -v error -show_entries format=duration -of csv=p
 
 // 1. voice
 for (const [i, s] of reel.segments.entries()) {
-  const key = crypto.createHash("sha1").update(VOICE + s.say).digest("hex").slice(0, 10);
+  const key = crypto.createHash("sha1").update(VOICE + s.say.replace(/\bVAT\b/g, "vat")).digest("hex").slice(0, 10);
   s.vo = `${dir}/vo/${i}-${key}.mp3`;
   if (!fs.existsSync(s.vo)) {
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE}?output_format=mp3_44100_128`, {
       method: "POST", headers: { "xi-api-key": env.ELEVEN_LABS_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ text: s.say, model_id: "eleven_multilingual_v2",
+      body: JSON.stringify({ text: s.say.replace(/\bVAT\b/g, "vat"), model_id: "eleven_multilingual_v2",
         voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true } }),
     });
     if (!r.ok) { console.error("ElevenLabs", r.status, await r.text()); process.exit(1); }

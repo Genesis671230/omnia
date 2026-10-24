@@ -1,0 +1,539 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* One continuous shot: a cutaway company building (the "dollhouse") under segments 0-6, whose
+     scenes are transparent so RL's wipes never show; the camera (#world) travels floor to floor. */
+  .scene.film{background:transparent}
+  #film{position:absolute;inset:0;z-index:1;overflow:hidden;background:#D6E2F5}
+  #sky{position:absolute;left:-200px;top:0;width:1480px;height:5200px;will-change:transform}
+  #shake{position:absolute;inset:0}
+  #world{position:absolute;left:0;top:0;width:1080px;height:3400px;will-change:transform}
+  #world svg,#sky svg{position:absolute;left:0;top:0;overflow:visible}
+  #world text{font-family:'IBM Plex Sans';font-weight:600}
+  #capp{position:absolute;left:0;right:0;top:1340px;bottom:0;background:#fff;border-top:1px solid #E3E7F0}
+  #ftag{position:absolute;right:72px;top:400px;z-index:4;background:#fff;color:var(--navy);font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;border-radius:6px;border:1px solid var(--line)}
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:150px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+  .hx{font-size:96px;color:#fff}
+</style></head>
+<body class="safe"><div class="stage">
+<div id="film">
+  <div id="sky"></div>
+  <div id="shake"><div id="world"></div></div>
+  <div id="capp"></div>
+  <div id="ftag">Dramatization</div>
+</div>
+
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+
+<!-- 7 proof -->
+<section class="scene night">
+  <div class="body"><div class="eyebrow" id="e_e"></div>
+    <div class="disp hx" style="margin-top:20px"><span class="line"><span>Our own books.</span></span></div>
+    <div style="margin-top:60px">
+      <div class="stat" id="e_s1"><span class="k">Bank credits</span><span class="v num" id="e_v1">0</span></div>
+      <div class="stat" id="e_s2"><span class="k">Matched to payouts<br>and orders</span><span class="v num" id="e_v2">0%</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:36px;line-height:1.45">Omnia is RAMZA's founding company and first user.<br>Figures from the live RAMZA app.</div>
+  </div>
+</section>
+
+<!-- 8 CTA -->
+<section class="scene navy">
+  <div class="agent" id="f_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="f_kw" style="margin-top:30px"><span class="kw">AGENT</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px" id="f_sub"></div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const F = window.FACTS, R = window.RULES;
+let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+/* ================= palette + geometry ================= */
+const C = { navy: "#0B1533", frame: "#1B2A55", slab: "#24366B", blue: "#3A55E6", green: "#1F7A4D", red: "#C2362B", amber: "#E0A100",
+  desk: "#F4F7FC", deskEdge: "#CBD5E6", deskFront: "#B7C4DD", line: "#CBD5E6", ink: "#14131C" };
+const FT = [600, 1240, 1880, 2520];           // floor tops (ceiling slab); each floor is 640 tall
+const ROOM = ["#E7EEF9", "#E4EFEA", "#ECEAF6", "#E3EBF5"];
+const DT = FT.map((t) => t + 470);           // desk-top line per floor
+const BOT = 3160;
+
+/* ================= cartoon people ================= */
+const MO = { sad: "M-12,-138 Q0,-147 12,-138", flat: "M-10,-142 L10,-142" };
+const BW = { sad: ["M-33,-198 L-12,-205", "M12,-205 L33,-198"], calm: ["M-33,-203 L-12,-204", "M12,-204 L33,-203"], up: ["M-33,-210 L-12,-214", "M12,-214 L33,-210"] };
+function hair(p) {
+  const h = p.hair;
+  switch (p.style) {
+    case "hijab": return { back: `<circle cx="0" cy="-168" r="70" fill="${h}"/>`, front:
+      `<path d="M-60,-160 Q-62,-98 0,-98 Q62,-98 60,-160 Q56,-122 0,-120 Q-56,-122 -60,-160 Z" fill="${h}"/><path d="M-58,-176 Q-56,-238 0,-238 Q56,-238 58,-176 Q40,-214 0,-214 Q-40,-214 -58,-176 Z" fill="${h}"/>`, ears: false };
+    case "long": return { back: `<path d="M-64,-182 Q-68,-86 -46,-78 L46,-78 Q68,-86 64,-182 Z" fill="${h}"/>`, front:
+      `<path d="M-58,-170 Q-62,-236 0,-236 Q62,-236 58,-170 Q54,-212 4,-214 Q-26,-206 -40,-188 Q-50,-180 -58,-170 Z" fill="${h}"/>`, ears: false };
+    case "curly": return { back: "", front: Array.from({ length: 9 }, (_, k) => { const a = Math.PI * (1.05 + k * 0.1125); return `<circle cx="${(Math.cos(a) * 54).toFixed(1)}" cy="${(-176 + Math.sin(a) * 54).toFixed(1)}" r="19" fill="${h}"/>`; }).join(""), ears: true };
+    case "bun": return { back: `<circle cx="0" cy="-238" r="24" fill="${h}"/>`, front:
+      `<path d="M-57,-172 Q-60,-232 0,-232 Q60,-232 57,-172 Q50,-208 0,-210 Q-50,-208 -57,-172 Z" fill="${h}"/>`, ears: true };
+    default: return { back: "", front:
+      `<path d="M-57,-176 Q-59,-234 0,-234 Q59,-234 57,-176 Q51,-208 18,-210 Q-12,-198 -57,-176 Z" fill="${h}"/>`, ears: true };
+  }
+}
+function person(p) {
+  const hr = hair(p), ears = hr.ears ? `<circle cx="-55" cy="-166" r="12" fill="${p.skin}"/><circle cx="55" cy="-166" r="12" fill="${p.skin}"/>` : "";
+  const brow = p.style === "hijab" ? "#2A1E18" : p.hair;
+  const eye = (x) => `<g class="eye"><ellipse cx="${x}" cy="-172" rx="12" ry="14" fill="#fff"/><g class="pu"><circle cx="${x}" cy="-170" r="7" fill="#14131C"/><circle cx="${x + 2.5}" cy="-173" r="2.2" fill="#fff"/></g></g>`;
+  return `<g class="pp">
+    <g class="bd"><path d="M-62,14 L-62,-66 Q-62,-112 -16,-112 L16,-112 Q62,-112 62,-66 L62,14 Z" fill="${p.shirt}"/>
+      <path d="M0,14 L0,-112 L16,-112 Q62,-112 62,-66 L62,14 Z" fill="#000" fill-opacity=".07"/>
+      ${p.tie ? `<path d="M-20,-112 L0,-86 L20,-112 Z" fill="#fff"/><path d="M-5,-108 L5,-108 L8,-62 L0,-52 L-8,-62 Z" fill="${p.tie}"/>` : `<path d="M-20,-112 L0,-88 L20,-112 Z" fill="#fff" fill-opacity=".9"/>`}</g>
+    <rect x="-14" y="-128" width="28" height="22" fill="${p.skin}"/>
+    <g class="hd">${hr.back}${ears}<circle cx="0" cy="-170" r="56" fill="${p.skin}"/>${hr.front}
+      ${p.beard ? `<path d="M-50,-168 Q-48,-110 0,-108 Q48,-110 50,-168 Q42,-134 0,-132 Q-42,-134 -50,-168 Z" fill="${p.hair}"/><path d="M-16,-144 Q0,-152 16,-144 L14,-138 Q0,-144 -14,-138 Z" fill="${p.hair}"/>` : ""}
+      <circle cx="-34" cy="-146" r="9" fill="#E2766A" fill-opacity=".28"/><circle cx="34" cy="-146" r="9" fill="#E2766A" fill-opacity=".28"/>
+      ${eye(-20)}${eye(20)}
+      ${p.glasses ? `<g fill="none" stroke="#14131C" stroke-width="3.5"><circle cx="-20" cy="-171" r="17"/><circle cx="20" cy="-171" r="17"/><path d="M-3,-172 L3,-172"/></g>` : ""}
+      <path class="bl" d="${BW.sad[0]}" stroke="${brow}" stroke-width="5.5" stroke-linecap="round"/>
+      <path class="br" d="${BW.sad[1]}" stroke="${brow}" stroke-width="5.5" stroke-linecap="round"/>
+      <path class="mo" d="${MO.sad}" fill="none" stroke="#6B2E25" stroke-width="4.5" stroke-linecap="round"/>
+      <path class="ms" d="M-17,-146 Q0,-122 17,-146 Z" fill="#6B2E25" opacity="0"/></g>
+    <g class="al"><line x1="-50" y1="-96" x2="-80" y2="-12" stroke="${p.shirt}" stroke-width="26" stroke-linecap="round"/><circle cx="-80" cy="-12" r="13" fill="${p.skin}"/></g>
+    <g class="ar"><line x1="50" y1="-96" x2="80" y2="-12" stroke="${p.shirt}" stroke-width="26" stroke-linecap="round"/><circle cx="80" cy="-12" r="13" fill="${p.skin}"/>${p.hold || ""}</g>
+  </g>`;
+}
+const deskG = (x0, x1, y) => `<rect x="${x0}" y="${y - 6}" width="${x1 - x0}" height="16" rx="4" fill="${C.desk}"/><rect x="${x0}" y="${y + 10}" width="${x1 - x0}" height="5" fill="${C.deskEdge}"/>
+  <rect x="${x0 + 14}" y="${y + 15}" width="${x1 - x0 - 28}" height="140" fill="${C.deskFront}"/>`;
+const stack = (x, y, cls) => `<g transform="translate(${x},${y})"><g class="stk ${cls || ""}">${Array.from({ length: 7 }, (_, k) => `<rect x="${-36 + (k % 2) * 3}" y="${-10 - k * 9}" width="70" height="9" rx="1.5" fill="#fff" stroke="${C.line}" stroke-width="1.5"/>`).join("")}</g></g>`;
+const plaque = (x, y, t, id) => `<g id="${id}"><rect x="${x}" y="${y}" width="${t.length * 17 + 44}" height="46" rx="6" fill="${C.navy}"/><text x="${x + 22}" y="${y + 31}" font-size="22" letter-spacing="4" fill="#fff">${t}</text>
+  <g class="badge" opacity="0" transform="translate(${x + t.length * 17 + 74},${y + 23})"><circle r="22" fill="${C.green}"/><path d="M-10,0 L-3,7 L10,-7" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g>`;
+const clock = (cx, cy, r, id) => `<g id="${id}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="${C.navy}" stroke-width="7"/>
+  ${Array.from({ length: 12 }, (_, k) => `<line x1="${cx}" y1="${cy - r + 10}" x2="${cx}" y2="${cy - r + (k % 3 ? 16 : 20)}" stroke="${C.navy}" stroke-width="${k % 3 ? 2.5 : 4}" transform="rotate(${k * 30} ${cx} ${cy})"/>`).join("")}
+  <line class="hh" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - r * 0.5}" stroke="${C.navy}" stroke-width="6" stroke-linecap="round"/>
+  <line class="mh" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - r * 0.75}" stroke="${C.red}" stroke-width="4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="5" fill="${C.navy}"/></g>`;
+const plant = (x, y, s = 1) => `<g transform="translate(${x},${y}) scale(${s})"><path d="M0,-40 C-30,-80 -40,-120 -10,-150 C-6,-110 -2,-80 0,-40Z" fill="#3E8A68"/><path d="M0,-40 C26,-90 46,-110 30,-160 C14,-120 6,-80 0,-40Z" fill="#2F7556"/><path d="M0,-40 C-6,-90 4,-140 4,-180 C14,-130 10,-90 0,-40Z" fill="#4C9C78"/><path d="M-26,-40 L26,-40 L20,0 L-20,0 Z" fill="${C.navy}"/></g>`;
+const monitor = (x, y, id) => `<g transform="translate(${x},${y})"><rect x="-8" y="0" width="16" height="44" fill="${C.frame}"/><rect x="-40" y="40" width="80" height="8" rx="3" fill="${C.frame}"/>
+  <rect x="-86" y="-104" width="172" height="110" rx="10" fill="${C.frame}"/><rect id="${id}" x="-76" y="-94" width="152" height="90" rx="5" fill="#2D3E70"/><g id="${id}c"></g></g>`;
+
+const P = {
+  asst: { skin: "#E7B994", hair: "#2B1D14", style: "bun", shirt: "#5B7FB8" },
+  a1: { skin: "#C68B62", hair: "#46577F", style: "hijab", shirt: "#2E3B5E" },
+  a2: { skin: "#8D5A3B", hair: "#1E1A18", style: "short", beard: true, shirt: "#4F8A72" },
+  a3: { skin: "#F1C9A5", hair: "#3A2418", style: "long", shirt: "#C0634F" },
+  a4: { skin: "#B07850", hair: "#2B1D14", style: "curly", glasses: true, shirt: "#6E62B5" },
+  aud: { skin: "#E2B48C", hair: "#8A8F99", style: "short", glasses: true, shirt: "#2F3A57", tie: "#8C2F27",
+    hold: `<g class="stampTool"><rect x="64" y="-60" width="32" height="34" rx="6" fill="${"#8C2F27"}"/><rect x="58" y="-30" width="44" height="14" rx="3" fill="#14131C"/></g>` },
+  own: { skin: "#A86F4C", hair: "#1E1A18", style: "short", beard: true, shirt: "#22305A", tie: "#3A55E6" },
+};
+const AX = [200, 375, 550, 725];
+
+/* ================= the building ================= */
+function skyline() {
+  const far = [], near = [];
+  for (let x = 0; x < 1480; x += 70 + Math.round(rnd() * 40)) far.push(`<rect x="${x}" y="${900 - rnd() * 600}" width="${60 + rnd() * 50}" height="3200" fill="#BCCBE6"/>`);
+  for (let x = 20; x < 1480; x += 110 + Math.round(rnd() * 60)) near.push(`<rect x="${x}" y="${1150 - rnd() * 500}" width="${80 + rnd() * 60}" height="3200" fill="#A7B8DA"/>`);
+  return `<svg width="1480" height="5200" viewBox="0 0 1480 5200">
+    <circle cx="1180" cy="700" r="80" fill="#F2C14E" class="sun"/>
+    ${[[160, 520], [560, 380], [980, 560]].map(([x, y]) => `<g transform="translate(${x},${y})" class="cloud"><rect x="-90" y="-26" width="180" height="52" rx="26" fill="#fff"/><circle cx="-20" cy="-30" r="38" fill="#fff"/><circle cx="30" cy="-20" r="30" fill="#fff"/></g>`).join("")}
+    <path d="M740,120 L756,700 L724,700 Z" fill="#BCCBE6"/>
+    ${far.join("")}${near.join("")}</svg>`;
+}
+function building() {
+  const rooms = FT.map((t, i) => `<rect x="110" y="${t}" width="780" height="640" fill="${ROOM[i]}"/>
+      <rect x="110" y="${t + 560}" width="780" height="80" fill="#000" fill-opacity=".05"/>
+      <rect x="90" y="${t - 14}" width="900" height="30" fill="${C.slab}"/>`).join("");
+  const tube = `<rect x="912" y="470" width="66" height="2660" rx="20" fill="#E9EFF9" stroke="${C.frame}" stroke-width="6"/>
+    <path d="M896,470 L994,470 L978,540 L912,540 Z" fill="${C.frame}"/>
+    ${FT.map((t) => `<rect x="905" y="${t + 120}" width="80" height="8" fill="${C.frame}" fill-opacity=".35"/>`).join("")}`;
+  // floor 1: inbox
+  const f1 = `${plaque(130, 640, "INBOX", "pl0")}${clock(820, 740, 52, "ck0")}
+    <rect x="150" y="${FT[1] - 14}" width="80" height="30" fill="#0B1533"/>
+    <rect x="240" y="${DT[0] + 30}" width="150" height="140" fill="${C.deskFront}"/><rect x="232" y="${DT[0] + 20}" width="166" height="14" rx="3" fill="${C.desk}"/>
+    <g id="printer"><rect x="255" y="${DT[0] - 50}" width="120" height="70" rx="10" fill="#DDE3EE"/><rect x="255" y="${DT[0] - 50}" width="120" height="22" rx="8" fill="#C3CCDD"/><rect x="275" y="${DT[0] - 6}" width="80" height="8" rx="2" fill="#14131C"/><circle cx="355" cy="${DT[0] - 16}" r="5" fill="${C.green}"/></g>
+    ${person(P.asst).replace('<g class="pp">', `<g class="pp" id="asst" transform="translate(560,${DT[0]})">`)}
+    ${monitor(735, DT[0] - 48, "m0")}
+    <g transform="translate(0,0)">${deskG(470, 840, DT[0])}</g>
+    ${plant(860, FT[1] - 16, 0.9)}`;
+  // floor 2: finance
+  const f2 = `${plaque(130, 1280, "FINANCE", "pl1")}${clock(820, 1350, 46, "ck1")}
+    <g id="scr1"><rect x="330" y="1290" width="400" height="150" rx="10" fill="${C.frame}"/><rect x="342" y="1302" width="376" height="126" rx="5" fill="#2D3E70" class="sb"/>
+      <g class="sc" opacity="0"><text x="362" y="1340" font-size="20" letter-spacing="2" fill="#5B6478">FLAGGED FOR REVIEW</text>
+      <text x="362" y="1385" font-size="22" fill="#14131C" style="font-weight:500">COD remittance · short</text>
+      <rect class="fp" x="600" y="1364" width="104" height="32" rx="16" fill="#FFF3DC"/><text x="652" y="1386" text-anchor="middle" font-size="19" fill="#8A5A00">Review</text></g></g>
+    ${["a1", "a2", "a3", "a4"].map((k, i) => person(P[k]).replace('<g class="pp">', `<g class="pp acc" id="${k}" transform="translate(${AX[i]},${DT[1]})">`)).join("")}
+    ${deskG(110, 800, DT[1])}
+    ${AX.map((x, i) => stack(x - 70, DT[1] - 6, `s${i}`)).join("")}
+    ${AX.map((x, i) => `<g class="role" id="role${i}" opacity="0"><rect x="${x - 62}" y="${DT[1] - 330}" width="124" height="42" rx="8" fill="${C.blue}"/><text x="${x}" y="${DT[1] - 302}" text-anchor="middle" font-size="20" letter-spacing="3" fill="#fff">${["ORDER", "FEE", "VAT", "INVOICE"][i]}</text></g>`).join("")}
+    <rect x="830" y="${FT[2] - 14}" width="60" height="30" fill="#0B1533"/>`;
+  // floor 3: audit
+  const f3 = `${plaque(130, 1920, "AUDIT", "pl2")}
+    <g>${[0, 1].map((k) => `<rect x="${140 + k * 92}" y="${DT[2] - 120}" width="84" height="${BOT - 0}" fill="#C6D0E3"/>`).join("")}</g>
+    <rect x="130" y="${DT[2] - 140}" width="200" height="20" fill="#B4C0D8"/>
+    ${[0, 1, 2].map((k) => `<rect x="${150 + (k % 2) * 92}" y="${DT[2] - 100 + k * 50}" width="64" height="10" rx="5" fill="#8C99B5"/>`).join("")}
+    <rect x="${780}" y="${DT[2] - 20}" width="120" height="16" rx="4" fill="${C.desk}"/><rect x="790" y="${DT[2] - 4}" width="100" height="160" fill="${C.deskFront}"/>
+    <path d="M800,${DT[2] - 20} L800,${DT[2] - 60} L880,${DT[2] - 60} L880,${DT[2] - 20}" fill="none" stroke="${C.frame}" stroke-width="5"/>
+    <rect x="880" y="${DT[2] - 140}" width="40" height="24" fill="${C.frame}"/>
+    ${person(P.aud).replace('<g class="pp">', `<g class="pp" id="aud" transform="translate(470,${DT[2]})">`)}
+    ${deskG(330, 700, DT[2])}
+    ${plant(740, FT[3] - 16, 1)}`;
+  // floor 4: owner
+  const f4 = `${plaque(130, 2560, "OWNER", "pl3")}
+    <g id="win4"><rect x="150" y="2630" width="430" height="280" rx="8" fill="#fff"/><rect class="wsky" x="164" y="2644" width="402" height="252" fill="#CFDCF2"/>
+      ${[[180, 120], [240, 180], [300, 90], [350, 210], [420, 140], [480, 170], [530, 100]].map(([x, h]) => `<rect class="wtw" x="${x}" y="${2896 - h}" width="44" height="${h}" fill="#9FB0D0"/>`).join("")}
+      <rect x="361" y="2644" width="8" height="252" fill="#fff"/></g>
+    <g id="cal4"><rect x="640" y="2610" width="150" height="150" rx="8" fill="#fff" stroke="${C.line}" stroke-width="2"/><rect x="640" y="2610" width="150" height="40" rx="8" fill="${C.red}"/><rect x="640" y="2636" width="150" height="14" fill="${C.red}"/>
+      <text x="715" y="2638" text-anchor="middle" font-size="17" letter-spacing="2" fill="#fff">MONTH END</text><text class="cd" x="715" y="2730" text-anchor="middle" font-size="56" fill="${C.navy}" style="font-family:Urbanist;font-weight:800">DAY 1</text></g>
+    ${clock(845, 2680, 44, "ck3")}
+    <g id="tv"><rect x="620" y="2790" width="260" height="150" rx="10" fill="${C.frame}"/><rect x="632" y="2802" width="236" height="126" rx="5" fill="#2D3E70"/>
+      <g class="tc" opacity="0"><rect x="632" y="2802" width="236" height="126" rx="5" fill="#fff"/><text x="652" y="2838" font-size="18" letter-spacing="2" fill="#5B6478">BANK = BOOKS</text>
+      <rect x="652" y="2856" width="128" height="36" rx="18" fill="#E3F4EA"/><text x="716" y="2881" text-anchor="middle" font-size="21" fill="${C.green}">Matched</text>
+      <g transform="translate(830,2874)"><circle r="20" fill="${C.green}"/><path d="M-9,0 L-3,6 L9,-7" stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g></g>
+    ${person(P.own).replace('<g class="pp">', `<g class="pp" id="own" transform="translate(370,${DT[3]})">`)}
+    ${deskG(200, 580, DT[3])}
+    <g id="phone"><rect x="470" y="${DT[3] - 34}" width="34" height="30" rx="5" fill="${C.navy}"/></g>
+    <g id="bub" opacity="0"><path d="M460,2700 L640,2700 Q660,2700 660,2720 L660,2770 Q660,2790 640,2790 L500,2790 L470,2820 L478,2790 L460,2790 Q440,2790 440,2770 L440,2720 Q440,2700 460,2700 Z" fill="#fff" stroke="${C.line}" stroke-width="2"/>
+      <text x="550" y="2757" text-anchor="middle" font-size="28" fill="${C.navy}" style="font-family:Urbanist;font-weight:800">Money in?</text></g>`;
+  const roof = `<rect x="70" y="560" width="940" height="44" fill="${C.frame}"/>
+    <g id="dish" transform="translate(220,560)"><rect x="-6" y="-70" width="12" height="70" fill="${C.frame}"/><path d="M-70,-130 Q0,-40 70,-130 Z" fill="#DDE3EE" stroke="${C.frame}" stroke-width="6"/><line x1="0" y1="-90" x2="0" y2="-140" stroke="${C.frame}" stroke-width="5"/><circle cx="0" cy="-144" r="8" fill="${C.red}"/></g>
+    <g id="sign"><rect x="370" y="398" width="8" height="162" fill="${C.frame}"/><rect x="702" y="398" width="8" height="162" fill="${C.frame}"/>
+      <rect x="330" y="400" width="420" height="96" rx="10" fill="${C.navy}"/><text x="540" y="462" text-anchor="middle" font-size="40" letter-spacing="8" fill="#fff" style="font-family:Urbanist;font-weight:800">YOUR COMPANY</text></g>
+    <g id="days" opacity="0"><rect x="640" y="356" width="150" height="56" rx="8" fill="${C.red}"/><text x="715" y="394" text-anchor="middle" font-size="30" fill="#fff" style="font-family:Urbanist;font-weight:800">6 DAYS</text></g>`;
+  const dims = FT.map((t, i) => `<rect class="dim" id="dim${i}" x="110" y="${t + 16}" width="780" height="610" fill="${C.navy}" opacity="0"/>
+     <rect class="scan" id="scan${i}" x="110" y="${t + 300}" width="790" height="6" fill="${C.blue}" opacity="0"/>`).join("");
+  const facade = (side) => {
+    const x0 = side ? 540 : 90, cells = [];
+    for (const [i, t] of FT.entries()) for (let k = 0; k < 2; k++) cells.push(`<rect class="fw fw${i}${side}${k}" x="${x0 + 40 + k * 215}" y="${t + 120}" width="170" height="380" rx="8" fill="#3A4C82"/>`);
+    return `<g id="fac${side}"><rect x="${x0}" y="580" width="450" height="${BOT - 580}" fill="${C.frame}"/>${cells.join("")}</g>`;
+  };
+  return `<svg width="1080" height="3400" viewBox="0 0 1080 3400">
+    <rect x="70" y="580" width="940" height="${BOT - 560}" fill="${C.frame}"/>
+    ${rooms}${tube}${f1}${f2}${f3}${f4}
+    <rect x="-1500" y="${BOT}" width="4080" height="600" fill="#9AA6BF"/><rect x="-1500" y="${BOT}" width="4080" height="16" fill="${C.frame}"/>
+    ${roof}${dims}
+    <g id="env" opacity="0"><rect x="-60" y="-40" width="120" height="80" rx="6" fill="#fff" stroke="${C.frame}" stroke-width="4"/><path d="M-58,-36 L0,8 L58,-36" fill="none" stroke="${C.frame}" stroke-width="4"/>
+      <rect x="-48" y="44" width="96" height="30" rx="6" fill="${C.blue}"/><text x="0" y="65" text-anchor="middle" font-size="17" letter-spacing="2" fill="#fff">PAYOUT</text></g>
+    <g id="card" opacity="0"><rect x="-48" y="-62" width="96" height="124" rx="6" fill="#fff" stroke="${C.line}" stroke-width="2.5"/><rect x="-48" y="-62" width="96" height="22" rx="6" fill="${C.blue}"/><rect x="-48" y="-48" width="96" height="8" fill="${C.blue}"/>
+      ${[0, 1, 2, 3].map((k) => `<rect class="cb" x="-38" y="${-30 + k * 22}" width="15" height="15" rx="3" fill="#fff" stroke="#9AA6BF" stroke-width="2"/><rect x="-16" y="${-25 + k * 22}" width="${[50, 40, 46, 36][k]}" height="6" rx="3" fill="#D5DCE8"/>
+        <path class="ct${k}" d="M-35,${-23 + k * 22} L-31,${-18 + k * 22} L-25,${-27 + k * 22}" stroke="${C.green}" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
+      <g class="rc" opacity="0" transform="rotate(-14)"><rect x="-52" y="-16" width="104" height="34" rx="5" fill="#fff" fill-opacity=".85" stroke="${C.red}" stroke-width="4"/><text x="0" y="8" text-anchor="middle" font-size="18" letter-spacing="1" fill="${C.red}" style="font-weight:700">RE-CHECK</text></g></g>
+    <g id="cap" opacity="0"><rect x="-26" y="-40" width="52" height="80" rx="20" fill="#8A92A6"/><rect x="-26" y="-6" width="52" height="10" fill="#6E778D"/></g>
+    <g id="agcap" opacity="0"><rect x="-28" y="-28" width="56" height="56" rx="19" fill="${C.blue}"/><rect x="-11" y="-12" width="8" height="18" rx="4" fill="#fff"/><rect x="3" y="-12" width="8" height="18" rx="4" fill="#fff"/></g>
+    <g id="agw" transform="translate(810,242)"><g id="agi">${KIT.body("#000").replace("<svg ", '<svg width="270" height="337" ')}</g></g>
+    ${facade(0)}${facade(1)}
+  </svg>`;
+}
+$("#sky").innerHTML = skyline();
+$("#world").innerHTML = building();
+
+/* ================= motion helpers ================= */
+const W = $("#world"), SKY = $("#sky");
+function cam(t, cx, cy, s, dur = 0.9, ease = "power3.inOut") {
+  const x = 540 - s * cx, y = 880 - s * cy;
+  const v = { x, y, scale: s, transformOrigin: "0 0" }, sv = { x: x * 0.15 - 100, y: y * 0.18 - 300 };
+  if (!dur) { tl.set(W, v, t); tl.set(SKY, sv, t); }
+  else { tl.to(W, { ...v, duration: dur, ease }, t); tl.to(SKY, { ...sv, duration: dur, ease }, t); }
+}
+const pp = (id) => document.getElementById(id);
+const pupils = (ids) => ids.flatMap((id) => [...pp(id).querySelectorAll(".pu")]);
+const look = (ids, t, x, y = 0, d = 0.18) => tl.to(pupils(ids), { x, y, duration: d, ease: "power2.out" }, t);
+function mood(ids, t, m) {
+  ids.forEach((id) => {
+    const g = pp(id);
+    const b = m === "happy" ? BW.calm : m === "up" ? BW.up : BW.sad;
+    tl.set(g.querySelector(".bl"), { attr: { d: b[0] } }, t); tl.set(g.querySelector(".br"), { attr: { d: b[1] } }, t);
+    tl.set(g.querySelector(".mo"), { opacity: m === "happy" ? 0 : 1, attr: { d: m === "up" ? MO.flat : MO.sad } }, t);
+    tl.set(g.querySelector(".ms"), { opacity: m === "happy" ? 1 : 0 }, t);
+  });
+}
+const ALL = ["asst", "a1", "a2", "a3", "a4", "aud", "own"];
+function idle(t0, t1) {
+  ALL.forEach((id, i) => {
+    const g = pp(id), hd = g.querySelector(".hd"), bd = g.querySelector(".bd");
+    tl.set([hd, bd], { transformOrigin: "50% 100%" }, 0);
+    const per = 1.1 + i * 0.11, n = Math.floor((t1 - t0) / per);
+    tl.fromTo(bd, { scaleY: 1 }, { scaleY: 1.025, duration: per, yoyo: true, repeat: Math.max(1, n - 1), ease: "sine.inOut" }, t0 + i * 0.13);
+    tl.fromTo(hd, { y: 0, rotation: -2 }, { y: -3, rotation: 2, duration: per * 1.3, yoyo: true, repeat: Math.max(1, Math.floor(n / 1.3) - 1), ease: "sine.inOut" }, t0 + i * 0.2);
+    const eyes = g.querySelectorAll(".eye");
+    tl.set(eyes, { transformOrigin: "50% 50%" }, 0);
+    for (let t = t0 + 0.4 + rnd() * 2; t < t1; t += 2 + rnd() * 2.4) { tl.to(eyes, { scaleY: 0.08, duration: 0.06 }, t); tl.to(eyes, { scaleY: 1, duration: 0.09 }, t + 0.1); }
+  });
+}
+function typing(id, t0, t1, per = 0.16) {
+  const g = pp(id), a = g.querySelector(".ar"), b = g.querySelector(".al");
+  tl.set([a, b], { transformOrigin: "50% 0%" }, 0);
+  const n = Math.max(2, Math.floor((t1 - t0) / per));
+  tl.fromTo(a, { rotation: 0 }, { rotation: -7, duration: per, yoyo: true, repeat: n - 1, ease: "sine.inOut" }, t0);
+  tl.fromTo(b, { rotation: 0 }, { rotation: 7, duration: per, yoyo: true, repeat: n - 1, ease: "sine.inOut" }, t0 + per / 2);
+}
+function stampArm(id, t) {
+  const a = pp(id).querySelector(".ar");
+  tl.set(a, { transformOrigin: "50% 0%" }, 0);
+  tl.to(a, { rotation: -28, y: -16, duration: 0.18, ease: "power2.out" }, t - 0.22);
+  tl.to(a, { rotation: 6, y: 4, duration: 0.08, ease: "power4.in" }, t - 0.04);
+  tl.to(a, { rotation: 0, y: 0, duration: 0.25, ease: "power2.out" }, t + 0.1);
+}
+function pop(el, t, s = "pop") {
+  tl.set(el, { transformOrigin: "50% 50%" }, 0);
+  tl.fromTo(el, { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2.6)" }, t);
+  if (s) E.sfx(s, t);
+}
+function shake(t, amt = 10) {
+  tl.to("#shake", { keyframes: [{ x: amt, y: -amt / 2 }, { x: -amt, y: amt / 2 }, { x: amt / 2, y: 0 }, { x: 0, y: 0 }], duration: 0.28, ease: "none" }, t);
+}
+function spin(id, t, dur, turns) {
+  const g = pp(id), c = g.querySelector("circle");
+  const o = `${c.getAttribute("cx")} ${c.getAttribute("cy")}`;
+  tl.to(g.querySelector(".mh"), { rotation: `+=${360 * turns}`, svgOrigin: o, duration: dur, ease: "none" }, t);
+  tl.to(g.querySelector(".hh"), { rotation: `+=${30 * turns}`, svgOrigin: o, duration: dur, ease: "none" }, t);
+}
+/* move an object along an arc: x and y on different eases */
+function arc(sel, t, x, y, dur, { ex = "power1.out", ey = "power2.in", ...rest } = {}) {
+  tl.to(sel, { x, duration: dur, ease: ex, ...rest }, t);
+  tl.to(sel, { y, duration: dur, ease: ey }, t);
+}
+tl.set(["#card", "#cap", "#agcap", "#env"], { transformOrigin: "50% 50%" }, 0);
+const CARD = { x: 330, y: DT[0] - 20 };
+
+/* ================= static parts of the solid scenes ================= */
+$("#e_e").textContent = `${F.close_month} close · Omnia`;
+$("#f_ag").innerHTML = KIT.sticker("#FF6A1A");
+$("#f_sub").textContent = `${R.offer.free_trial.days}-day free trial · read-only access`;
+RL.build();
+const END = RL.seg(6).end;
+idle(0, END);
+tl.to(".cloud", { x: "+=90", duration: END, ease: "none" }, 0);
+
+/* ================= 0: the building, the email arrives, the facade opens ================= */
+{
+  const five = RL.w(0, "Five"), six = RL.w(0, "Six"), wa = RL.w(0, "Watch"), mo = RL.w(0, "month");
+  cam(0, 560, 920, 0.78, 0);
+  cam(0.01, 540, 900, 0.86, wa - 0.05, "none");
+  // the email flies in from the sky and lands in the dish
+  tl.set("#env", { opacity: 1, x: 380, y: 330, rotation: -18, scale: 2.6 }, 0);
+  arc("#env", 0, 220, 380, 1.3, { rotation: 8, scale: 1.3, ex: "power2.out", ey: "sine.inOut" });
+  tl.to("#env", { scale: 0, opacity: 0, duration: 0.25, ease: "back.in(2)" }, 1.4);
+  tl.fromTo("#dish", { rotation: 0 }, { rotation: -8, svgOrigin: "220 560", duration: 0.12, yoyo: true, repeat: 3 }, 1.45);
+  E.sfx("whoosh", 0.1); E.sfx("pop", 1.45);
+  // five people: five windows light up, one by one
+  ["fw000", "fw101", "fw110", "fw111", "fw201"].forEach((c, i) => {
+    const el = $(`.${c}`);
+    tl.to(el, { attr: { fill: "#F6F8FD" }, duration: 0.12 }, five + i * 0.09); E.sfx("blip", five + i * 0.09);
+  });
+  pop("#days", six); KIT.punch("#days", six + 0.3, 1.1);
+  // the dollhouse opens
+  tl.to("#fac0", { x: -470, duration: 0.95, ease: "power3.inOut" }, wa - 0.1);
+  tl.to("#fac1", { x: 470, duration: 0.95, ease: "power3.inOut" }, wa - 0.1);
+  E.sfx("whoosh", wa - 0.1);
+  tl.to(["#fac0", "#fac1"], { opacity: 0, duration: 0.3 }, wa + 0.8);
+  cam(mo - 0.25, 500, 960, 1.28, 1.0);
+}
+
+/* ================= 1: inbox ================= */
+{
+  const s = RL.seg(1), ib = RL.w(1, "inbox"), dl = RL.w(1, "downloads"), pr = RL.w(1, "prints");
+  const m0c = pp("m0c");
+  m0c.innerHTML = `<g id="mEnv" opacity="0"><rect x="-34" y="-74" width="68" height="46" rx="4" fill="#fff"/><path d="M-32,-72 L0,-48 L32,-72" fill="none" stroke="${C.frame}" stroke-width="3"/><circle cx="34" cy="-74" r="13" fill="${C.red}"/><text x="34" y="-68" text-anchor="middle" font-size="16" fill="#fff">1</text></g>
+    <rect id="mBar" x="-60" y="-20" width="120" height="8" rx="4" fill="#fff" fill-opacity=".25" opacity="0"/><rect id="mBarF" x="-60" y="-20" width="120" height="8" rx="4" fill="#fff" opacity="0"/>`;
+  look(["asst"], s.start, 6, 0);
+  pop("#mEnv", ib - 0.05); E.sfx("chime", ib);
+  tl.to("#mEnv", { y: -4, duration: 0.18, yoyo: true, repeat: 3, ease: "sine.inOut" }, ib + 0.4);
+  typing("asst", dl - 0.3, dl + 0.9);
+  tl.set(["#mBar", "#mBarF"], { opacity: 1 }, dl);
+  tl.fromTo("#mBarF", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.9, ease: "power1.inOut" }, dl);
+  // the printer wakes and pushes out the payout sheet
+  tl.fromTo("#printer", { y: 0 }, { y: -4, duration: 0.07, yoyo: true, repeat: 7 }, pr - 0.25);
+  E.sfx("typing", pr - 0.25);
+  look(["asst"], pr - 0.2, -6, 0);
+  tl.set("#card", { opacity: 1, x: 315, y: DT[0] + 14, scale: 0.3, rotation: 0 }, pr - 0.15);
+  tl.to("#card", { y: DT[0] - 120, scale: 1.25, duration: 0.6, ease: "back.out(1.6)" }, pr - 0.1);
+  tl.to("#card", { rotation: -4, duration: 0.5, yoyo: true, repeat: 1, ease: "sine.inOut" }, pr + 0.5);
+  cam(pr - 0.3, 430, 990, 1.42, 1.2, "power2.inOut");
+}
+
+/* ================= 2: finance, column by column ================= */
+{
+  const s = RL.seg(2), dn = RL.w(2, "Down"), four = RL.w(2, "Four"), by = RL.w(2, "By");
+  const W4 = [RL.w(2, "order"), RL.w(2, "fee"), RL.w(2, "VAT"), RL.w(2, "invoice")];
+  // the sheet drops through the hatch; the camera follows it down a floor
+  arc("#card", dn - 0.25, 190, FT[1] - 60, 0.4, { rotation: -10, ex: "power2.out", ey: "power1.in" });
+  tl.to("#card", { y: DT[1] - 70, rotation: 6, duration: 0.55, ease: "bounce.out" }, dn + 0.15);
+  E.sfx("whoosh", dn - 0.2);
+  cam(dn - 0.2, 500, 1600, 1.28, 0.9, "power3.inOut");
+  look(["a1", "a2", "a3", "a4"], dn + 0.4, -6, -2);
+  // four role tags pop on "Four"
+  [0, 1, 2, 3].forEach((i) => pop(`#role${i}`, four + i * 0.1, i ? "blip" : "pop"));
+  // the sheet travels desk to desk; each accountant stamps one row; the others watch it go
+  W4.forEach((t, i) => {
+    const x = AX[i] + 92;
+    tl.to("#card", { x, y: DT[1] - 70, rotation: i % 2 ? 4 : -4, duration: 0.35, ease: "power3.inOut" }, t - 0.4);
+    look(["a1", "a2", "a3", "a4"].filter((_, k) => k !== i), t - 0.35, 0, 0);
+    look([["a1", "a2", "a3", "a4"][i]], t - 0.35, 7, 3);
+    stampArm(["a1", "a2", "a3", "a4"][i], t);
+    E.draw($(`#card .ct${i}`), t, 0.18);
+    KIT.punch(`#role${i}`, t, 1.12);
+    E.sfx("click", t);
+  });
+  // by hand: more payouts rain in, the stacks rise, everyone sighs
+  for (let k = 0; k < 10; k++) {
+    const i = k % 4, el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    Object.entries({ x: -35, y: -5, width: 70, height: 10, rx: 2, fill: "#fff", stroke: C.line, "stroke-width": 1.5 }).forEach(([a, v]) => el.setAttribute(a, v));
+    W.querySelector("svg").appendChild(el);
+    const t = by - 0.3 + k * 0.08;
+    tl.set(el, { opacity: 0 }, 0);
+    tl.fromTo(el, { x: AX[i] - 70 + (rnd() - 0.5) * 120, y: FT[1] + 20, rotation: (rnd() - 0.5) * 120, opacity: 1 }, { x: AX[i] - 70, y: DT[1] - 80, rotation: 0, duration: 0.45, ease: "power2.in", immediateRender: false }, t);
+    tl.to(el, { opacity: 0, duration: 0.05 }, t + 0.45);
+  }
+  $$(".stk").forEach((st) => { tl.set(st, { transformOrigin: "50% 100%" }, 0); tl.to(st, { scaleY: 1.9, duration: 0.8, ease: "back.out(1.6)" }, by + 0.1); });
+  spin("ck1", by - 0.2, 1.6, 3);
+  mood(["a1", "a2", "a3", "a4"], by, "sad");
+  look(["a1", "a2", "a3", "a4"], by, 0, 5);
+}
+
+/* ================= 3: the auditor, and back up it goes ================= */
+{
+  const s = RL.seg(3), au = RL.w(3, "auditor"), ag = RL.w(3, "again"), up = RL.w(3, "up");
+  arc("#card", s.start, 860, FT[2] - 50, 0.45, { rotation: 12, ex: "power2.inOut", ey: "power1.in" });
+  tl.to("#card", { y: DT[2] - 90, rotation: -6, duration: 0.45, ease: "bounce.out" }, s.start + 0.45);
+  cam(s.start + 0.05, 580, 2250, 1.28, 0.95);
+  tl.to("#card", { x: 640, y: DT[2] - 70, rotation: 0, duration: 0.5, ease: "power3.inOut" }, au - 0.1);
+  look(["aud"], au - 0.1, 8, 3);
+  stampArm("aud", ag + 0.1);
+  pop("#card .rc", ag + 0.1, null); E.sfx("impact", ag + 0.1); shake(ag + 0.1, 12);
+  // into the tube, and shot back up
+  arc("#card", up - 0.6, 900, DT[2] - 130, 0.4, { scale: 0.4, ex: "power2.in", ey: "power2.out" });
+  tl.to("#card", { opacity: 0, duration: 0.05 }, up - 0.2);
+  tl.set("#cap", { opacity: 1, x: 945, y: DT[2] - 130 }, up - 0.2);
+  tl.to("#cap", { y: 300, duration: 0.7, ease: "power3.in" }, up - 0.15);
+  E.sfx("whoosh", up - 0.15);
+  cam(up - 0.1, 580, 1500, 1.1, 0.45, "power2.in");
+  look(["aud"], up - 0.15, 3, -8);
+}
+
+/* ================= 4: the owner waits ================= */
+{
+  const s = RL.seg(4), wt = RL.w(4, "waits"), mn = RL.w(4, "money"), ar = RL.w(4, "arrive");
+  cam(s.start + 0.05, 470, 2860, 1.3, 0.9, "power3.inOut");
+  tl.set("#cap", { opacity: 0 }, s.start + 0.5);
+  look(["own"], s.start, 6, 6);
+  // finger tapping, the days roll by
+  const a = pp("own").querySelector(".ar");
+  tl.set(a, { transformOrigin: "50% 0%" }, 0);
+  tl.fromTo(a, { rotation: 0 }, { rotation: -6, duration: 0.09, yoyo: true, repeat: 15 }, wt);
+  const d0 = wt, d1 = mn - 0.1, n = 5;
+  spin("ck3", d0, d1 - d0, 10);
+  for (let k = 0; k <= n; k++) {
+    const t = d0 + ((d1 - d0) * k) / n;
+    tl.set("#cal4 .cd", { textContent: `DAY ${k + 1}` }, t);
+    tl.fromTo("#cal4", { y: 0 }, { y: -8, duration: 0.07, yoyo: true, repeat: 1 }, t);
+    if (k) E.sfx("click", t);
+    if (k < n) {
+      const h = (d1 - d0) / n;
+      tl.set("#win4 .wsky", { attr: { fill: "#1E2A52" } }, t + h * 0.45); tl.set("#win4 .wtw", { attr: { fill: "#33406A" } }, t + h * 0.45);
+      tl.set("#win4 .wsky", { attr: { fill: "#CFDCF2" } }, t + h * 0.9); tl.set("#win4 .wtw", { attr: { fill: "#9FB0D0" } }, t + h * 0.9);
+    }
+  }
+  pop("#bub", mn - 0.05); look(["own"], mn, 7, -7); mood(["own"], mn, "up");
+  KIT.punch("#bub", ar, 1.1); E.sfx("impact", ar);
+}
+
+/* ================= 5: the agent goes through the building ================= */
+{
+  const s = RL.seg(5), ag = RL.w(5, "agent"), rz = RL.w(5, "RAMZA"), gm = RL.w(5, "Gmail"), bk = RL.w(5, "bank"), iv = RL.w(5, "invoice");
+  tl.to(".dim", { opacity: 0.55, duration: 0.4 }, s.start);
+  tl.to("#bub", { opacity: 0, duration: 0.2 }, s.start);
+  cam(s.start, 700, 480, 1.15, 0.9, "power3.inOut");
+  tl.set("#ftag", { textContent: "Illustration" }, s.start);
+  KIT.dropIn(pp("agw"), ag - 0.2);
+  // it hops into the tube
+  tl.to("#agi", { y: 120, scale: 0.35, transformOrigin: "50% 100%", duration: 0.35, ease: "back.in(1.8)" }, rz - 0.15);
+  tl.to("#agw", { opacity: 0, duration: 0.05 }, rz + 0.2);
+  tl.set("#agcap", { opacity: 1, x: 945, y: 520 }, rz + 0.2);
+  cam(rz, 540, 900, 0.85, 0.8, "power3.inOut");
+  E.sfx("whoosh", rz);
+  const stops = [[gm, 0], [bk, 1], [iv, 2], [s.end - 0.6, 3]];
+  let prev = rz + 0.2;
+  stops.forEach(([t, i]) => {
+    const y = FT[i] + 300;
+    tl.to("#agcap", { y, duration: Math.max(0.3, t - prev - 0.1), ease: "power2.inOut" }, prev);
+    if (i) cam(t - 0.45, 540, FT[i] + 280, 0.85, 0.5, "power2.inOut");
+    tl.to(`#dim${i}`, { opacity: 0, duration: 0.3 }, t);
+    tl.set(`#scan${i}`, { opacity: 1, scaleX: 0, transformOrigin: "100% 50%" }, t - 0.1);
+    tl.to(`#scan${i}`, { scaleX: 1, duration: 0.3, ease: "power2.out" }, t - 0.1);
+    tl.to(`#scan${i}`, { opacity: 0, duration: 0.2 }, t + 0.25);
+    pop(`#pl${i} .badge`, t + 0.1, "pop");
+    const who = [["asst"], ["a1", "a2", "a3", "a4"], ["aud"], ["own"]][i];
+    mood(who, t + 0.15, "happy");
+    look(who, t + 0.1, 0, 0);
+    prev = t;
+  });
+  // floor by floor: Gmail on the monitor, the stacks gone, the re-check cleared
+  tl.set("#mEnv", { opacity: 0 }, gm); tl.set(["#mBar", "#mBarF"], { opacity: 0 }, gm);
+  pp("m0c").insertAdjacentHTML("beforeend", `<g id="mOk" opacity="0"><rect x="-60" y="-80" width="120" height="66" rx="6" fill="#fff"/><path d="M-40,-66 L-40,-30 L-28,-30 L-28,-54 L0,-34 L28,-54 L28,-30 L40,-30 L40,-66 L0,-40 Z" fill="${C.red}"/><circle cx="46" cy="-74" r="14" fill="${C.green}"/><path d="M40,-74 L45,-69 L52,-79" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/></g>`);
+  pop("#mOk", gm + 0.1, null);
+  tl.to(".stk", { scaleY: 0, opacity: 0, duration: 0.3, ease: "back.in(2)" }, bk + 0.1);
+  tl.to(".role", { opacity: 0, duration: 0.2 }, bk + 0.1);
+  tl.to("#days", { opacity: 0, duration: 0.2 }, rz);
+}
+
+/* ================= 6: review only what it flags; the owner's answer ================= */
+{
+  const s = RL.seg(6), rv = RL.w(6, "reviews"), fl = RL.w(6, "flags"), ow = RL.w(6, "owner"), an = RL.w(6, "answer"), sc = RL.w(6, "screen");
+  tl.to("#agcap", { opacity: 0, duration: 0.2 }, s.start);
+  cam(s.start, 500, 1600, 1.28, 0.9, "power3.inOut");
+  tl.to("#scr1 .sb", { attr: { fill: "#fff" }, duration: 0.2 }, rv - 0.1);
+  tl.to("#scr1 .sc", { opacity: 1, duration: 0.25 }, rv);
+  E.sfx("chime", rv);
+  look(["a1", "a2", "a3", "a4"], rv + 0.05, [8, 4, -2, -7][0], -9);
+  ["a1", "a2", "a3", "a4"].forEach((id, i) => { look([id], rv + 0.05 + i * 0.05, [7, 3, -3, -7][i], -9); tl.to(pp(id).querySelector(".hd"), { rotation: [6, 3, -3, -6][i], duration: 0.4 }, rv); });
+  KIT.punch("#scr1 .fp", fl, 1.2); E.sfx("pop", fl);
+  cam(ow - 0.3, 470, 2860, 1.3, 0.9, "power3.inOut");
+  tl.to("#tv .tc", { opacity: 1, duration: 0.25 }, an - 0.2);
+  pop("#tv .tc g", an, "chime");
+  look(["own"], an, 9, 2);
+  mood(["own"], an, "happy");
+  const a = pp("own").querySelector(".ar");
+  tl.to(a, { rotation: -130, duration: 0.35, ease: "back.out(2)" }, an + 0.2);
+  tl.to(a, { rotation: -115, duration: 0.18, yoyo: true, repeat: 3, ease: "sine.inOut" }, an + 0.55);
+  KIT.punch("#tv", sc, 1.06);
+  cam(sc + 0.3, 540, 1750, 0.52, 1.6, "power2.inOut");
+  tl.to(".dim", { opacity: 0, duration: 0.2 }, s.start);
+}
+
+/* ================= 7: proof ================= */
+{
+  const s7 = RL.seg(7).start;
+  E.lines(".scene:nth-of-type(8) .disp", s7 + 0.3);
+  const c1 = RL.w(7, String(F.close_credits)), c2 = RL.w(7, F.close_matched_pct + "%");
+  tl.fromTo("#e_s1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c1 - 0.3);
+  E.count($("#e_v1"), c1 - 0.2, F.close_credits, { dur: 1.0 });
+  tl.fromTo("#e_s2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c2 - 0.3);
+  E.count($("#e_v2"), c2 - 0.2, F.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+  E.sfx("chime", RL.w(7, "matched"));
+}
+
+/* ================= 8: CTA ================= */
+{
+  const s8 = RL.seg(8).start;
+  KIT.startAt("#f_ag", s8 - 0.6);
+  tl.fromTo("#f_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s8 + 0.1);
+  const kw = RL.w(8, "Comment", "t1");
+  tl.fromTo("#f_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, kw); E.sfx("impact", kw + 0.1);
+  tl.fromTo("#f_sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 }, RL.w(8, "free") - 0.2);
+}
+</script>
+</body></html>

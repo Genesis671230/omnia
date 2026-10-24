@@ -1,0 +1,372 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* "Brokers" — Khalid (AI founder) asks, Noor (AI presenter) answers. Faces only on the two lip-synced
+     lines; every other second is a source on screen: the Ministry's own page with the line highlighted,
+     the news coverage, a 1,063-dot count, then real objects on a desk. Captions own 1390–1650. */
+  html,body,.stage{background:transparent!important}
+  .ov{position:absolute;opacity:0}
+  .full{left:0;top:0;width:1080px;height:1920px}
+  .paperbg{background:#F3F1EC}
+  .navybg{background:#0B1533}
+  .tag{position:absolute;background:#fff;color:#0B1533;font-size:24px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:10px 18px;border-radius:6px}
+  .lower{left:64px;top:1180px;background:#fff;border-left:8px solid #C8321F;border-radius:8px;padding:14px 22px;font-size:26px;color:#5B6478;box-shadow:0 20px 40px -20px rgba(0,0,0,.6)}
+  .lower b{display:block;font-family:'Urbanist';font-size:40px;color:#0B1533}
+  /* document camera */
+  .doc{position:absolute;left:40px;right:40px;top:300px;height:930px;overflow:hidden;background:#fff;border-radius:10px;box-shadow:0 30px 60px -30px rgba(0,0,0,.45)}
+  .doc img{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+  .src{position:absolute;left:40px;top:1244px;font-size:24px;color:#5B6478;font-family:'IBM Plex Mono'}
+  .big{position:absolute;left:0;right:0;text-align:center;font-family:'Urbanist';font-weight:900;letter-spacing:-.05em;color:#0B1533;line-height:.9}
+  .big small{display:block;font-family:'IBM Plex Sans';font-weight:600;font-size:34px;letter-spacing:.14em;text-transform:uppercase;color:#5B6478;margin-top:18px}
+  .red{color:#C8321F}
+  #waffle{position:absolute;left:68px;top:560px;width:944px;display:grid;grid-template-columns:repeat(41,18px);gap:5px}
+  #waffle i{width:18px;height:18px;border-radius:3px;background:#C9CED8}
+  .clip{position:absolute;width:820px;height:520px;overflow:hidden;background:#fff;box-shadow:0 30px 50px -20px rgba(0,0,0,.55)}
+  .clip img{position:absolute;transform-origin:0 0}
+  .qcard{left:64px;right:64px;top:520px;background:#fff;border-radius:16px;padding:60px 56px;box-shadow:0 40px 70px -30px rgba(0,0,0,.6)}
+  .qcard .k{font-size:28px;font-weight:700;letter-spacing:.16em;color:#5B6478;text-transform:uppercase}
+  .qcard .t{font-family:'Urbanist';font-weight:900;font-size:120px;letter-spacing:-.045em;line-height:.95;color:#0B1533;margin-top:16px}
+  .pip{position:absolute;width:170px;height:170px;border-radius:50%;overflow:hidden;border:6px solid #fff;box-shadow:0 0 0 6px #C8321F}
+  .pip img{width:100%;height:100%;object-fit:cover;object-position:50% 22%}
+  .hlcard{left:56px;right:56px;top:880px;background:#fff;border-radius:12px;padding:26px 30px;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
+  .hlcard .k{font-size:22px;font-weight:700;letter-spacing:.14em;color:#5B6478}
+  .hlcard .q{font-size:36px;line-height:1.35;color:#14131C;margin-top:10px}
+  .hlcard mark{background:#FFE14D;padding:0 4px}
+  .ck{left:64px;right:64px;top:820px;display:flex;flex-direction:column;gap:16px}
+  .ck .r{display:flex;align-items:center;gap:22px;background:#fff;border-radius:12px;padding:24px 28px;font-family:'Urbanist';font-weight:800;font-size:50px;letter-spacing:-.02em;color:#0B1533;opacity:0;box-shadow:0 20px 40px -24px rgba(0,0,0,.5)}
+  .ck .r i{width:56px;height:56px;border-radius:10px;border:4px solid #0B1533;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:40px;color:#fff}
+  /* desk */
+  #desk{background:#D8B78A}
+  #desk svg.grain{position:absolute;inset:0}
+  .paper{position:absolute;background:#FBFAF6;box-shadow:0 2px 0 rgba(90,60,20,.10),0 22px 36px rgba(70,45,10,.32);color:#1E2230}
+  .mono{font-family:'IBM Plex Mono',monospace;font-weight:500}
+  #st{left:40px;top:330px;width:1000px;padding:30px 34px}
+  #st .h{display:flex;justify-content:space-between;border-bottom:3px solid #1E2A4A;padding-bottom:14px}
+  #st .h b{font-family:'Urbanist';font-weight:800;font-size:38px;color:#1E2A4A}
+  .row{position:relative;display:grid;grid-template-columns:110px 1fr 220px 260px;font-size:24px;padding:16px 0;border-bottom:1px solid #E6E3DA;align-items:center}
+  .row .amt{text-align:right}
+  .row .res{text-align:right;font-family:'IBM Plex Sans';font-weight:600;font-size:22px}
+  .row .res span{display:inline-block;padding:6px 12px;border-radius:6px;opacity:0}
+  .ok{background:#E3F1E6;color:#1F7A4D}
+  .bad{background:#FBE3DF;color:#B22F1E}
+  .hlbar{position:absolute;left:-10px;right:-10px;top:6px;bottom:6px;background:#FFE14D;mix-blend-mode:multiply;transform-origin:left;transform:scaleX(0)}
+  .folder{position:absolute;width:300px;height:220px;background:#E9C98B;border-radius:6px 18px 6px 6px;box-shadow:0 18px 28px rgba(70,45,10,.35);padding:56px 22px 0;font-size:22px;color:#3B2F12}
+  .folder:before{content:"";position:absolute;left:0;top:-22px;width:130px;height:30px;background:#E9C98B;border-radius:8px 8px 0 0}
+  .folder b{display:block;font-family:'Urbanist';font-weight:800;font-size:30px;color:#2B1D05}
+  .folder .inv{display:inline-block;margin-top:12px;font-family:'IBM Plex Mono';font-size:20px;background:#fff;padding:4px 10px;border-radius:4px;opacity:0}
+  #sheet{left:120px;top:900px;width:840px;padding:20px;transform:rotate(-2deg)}
+  #sheet .g{display:grid;grid-template-columns:1.2fr 1fr 1fr;border-left:1px solid #C9D3C0}
+  #sheet .g span{border-right:1px solid #C9D3C0;border-bottom:1px solid #C9D3C0;padding:10px 12px;font-family:'IBM Plex Mono';font-size:24px;height:52px}
+  #sheet .g .h{background:#E3EDDB}
+  #sheet .g .q{background:#FDE2DE;color:#C8321F;font-weight:600}
+  #ag{position:absolute;left:450px;top:690px;width:180px;height:210px;z-index:5}
+  .note{position:absolute;left:600px;top:1060px;width:400px;background:#fff;border-left:8px solid #0B1533;border-radius:8px;padding:18px 22px;font-size:26px;line-height:1.35;color:#14131C;box-shadow:0 20px 30px -16px rgba(0,0,0,.5)}
+  .ex{right:56px;top:300px}
+  /* end */
+  .end .ag{position:absolute;left:340px;top:360px;width:400px;height:380px}
+  .end .body{position:absolute;left:72px;right:72px;top:820px;text-align:center}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:#0B1533;padding:14px 54px;border-radius:14px}
+  .end .l{font-size:32px;color:#C4CAD9;margin-top:26px;line-height:1.45}
+  .fdisc{position:absolute;left:64px;right:64px;top:1680px;font-size:20px;line-height:1.4;color:#8E97B3;text-align:center}
+  #caps{position:absolute;left:56px;right:56px;top:1390px;height:260px}
+  .cap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;visibility:hidden;text-align:center}
+  .cap .who{font-size:22px;font-weight:700;letter-spacing:.16em;color:#fff;background:#C8321F;padding:6px 14px;border-radius:5px;margin-bottom:12px}
+  .cap .who.n{background:#3A55E6}
+  .cap .w{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .cap span{font-family:'Urbanist';font-weight:800;font-size:70px;line-height:1.08;letter-spacing:-.02em;color:#fff;background:#0B1533;padding:4px 16px;border-radius:10px;opacity:0}
+  .cap span.hl{background:#C8321F}
+</style></head>
+<body><div class="stage">
+  <!-- A: Khalid on camera -->
+  <div class="ov tag" id="tagK" style="left:64px;top:300px">AI founder · Khalid</div>
+  <div class="ov lower" id="lowK"><b>Khalid</b>Founder, Dubai brokerage · AI character</div>
+
+  <!-- B/C/H: the Ministry's page -->
+  <div class="ov full paperbg" id="sceneDoc">
+    <div class="doc" id="doc"><img id="docimg" src="../shots/moet-h1-2025.png"></div>
+    <div class="src" id="docsrc">moet.gov.ae · 24 Jul 2025</div>
+  </div>
+  <!-- counter over the page -->
+  <div class="ov big" id="n1063" style="top:640px;left:120px;right:120px;font-size:230px;background:#0B1533;color:#fff;border-radius:18px;padding:50px 0 40px;box-shadow:0 40px 70px -30px rgba(0,0,0,.6)"><span id="n1063v">0</span><small style="color:#C4CAD9">AML violations · H1 2025</small></div>
+
+  <!-- C: waffle -->
+  <div class="ov full paperbg" id="sceneWaffle">
+    <div class="big" style="top:330px;font-size:150px"><span class="red" id="w495">0</span> <span style="color:#8A92A6">/ 1,063</span><small>violations were real-estate brokerages</small></div>
+    <div id="waffle"></div>
+  </div>
+
+  <!-- D: 18.5M + news clippings -->
+  <div class="ov full navybg" id="sceneMoney">
+    <div class="clip" id="cl1" style="left:110px;top:760px"><img src="../shots/gulfnews.png" id="cl1i"></div>
+    <div class="clip" id="cl2" style="left:150px;top:820px"><img src="../shots/khaleej.png" id="cl2i"></div>
+    <div class="big" id="m185" style="top:360px;font-size:210px;color:#fff">AED <span id="m185v">0</span>M<small style="color:#C4CAD9">in fines · six months</small></div>
+  </div>
+
+  <!-- E: Q1 2023 -->
+  <div class="ov full paperbg" id="sceneOld">
+    <div class="doc" id="doc2"><img id="doc2img" src="../shots/moet-q1-2023.png"></div>
+    <div class="src">moet.gov.ae · Q1 2023 inspections</div>
+    <div class="ov big" id="quarter" style="top:1010px;font-size:150px"><span style="background:#C8321F;color:#fff;padding:6px 34px;border-radius:14px">1 in 4</span></div>
+  </div>
+
+  <!-- F / I: Khalid asks (voice over a question card) -->
+  <div class="ov full paperbg" id="sceneQ1"><div class="qcard ov" id="q1"><div class="k">Khalid asks</div><div class="t">“We're not a bank.<br><span class="red">Why brokers?</span>”</div></div></div>
+  <div class="ov full paperbg" id="sceneQ2"><div class="qcard ov" id="q2"><div class="k">Khalid asks</div><div class="t">“So where does the <span class="red">proof</span> live?”</div></div></div>
+
+  <!-- G: Noor on camera + the high-risk line -->
+  <div class="ov tag" id="tagN" style="left:64px;top:300px">AI presenter · Noor</div>
+  <div class="ov hlcard" id="hr"><div class="k">MINISTRY OF ECONOMY · 21 DEC 2022</div>
+    <div class="q">Precious-metal dealers, brokers and real-estate agents are “classified as <mark>high-risk</mark> under the sectoral risk classification.”</div></div>
+
+  <!-- H: the three things inspectors check -->
+  <div class="ov ck" id="ck">
+    <div class="r" id="ck1"><i>✓</i>Due diligence</div>
+    <div class="r" id="ck2"><i>✓</i>Risk assessment</div>
+    <div class="r" id="ck3"><i>✓</i>Suspicious-transaction reports</div>
+  </div>
+
+  <!-- J/K: the desk -->
+  <div class="ov full" id="desk"><svg class="grain" width="1080" height="1920" id="grain"></svg>
+    <div class="paper" id="st"><div class="h"><b>Bank statement</b><span class="mono" style="font-size:20px;color:#6B7180">Brokerage client account · Oct</span></div>
+      <div id="rows"></div></div>
+    <div class="paper" id="sheet"><div class="g" id="sg"></div></div>
+    <div id="folders"></div>
+    <div class="ov note" id="note"><b>goAML reports</b><br>stay with your compliance officer.</div>
+    <div id="ag"></div>
+    <div class="tag ex" style="box-shadow:0 0 0 1px #E3E7F0">Example</div>
+  </div>
+
+  <!-- PIP: who is talking during the B-roll -->
+  <div class="ov pip" id="pipK" style="left:56px;top:1180px"><img src="../shots/khalid.png"></div>
+  <div class="ov pip" id="pipN" style="left:56px;top:1180px;box-shadow:0 0 0 6px #3A55E6"><img src="../shots/noor.jpg"></div>
+
+  <!-- L: end -->
+  <div class="ov full navybg end" id="end"><div class="ag" id="endag"></div>
+    <div class="body"><div class="disp" style="font-size:76px;color:#fff">Comment</div>
+      <div style="margin-top:24px"><span class="kw">TRAIL</span></div>
+      <div class="l" id="endl"></div></div>
+    <div class="fdisc" id="disc"></div></div>
+  <div id="caps"></div>
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const FILM = window.FILM, R = window.RULES, V = FILM.voices;
+const at = (i, word) => { const v = V[i], k = v.text.toLowerCase().indexOf(word.toLowerCase()); if (k < 0) throw new Error("no word " + word + " in line " + i); return v.at + 0.1 + (k / v.text.length) * (v.len - 0.2); };
+const st = (i) => V[i].at, en = (i) => V[i].at + V[i].len;
+const showT = (sel, t0, t1, from = { y: 40 }, d = 0.45) => {
+  tl.fromTo(sel, { opacity: 0, ...from }, { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0, duration: d, ease: "expo.out" }, t0);
+  if (t1 != null) tl.to(sel, { opacity: 0, duration: 0.18 }, t1 - 0.18);
+};
+const cut = (sel, t0, t1) => { tl.set(sel, { opacity: 1 }, t0); if (t1 != null) tl.set(sel, { opacity: 0 }, t1); };
+
+/* captions: three-word chunks */
+const caps = $("#caps");
+V.forEach((v, i) => {
+  const words = v.text.split(/\s+/), chunks = [];
+  for (let j = 0; j < words.length; j += 3) chunks.push(words.slice(j, j + 3));
+  let c0 = 0;
+  chunks.forEach((ch, j) => {
+    const txt = ch.join(" "), t0 = v.at + 0.08 + (c0 / v.text.length) * v.len;
+    c0 += txt.length + 1;
+    const t1 = j + 1 < chunks.length ? v.at + 0.08 + (c0 / v.text.length) * v.len : v.at + v.len + 0.2;
+    const el = document.createElement("div");
+    el.className = "cap";
+    const nn = v.who.startsWith("Noor");
+    el.innerHTML = `${j === 0 ? `<div class="who ${nn ? "n" : ""}">${v.who.split(" · ")[0].toUpperCase()}</div>` : ""}<div class="w">${ch.map((w) => `<span class="${/495|1,063|thousand|ninety-five|million|quarter|high-risk|evidence|proof|books|guess|TRAIL|free|RAMZA|bank/i.test(w) ? "hl" : ""}">${w}</span>`).join("")}</div>`;
+    caps.append(el);
+    tl.set(el, { visibility: "visible" }, t0 - 0.05);
+    tl.set(el, { visibility: "hidden" }, t1 - 0.05);
+    tl.fromTo(el.querySelectorAll("span"), { opacity: 0, y: 18, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.16, stagger: 0.07, ease: "back.out(2)" }, t0 - 0.05);
+  });
+});
+
+/* document camera: centre a mark box (PNG px) in the frame at a given zoom */
+const FW = 1000, FH = 930;
+const camTo = (img, box, z, t, d = 0.9) => {
+  const [x, y, w, h] = box, cx = x + w / 2, cy = y + h / 2;
+  tl.to(img, { x: FW / 2 - cx * z, y: FH / 2 - cy * z, scale: z, duration: d, ease: "power3.inOut" }, t);
+};
+const camSet = (img, box, z, t) => { const [x, y, w, h] = box; tl.set(img, { x: FW / 2 - (x + w / 2) * z, y: FH / 2 - (y + h / 2) * z, scale: z }, t); };
+const MO = [[325, 1219, 383, 60], [170, 1474, 1823, 120], [170, 2288, 1697, 120]]; // shots/moet-h1-2025.json
+const Q1 = [[308, 1470, 293, 60], [927, 1470, 160, 60]];                              // shots/moet-q1-2023.json
+
+/* ===== A: Khalid on camera (lip-synced footage under) ===== */
+showT("#tagK", 0.2, en(0) + 0.1, { x: -30 });
+showT("#lowK", 0.6, en(0) + 0.1, { x: -60 });
+E.sfx("impact", 0.25);
+
+/* ===== B: 1,063 violations — the Ministry's own page ===== */
+cut("#sceneDoc", en(0) + 0.1, en(1) + 0.2);
+E.sfx("whoosh", en(0) + 0.05);
+camSet("#docimg", MO[0], 0.55, en(0) + 0.1);
+camTo("#docimg", MO[0], 0.85, en(0) + 0.15, 1.2);
+tl.fromTo("#docimg", { filter: "blur(6px)" }, { filter: "blur(0px)", duration: 0.5 }, en(0) + 0.1);
+showT("#pipN", st(1), en(4) + 0.2, { scale: 0.5 }, 0.35);
+tl.set("#n1063", { opacity: 1 }, at(1, "one thousand"));
+E.count($("#n1063v"), at(1, "one thousand"), 1063, { dur: 1.0, fmt: (v) => Math.round(v).toLocaleString("en-US") });
+E.sfx("rise", at(1, "one thousand") - 0.2);
+KIT.punch($("#n1063"), at(1, "money-laundering"), 1.06);
+E.sfx("impact", at(1, "money-laundering"));
+tl.to("#n1063", { opacity: 0, y: -40, duration: 0.25 }, en(1) - 0.1);
+camTo("#docimg", [170, 1474, 1823, 120], 0.53, at(1, "compliance") + 0.2, 0.9);
+
+/* ===== C: 495 of them were brokerages — waffle ===== */
+{
+  const w = $("#waffle");
+  for (let k = 0; k < 1063; k++) w.append(document.createElement("i"));
+  const dots = [...w.children];
+  cut("#sceneWaffle", st(2) - 0.15, en(2) + 0.25);
+  E.sfx("swish", st(2) - 0.15);
+  tl.fromTo(dots, { scale: 0 }, { scale: 1, duration: 0.25, stagger: { amount: 0.5, from: "random" } }, st(2) - 0.1);
+  const t0 = at(2, "ninety-five") - 0.6;
+  tl.to(dots.slice(0, 495), { backgroundColor: "#C8321F", duration: 0.05, stagger: { amount: 1.3 } }, t0);
+  E.count($("#w495"), t0, 495, { dur: 1.3 });
+  E.sfx("typing", t0, { dur: 1.2 });
+  E.sfx("impact", at(2, "brokerages"));
+}
+
+/* ===== D: AED 18.5M in six months — the news ===== */
+{
+  cut("#sceneMoney", st(3) - 0.15, en(3) + 0.25);
+  E.sfx("whoosh", st(3) - 0.15);
+  const g = [655, 1479, 68, 42], k = [852, 1486, 62, 40]; // the "495" marks in each clipping
+  tl.set("#cl1i", { x: 410 - g[0] * 0.62, y: 260 - g[1] * 0.62, scale: 0.62 }, 0);
+  tl.set("#cl2i", { x: 410 - k[0] * 0.62, y: 260 - k[1] * 0.62, scale: 0.62 }, 0);
+  tl.fromTo("#cl1", { opacity: 0, y: 900, rotation: -14 }, { opacity: 1, y: 0, rotation: -5, duration: 0.5, ease: "expo.out" }, st(3) + 0.2);
+  tl.fromTo("#cl2", { opacity: 0, y: 900, rotation: 12 }, { opacity: 1, y: 60, rotation: 4, duration: 0.5, ease: "expo.out" }, st(3) + 0.8);
+  E.sfx("swish", st(3) + 0.2); E.sfx("swish", st(3) + 0.8);
+  tl.set("#m185", { opacity: 1 }, st(3));
+  E.count($("#m185v"), st(3), 18.5, { dur: 1.1, fmt: (v) => v.toFixed(1) });
+  KIT.punch($("#m185"), at(3, "six months"), 1.08);
+  E.sfx("impact", at(3, "six months"));
+}
+
+/* ===== E: not new — Q1 2023, a quarter of all violations ===== */
+cut("#sceneOld", st(4) - 0.15, en(4) + 0.3);
+E.sfx("whoosh", st(4) - 0.15);
+camSet("#doc2img", Q1[0], 0.5, st(4) - 0.15);
+camTo("#doc2img", [170, 1470, 1800, 60], 0.54, st(4) + 0.1, 1.4);
+tl.set("#quarter", { opacity: 1 }, at(4, "quarter") - 0.1);
+tl.fromTo("#quarter", { scale: 1.6 }, { scale: 1, duration: 0.3, ease: "power4.in" }, at(4, "quarter") - 0.1);
+E.sfx("impact", at(4, "quarter") + 0.2);
+
+/* ===== F: Khalid: "We're not a bank. Why brokers?" ===== */
+cut("#sceneQ1", st(5) - 0.2, en(5) + 0.35);
+showT("#q1", st(5) - 0.15, null, { scale: 0.85, y: 60 }, 0.4);
+showT("#pipK", st(5) - 0.1, en(5) + 0.35, { scale: 0.5 }, 0.3);
+E.sfx("pop", st(5));
+
+/* ===== G: Noor on camera (lip-synced footage under) + the high-risk line ===== */
+showT("#tagN", st(6), en(6), { x: -30 });
+showT("#hr", at(6, "classes") - 0.3, en(6) + 0.1, { y: 120 });
+E.sfx("swish", at(6, "classes") - 0.3);
+E.sfx("blip", at(6, "high-risk"));
+
+/* ===== H: what inspectors check — back to the Ministry's page ===== */
+cut("#sceneDoc", st(7) - 0.2, en(7) + 0.2);
+E.sfx("whoosh", st(7) - 0.2);
+camSet("#docimg", MO[2], 0.45, st(7) - 0.2);
+camTo("#docimg", [170, 2860, 1697, 120], 0.53, st(7), 0.8);
+tl.set("#docsrc", { opacity: 1 }, st(7) - 0.2);
+showT("#pipN", st(7) - 0.1, en(7) + 0.2, { scale: 0.5 }, 0.3);
+tl.set("#ck", { opacity: 1 }, st(7));
+[["#ck1", "due diligence"], ["#ck2", "risk assessment"], ["#ck3", "suspicious"]].forEach(([id, w]) => {
+  tl.fromTo(id, { opacity: 0, x: -80 }, { opacity: 1, x: 0, duration: 0.4, ease: "expo.out" }, at(7, w) - 0.15);
+  tl.to(`${id} i`, { backgroundColor: "#1F7A4D", borderColor: "#1F7A4D", duration: 0.15 }, at(7, w) + 0.3);
+  E.sfx("click", at(7, w));
+});
+tl.set("#ck", { opacity: 0 }, en(7) + 0.2);
+
+/* ===== I: Khalid: "So where does the proof live?" ===== */
+cut("#sceneQ2", st(8) - 0.2, en(8) + 0.4);
+showT("#q2", st(8) - 0.15, null, { scale: 0.85, y: 60 }, 0.4);
+showT("#pipK", st(8) - 0.1, en(8) + 0.4, { scale: 0.5 }, 0.3);
+E.sfx("pop", st(8));
+
+/* ===== J/K: the desk — payments in, tied to a client and a deal ===== */
+{
+  let seed = 5; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let g = "";
+  for (let p = 0; p < 5; p++) {
+    const x0 = p * 216;
+    g += `<rect x="${x0}" y="0" width="216" height="1920" fill="${["#D8B78A", "#D3B083", "#DBBC90", "#D5B386", "#D9B98C"][p]}"/>`;
+    for (let i = 0; i < 14; i++) { const x = x0 + 8 + rnd() * 200; let d = `M${x},0`; for (let y = 0; y <= 1920; y += 120) d += ` Q${x + (rnd() - .5) * 18},${y + 60} ${x + (rnd() - .5) * 9},${y + 120}`; g += `<path d="${d}" fill="none" stroke="#B98F5C" stroke-opacity="${(0.12 + rnd() * 0.22).toFixed(2)}" stroke-width="${(1 + rnd() * 2).toFixed(1)}"/>`; }
+    g += `<rect x="${x0 + 214}" y="0" width="2" height="1920" fill="#A97F4E" fill-opacity=".55"/>`;
+  }
+  $("#grain").innerHTML = g;
+  const ROWS = [["03 OCT", "TRF A. RAHMAN", "250,000.00", "INV-1204", 1], ["04 OCT", "TRF J. SMITH", "85,500.00", "INV-1217", 1], ["05 OCT", "TRF KESTREL LLC", "120,000.00", "INV-1222", 1], ["06 OCT", "TRF NORTHWIND GEN TR", "42,000.00", "", 0], ["07 OCT", "TRF S. MENON", "64,250.00", "INV-1230", 1]];
+  $("#rows").innerHTML = ROWS.map(([d, t, a, inv, ok], k) => `<div class="row mono" id="r${k}"><i class="hlbar"></i><span style="position:relative">${d}</span><span style="position:relative">${t}</span><span class="amt" style="position:relative">${a}</span><span class="res"><span class="${ok ? "ok" : "bad"}">${ok ? "✓ " + inv : "No client · ask"}</span></span></div>`).join("");
+  $("#sg").innerHTML = ["Payment", "Client", "Deal"].map((h) => `<span class="h">${h}</span>`).join("") + [["250,000", "?", "?"], ["85,500", "J. Smith?", "?"], ["120,000", "?", "?"], ["42,000", "?", "?"]].map((r) => r.map((c) => `<span class="${c.includes("?") ? "q" : ""}">${c}</span>`).join("")).join("");
+  const FOL = [["Unit 1204 · Marina", "A. Rahman", "INV-1204", 40, 1000], ["Villa 17 · Ranches", "J. Smith", "INV-1217", 380, 1050], ["Office 3B · JLT", "Kestrel LLC", "INV-1222", 720, 1000]];
+  $("#folders").innerHTML = FOL.map(([u, c, inv, x, y], k) => `<div class="folder" id="f${k}" style="left:${x}px;top:${y}px"><b>${u}</b>Client: ${c}<br><span class="inv">${inv} ✓</span></div>`).join("");
+  $("#ag").innerHTML = KIT.body("#3B2A12");
+
+  const t9 = st(9) - 0.2;
+  cut("#desk", t9, en(10) + 0.35);
+  E.sfx("whoosh", t9);
+  tl.fromTo("#st", { y: -900, rotation: -6 }, { y: 0, rotation: -1, duration: 0.6, ease: "expo.out" }, t9 + 0.05);
+  showT("#pipN", st(9), en(10) + 0.3, { scale: 0.5 }, 0.3);
+  tl.set("#pipN", { top: 1205, left: 860 }, st(9) - 0.3);
+tl.set("#pipN", { top: 1180, left: 56 }, 0);
+  tl.set(["#sheet", "#ag"], { opacity: 0 }, 0);
+  ROWS.forEach((_, k) => tl.to(`#r${k} .hlbar`, { scaleX: 1, duration: 0.25 }, at(9, "every payment") + k * 0.12));
+  E.sfx("swish", at(9, "every payment"));
+  $$(".folder").forEach((f, k) => tl.fromTo(f, { opacity: 0, y: 700, rotation: (k - 1) * 8 }, { opacity: 1, y: 0, rotation: (k - 1) * 3, duration: 0.5, ease: "expo.out" }, at(9, "named client") - 0.2 + k * 0.15));
+  E.sfx("swish", at(9, "named client") - 0.2);
+  // spreadsheet: the guess
+  tl.to(".folder", { opacity: 0, y: 600, duration: 0.35, ease: "power3.in" }, at(9, "spreadsheet") - 0.35);
+  tl.fromTo("#sheet", { opacity: 0, y: 700 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, at(9, "spreadsheet") - 0.2);
+  E.sfx("swish", at(9, "spreadsheet") - 0.2);
+  tl.fromTo("#sheet .q", { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.12, stagger: 0.05 }, at(9, "guess") - 0.2);
+  E.sfx("impact", at(9, "guess"));
+  // K: RAMZA matches each payment to client + invoice
+  tl.to("#sheet", { opacity: 0, y: 700, rotation: 8, duration: 0.4, ease: "power3.in" }, st(10) - 0.1);
+  tl.to(".folder", { opacity: 1, y: 0, duration: 0.5, ease: "expo.out", stagger: 0.1 }, st(10) + 0.2);
+  KIT.dropIn($("#ag"), at(10, "matches") - 0.4);
+  tl.set("#ag", { opacity: 1 }, at(10, "matches") - 0.4);
+  ROWS.forEach((r, k) => {
+    const t = at(10, "matches") + k * 0.35;
+    tl.fromTo(`#r${k} .res span`, { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: 0.2, ease: "back.out(2)" }, t);
+    E.sfx(r[4] ? "pop" : "blip", t);
+  });
+  $$(".folder .inv").forEach((s, k) => tl.to(s, { opacity: 1, duration: 0.2 }, at(10, "invoice") + k * 0.2));
+  E.sfx("chime", at(10, "ready"));
+  showT("#note", at(10, "compliance") - 0.3, en(10) + 0.35, { x: 120 });
+}
+
+/* ===== L: end ===== */
+$("#endag").innerHTML = KIT.body();
+$("#endl").textContent = R.offer.free_trial.free_setup.headline;
+$("#disc").textContent = "Khalid and Noor are AI-generated characters. Figures: UAE Ministry of Economy and Tourism releases (H1 2025, 24 Jul 2025; Q1 2023; Dec 2022). Bank lines on the desk are an illustrative example. RAMZA is not an AML compliance service and this is not legal advice.";
+const ec = st(11) - 0.2;
+cut("#end", ec, null);
+tl.fromTo("#end", { yPercent: 100 }, { yPercent: 0, duration: 0.6, ease: "expo.inOut" }, ec);
+E.sfx("whoosh", ec);
+KIT.dropIn($("#endag"), ec + 0.3);
+tl.fromTo("#end .kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, at(11, "TRAIL") - 0.1);
+E.sfx("impact", at(11, "TRAIL"));
+
+tl.set({}, {}, FILM.total);
+window.__DUR = FILM.total;
+window.BEATS = [
+  { tag: "HOOK", t: 0, open: "Khalid on camera, lip-synced, asks the question", reveal: "AI founder tag + lower third" },
+  { tag: "PROOF", t: st(1), open: "whoosh to the Ministry's page", reveal: "camera pushes into the highlighted line; 1,063 counter slams" },
+  { tag: "PROOF", t: st(2), open: "cut to 1,063 dots", reveal: "495 turn red; counter" },
+  { tag: "PROOF", t: st(3), open: "navy, AED 18.5M counter", reveal: "Gulf News + Khaleej Times clippings fly in" },
+  { tag: "PROOF", t: st(4), open: "Q1 2023 page", reveal: "push into '25 per cent'; '1 in 4' stamp" },
+  { tag: "OBJECTION", t: st(5), open: "question card", reveal: "We're not a bank. Why brokers?" },
+  { tag: "ANSWER", t: st(6), open: "Noor on camera, lip-synced", reveal: "quote card: classified as high-risk" },
+  { tag: "METHOD", t: st(7), open: "back to the Ministry page", reveal: "three checks tick in" },
+  { tag: "TURN", t: st(8), open: "question card", reveal: "So where does the proof live?" },
+  { tag: "METHOD", t: st(9), open: "desk: bank statement drops", reveal: "rows highlight → deal folders → spreadsheet of ?" },
+  { tag: "OFFER", t: st(10), open: "agent drops in", reveal: "each payment gets its invoice; unmatched one flagged; compliance note" },
+  { tag: "CTA", t: st(11), open: "navy wipe up", reveal: "Comment TRAIL + free setup + disclaimer" },
+];
+</script>
+</body></html>

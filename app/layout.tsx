@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   title: { default: brandTitle, template: `%s · ${brandTitle}` },
   description: BRAND.description,
   generator: "v0.app",
+  // Search Console HTML-tag verification: paste only the content="…" value.
+  verification: process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : undefined,
 }
 export const viewport: Viewport = { themeColor: "#f7f3eb", width: "device-width", initialScale: 1 }
 

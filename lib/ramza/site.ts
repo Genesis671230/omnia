@@ -4,7 +4,7 @@
 
 /* Trailing slash stripped once, here, rather than at every call site. */
 export const RAMZA_ORIGIN = (
-  process.env.NEXT_PUBLIC_RAMZA_ORIGIN || "https://ramza.ai"
+  process.env.NEXT_PUBLIC_RAMZA_ORIGIN || "https://ramzaworks.com"
 ).replace(/\/+$/, "");
 
 export const RAMZA_EMAIL = process.env.NEXT_PUBLIC_RAMZA_EMAIL || "accounts@ramzaworks.com";

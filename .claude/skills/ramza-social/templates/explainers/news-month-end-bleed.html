@@ -1,0 +1,403 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* News reel (2026-10-22): real article screenshots (HD/news-*.png, captured at 430px @3x and
+     shown at 900px, so 1 CSS px of the article = 2.093 px here), real stock photography, flat
+     navy washes. Highlighter = flat yellow multiply bar; red ink = drawn SVG ring. */
+  .bg{position:absolute;left:0;top:0;width:1080px;height:1340px;object-fit:cover;will-change:transform}
+  .wash{position:absolute;left:0;top:0;width:1080px;height:1340px;background:#0B1533;opacity:.62}
+  .wash.lt{opacity:.5}
+  .cap2{position:absolute;left:0;right:0;top:1330px;bottom:0;background:var(--navy)}
+  .persp{position:absolute;inset:0;perspective:1600px}
+  .news{position:absolute;left:90px;width:900px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 50px 90px -30px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08);will-change:transform}
+  .news img{display:block;width:900px}
+  .hlb{position:absolute;background:#FFE45C;mix-blend-mode:multiply;border-radius:4px;transform-origin:0 50%;transform:scaleX(0)}
+  .ink{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+  .src{position:absolute;display:flex;align-items:center;gap:14px;background:#fff;color:var(--navy);border-radius:8px;padding:12px 20px;font-size:24px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 20px 40px -20px rgba(0,0,0,.5)}
+  .src i{width:14px;height:14px;border-radius:50%;background:var(--red)}
+  .count{position:absolute;right:72px;top:250px;background:var(--red);color:#fff;font-family:'Urbanist';font-weight:800;font-size:54px;letter-spacing:-.01em;padding:12px 26px;border-radius:10px}
+  .big{position:absolute;left:72px;right:72px;font-family:'Urbanist';font-weight:800;color:#fff;letter-spacing:-.045em;line-height:.9}
+  .sub{position:absolute;left:72px;right:72px;font-size:36px;color:#C4CAD9;line-height:1.3}
+  .cut{position:absolute;left:0;top:0;width:1080px;height:1340px;overflow:hidden}
+  .flash{position:absolute;left:0;top:0;width:1080px;height:1340px;background:#fff;opacity:0;z-index:20}
+  .word{position:absolute;left:72px;top:980px;font-family:'Urbanist';font-weight:800;font-size:150px;line-height:.9;letter-spacing:-.05em;color:#fff}
+  /* artifacts */
+  .doc{position:absolute;left:110px;right:110px;background:#fff;border-radius:16px;box-shadow:0 50px 90px -30px rgba(0,0,0,.7);overflow:hidden;color:var(--ink)}
+  .doc .dh{display:flex;align-items:center;gap:18px;padding:26px 30px;border-bottom:1px solid var(--line)}
+  .doc .dh img{height:56px}
+  .doc .dh .t{font-size:30px;font-weight:700}
+  .doc .dh .s{font-size:24px;color:var(--mute)}
+  .doc .dh .tg{margin-left:auto}
+  .doc .rw{display:flex;justify-content:space-between;align-items:center;padding:22px 30px;border-bottom:1px solid var(--line);font-size:30px;position:relative}
+  .doc .rw:last-child{border-bottom:0}
+  .doc .rw .m{font-family:'IBM Plex Mono';font-size:30px}
+  .doc .rw.bad .m{color:var(--red)}
+  .doc .rw.tot{font-weight:700;background:#F6F7FA}
+  .doc .note{position:absolute;right:30px;font-size:22px;font-weight:700;color:var(--red);letter-spacing:.08em;text-transform:uppercase}
+  .tag2{position:absolute;left:72px;top:1262px;z-index:6;background:#fff;color:var(--navy);font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;border-radius:6px}
+  .inv{display:grid;grid-template-columns:1fr 200px 150px;align-items:center;padding:20px 30px;border-bottom:1px solid var(--line);font-size:28px}
+  .inv .m{font-family:'IBM Plex Mono';text-align:right;font-size:27px}
+  .inv .p{justify-self:end}
+  .tile{position:absolute;width:300px;height:190px;background:#fff;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--navy);font-family:'Urbanist';font-weight:700;font-size:32px;box-shadow:0 40px 70px -30px rgba(0,0,0,.6)}
+  .tile img{height:62px}
+  .tile small{font-family:'IBM Plex Sans';font-weight:500;font-size:22px;color:var(--slate)}
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:140px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+  .hx{font-size:96px;color:#fff}
+</style></head>
+<body class="safe"><div class="stage">
+
+<!-- 0 Gulf News -->
+<section class="scene navy">
+  <img class="bg" id="a_bg" src="PHOTO/bb-business-bay-dusk.jpg"><div class="wash"></div>
+  <div class="persp"><div class="news" id="a_n" style="top:380px">
+    <img src="HD/news-gulfnews.png">
+    <i class="hlb" id="a_h1" style="left:28px;top:452px;width:786px;height:70px"></i>
+    <i class="hlb" id="a_h2" style="left:28px;top:527px;width:712px;height:70px"></i>
+    <svg class="ink" viewBox="0 0 900 984"><path id="a_r1" d="" fill="none" stroke="#D7261E" stroke-width="6" stroke-linecap="round"/></svg>
+  </div></div>
+  <div class="src" id="a_s" style="left:72px;top:1200px"><i></i>Gulf News · updated 30 Sep 2026</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 1 Economy Middle East: the date and the fine -->
+<section class="scene navy">
+  <img class="bg" id="b_bg" src="PHOTO/bb-difc-towers-night.jpg"><div class="wash"></div>
+  <div class="persp">
+    <div class="news" id="b_n" style="top:420px">
+      <img src="HD/news-eme.png">
+      <i class="hlb" id="b_h1" style="left:40px;top:284px;width:820px;height:50px"></i>
+      <i class="hlb" id="b_h2" style="left:40px;top:334px;width:140px;height:50px"></i>
+    </div>
+    <div class="news" id="b_q" style="top:830px">
+      <img src="HD/news-eme-quote.png">
+      <i class="hlb" id="b_q1" style="left:0;top:0;width:0;height:0"></i>
+      <svg class="ink" viewBox="0 0 900 391"><path id="b_r1" d="" fill="none" stroke="#D7261E" stroke-width="6" stroke-linecap="round"/><path id="b_r2" d="" fill="none" stroke="#D7261E" stroke-width="6" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+  <div class="count" id="b_c" style="top:1225px"></div>
+  <div class="src" id="b_s" style="left:72px;top:1240px"><i></i>Economy Middle East · 22 Oct 2026</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 2 CFO.com -->
+<section class="scene navy">
+  <img class="bg" id="c_bg" src="PHOTO/px-accountant-files.jpg"><div class="wash"></div>
+  <div class="persp"><div class="news" id="c_n" style="top:380px">
+    <img src="HD/news-cfo.png">
+    <i class="hlb" id="c_h1" style="left:28px;top:248px;width:810px;height:64px"></i>
+    <i class="hlb" id="c_h2" style="left:28px;top:314px;width:800px;height:64px"></i>
+    <svg class="ink" viewBox="0 0 900 670"><path id="c_u" d="M30,646 C140,640 260,644 350,640" fill="none" stroke="#D7261E" stroke-width="5" stroke-linecap="round"/></svg>
+  </div></div>
+  <div class="src" id="c_s" style="left:72px;top:1120px"><i></i>CFO.com · 23 Apr 2025 · Ledge survey</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 3 the quote: 20-50 hours -->
+<section class="scene navy">
+  <img class="bg" id="d_bg" src="PHOTO/px-statements-calculator.jpg"><div class="wash" style="opacity:.75"></div>
+  <div class="big" style="top:420px;font-size:230px"><span id="d_n">20–50</span></div>
+  <div class="sub" style="top:650px">hours a month on reconciliation</div>
+  <div class="persp"><div class="news" id="d_q" style="top:780px">
+    <img src="HD/news-cfo-quote.png">
+    <i class="hlb" id="d_h" style="left:176px;top:138px;width:388px;height:48px"></i>
+  </div></div>
+  <div class="src" id="d_s" style="left:72px;top:1170px"><i></i>CFO.com · Ledge survey</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 4 b-roll: an online store's month -->
+<section class="scene night">
+  <div class="cut" id="e_c0"><img class="bg" src="PHOTO/in-ecommerce-packing.jpg"><div class="wash lt"></div></div>
+  <div class="cut" id="e_c1"><img class="bg" src="PHOTO/parcels.jpg"><div class="wash lt"></div></div>
+  <div class="cut" id="e_c2"><img class="bg" src="PHOTO/px-order-label.jpg"><div class="wash lt"></div></div>
+  <div class="cut" id="e_c3"><img class="bg" src="PHOTO/in-logistics-courier.jpg"><div class="wash lt"></div></div>
+  <div class="word" id="e_w">Where the<br>week goes.</div>
+  <div class="flash" id="e_f"></div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 5 three leaks -->
+<section class="scene night">
+  <div class="cut" id="f_c0"><img class="bg" src="PHOTO/card-checkout.jpg"><div class="wash"></div></div>
+  <div class="cut" id="f_c1"><img class="bg" src="PHOTO/in-logistics-van.jpg"><div class="wash"></div></div>
+  <div class="cut" id="f_c2"><img class="bg" src="PHOTO/px-analyst-desk.jpg"><div class="wash"></div></div>
+  <div class="tag2">Illustration</div>
+  <div class="doc" id="f_d0" style="top:420px">
+    <div class="dh"><img src="LG/tabby-mark.png"><div><div class="t">Settlement report</div><div class="s">Payout to your bank</div></div><span class="pill n tg">CSV</span></div>
+    <div class="rw"><span>Orders</span><span class="m">18,420.50</span></div>
+    <div class="rw bad" id="f_fee"><span>Fees</span><span class="m">−612.40</span></div>
+    <div class="rw tot"><span>Paid to bank</span><span class="m">17,808.10</span></div>
+  </div>
+  <div class="doc" id="f_d1" style="top:420px">
+    <div class="dh"><div style="width:56px;height:56px;border-radius:12px;background:#0B1533;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Urbanist;font-weight:800;font-size:20px">COD</div><div><div class="t">COD remittance</div><div class="s">Courier, cash collected</div></div><span class="pill n tg">PDF</span></div>
+    <div class="rw"><span>Expected</span><span class="m">4,980.00</span></div>
+    <div class="rw"><span>Received</span><span class="m">4,712.00</span></div>
+    <div class="rw tot bad" id="f_short"><span>Short</span><span class="m">−268.00</span></div>
+  </div>
+  <div class="doc" id="f_d2" style="top:420px">
+    <div class="dh"><div style="width:56px;height:56px;border-radius:12px;background:#1F7A4D;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Urbanist;font-weight:800;font-size:20px">BANK</div><div><div class="t">Bank statement</div><div class="s">One credit line</div></div></div>
+    <div class="rw tot"><span>TABBY FZ LLC</span><span class="m">+17,419.10</span></div>
+    <div class="rw"><span>Sales in the payout</span><span class="m">17,808.10</span></div>
+    <div class="rw bad" id="f_ref"><span>Refund, netted inside</span><span class="m">−389.00</span></div>
+  </div>
+  <svg class="ink" viewBox="0 0 1080 1920" style="z-index:5"><path id="f_r" d="" fill="none" stroke="#D7261E" stroke-width="7" stroke-linecap="round"/></svg>
+  <div class="cap2"></div>
+</section>
+
+<!-- 6 invoices stay open -->
+<section class="scene night">
+  <img class="bg" id="g_bg" src="PHOTO/px-accountant-review.jpg"><div class="wash"></div>
+  <div class="tag2">Illustration</div>
+  <div class="doc" id="g_d" style="top:420px">
+    <div class="dh"><img src="LG/zoho-mark.png" style="height:46px"><div><div class="t">Invoices</div><div class="s">September</div></div><span class="pill a tg" id="g_ct">0 open</span></div>
+    <div id="g_rows"></div>
+  </div>
+  <svg class="cursor" id="g_cu" viewBox="0 0 24 24" style="position:absolute;width:64px;height:64px;left:0;top:0;z-index:6"><path d="M4 2 L4 20 L9 15 L12.5 22 L15.5 20.6 L12 13.8 L19 13.8 Z" fill="#14131C" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  <div class="cap2"></div>
+</section>
+
+<!-- 7 the agent does the match -->
+<section class="scene navy">
+  <div class="agent" id="h_ag" style="left:860px;top:395px;width:150px;height:170px"></div>
+  <div class="src" id="h_gm" style="left:72px;top:440px"><img src="LG/gmail.svg" style="height:30px">Payout files read <b id="h_n" style="color:var(--blue)">0</b></div>
+  <div class="appwin" id="h_w" style="top:560px">
+    <div class="ah" id="h_ic"><span class="t">Month close</span><span class="s" id="h_mo"></span></div>
+    <div class="prog"><b id="h_pb"></b></div>
+    <div class="pk"><span>Matched to the bank</span><span class="num" id="h_pc">0 of 5</span></div>
+    <div id="h_rows"></div>
+    <div style="display:flex;gap:14px;padding:22px 28px;border-top:1px solid var(--line)"><span class="pill g" id="h_c1" style="opacity:0;font-size:27px;padding:12px 20px">Fees + VAT booked</span><span class="pill g" id="h_c2" style="opacity:0;font-size:27px;padding:12px 20px">Invoices closed</span></div>
+  </div>
+  <div class="illus" style="top:1290px;color:#7F89A6">Illustrative rows from the RAMZA app.</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 8 e-invoicing: map + accredited provider -->
+<section class="scene navy">
+  <img class="bg" src="PHOTO/bb-office-team.jpg" id="i_bg"><div class="wash" style="opacity:.82"></div>
+  <div class="eyebrow" style="position:absolute;left:72px;top:430px">E-invoicing</div>
+  <div class="tile" id="i_t0" style="left:72px;top:480px"><img src="LG/shopify.svg">Store<small>orders</small></div>
+  <div class="tile" id="i_t1" style="left:708px;top:480px"><img src="LG/zoho-books.svg"><small>invoices</small></div>
+  <div class="tile" id="i_t2" style="left:390px;top:760px;width:300px"><svg viewBox="20 20 160 160" style="width:70px;height:70px"><rect x="20" y="20" width="160" height="160" rx="54" fill="#3A55E6"/><rect x="68" y="72" width="22" height="50" rx="11" fill="#fff"/><rect x="110" y="72" width="22" height="50" rx="11" fill="#fff"/></svg>RAMZA<small>maps every source</small></div>
+  <div class="tile" id="i_t3" style="left:72px;top:1060px;height:170px">Accredited<small>service provider</small></div>
+  <div class="tile" id="i_t4" style="left:708px;top:1060px;height:170px">Your customer<small>their provider</small></div>
+  <svg class="ink" viewBox="0 0 1080 1920" style="z-index:0"><g fill="none" stroke="#B3A6FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 14">
+    <path id="i_l0" d="M222,670 C222,720 400,760 480,760"/><path id="i_l1" d="M858,670 C858,720 680,760 600,760"/>
+    <path id="i_l2" d="M480,950 C400,1000 222,1000 222,1060"/><path id="i_l3" d="M372,1145 L708,1145"/></g></svg>
+  <div class="illus" style="top:1270px;color:#9AA3BC">RAMZA is not an accredited service provider.</div>
+  <div class="cap2"></div>
+</section>
+
+<!-- 9 proof -->
+<section class="scene night">
+  <div class="body"><div class="eyebrow" id="j_e"></div>
+    <div class="disp hx" style="margin-top:20px"><span class="line"><span>Our own books.</span></span></div>
+    <div style="margin-top:60px">
+      <div class="stat" id="j_s1"><span class="k">Bank lines<br>not yet in Zoho</span><span class="v num" id="j_v1">0</span></div>
+      <div class="stat" id="j_s2"><span class="k">Worth</span><span class="v num" id="j_v2">0</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:36px;line-height:1.45">Omnia is RAMZA's founding company and first user.<br>Figures from the live RAMZA app.</div>
+  </div>
+</section>
+
+<!-- 10 CTA -->
+<section class="scene navy">
+  <div class="agent" id="k_ag" style="left:300px;top:430px;width:480px;height:430px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div id="k_kw" style="margin-top:30px"><span class="kw">AGENT</span></div>
+    <div style="font-size:32px;color:#C4CAD9;margin-top:34px" id="k_sub"></div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const F = window.FACTS, R = window.RULES, EI = R.einvoicing;
+const dubaiToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dubai" }).format(new Date());
+const left = Math.round((Date.parse(EI.large.asp_by) - Date.parse(dubaiToday)) / 864e5);
+/* hand-drawn ink ring around a box (x, y, w, h) */
+const ring = (x, y, w, h) => { const cx = x + w / 2, cy = y + h / 2, rx = w / 2 + 22, ry = h / 2 + 14;
+  return `M${cx - rx * 0.2},${cy - ry * 1.05} C${cx + rx * 1.1},${cy - ry * 1.15} ${cx + rx * 1.1},${cy + ry * 1.05} ${cx},${cy + ry} C${cx - rx * 1.12},${cy + ry * 0.95} ${cx - rx * 1.08},${cy - ry * 1.1} ${cx + rx * 0.35},${cy - ry * 1.08}`; };
+function hl(sel, t, d = 0.35) { tl.to(sel, { scaleX: 1, duration: d, ease: "power2.inOut" }, t); E.sfx("blip", t); }
+function slam(sel, t, { rx = 10, ry = -12, rz = -3 } = {}) {
+  tl.fromTo(sel, { scale: 1.3, opacity: 0, rotationX: rx * 2, rotationY: ry * 2, rotationZ: rz * 2, transformPerspective: 1600 },
+    { scale: 1, opacity: 1, rotationX: rx, rotationY: ry, rotationZ: rz, duration: 0.45, ease: "power4.out" }, t);
+  E.sfx("impact", t + 0.15);
+}
+function drift(sel, t0, t1, to = { rotationX: 0, rotationY: 0, rotationZ: 0, scale: 1.06 }) { tl.to(sel, { ...to, duration: t1 - t0, ease: "sine.inOut" }, t0); }
+function shake(sel, t, a = 10) { tl.to(sel, { keyframes: [{ x: a }, { x: -a }, { x: a / 2 }, { x: 0 }], duration: 0.24, ease: "none" }, t); }
+function chip(sel, t) { tl.fromTo(sel, { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, t); }
+
+$("#a_r1").setAttribute("d", ring(615, 693, 230, 40));
+$("#b_r1").setAttribute("d", ring(304, 8, 150, 38));
+$("#b_r2").setAttribute("d", ring(646, 211, 140, 38));
+$("#b_c").textContent = `${left} days left`;
+const INV = [["INV-1042", "Tabby", "389.00"], ["INV-1043", "Stripe", "2,105.50"], ["INV-1044", "COD", "915.25"], ["INV-1045", "Tamara", "640.00"], ["INV-1046", "Telr", "1,240.00"], ["INV-1047", "COD", "455.75"]];
+$("#g_rows").innerHTML = INV.map(([n, g, a], i) => `<div class="inv" id="g_r${i}"><span>${n} <span style="color:var(--mute);font-size:24px">· ${g}</span></span><span class="m">${a}</span><span class="p"><span class="pill a">Open</span></span></div>`).join("");
+const ROWS = [["LG/tabby-mark.png", "TABBY FZ LLC", "17,808.10"], ["LG/tamara-mark.png", "TAMARA PAYOUT", "9,870.00"], ["LG/stripe-mark.png", "NETWORK INTL", "12,306.18"], ["LG/telr-mark.png", "TELR SETTLEMENT", "6,215.40"], [null, "COURIER COD", "4,712.00"]];
+$("#h_rows").innerHTML = ROWS.map(([lg, nm, amt], i) => `<div class="trow" id="h_r${i}"><span>${lg ? `<img src="${lg}">` : `<b style="font-family:Urbanist">COD</b>`}</span><span class="d">${nm}</span><span class="m">${amt}</span>
+  <span class="st"><span class="pill a" id="h_pa${i}">Pending</span><span class="pill g" id="h_pg${i}" style="opacity:0">Matched</span></span></div>`).join("");
+$("#h_ic").insertAdjacentHTML("afterbegin", KIT.mark(true));
+$("#h_mo").textContent = F.close_month;
+$("#h_ag").innerHTML = KIT.body("#000");
+$("#k_ag").innerHTML = KIT.sticker("#FF6A1A");
+$("#k_sub").textContent = `${R.offer.free_trial.days}-day free trial · read-only access`;
+$("#j_e").textContent = `Omnia · as of ${new Date(F.as_of).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+RL.build();
+
+/* 0 — Gulf News, frame 0 already shows the article */
+{
+  const s = RL.seg(0), gn = RL.w(0, "Gulf"), nr = RL.w(0, "nears");
+  E.kenBurns("#a_bg", 0, s.end, { from: 1.18, to: 1.0 });
+  tl.set("#a_n", { rotationX: 9, rotationY: -12, rotationZ: -2, transformPerspective: 1600, scale: 0.84 }, 0);
+  drift("#a_n", 0, s.end + 0.3, { rotationX: 2, rotationY: -3, rotationZ: 0, scale: 0.92 });
+  hl("#a_h1", gn - 0.05, 0.45); hl("#a_h2", nr - 0.15, 0.4);
+  E.draw($("#a_r1"), nr + 0.25, 0.5); E.sfx("click", nr + 0.3);
+  chip("#a_s", gn + 0.2);
+}
+/* 1 — Economy Middle East slams in; the date and the fine get circled */
+{
+  const s = RL.seg(1), lg = RL.w(1, "Large"), oc = RL.w(1, "October"), ae = RL.w(1, "AED") ?? RL.w(1, "5,000");
+  E.kenBurns("#b_bg", s.start, s.end - s.start, { from: 1.15, to: 1.0 });
+  slam("#b_n", s.start + 0.1, { rx: 6, ry: 8, rz: 2 }); shake(".scene:nth-of-type(2) .persp", s.start + 0.2);
+  drift("#b_n", s.start + 0.6, s.end, { rotationX: 0, rotationY: 2, rotationZ: 0, scale: 1.0 });
+  hl("#b_h1", lg - 0.1, 0.45); hl("#b_h2", lg + 0.3, 0.15);
+  tl.to("#b_n", { y: -95, scale: 0.76, duration: 0.55, ease: "power3.inOut" }, oc - 0.6);
+  tl.fromTo("#b_q", { y: 220, opacity: 0, rotationX: -14, transformPerspective: 1600 }, { y: 0, opacity: 1, rotationX: 0, duration: 0.55, ease: "expo.out" }, oc - 0.6);
+  E.draw($("#b_r1"), oc - 0.05, 0.45); E.sfx("click", oc);
+  E.draw($("#b_r2"), ae - 0.05, 0.45); E.sfx("impact", ae + 0.1); shake(".scene:nth-of-type(2) .persp", ae + 0.1, 12);
+  pop("#b_c", oc + 0.2); chip("#b_s", s.start + 0.5);
+}
+function pop(sel, t) { tl.fromTo(sel, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(2.6)" }, t); E.sfx("pop", t); }
+/* 2 — CFO.com */
+{
+  const s = RL.seg(2), cf = RL.w(2, "CFO"), hf = RL.w(2, "half"), wk = RL.w(2, "week");
+  E.kenBurns("#c_bg", s.start, s.end - s.start, { from: 1.0, to: 1.14 });
+  slam("#c_n", s.start + 0.1, { rx: 8, ry: 10, rz: 2 });
+  drift("#c_n", s.start + 0.6, s.end, { rotationX: 1, rotationY: 2, rotationZ: 0, scale: 1.03 });
+  E.draw($("#c_u"), cf + 0.1, 0.35);
+  hl("#c_h1", hf - 0.1, 0.4); hl("#c_h2", wk - 0.35, 0.4);
+  chip("#c_s", cf);
+}
+/* 3 — the quote */
+{
+  const s = RL.seg(3), rc = RL.w(3, "reconciliation");
+  E.kenBurns("#d_bg", s.start, s.end - s.start, { from: 1.12, to: 1.0 });
+  tl.fromTo("#d_n", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, s.start + 0.15);
+  tl.fromTo(".scene:nth-of-type(4) .sub", { opacity: 0 }, { opacity: 1, duration: 0.4 }, s.start + 0.4);
+  tl.fromTo("#d_q", { y: 160, opacity: 0, rotationX: -12, transformPerspective: 1600, scale: 1.1 }, { y: 0, opacity: 1, rotationX: 0, scale: 1.1, duration: 0.6, ease: "expo.out" }, s.start + 0.3);
+  hl("#d_h", s.voice + 0.15, 0.6);
+  KIT.punch("#d_n", rc, 1.06);
+  chip("#d_s", s.start + 0.6);
+}
+/* 4 — b-roll: four hard cuts with a two-frame flash */
+{
+  const s = RL.seg(4), gs = RL.w(4, "goes");
+  const cuts = [s.start, s.start + (gs - s.start) * 0.33, s.start + (gs - s.start) * 0.66, gs - 0.05];
+  cuts.forEach((t, i) => {
+    tl.set(`#e_c${i}`, { zIndex: 2 + i, visibility: "visible" }, t);
+    if (i) { tl.set(`#e_c${i}`, { visibility: "hidden" }, 0); tl.fromTo("#e_f", { opacity: 0.85 }, { opacity: 0, duration: 0.12 }, t); E.sfx("swish", t); }
+    E.kenBurns(`#e_c${i} img`, t, 1.6, { from: 1.22, to: 1.05, x: i % 2 ? -30 : 30 });
+  });
+  tl.fromTo("#e_w", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, gs - 0.15);
+  tl.set("#e_w", { zIndex: 10 }, 0);
+}
+/* 5 — three leaks, one artifact each */
+{
+  const s = RL.seg(5), W = [RL.w(5, "net"), RL.w(5, "short"), RL.w(5, "inside")];
+  const T = [s.start, RL.w(5, "Cash") - 0.2, RL.w(5, "Refunds") - 0.2];
+  const TARGETS = [["#f_fee", 640, 535], ["#f_short", 640, 680], ["#f_ref", 640, 680]];
+  [0, 1, 2].forEach((i) => {
+    const t = T[i];
+    tl.set(`#f_c${i}`, { zIndex: 1 + i, visibility: "visible" }, t);
+    if (i) tl.set(`#f_c${i}`, { visibility: "hidden" }, 0);
+    E.kenBurns(`#f_c${i} img`, t, 2.4, { from: 1.15, to: 1.0 });
+    tl.set(`#f_d${i}`, { zIndex: 4 }, 0);
+    tl.fromTo(`#f_d${i}`, { y: 260, opacity: 0, rotationX: -16, transformPerspective: 1600 }, { y: 0, opacity: 1, rotationX: 0, duration: 0.5, ease: "expo.out" }, t + 0.05);
+    if (i < 2) tl.to(`#f_d${i}`, { x: -1100, rotation: -6, duration: 0.45, ease: "power3.in" }, T[i + 1] - 0.1);
+    else tl.set(`#f_d${i}`, {}, t);
+    E.sfx("whoosh", t);
+    KIT.punch(TARGETS[i][0], W[i], 1.06);
+    tl.to(TARGETS[i][0], { backgroundColor: "#FBE9E7", duration: 0.15 }, W[i] - 0.05);
+    E.sfx("impact", W[i] + 0.05);
+  });
+  [1, 2].forEach((i) => tl.set(`#f_d${i}`, { opacity: 0 }, 0));
+}
+/* 6 — invoices stay open */
+{
+  const s = RL.seg(6), op = RL.w(6, "open"), hd = RL.w(6, "hand");
+  E.kenBurns("#g_bg", s.start, s.end - s.start, { from: 1.0, to: 1.12 });
+  tl.fromTo("#g_d", { y: 200, opacity: 0, rotationX: -14, transformPerspective: 1600 }, { y: 0, opacity: 1, rotationX: 0, duration: 0.5, ease: "expo.out" }, s.start + 0.1);
+  INV.forEach((_, i) => {
+    const t = s.start + 0.3 + (op + 0.3 - s.start - 0.3) * (i / INV.length);
+    tl.fromTo(`#g_r${i}`, { x: 60, opacity: 0 }, { x: 0, opacity: 1, duration: 0.3, ease: "expo.out" }, t);
+    tl.set("#g_ct", { textContent: `${i + 1} open` }, t); E.sfx("blip", t);
+  });
+  KIT.punch("#g_ct", op, 1.2);
+  tl.set("#g_cu", { x: 900, y: 1200 }, 0);
+  tl.to("#g_cu", { x: 850, y: 640, duration: 0.6, ease: "power2.inOut" }, hd - 0.7);
+  tl.fromTo("#g_cu", { scale: 1 }, { scale: 0.8, duration: 0.08, yoyo: true, repeat: 1 }, hd - 0.05); E.sfx("click", hd);
+  tl.to("#g_cu", { y: 720, duration: 0.5, ease: "power1.inOut" }, hd + 0.2);
+}
+/* 7 — the agent: files read, rows matched, invoices closed */
+{
+  const s = RL.seg(7), rd = RL.w(7, "reads"), bk = RL.w(7, "bank"), bf = RL.w(7, "books"), iv = RL.w(7, "invoices");
+  KIT.dropIn($("#h_ag"), s.start + 0.05);
+  chip("#h_gm", rd - 0.2);
+  for (let i = 1; i <= 5; i++) { tl.set("#h_n", { textContent: String(i) }, rd + i * 0.12); }
+  E.sfx("typing", rd);
+  tl.fromTo("#h_w", { y: 160, opacity: 0, rotationX: -12, transformPerspective: 1600 }, { y: 0, opacity: 1, rotationX: 0, duration: 0.6, ease: "expo.out" }, s.start + 0.3);
+  ROWS.forEach((_, i) => {
+    const t = bk - 0.3 + ((bf - bk + 0.1) * i) / ROWS.length;
+    tl.to(`#h_pa${i}`, { opacity: 0, duration: 0.12 }, t);
+    tl.fromTo(`#h_pg${i}`, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.4)" }, t); E.sfx("pop", t);
+    tl.set("#h_pc", { textContent: `${i + 1} of 5` }, t);
+  });
+  tl.fromTo("#h_pb", { scaleX: 0 }, { scaleX: 1, duration: bf - bk + 0.1, ease: "none" }, bk - 0.3);
+  pop("#h_c1", bf); pop("#h_c2", iv);
+}
+/* 8 — e-invoicing map */
+{
+  const s = RL.seg(8), mp = RL.w(8, "maps"), ac = RL.w(8, "accredited");
+  E.kenBurns("#i_bg", s.start, s.end - s.start, { from: 1.1, to: 1.0 });
+  ["#i_t0", "#i_t1"].forEach((t, i) => tl.fromTo(t, { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, s.start + 0.2 + i * 0.12));
+  tl.fromTo("#i_t2", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2)" }, mp - 0.1); E.sfx("impact", mp);
+  E.draw($("#i_l0"), mp + 0.1, 0.4); E.draw($("#i_l1"), mp + 0.1, 0.4);
+  tl.fromTo("#i_t3", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, ac - 0.1); E.sfx("pop", ac);
+  E.draw($("#i_l2"), ac - 0.2, 0.4);
+  tl.fromTo("#i_t4", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "expo.out" }, ac + 0.5);
+  E.draw($("#i_l3"), ac + 0.5, 0.4);
+}
+/* 9 — proof */
+{
+  const s = RL.seg(9);
+  E.lines(".scene:nth-of-type(10) .disp", s.start + 0.3);
+  const c1 = RL.w(9, String(F.bank_lines_not_in_zoho)), c2 = RL.w(9, "AED");
+  tl.fromTo("#j_s1", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c1 - 0.3);
+  E.count($("#j_v1"), c1 - 0.2, F.bank_lines_not_in_zoho, { dur: 1.0 });
+  tl.fromTo("#j_s2", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, c2 - 0.3);
+  E.count($("#j_v2"), c2 - 0.2, F.bank_lines_not_in_zoho_aed / 1e6, { dur: 1.1, fmt: (v) => `${v.toFixed(2)}M` });
+  E.sfx("chime", c2 + 0.9);
+}
+/* 10 — CTA */
+{
+  const s = RL.seg(10).start;
+  KIT.startAt("#k_ag", s - 0.6);
+  tl.fromTo("#k_ag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, s + 0.1);
+  const kw = RL.w(10, "Comment", "t1");
+  tl.fromTo("#k_kw", { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2.4)" }, kw); E.sfx("impact", kw + 0.1);
+  tl.fromTo("#k_sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 }, RL.w(10, "free") - 0.2);
+}
+</script>
+</body></html>

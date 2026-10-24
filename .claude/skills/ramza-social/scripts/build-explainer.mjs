@@ -17,7 +17,6 @@ const TPL = path.resolve(HERE, "../templates/explainers");
 const args = process.argv.slice(2);
 const [id, workArg] = args;
 const opt = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : null);
-const VOICE = opt("--voice") ?? "EXAVITQu4vr4xnSDxMaL"; // Sarah, same voice as Noor reels
 const CHECK = opt("--check");
 
 const env = Object.fromEntries(fs.readFileSync(`${REPO}/.env`, "utf8").split("\n").filter((l) => /^[A-Z_]+=/.test(l))
@@ -26,11 +25,16 @@ const R = JSON.parse(fs.readFileSync(`${REPO}/config/rules.json`, "utf8"));
 const F = JSON.parse(fs.readFileSync(path.resolve(HERE, "../templates/facts.json"), "utf8"));
 const ex = explainers(R, F).find((x) => x.id === id);
 if (!ex) { console.error("unknown explainer", id, "→", explainers(R, F).map((x) => x.id).join(", ")); process.exit(1); }
+const VOICE = opt("--voice") ?? ex.voice ?? "EXAVITQu4vr4xnSDxMaL"; // default Sarah, same voice as Noor reels
 
 const dir = path.resolve(workArg, "explainers", id);
 fs.mkdirSync(`${dir}/vo`, { recursive: true });
 const sh = (c) => execSync(c, { stdio: ["ignore", "pipe", "inherit"] }).toString().trim();
 const dur = (f) => +sh(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${f}"`);
+
+/* founder rule 2026-10-24: VAT is said as one word ("vat"), never spelled V-A-T. Same length, so
+   ElevenLabs' character timestamps still line up with the caption tokens. */
+const sayAsWord = (t) => t.replace(/\bVAT\b/g, "vat");
 
 /* `{shown|spoken}` groups and *keyword* spans → tokens with the spoken text's char ranges */
 function tokenize(say) {
@@ -56,7 +60,8 @@ const GAP = 0.28, LEAD = 0.35, TAIL = 2.4;
 let t = LEAD;
 const segs = [];
 for (const [i, s] of ex.segments.entries()) {
-  const { toks, spoken } = tokenize(s.say);
+  const { toks, spoken: written } = tokenize(s.say);
+  const spoken = sayAsWord(written);
   const key = crypto.createHash("sha1").update(VOICE + spoken).digest("hex").slice(0, 10);
   const mp3 = `${dir}/vo/${i}-${key}.mp3`, js = `${dir}/vo/${i}-${key}.json`;
   if (!fs.existsSync(mp3)) {
@@ -93,7 +98,7 @@ for (const [ln, to] of [["PHOTO", "public/ramza/photos"], ["BRAND", "public/ramz
   fs.symlinkSync(`${REPO}/${to}`, `${dir}/${ln}`);
 }
 fs.writeFileSync(`${dir}/data.js`, `window.RULES=${JSON.stringify(R)};window.FACTS=${JSON.stringify(F)};window.TIMING=${JSON.stringify({ dur: total,
-  segs: segs.map(({ mp3, ...s }) => s) })};window.DISCLAIMER=${JSON.stringify(ex.disclaimer)};`);
+  segs: segs.map(({ mp3, ...s }) => s) })};window.DISCLAIMER=${JSON.stringify(ex.disclaimer)};window.DATA=${JSON.stringify(ex.data ?? {})};`);
 console.log(JSON.stringify({ id, dur: total, segs: segs.map((s) => [s.start, s.end]) }));
 
 // 3. frames

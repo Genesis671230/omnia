@@ -1,6 +1,7 @@
 /* Ad pixels for the RAMZA pages. Each loads only when its env var is set, so
  * plugging a new ad account in is: set the ID in Vercel → redeploy. Events are
- * sent through lib/ramza/track.ts. */
+ * sent through lib/ramza/track.ts. GA4 defaults to the RAMZA property and only
+ * loads in production builds, so local dev never pollutes the reports. */
 
 import Script from "next/script";
 
@@ -8,6 +9,7 @@ const META = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const TIKTOK = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID;
 const GTM = process.env.NEXT_PUBLIC_GTM_ID;
 const GADS = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+export const GA4 = process.env.NODE_ENV === "production" ? process.env.NEXT_PUBLIC_GA4_ID || "G-R7CCE11LPC" : process.env.NEXT_PUBLIC_GA4_ID;
 
 export function Pixels() {
   return (
@@ -27,11 +29,12 @@ export function Pixels() {
           {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${GTM}');`}
         </Script>
       )}
-      {GADS && (
+      {/* One gtag.js for GA4 and Google Ads; each ID gets its own config. */}
+      {(GA4 || GADS) && (
         <>
-          <Script src={`https://www.googletagmanager.com/gtag/js?id=${GADS}`} strategy="afterInteractive" />
-          <Script id="gads" strategy="afterInteractive">
-            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config','${GADS}');`}
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA4 || GADS}`} strategy="afterInteractive" />
+          <Script id="gtag" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());${[GA4, GADS].filter(Boolean).map((id) => `gtag('config','${id}');`).join("")}`}
           </Script>
         </>
       )}

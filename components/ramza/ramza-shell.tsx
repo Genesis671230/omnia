@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Fraunces, Urbanist } from "next/font/google";
 import { Backdrop } from "./backdrop";
+import { Pixels } from "./ct/pixels";
 import "@/app/ramza/ramza.css";
 
 const plex = IBM_Plex_Sans({
@@ -34,7 +35,8 @@ const plexArabic = IBM_Plex_Sans_Arabic({
 });
 
 /* Wraps every RAMZA-branded route (/ramza and /privacy). Sets the scoped
-   token context and the IBM Plex fonts without touching the omnia app shell. */
+   token context and the IBM Plex fonts without touching the omnia app shell.
+   Pixels (GA4, Meta, TikTok, GTM) load here so guides and hubs are tracked too. */
 export function RamzaShell({ children }: { children: ReactNode }) {
   return (
     <div
@@ -48,6 +50,7 @@ export function RamzaShell({ children }: { children: ReactNode }) {
       className={`${plex.variable} ${plexArabic.variable} ${fraunces.variable} ${urbanist.variable} relative min-h-screen`}
       style={{ color: "var(--ink)" }}
     >
+      <Pixels />
       <Backdrop />
       <div className="relative z-[1]">{children}</div>
     </div>

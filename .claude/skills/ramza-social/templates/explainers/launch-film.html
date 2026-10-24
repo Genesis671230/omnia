@@ -1,0 +1,420 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<style>
+  /* RAMZA launch film. Grammar from ramza-director/direction.md "Launch-film grammar": no caption bar,
+     the words are the picture, one word per beat on the voice, paper ↔ navy flips on the sentence's
+     turn, ONE accent (agent blue) drawn as hand scribbles, the name lands on a full-bleed slam.
+     Critical content stays in y 300–1320 so the 4:5 and 1:1 crops keep it. */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Urbanist:wght@600;700;800&display=block');
+  :root{--blue:#4B67EE;--navy:#0B1533;--paper:#F6F7FA;--ink:#14131C;--mute:#8A92A6;--line:#DCE1EB;--red:#D9463A}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:var(--paper)}
+  body{font-family:'IBM Plex Sans',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .sc{position:absolute;inset:0;visibility:hidden;overflow:hidden}
+  .paper{background:var(--paper);color:var(--ink)}
+  .ink{background:var(--navy);color:#fff}
+  .slam{background:var(--blue);color:#fff}
+  .in{position:absolute;inset:0;transform-origin:540px 820px}
+  .d{position:absolute;font-family:'Urbanist';font-weight:800;letter-spacing:-.04em;line-height:.95;white-space:nowrap}
+  .m{position:absolute;font-family:'IBM Plex Mono';font-weight:500;white-space:nowrap}
+  .c{left:0;right:0;text-align:center}
+  .b{color:var(--blue)}
+  .mute{color:var(--mute)}
+  svg.sk{position:absolute;inset:0;width:1080px;height:1920px;overflow:visible;pointer-events:none}
+  svg.sk path{fill:none;stroke:var(--blue);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+
+  /* s1 stacks */
+  .stack{position:absolute;left:0;right:0;top:520px;height:520px}
+  .stack div{position:absolute;left:0;right:0;text-align:center;font-family:'Urbanist';font-weight:800;font-size:190px;letter-spacing:-.045em;line-height:1}
+  .tag{position:absolute;font-family:'IBM Plex Mono';font-size:25px;color:rgba(255,255,255,.62);border:1px solid rgba(255,255,255,.22);padding:8px 14px;border-radius:8px;white-space:nowrap}
+  #days{position:absolute;left:90px;top:1180px;width:900px;display:grid;grid-template-columns:repeat(15,1fr);gap:10px}
+  #days i{display:block;height:42px;border:1.5px solid rgba(255,255,255,.3);border-radius:6px}
+  #days i b{display:block;width:100%;height:100%;background:var(--blue);border-radius:4px;transform:scale(0)}
+
+  /* s2 timeline */
+  #tline{position:absolute;left:0;top:1000px;width:3000px;height:90px}
+  #tline .h{position:absolute;left:0;right:0;top:44px;height:2px;background:#C9CFDB}
+  #tline span{position:absolute;top:0;width:2px;height:90px;background:#C9CFDB}
+  #tline em{position:absolute;top:-44px;font-style:normal;font-family:'IBM Plex Mono';font-size:24px;color:var(--mute)}
+
+  /* s3 sheet */
+  #sheet{position:absolute;left:90px;top:540px;width:900px;border-top:1.5px solid rgba(255,255,255,.25);border-left:1.5px solid rgba(255,255,255,.25)}
+  #sheet .r{display:grid;grid-template-columns:64px repeat(4,1fr);height:64px}
+  #sheet .r>*{position:relative;border-right:1.5px solid rgba(255,255,255,.25);border-bottom:1.5px solid rgba(255,255,255,.25);font-family:'IBM Plex Mono';font-size:22px;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:flex-end;padding:0 14px}
+  #sheet .r>.n,#sheet .hd>*{justify-content:center;color:rgba(255,255,255,.45)}
+  #sheet .fl{position:absolute;inset:0;background:var(--red);opacity:.85;transform:scaleX(0);transform-origin:left}
+  #sheet .r>* s{position:relative;text-decoration:none}
+  #chip{position:absolute;left:0;top:0;width:200px;height:56px;background:var(--blue);color:#fff;border-radius:6px;font-family:'IBM Plex Mono';font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px rgba(0,0,0,.35)}
+  .cur{position:absolute;width:54px;height:54px}
+
+  /* s6/s7 agent card */
+  .card{position:absolute;left:90px;width:900px;background:#fff;border:1.5px solid var(--line);border-radius:22px;box-shadow:0 18px 40px rgba(11,21,51,.08)}
+  .mk{position:absolute;border-radius:28%;background:var(--blue)}
+  .mk:before,.mk:after{content:"";position:absolute;top:31%;width:13.5%;height:38%;border-radius:99px;background:#fff}
+  .mk:before{left:31.5%}.mk:after{right:31.5%}
+  .mk.w{background:#fff}.mk.w:before,.mk.w:after{background:var(--blue)}
+  #cmd{top:650px;height:150px}
+  #cmd .m{left:150px;top:52px;font-size:40px;color:var(--ink)}
+  #caret{display:inline-block;width:3px;height:44px;background:var(--blue);vertical-align:-8px;margin-left:4px}
+  #bank{top:850px;height:170px;overflow:hidden}
+  #bank .m{font-size:27px}
+  #bank .hl{position:absolute;left:18px;right:18px;top:74px;height:72px;background:rgba(75,103,238,.16);border-radius:8px;transform:scaleX(0);transform-origin:left}
+  .step{position:absolute;left:90px;width:900px;height:96px;border-bottom:1.5px solid var(--line);display:flex;align-items:center;font-size:36px;font-weight:500}
+  .step i{width:46px;height:46px;border-radius:50%;background:var(--blue);margin-right:26px;flex:none;display:flex;align-items:center;justify-content:center}
+  .step i svg{width:26px;height:26px}
+  .step b{margin-left:auto;font-family:'IBM Plex Mono';font-weight:500;font-size:34px}
+
+  /* s8 bars */
+  .bar{position:absolute;left:90px;width:900px;height:96px}
+  .bar .t{position:absolute;left:0;top:0;font-size:30px;color:rgba(255,255,255,.75)}
+  .bar .v{position:absolute;right:0;top:-6px;font-family:'IBM Plex Mono';font-size:38px}
+  .bar .tr{position:absolute;left:0;right:0;top:50px;height:34px;background:rgba(255,255,255,.1);border-radius:6px;overflow:hidden}
+  .bar .f{height:100%;border-radius:6px;transform:scaleX(0);transform-origin:left}
+
+  /* s9 approve */
+  #code{top:660px;height:160px}
+  #code .m{left:60px;top:52px;font-size:46px;color:var(--ink)}
+  #btn{position:absolute;left:250px;top:1040px;width:580px;height:130px;border-radius:18px;background:var(--navy);color:#fff;font-family:'Urbanist';font-weight:700;font-size:50px;display:flex;align-items:center;justify-content:center;gap:18px}
+
+  #disc{position:absolute;left:80px;right:80px;top:1530px;text-align:center;font-size:21px;line-height:1.4;color:var(--mute);z-index:20;visibility:hidden}
+</style></head>
+<body>
+
+<!-- 0 · You're selling more than ever (paper) -->
+<section class="sc paper" id="s0"><div class="in">
+  <div class="m mute" style="left:90px;top:330px;font-size:26px;letter-spacing:.12em">ORDERS TODAY</div>
+  <div class="m" id="s0n" style="left:90px;top:372px;font-size:56px;color:var(--ink)">0</div>
+  <div class="d" id="s0a" style="left:86px;top:560px;font-size:170px">You're</div>
+  <div class="d" id="s0b" style="left:86px;top:740px;font-size:170px">selling</div>
+  <div class="d b" id="s0c" style="left:80px;top:910px;font-size:330px">more</div>
+  <div class="d mute" id="s0d" style="left:90px;top:1240px;font-size:84px;font-weight:700">than ever.</div>
+  <svg class="sk"><path id="s0p" d="M70,1180 C170,1120 230,1150 300,1060 C360,990 420,1040 500,960 C590,870 640,930 720,820 C800,720 880,700 990,560"/><path id="s0h" d="M890,560 L992,556 L976,662"/></svg>
+</div></section>
+
+<!-- 1 · Orders. Refunds. Payouts. Every single day. (navy) -->
+<section class="sc ink" id="s1"><div class="in">
+  <div class="stack" id="st0"></div><div class="stack" id="st1"></div><div class="stack" id="st2"></div>
+  <div id="tags"></div>
+  <div class="d c" id="s1e" style="top:1040px;font-size:104px">every single day.</div>
+  <div id="days"></div>
+</div></section>
+
+<!-- 2 · But your books are still kept like it's 1920 (paper) -->
+<section class="sc paper" id="s2"><div class="in">
+  <div class="d" id="s2a" style="left:86px;top:350px;font-size:150px">But</div>
+  <div class="d" id="s2b" style="left:86px;top:500px;font-size:150px">your books</div>
+  <div class="d mute" id="s2c" style="left:90px;top:730px;font-size:70px;font-weight:700">are still kept like it's</div>
+  <svg class="sk"><path id="s2p" d="M440,668 C560,652 700,672 870,650 C770,672 600,684 470,694"/></svg>
+  <div id="tline"><div class="h"></div></div>
+  <div class="d b" id="s2y" style="left:80px;top:1110px;font-size:230px">2026</div>
+</div></section>
+
+<!-- 3 · By hand. Line by line. Gateway by gateway. (navy) -->
+<section class="sc ink" id="s3"><div class="in">
+  <div class="d" id="s3a" style="left:90px;top:340px;font-size:130px">By hand.</div>
+  <div class="d" id="s3b" style="left:90px;top:340px;font-size:130px">Line by line.</div>
+  <div class="d" id="s3c" style="left:90px;top:350px;font-size:96px">Gateway by gateway.</div>
+  <div id="sheet"></div>
+  <div id="chip">9,412.37</div>
+  <svg class="cur" id="cur3" viewBox="0 0 24 24"><path d="M4 2l15 9.5-6.6 1.3L9.6 20z" fill="#fff" stroke="#0B1533" stroke-width="1.4"/></svg>
+</div></section>
+
+<!-- 4 · The store sold 10,000. The bank got 9,412. Where did 587 go? (paper) -->
+<section class="sc paper" id="s4"><div class="in">
+  <div class="m mute" id="s4l1" style="left:90px;top:350px;font-size:28px;letter-spacing:.12em">THE STORE SOLD · AED</div>
+  <div class="d" id="s4v1" style="left:84px;top:395px;font-size:180px">0</div>
+  <div class="m mute" id="s4l2" style="left:90px;top:610px;font-size:28px;letter-spacing:.12em">THE BANK GOT · AED</div>
+  <div class="d" id="s4v2" style="left:84px;top:655px;font-size:180px">0</div>
+  <div class="d" id="s4w" style="left:90px;top:880px;font-size:96px">Where did</div>
+  <div class="d b" id="s4g" style="left:300px;top:990px;font-size:280px">587</div>
+  <div class="d b" id="s4q" style="left:820px;top:1000px;font-size:240px">?</div>
+  <svg class="sk"><path id="s4p" d="M330,1050 C480,975 800,995 815,1135 C830,1275 520,1305 360,1255 C220,1210 240,1085 430,1035"/></svg>
+</div></section>
+
+<!-- 5 · Meet RAMZA (full-bleed slam) -->
+<section class="sc slam" id="s5"><div class="in">
+  <div class="d c" id="s5a" style="top:420px;font-size:96px;font-weight:700;color:rgba(255,255,255,.75)">Meet</div>
+  <div class="mk w" id="s5m" style="left:390px;top:570px;width:300px;height:300px"></div>
+  <div class="d c" id="s5w" style="top:960px;font-size:230px;letter-spacing:-.03em">RAMZA</div>
+</div></section>
+
+<!-- 6 · An AI agent that closes your month, starting from the bank (paper) -->
+<section class="sc paper" id="s6"><div class="in">
+  <div class="d" id="s6a" style="left:90px;top:340px;font-size:120px">An AI agent</div>
+  <div class="d mute" id="s6b" style="left:92px;top:480px;font-size:76px;font-weight:700">that closes your month.</div>
+  <div class="card" id="cmd"><div class="mk" style="left:44px;top:41px;width:68px;height:68px"></div><div class="m"><span id="typed"></span><span id="caret"></span></div></div>
+  <div class="card" id="bank">
+    <div class="m mute" style="left:40px;top:26px;font-size:22px;letter-spacing:.12em">BANK STATEMENT · CREDITS</div>
+    <div class="hl" id="bhl"></div>
+    <div class="m" style="left:40px;top:92px">28 OCT</div>
+    <div class="m" style="left:200px;top:92px">CARD SETTLEMENT</div>
+    <div class="m" style="right:40px;top:92px;font-weight:600">+9,412.37</div>
+  </div>
+</div></section>
+
+<!-- 7 · The fee. VAT on the fee. One refund. 12 orders. Every dirham, found. (paper) -->
+<section class="sc paper" id="s7"><div class="in">
+  <div class="card" id="cmd7" style="top:330px;height:150px"><div class="mk" style="left:44px;top:41px;width:68px;height:68px"></div><div class="m" style="left:150px;top:52px;font-size:40px">close October, from the bank</div></div>
+  <div id="steps"></div>
+  <div class="d b c" id="s7g" style="top:560px;font-size:250px">587.63</div>
+  <div class="d c" id="s7f" style="top:820px;font-size:150px">found.</div>
+  <div class="m c mute" id="s7e" style="top:1030px;font-size:32px">330.00 + 16.50 + 241.13 = 587.63 · debits = credits</div>
+  <svg class="sk"><path id="s7p" d="M330,1000 C420,990 640,1010 760,994"/></svg>
+</div></section>
+
+<!-- 8 · One Dubai brand. September. 145 bank credits. 89% matched. (navy) -->
+<section class="sc ink" id="s8"><div class="in">
+  <div class="m" id="s8l" style="left:90px;top:360px;font-size:28px;letter-spacing:.12em;color:rgba(255,255,255,.6)"></div>
+  <div class="d" id="s8n" style="left:80px;top:420px;font-size:360px">0</div>
+  <div class="d" id="s8u" style="left:90px;top:780px;font-size:80px;font-weight:700;color:rgba(255,255,255,.75)">bank credits</div>
+  <div class="bar" id="bar1" style="top:960px"><div class="t">Matched by the agent</div><div class="v" id="b1v">0%</div><div class="tr"><div class="f" style="background:var(--blue)"></div></div></div>
+  <div class="bar" id="bar2" style="top:1090px"><div class="t">Left for your review</div><div class="v" id="b2v">0%</div><div class="tr"><div class="f" style="background:rgba(255,255,255,.35)"></div></div></div>
+</div></section>
+
+<!-- 9 · And nothing posts to Zoho, until you approve. (paper) -->
+<section class="sc paper" id="s9"><div class="in">
+  <div class="d" id="s9a" style="left:90px;top:340px;font-size:120px">Nothing posts</div>
+  <div class="d" id="s9b" style="left:90px;top:480px;font-size:120px">to Zoho,</div>
+  <div class="card" id="code"><div class="m"><span id="typed9"></span></div></div>
+  <svg class="sk"><path id="s9x1" d="M130,690 C400,720 700,770 950,800"/><path id="s9x2" d="M140,810 C420,760 700,720 960,680"/></svg>
+  <div class="d" id="s9c" style="left:90px;top:880px;font-size:96px">until <span class="b">you</span> approve.</div>
+  <div id="btn"><span id="btnt">Approve journal</span><span id="btnd" style="position:absolute">Approved · posted</span></div>
+  <svg class="cur" id="cur9" viewBox="0 0 24 24" style="width:64px;height:64px"><path d="M4 2l15 9.5-6.6 1.3L9.6 20z" fill="#fff" stroke="#0B1533" stroke-width="1.4"/></svg>
+</div></section>
+
+<!-- 10 · You sell. RAMZA closes the books. Free setup. (navy) -->
+<section class="sc ink" id="s10"><div class="in">
+  <div class="d c" id="s10a" style="top:400px;font-size:190px">You sell.</div>
+  <div class="d c" id="s10b" style="top:630px;font-size:82px"><span class="b">RAMZA</span> closes the books.</div>
+  <div id="lock" style="position:absolute;left:0;right:0;top:880px;height:170px">
+    <div class="mk" style="left:270px;top:10px;width:150px;height:150px"></div>
+    <div class="d" style="left:450px;top:22px;font-size:140px;letter-spacing:-.03em">RAMZA</div>
+  </div>
+  <div class="m c" id="s10c" style="top:1120px;font-size:32px;color:rgba(255,255,255,.75)">Free setup · Pay once it closes your month</div>
+</div></section>
+
+<div id="disc"></div>
+
+<script>
+const T = window.TIMING, S = T.segs, D = window.DATA, tl = E.tl, $ = (s) => document.querySelector(s);
+window.__DUR = T.dur;
+const norm = (s) => s.toLowerCase().replace(/[^a-z0-9%]/g, "");
+/** voice time of the n-th token that reads `word` in segment i (t1 = its end) */
+function w(i, word, n = 0, end = false) {
+  let k = 0;
+  for (const t of S[i].tokens) if (norm(t.w) === norm(word) && k++ === n) return end ? t.t1 : t.t0;
+  console.error("no word", i, word); return S[i].voice;
+}
+const on = (i) => S[i].start, off = (i) => (i + 1 < S.length ? S[i + 1].start : T.dur);
+const pop = (sel, at, { y = 70, s = 1, d = 0.45, sfx = null } = {}) => {
+  tl.fromTo(sel, { autoAlpha: 0, y, scale: s }, { autoAlpha: 1, y: 0, scale: 1, duration: d, ease: "expo.out" }, at);
+  if (sfx) E.sfx(sfx, at);
+};
+const hide = (sel, at, d = 0.2) => tl.to(sel, { autoAlpha: 0, duration: d, ease: "power2.in" }, at);
+const draw = (sel, at, d = 0.5) => { gsap.set(sel, { opacity: 0 }); tl.set(sel, { opacity: 1 }, at); E.draw($(sel), at, d); E.sfx("swish", at); };
+const fmt2 = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const typeIn = (el, text, at, d) => {
+  const o = { n: 0 };
+  tl.fromTo(o, { n: 0 }, { n: text.length, duration: d, ease: "none", onUpdate: () => { el.textContent = text.slice(0, Math.round(o.n)); } }, at);
+  E.sfx("typing", at);
+};
+// every scene: on at its segment, off at the next, a slow push-in so no frame is ever static
+document.querySelectorAll(".sc").forEach((el, i) => {
+  E.scene(`#${el.id}`, on(i), off(i));
+  tl.fromTo(el.querySelector(".in"), { scale: 1 }, { scale: 1.045, duration: off(i) - on(i), ease: "none" }, on(i));
+  if (i) E.sfx(i === 5 ? "impact" : "whoosh", on(i));
+});
+
+// 0 · selling more
+gsap.set(["#s0a", "#s0b", "#s0c", "#s0d"], { autoAlpha: 0 });
+pop("#s0a", w(0, "you're") - 0.05);
+pop("#s0b", w(0, "selling"));
+pop("#s0c", w(0, "more"), { s: 0.7, y: 0, d: 0.5, sfx: "pop" });
+draw("#s0p", w(0, "more") + 0.05, 0.55); draw("#s0h", w(0, "more") + 0.55, 0.18);
+pop("#s0d", w(0, "than"));
+E.count($("#s0n"), on(0), 148, { dur: off(0) - on(0) });
+
+// 1 · orders / refunds / payouts multiply
+const words1 = ["Orders.", "Refunds.", "Payouts."];
+words1.forEach((wd, k) => {
+  const st = $(`#st${k}`);
+  for (let j = 0; j < 7; j++) {
+    const d = document.createElement("div");
+    d.textContent = wd;
+    d.style.top = `${j * 62}px`;
+    d.style.opacity = j === 3 ? 1 : 0.16 + 0.1 * (3 - Math.abs(j - 3));
+    st.appendChild(d);
+  }
+  gsap.set(st, { autoAlpha: 0 });
+  const at = w(1, wd), next = k < 2 ? w(1, words1[k + 1]) : w(1, "every");
+  tl.set(st, { autoAlpha: 1 }, at);
+  tl.fromTo(st.children, { y: (j) => (3 - j) * 62, scaleY: 0.6 }, { y: 0, scaleY: 1, duration: 0.5, ease: "expo.out", stagger: 0.025 }, at);
+  E.sfx("pop", at);
+  tl.set(st, { autoAlpha: 0 }, next - 0.02);
+});
+const tags = [["Stripe", 80, 360], ["Tabby", 760, 330], ["Tamara", 640, 1080], ["Shopify Payments", 90, 1110], ["COD", 880, 470],
+  ["Order #1042", 120, 470], ["Refund −241.13", 660, 1180], ["Payout +9,412.37", 300, 1260], ["Telr", 470, 380]];
+tags.forEach(([t, x, y], j) => {
+  const el = document.createElement("div");
+  el.className = "tag"; el.textContent = t; el.style.left = x + "px"; el.style.top = y + "px";
+  $("#tags").appendChild(el);
+  gsap.set(el, { autoAlpha: 0 });
+  pop(el, w(1, "orders.") + 0.15 + j * 0.17, { y: 20, d: 0.3 });
+});
+hide("#tags", w(1, "every") - 0.05, 0.15);
+gsap.set("#s1e", { autoAlpha: 0 });
+pop("#s1e", w(1, "every"));
+for (let j = 0; j < 30; j++) $("#days").insertAdjacentHTML("beforeend", "<i><b></b></i>");
+gsap.set("#days", { autoAlpha: 0 });
+tl.set("#days", { autoAlpha: 1 }, w(1, "every"));
+tl.to("#days b", { scale: 1, duration: 0.12, stagger: (off(1) - w(1, "every") - 0.3) / 30, ease: "back.out(2)" }, w(1, "every") + 0.1);
+
+// 2 · like it's 1920
+gsap.set(["#s2a", "#s2b", "#s2c", "#s2y"], { autoAlpha: 0 });
+pop("#s2a", w(2, "but"));
+pop("#s2b", w(2, "your"));
+draw("#s2p", w(2, "books"), 0.45);
+pop("#s2c", w(2, "are"), { y: 30 });
+for (let j = 0; j < 14; j++) {
+  const yr = 2020 - j * 10, x = 2880 - j * 200;
+  $("#tline").insertAdjacentHTML("beforeend", `<span style="left:${x}px"></span><em style="left:${x - 30}px">${yr}</em>`);
+}
+tl.fromTo("#tline", { x: -2000, autoAlpha: 0 }, { x: -80, autoAlpha: 1, duration: w(2, "1920.") - w(2, "still") + 0.4, ease: "power2.inOut" }, w(2, "still"));
+tl.set("#s2y", { autoAlpha: 1 }, w(2, "still"));
+E.count($("#s2y"), w(2, "still"), 1920, { from: 2026, dur: w(2, "1920.") - w(2, "still") + 0.3, fmt: (v) => String(Math.round(v)) });
+tl.fromTo("#s2y", { scale: 1 }, { scale: 1.12, duration: 0.25, yoyo: true, repeat: 1, ease: "power2.out", transformOrigin: "left center" }, w(2, "1920."));
+E.sfx("pop", w(2, "1920."));
+
+// 3 · by hand, line by line, gateway by gateway
+const cols = ["", "A", "B", "C", "D"];
+let html = `<div class="r hd">${cols.map((c) => `<div>${c}</div>`).join("")}</div>`;
+const vals = ["349.00", "1,280.00", "−241.13", "88.50", "2,150.00", "−330.00", "612.40", "−16.50", "975.00", "430.00", "1,104.20", "260.00"];
+for (let r = 1; r <= 9; r++) html += `<div class="r"><div class="n">${r}</div>${[0, 1, 2, 3].map((c) => `<div><span class="fl"></span><s>${vals[(r * 4 + c) % vals.length]}</s></div>`).join("")}</div>`;
+$("#sheet").innerHTML = html;
+gsap.set(["#s3a", "#s3b", "#s3c"], { autoAlpha: 0 });
+pop("#s3a", w(3, "by"));
+hide("#s3a", w(3, "line") - 0.05, 0.1); pop("#s3b", w(3, "line"), { y: 40, d: 0.3 });
+hide("#s3b", w(3, "gateway") - 0.05, 0.1); pop("#s3c", w(3, "gateway"), { y: 40, d: 0.3 });
+tl.fromTo("#sheet", { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0, duration: 0.4, ease: "expo.out" }, on(3) + 0.05);
+// one cell dragged by hand: B2 → C6
+const cell = (r, c) => ({ x: 90 + 64 + (c - 1) * 209 + 4, y: 540 + 64 * r + 4 });
+const a = cell(2, 2), b = cell(6, 3);
+gsap.set("#chip", { x: a.x, y: a.y, autoAlpha: 0 }); gsap.set("#cur3", { x: a.x + 150, y: a.y + 40, autoAlpha: 0 });
+tl.to(["#chip", "#cur3"], { autoAlpha: 1, duration: 0.15 }, w(3, "hand."));
+tl.to("#chip", { x: b.x, y: b.y, rotation: -3, duration: 0.9, ease: "power2.inOut" }, w(3, "hand.") + 0.15);
+tl.to("#cur3", { x: b.x + 150, y: b.y + 40, duration: 0.9, ease: "power2.inOut" }, w(3, "hand.") + 0.15);
+E.sfx("click", w(3, "hand.") + 0.1);
+tl.to(["#chip", "#cur3"], { autoAlpha: 0, duration: 0.15 }, w(3, "line"));
+// line by line: cells typed in one by one
+const cells = [...document.querySelectorAll("#sheet s")];
+cells.forEach((s, j) => {
+  const t = w(3, "line") + j * ((w(3, "gateway") - w(3, "line")) / cells.length);
+  gsap.set(s, { autoAlpha: 0 });
+  tl.set(s, { autoAlpha: 1 }, t);
+});
+E.sfx("typing", w(3, "line"));
+// gateway by gateway: the sheet floods red, row by row
+tl.to("#sheet .fl", { scaleX: 1, duration: 0.18, stagger: { each: (off(3) - w(3, "gateway") - 0.4) / 36, from: "start" }, ease: "power2.out" }, w(3, "gateway") + 0.05);
+
+// 4 · where did 587 go
+gsap.set(["#s4l1", "#s4v1", "#s4l2", "#s4v2", "#s4w", "#s4g", "#s4q"], { autoAlpha: 0 });
+pop("#s4l1", w(4, "store"), { y: 20 }); tl.set("#s4v1", { autoAlpha: 1 }, w(4, "sold"));
+E.count($("#s4v1"), w(4, "sold"), 10000, { dur: 0.9, fmt: fmt2 });
+pop("#s4l2", w(4, "bank"), { y: 20 }); tl.set("#s4v2", { autoAlpha: 1 }, w(4, "got"));
+E.count($("#s4v2"), w(4, "got"), 9412.37, { dur: 1.1, fmt: fmt2 });
+pop("#s4w", w(4, "where"));
+pop("#s4g", w(4, "587"), { s: 0.6, y: 0, sfx: "pop" });
+draw("#s4p", w(4, "587") + 0.15, 0.6);
+pop("#s4q", w(4, "go?"), { y: 40 });
+tl.fromTo("#s4q", { rotation: 0 }, { rotation: 14, duration: 0.3, yoyo: true, repeat: 3, ease: "sine.inOut" }, w(4, "go?") + 0.2);
+
+// 5 · slam
+tl.fromTo("#s5", { clipPath: "circle(0% at 540px 820px)" }, { clipPath: "circle(150% at 540px 820px)", duration: 0.55, ease: "expo.out" }, on(5));
+gsap.set(["#s5a", "#s5m", "#s5w"], { autoAlpha: 0 });
+pop("#s5a", w(5, "meet"), { y: 30 });
+tl.fromTo("#s5m", { autoAlpha: 0, scale: 0.2, rotation: -20 }, { autoAlpha: 1, scale: 1, rotation: 0, duration: 0.6, ease: "back.out(2.2)" }, w(5, "ramza.") - 0.08);
+tl.fromTo("#s5w", { autoAlpha: 0, scale: 1.6, letterSpacing: "0.2em" }, { autoAlpha: 1, scale: 1, letterSpacing: "-0.03em", duration: 0.5, ease: "expo.out" }, w(5, "ramza."));
+E.sfx("impact", w(5, "ramza."));
+// the agent blinks once, like the logo
+tl.to("#s5m", { scaleY: 0.92, duration: 0.08, yoyo: true, repeat: 1 }, w(5, "ramza.") + 1.0);
+
+// 6 · the agent closes the month from the bank
+gsap.set(["#s6a", "#s6b", "#cmd", "#bank"], { autoAlpha: 0 });
+pop("#s6a", w(6, "an"));
+pop("#s6b", w(6, "that"), { y: 30 });
+pop("#cmd", w(6, "closes") - 0.2, { y: 40 });
+typeIn($("#typed"), "close October, from the bank", w(6, "closes"), w(6, "bank.") - w(6, "closes") - 0.1);
+tl.fromTo("#caret", { opacity: 1 }, { opacity: 0, duration: 0.3, repeat: 9, yoyo: true, ease: "steps(1)" }, on(6));
+pop("#bank", w(6, "bank.") - 0.1, { y: 60 });
+tl.to("#bhl", { scaleX: 1, duration: 0.45, ease: "power2.out" }, w(6, "bank.") + 0.3);
+
+// 7 · every dirham found
+const tick = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const steps = [["Payout file matched", "9,412.37", on(7) + 0.1], ["Gateway fee", "330.00", w(7, "fee.")],
+  ["VAT on the fee", "16.50", w(7, "vat")], ["One refund, netted", "241.13", w(7, "refund.")], [`${D.orders} invoices marked paid`, `${D.orders}/${D.orders}`, w(7, String(D.orders))]];
+steps.forEach(([t, v, at], j) => {
+  $("#steps").insertAdjacentHTML("beforeend", `<div class="step" id="st7${j}" style="top:${540 + j * 110}px"><i>${tick}</i>${t}<b>${v}</b></div>`);
+  gsap.set(`#st7${j}`, { autoAlpha: 0 });
+  pop(`#st7${j}`, at, { y: 30, d: 0.35, sfx: "pop" });
+  tl.fromTo(`#st7${j} i`, { scale: 0 }, { scale: 1, duration: 0.35, ease: "back.out(3)" }, at + 0.1);
+});
+gsap.set(["#s7g", "#s7f", "#s7e"], { autoAlpha: 0 });
+hide(["#steps", "#cmd7"], w(7, "every") - 0.1, 0.15);
+pop("#s7g", w(7, "every"), { s: 0.7, y: 0, sfx: "chime" });
+pop("#s7f", w(7, "found."), { y: 40 });
+draw("#s7p", w(7, "found.") + 0.25, 0.4);
+pop("#s7e", w(7, "found.") + 0.5, { y: 20 });
+
+// 8 · proof
+$("#s8l").textContent = `ONE DUBAI BRAND · ${D.close_month.toUpperCase()}`;
+gsap.set(["#s8l", "#s8n", "#s8u", "#bar1", "#bar2"], { autoAlpha: 0 });
+pop("#s8l", w(8, "one"), { y: 20 });
+tl.set("#s8n", { autoAlpha: 1 }, w(8, String(D.close_credits)));
+E.count($("#s8n"), w(8, String(D.close_credits)), D.close_credits, { dur: 1.0 });
+pop("#s8u", w(8, "credits."), { y: 30 });
+const pAt = w(8, D.close_matched_pct + "%");
+pop("#bar1", pAt - 0.3, { y: 30 }); pop("#bar2", pAt - 0.15, { y: 30 });
+tl.to("#bar1 .f", { scaleX: D.close_matched_pct / 100, duration: 1.0, ease: "power3.out" }, pAt);
+tl.to("#bar2 .f", { scaleX: 1 - D.close_matched_pct / 100, duration: 1.0, ease: "power3.out" }, pAt + 0.1);
+E.count($("#b1v"), pAt, D.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+E.count($("#b2v"), pAt + 0.1, 100 - D.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+
+// 9 · nothing posts until you approve
+gsap.set(["#s9a", "#s9b", "#code", "#s9c", "#btn", "#cur9"], { autoAlpha: 0 });
+pop("#s9a", w(9, "nothing"));
+pop("#s9b", w(9, "to"));
+pop("#code", w(9, "nothing") + 0.1, { y: 40 });
+typeIn($("#typed9"), "post_without_your_click()", w(9, "nothing") + 0.2, 0.9);
+draw("#s9x1", w(9, "zoho,"), 0.25); draw("#s9x2", w(9, "zoho,") + 0.22, 0.25);
+pop("#s9c", w(9, "until"), { y: 40 });
+pop("#btn", w(9, "until") + 0.1, { y: 40 });
+gsap.set("#cur9", { x: 900, y: 1300 });
+tl.set("#cur9", { autoAlpha: 1 }, w(9, "you"));
+tl.to("#cur9", { x: 600, y: 1100, duration: 0.5, ease: "power2.out" }, w(9, "you"));
+const clickAt = w(9, "approve.") + 0.15;
+tl.to("#btn", { scale: 0.95, duration: 0.08, yoyo: true, repeat: 1 }, clickAt);
+tl.set("#btn", { backgroundColor: "#4B67EE" }, clickAt + 0.08);
+gsap.set("#btnd", { autoAlpha: 0 });
+tl.set("#btnt", { autoAlpha: 0 }, clickAt + 0.08); tl.set("#btnd", { autoAlpha: 1 }, clickAt + 0.08);
+E.sfx("click", clickAt); E.sfx("chime", clickAt + 0.1);
+
+// 10 · end
+gsap.set(["#s10a", "#s10b", "#lock", "#s10c"], { autoAlpha: 0 });
+pop("#s10a", w(10, "you"));
+pop("#s10b", w(10, "ramza"));
+pop("#lock", w(10, "free"), { s: 0.85, y: 0, sfx: "impact" });
+pop("#s10c", w(10, "pay"), { y: 20 });
+
+// disclaimer from the worked example on
+$("#disc").textContent = window.DISCLAIMER;
+tl.set("#disc", { visibility: "visible" }, on(4));
+tl.set("#disc", { color: "rgba(255,255,255,.55)" }, on(5));
+tl.set("#disc", { color: "#8A92A6" }, on(6));
+tl.set("#disc", { color: "rgba(255,255,255,.55)" }, on(8));
+tl.set("#disc", { color: "#8A92A6" }, on(9));
+tl.set("#disc", { color: "rgba(255,255,255,.55)" }, on(10));
+</script>
+</body></html>

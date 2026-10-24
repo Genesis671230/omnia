@@ -1,0 +1,554 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="reel.css">
+<link rel="stylesheet" href="kit.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="reel.js"></script>
+<script src="kit.js"></script>
+<style>
+  /* One top-down desk under segments 0-6 (their scenes are transparent, so RL's wipes never show).
+     Real accounting objects in real colours: a printed bank statement, the store's sales slip,
+     dirham coins, the gateway's payout report, tax invoices, a green columnar journal pad, a phone.
+     The RAMZA agent is the only cartoon: it does the work on the papers. */
+  .scene.film{background:transparent}
+  #film{position:absolute;inset:0;z-index:1;overflow:hidden;background:#fff}
+  #desk{position:absolute;left:0;top:0;width:1080px;height:1340px;overflow:hidden;background:#D8B78A}
+  #desk>svg.grain{position:absolute;inset:0}
+  #cam{position:absolute;inset:0;transform-origin:540px 880px;will-change:transform}
+  #capp{position:absolute;left:0;right:0;top:1340px;bottom:0;background:#fff;border-top:1px solid #E3E7F0}
+  #ftag{position:absolute;right:72px;top:296px;z-index:4;background:#fff;color:var(--navy);font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;border-radius:6px;border:1px solid var(--line)}
+  #chrome .lock span{color:#14131C}
+
+  .ob{position:absolute;will-change:transform}
+  .paper{background:#FBFAF6;box-shadow:0 2px 0 rgba(90,60,20,.10),0 20px 34px rgba(70,45,10,.30);color:#1E2230}
+  .mono{font-family:'IBM Plex Mono',monospace;font-weight:500}
+
+  /* bank statement */
+  #stmt{left:60px;top:470px;width:560px;height:790px;padding:34px 30px}
+  #stmt .bh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1E2A4A;padding-bottom:16px}
+  #stmt .bh b{font-family:'Urbanist';font-weight:800;font-size:34px;letter-spacing:-.02em;color:#1E2A4A}
+  #stmt .bh small{display:block;font-size:17px;color:#6B7180;margin-top:6px}
+  #stmt .acc{font-size:17px;color:#6B7180;text-align:right;line-height:1.5}
+  #stmt .th{display:grid;grid-template-columns:78px 1fr 150px;font-size:15px;letter-spacing:.1em;color:#8A8F9C;margin:20px 0 6px}
+  #stmt .th span:last-child,#stmt .r span:last-child{text-align:right}
+  .r{position:relative;display:grid;grid-template-columns:78px 1fr 150px;font-size:20px;padding:15px 0;border-bottom:1px solid #E6E3DA}
+  .r .cr{color:#1E2230}
+  .r .dr{color:#8A3A2E}
+  .hlbar{position:absolute;left:-8px;right:-8px;top:6px;bottom:6px;background:#FFE14D;mix-blend-mode:multiply;transform-origin:left center;transform:scaleX(0);border-radius:3px}
+
+  /* thermal sales slip */
+  #slip{left:680px;top:520px;width:340px;height:700px;padding:30px 26px 40px;
+    clip-path:polygon(0 0,100% 0,100% calc(100% - 14px),95% 100%,90% calc(100% - 14px),85% 100%,80% calc(100% - 14px),75% 100%,70% calc(100% - 14px),65% 100%,60% calc(100% - 14px),55% 100%,50% calc(100% - 14px),45% 100%,40% calc(100% - 14px),35% 100%,30% calc(100% - 14px),25% 100%,20% calc(100% - 14px),15% 100%,10% calc(100% - 14px),5% 100%,0 calc(100% - 14px));
+    background:#FDFDFB;font-size:18px;color:#2A2D35}
+  #slip .c{text-align:center;line-height:1.5}
+  #slip .dash{border-top:2px dashed #9CA0AA;margin:12px 0}
+  #slip .o{display:flex;justify-content:space-between;line-height:1.62}
+  #slip .tot{display:flex;justify-content:space-between;font-size:24px;font-weight:700;margin-top:4px}
+  #ring{position:absolute;left:-14px;top:-12px;width:calc(100% + 28px);height:calc(100% + 24px);overflow:visible}
+
+  /* sticky note */
+  #note{left:360px;top:1020px;width:250px;height:230px;background:#FFE98A;box-shadow:0 14px 22px rgba(70,45,10,.28);padding:28px 22px;font-family:'Urbanist';color:#3B2F12}
+  #note b{display:block;font-size:56px;font-weight:800;letter-spacing:-.03em}
+  /* the cover: the same sticky note, filling the centre at frame 0 */
+  #bignote{position:absolute;left:215px;top:520px;width:650px;height:600px;z-index:5;background:#FFE98A;box-shadow:0 30px 50px rgba(70,45,10,.35);padding:70px 56px;font-family:'Urbanist';color:#3B2F12;transform:rotate(-4deg)}
+  #bignote b{display:block;font-family:'IBM Plex Mono';font-weight:500;font-size:118px;letter-spacing:-.04em;line-height:1}
+  #bignote span{display:block;font-size:68px;font-weight:700;line-height:1.05;margin-top:40px}
+  #bignote i{display:block;height:10px;width:330px;background:#D23B2E;border-radius:6px;margin-top:22px;transform:rotate(-2deg);transform-origin:left}
+  #note span{font-size:26px;font-weight:600}
+
+  /* coins + price tags */
+  #coins{position:absolute;inset:0;overflow:visible}
+  .ptag{position:absolute;background:#F1E2BF;border:1px solid #CDB27D;border-radius:8px 8px 8px 8px;padding:14px 22px 14px 44px;box-shadow:0 10px 16px rgba(70,45,10,.22);color:#3B2F12;white-space:nowrap}
+  .ptag:before{content:"";position:absolute;left:16px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:#D8B78A;border:2px solid #B89257}
+  .ptag small{display:block;font-size:20px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7A6236}
+  .ptag b{font-family:'IBM Plex Mono';font-weight:500;font-size:34px}
+  .ptag.ok{background:#E3F1E6;border-color:#7DB38E}
+  .ptag.ok small{color:#1F7A4D}
+
+  /* pile of reports, calculator, clock */
+  .rep{width:330px;height:430px;padding:0 0 20px;overflow:hidden}
+  .rep .hd{height:64px;display:flex;align-items:center;padding:0 22px;font-family:'Urbanist';font-weight:800;font-size:28px;letter-spacing:-.01em}
+  .rep .ln{height:12px;margin:18px 22px 0;background:#E7E4DC;border-radius:2px}
+  #calc{left:90px;top:1000px;width:230px;height:310px;background:#2F333B;border-radius:22px;box-shadow:0 18px 28px rgba(40,25,5,.38);padding:22px}
+  #calc .lcd{height:70px;background:#B9C6A4;border-radius:6px;font-family:'IBM Plex Mono';font-size:36px;color:#22281C;text-align:right;padding:12px 14px;overflow:hidden}
+  #calc .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}
+  #calc .keys i{height:34px;border-radius:8px;background:#4A4F59}
+  #calc .keys i.o{background:#C8742E}
+  #clock{left:800px;top:440px;width:200px;height:200px}
+
+  /* payout report (gateway colours: Stripe purple) */
+  #rep{left:600px;top:470px;width:440px;height:840px;overflow:hidden}
+  #rep .hd{background:#635BFF;color:#fff;height:78px;display:flex;align-items:center;justify-content:space-between;padding:0 26px}
+  #rep .hd b{font-family:'Urbanist';font-weight:800;font-size:34px;letter-spacing:-.02em}
+  #rep .hd span{font-size:18px;opacity:.9}
+  #rep .meta{padding:16px 26px 0;font-size:17px;color:#6B7180;line-height:1.5}
+  #rep .sum{padding:8px 26px 0}
+  #rep .s{position:relative;display:flex;justify-content:space-between;font-size:21px;padding:11px 0;border-bottom:1px solid #E6E3DA}
+  #rep .s.net{font-weight:600;font-size:24px;border-bottom:3px double #1E2230}
+  #rep .chg{padding:14px 26px 0;font-size:16px;color:#6B7180}
+  #rep .c{position:relative;display:flex;justify-content:space-between;font-size:17px;line-height:1.75;color:#2A2D35}
+  #link{position:absolute;inset:0;overflow:visible;pointer-events:none}
+  #eq{left:150px;top:1160px;background:#1F7A4D;color:#fff;font-family:'IBM Plex Mono';font-size:30px;padding:12px 22px;border-radius:8px;box-shadow:0 10px 18px rgba(20,60,30,.3)}
+
+  /* tax invoices */
+  .inv{width:150px;height:196px;padding:14px 14px;font-size:12px;color:#2A2D35}
+  .inv b{display:block;font-family:'Urbanist';font-weight:800;font-size:15px;letter-spacing:.04em;color:#1E2A4A}
+  .inv .no{font-family:'IBM Plex Mono';font-size:13px;color:#6B7180;margin-top:4px}
+  .inv .ln{height:6px;background:#E7E4DC;margin-top:10px;border-radius:2px}
+  .inv .am{font-family:'IBM Plex Mono';font-size:17px;margin-top:16px;text-align:right}
+  .stamp{position:absolute;left:22px;top:84px;border:4px solid #2647B8;color:#2647B8;font-family:'Urbanist';font-weight:800;font-size:30px;letter-spacing:.1em;padding:0 10px;border-radius:6px;transform:rotate(-14deg);opacity:0;mix-blend-mode:multiply}
+
+  /* journal pad: green columnar accounting paper */
+  #jv{left:60px;top:640px;width:960px;height:620px;background:#ECF4E4;padding:0;overflow:hidden}
+  #jv .top{height:96px;background:#F6FAF1;border-bottom:3px solid #7FA86C;display:flex;align-items:center;justify-content:space-between;padding:0 36px}
+  #jv .top b{font-family:'Urbanist';font-weight:800;font-size:38px;color:#1E3A24;letter-spacing:-.01em}
+  #jv .top span{font-family:'IBM Plex Mono';font-size:20px;color:#4F6B4F}
+  #jv .cols{position:absolute;left:0;right:0;top:96px;bottom:0;pointer-events:none}
+  #jv .cols i{position:absolute;top:0;bottom:0;width:2px;background:#9EC28B}
+  #jv .cols i.m{background:#D9534F;width:3px}
+  #jv .hdr,#jv .row{display:grid;grid-template-columns:470px 210px 210px;padding:0 0 0 70px;height:76px;align-items:center;border-bottom:1px solid #B9D5A9}
+  #jv .hdr{height:58px;font-size:18px;letter-spacing:.14em;color:#4F6B4F;text-transform:uppercase}
+  #jv .row{font-family:'IBM Plex Mono';font-size:30px;color:#1E2230}
+  #jv .row span:nth-child(2),#jv .row span:nth-child(3),#jv .hdr span:nth-child(2),#jv .hdr span:nth-child(3){text-align:right;padding-right:22px}
+  #jv .row.cr span:first-child{padding-left:60px}
+  #jv .row.tot{font-weight:600;border-bottom:none}
+  #jv .row.tot span:nth-child(2),#jv .row.tot span:nth-child(3){border-bottom:5px double #1E2230;line-height:1.3}
+  #jv .ty{clip-path:inset(0 100% 0 0)}
+  #post{left:110px;top:760px;border:5px solid #1F7A4D;color:#1F7A4D;font-family:'Urbanist';font-weight:800;font-size:48px;letter-spacing:.12em;padding:2px 18px;border-radius:8px;transform:rotate(-10deg);opacity:0;mix-blend-mode:multiply}
+
+  /* phone */
+  #phone{left:600px;top:450px;width:400px;height:820px;background:#16181D;border-radius:56px;padding:18px;box-shadow:0 26px 40px rgba(30,18,4,.42)}
+  #phone .scr{position:relative;width:100%;height:100%;background:#fff;border-radius:42px;overflow:hidden;padding:64px 28px 0}
+  #phone .notch{position:absolute;left:50%;top:14px;width:110px;height:30px;margin-left:-55px;background:#16181D;border-radius:16px}
+  #phone .app{display:flex;align-items:center;gap:12px;font-family:'Urbanist';font-weight:700;font-size:28px;color:#0B1533}
+  #phone .app svg{width:44px;height:44px}
+  #phone h4{font-family:'Urbanist';font-weight:800;font-size:38px;line-height:1.05;letter-spacing:-.02em;color:#0B1533;margin:28px 0 18px}
+  #phone .it{display:flex;justify-content:space-between;font-size:20px;padding:14px 0;border-bottom:1px solid #E3E7F0;color:#14131C}
+  #phone .it span:last-child{font-family:'IBM Plex Mono';font-size:19px;color:#5B6478}
+  #phone .bal{color:#1F7A4D;font-weight:600}
+  #btn{position:absolute;left:28px;right:28px;bottom:44px;height:84px;border-radius:14px;background:#0B1533;color:#fff;font-weight:600;font-size:26px;display:flex;align-items:center;justify-content:center}
+  #btn2{position:absolute;inset:0;border-radius:14px;background:#1F7A4D;color:#fff;font-weight:600;font-size:26px;display:flex;align-items:center;justify-content:center;opacity:0}
+  #tap{position:absolute;left:50%;top:50%;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:4px solid #fff;opacity:0}
+
+  /* the agent */
+  #ag{width:170px;height:200px;left:820px;top:1110px;z-index:30}
+
+  /* proof + CTA (navy) */
+  .stat{padding:44px 0;border-top:1px solid #1D2645;display:flex;align-items:baseline;justify-content:space-between}
+  .stat:last-child{border-bottom:1px solid #1D2645}
+  .stat .k{font-size:38px;color:#C4CAD9}
+  .stat .v{font-family:'Urbanist';font-weight:800;font-size:150px;letter-spacing:-.04em;line-height:1;color:#fff}
+  .kw{display:inline-block;font-family:'IBM Plex Mono';font-weight:500;font-size:150px;background:#fff;color:var(--navy);padding:18px 54px;border-radius:14px;letter-spacing:.02em}
+</style></head>
+<body class="safe"><div class="stage">
+<div id="film">
+  <div id="desk">
+    <svg class="grain" width="1080" height="1340" id="grain"></svg>
+    <div id="cam">
+      <!-- bank statement -->
+      <div class="ob paper" id="stmt" data-focus>
+        <div class="bh"><div><b>Bank statement</b><small>Business current account · AED</small></div>
+          <div class="acc mono">Acct ****4821<br>01–30 Sep 2026</div></div>
+        <div class="th mono"><span>DATE</span><span>DESCRIPTION</span><span>AMOUNT</span></div>
+        <div class="r mono"><span>02 SEP</span><span>TABBY PAYOUT</span><span class="cr">4,180.20</span></div>
+        <div class="r mono"><span>03 SEP</span><span>DEWA BILL</span><span class="dr">-612.40</span></div>
+        <div class="r mono" id="srow"><i class="hlbar" id="hl"></i><span style="position:relative">04 SEP</span><span style="position:relative">STRIPE PAYOUT</span><span class="cr" style="position:relative" id="samt">9,412.37</span></div>
+        <div class="r mono"><span>05 SEP</span><span>SALARIES</span><span class="dr">-18,500.00</span></div>
+        <div class="r mono"><span>06 SEP</span><span>TAMARA PAYOUT</span><span class="cr">2,904.65</span></div>
+        <div class="r mono"><span>07 SEP</span><span>CARD POS SETTLE</span><span class="cr">1,236.90</span></div>
+        <div class="r mono"><span>08 SEP</span><span>COURIER COD</span><span class="cr">3,310.00</span></div>
+        <div class="r mono"><span>09 SEP</span><span>SHOP RENT</span><span class="dr">-7,000.00</span></div>
+      </div>
+      <!-- store sales slip -->
+      <div class="ob paper mono" id="slip">
+        <div class="c">STORE SALES<br>04 SEP 2026</div><div class="dash"></div>
+        <div id="olist"></div><div class="dash"></div>
+        <div class="tot" style="position:relative"><span>TOTAL AED</span><span>10,000.00</span>
+          <svg id="ring" viewBox="0 0 316 60" preserveAspectRatio="none"><path id="ringp" d="M160,6 C60,2 8,12 8,32 C8,54 120,58 200,56 C280,54 310,44 308,28 C306,10 240,2 120,8" fill="none" stroke="#D23B2E" stroke-width="4" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="ob" id="note" data-review-ignore><b class="mono" style="font-family:'IBM Plex Mono';font-size:46px">−587.63</b><span>where did it go?</span></div>
+
+      <!-- coins + tags -->
+      <svg id="coins" width="1080" height="1340"></svg>
+      <div class="ptag" id="t_sale" style="left:375px;top:1150px"><span id="ts1"><small>Store sales</small><b>10,000.00</b></span></div>
+      <div class="ptag ok" id="t_paid" style="left:375px;top:1150px"><small>Paid to the bank</small><b>9,412.37</b></div>
+      <div class="ptag" id="t_fee" style="left:700px;top:690px"><small>Gateway fee</small><b>330.00</b></div>
+      <div class="ptag" id="t_vat" style="left:700px;top:950px"><small>VAT on the fee</small><b>16.50</b></div>
+      <div class="ptag" id="t_ref" style="left:70px;top:810px"><small>Refund</small><b>241.13</b></div>
+
+      <!-- the pile (by hand) -->
+      <div id="pile" data-review-ignore></div>
+      <div class="ob" id="calc"><div class="lcd" id="lcd">0.</div><div class="keys"></div></div>
+      <svg class="ob" id="clock" viewBox="-100 -100 200 200"></svg>
+
+      <!-- payout report -->
+      <div class="ob paper" id="rep" data-focus>
+        <div class="hd"><b>stripe</b><span>Payout report</span></div>
+        <div class="meta mono">Payout po_1QF8…Kx2<br>Arrived 04 Sep 2026 · AED</div>
+        <div class="sum mono">
+          <div class="s"><span>Charges (12)</span><span>10,000.00</span></div>
+          <div class="s"><span>Fees</span><span>-330.00</span></div>
+          <div class="s"><span>VAT on fees</span><span>-16.50</span></div>
+          <div class="s"><span>Refunds (1)</span><span>-241.13</span></div>
+          <div class="s net" id="rnet"><i class="hlbar" id="hl2"></i><span style="position:relative">Net payout</span><span style="position:relative" id="ramt">9,412.37</span></div>
+        </div>
+        <div class="chg mono">CHARGES</div>
+        <div class="sum mono" id="clist" style="padding-top:2px"></div>
+      </div>
+      <svg id="link" width="1080" height="1340"><path id="linkp" fill="none" stroke="#D23B2E" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 0"/></svg>
+      <div class="ob" id="eq">9,412.37 = 9,412.37</div>
+
+      <!-- invoices -->
+      <div id="invs" data-review-ignore></div>
+
+      <!-- journal pad -->
+      <div class="ob paper" id="jv" data-focus>
+        <div class="top"><b>Journal entry</b><span>JV-0904 · Stripe payout 04 Sep</span></div>
+        <div class="cols"><i class="m" style="left:52px"></i><i style="left:540px"></i><i style="left:750px"></i></div>
+        <div class="hdr mono"><span>Account</span><span>Debit</span><span>Credit</span></div>
+        <div class="row ty" id="j1"><span>Bank</span><span>9,412.37</span><span></span></div>
+        <div class="row ty" id="j2"><span>Gateway fees</span><span>330.00</span><span></span></div>
+        <div class="row ty" id="j3"><span>Input VAT 5%</span><span>16.50</span><span></span></div>
+        <div class="row ty" id="j4"><span>Customer refunds</span><span>241.13</span><span></span></div>
+        <div class="row cr ty" id="j5"><span>Stripe clearing</span><span></span><span>10,000.00</span></div>
+        <div class="row tot ty" id="j6"><span>Total</span><span>10,000.00</span><span>10,000.00</span></div>
+      </div>
+      <div class="ob" id="post" data-review-ignore>POSTED</div>
+
+      <!-- phone -->
+      <div class="ob" id="phone" data-focus><div class="scr"><div class="notch"></div>
+        <div class="app"><svg viewBox="20 20 160 160" id="pmark"></svg>ramza</div>
+        <h4>Ready to post</h4>
+        <div class="it"><span>Payout matched</span><span>9,412.37</span></div>
+        <div class="it"><span>Invoices marked paid</span><span>12</span></div>
+        <div class="it"><span>Journal</span><span>JV-0904</span></div>
+        <div class="it"><span>Debits = credits</span><span class="bal">Balanced</span></div>
+        <div id="btn">Approve and post<div id="btn2">Posted to Zoho ✓</div><i id="tap"></i></div>
+      </div></div>
+
+      <div class="ob agent" id="ag"></div>
+    </div>
+  </div>
+  <div id="capp"></div>
+  <div id="bignote" data-review-ignore><b>−587.63</b><span>where did<br>it go?</span><i id="bnu"></i></div>
+  <div id="ftag">Example</div>
+</div>
+
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+<section class="scene film"></section>
+
+<!-- 7 proof -->
+<section class="scene night">
+  <div class="body" style="top:440px"><div class="eyebrow" id="p_e"></div>
+    <div class="disp" style="font-size:92px;margin-top:20px;color:#fff"><span class="line"><span>Real books.</span></span><span class="line"><span>One month.</span></span></div>
+    <div style="margin-top:50px">
+      <div class="stat" id="p_s1"><span class="k">Bank credits</span><span class="v num" id="p_v1">0</span></div>
+      <div class="stat" id="p_s2"><span class="k">Matched by<br>the agent</span><span class="v num" id="p_v2">0%</span></div>
+    </div>
+    <div style="font-size:26px;color:#7F89A6;margin-top:34px;line-height:1.45" id="p_src"></div>
+  </div>
+</section>
+
+<!-- 8 CTA -->
+<section class="scene navy">
+  <div class="agent" id="c_ag" style="left:370px;top:440px;width:340px;height:330px"></div>
+  <div class="body" style="top:900px;text-align:center">
+    <div class="disp" style="font-size:80px;color:#fff">Comment</div>
+    <div style="margin-top:28px" id="c_kw"><span class="kw">CLOSE</span></div>
+    <div style="font-size:31px;color:#C4CAD9;margin-top:34px;line-height:1.4" id="c_sub"></div>
+  </div>
+</section>
+
+</div>
+<script>
+const { tl } = E, $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const F = window.FACTS, R = window.RULES;
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const S = (i) => RL.seg(i).start, V = (i, d = 0) => RL.at(i, d), W = (i, w) => RL.w(i, w);
+const NS = "http://www.w3.org/2000/svg";
+
+/* ============ worked example (balances: 10,000.00 − 330.00 − 16.50 − 241.13 = 9,412.37) ============ */
+const ORD = [1250, 640, 980.5, 415, 1120, 760.25, 899, 530.75, 1345, 455.5, 704, 900];
+console.assert(Math.abs(ORD.reduce((a, b) => a + b, 0) - 10000) < 1e-6, "orders must sum to 10,000.00");
+console.assert(Math.abs(10000 - 330 - 16.5 - 241.13 - 9412.37) < 1e-6, "payout must balance");
+const m2 = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+$("#olist").innerHTML = ORD.map((v, k) => `<div class="o"><span>#${4101 + k}</span><span>${m2(v)}</span></div>`).join("");
+$("#clist").innerHTML = ORD.map((v, k) => `<div class="c" id="c${k}"><span>ch · #${4101 + k}</span><span>${m2(v)}</span></div>`).join("");
+
+/* ============ desk: light oak planks, grain lines ============ */
+{
+  let g = "";
+  for (let p = 0; p < 5; p++) {
+    const x0 = p * 270;
+    g += `<rect x="${x0}" y="0" width="270" height="1340" fill="${["#D8B78A", "#D3B083", "#DBBC90", "#D5B386", "#D9B98C"][p]}"/>`;
+    for (let k = 0; k < 16; k++) {
+      const x = x0 + 8 + rnd() * 254, a = 4 + rnd() * 10;
+      let d = `M${x.toFixed(1)},0`;
+      for (let y = 0; y <= 1340; y += 120) d += ` Q${(x + (rnd() - .5) * a * 2).toFixed(1)},${y + 60} ${(x + (rnd() - .5) * a).toFixed(1)},${y + 120}`;
+      g += `<path d="${d}" fill="none" stroke="#B98F5C" stroke-opacity="${(0.12 + rnd() * 0.22).toFixed(2)}" stroke-width="${(1 + rnd() * 2.2).toFixed(1)}"/>`;
+    }
+    g += `<rect x="${x0 + 268}" y="0" width="2" height="1340" fill="#A97F4E" fill-opacity=".55"/>`;
+  }
+  $("#grain").innerHTML = g;
+}
+
+/* ============ objects ============ */
+$("#calc .keys").innerHTML = Array.from({ length: 16 }, (_, k) => `<i class="${k % 4 === 3 ? "o" : ""}"></i>`).join("");
+$("#clock").innerHTML = `<circle r="96" fill="#F4F1EA" stroke="#2F333B" stroke-width="9"/>${Array.from({ length: 12 }, (_, k) =>
+  `<line x1="0" y1="-84" x2="0" y2="${k % 3 ? -76 : -70}" stroke="#2F333B" stroke-width="${k % 3 ? 3 : 5}" transform="rotate(${k * 30})"/>`).join("")}
+  <line id="hh" x1="0" y1="0" x2="0" y2="-46" stroke="#2F333B" stroke-width="8" stroke-linecap="round"/>
+  <line id="mh" x1="0" y1="0" x2="0" y2="-70" stroke="#C2362B" stroke-width="5" stroke-linecap="round"/><circle r="7" fill="#2F333B"/>`;
+$("#pmark").innerHTML = KIT.head("", "");
+$("#ag").innerHTML = KIT.body("#3B2A12");
+$("#c_ag").innerHTML = KIT.body();
+
+/* dirham coins (cupronickel): side band with milled edge, top face, inner ring */
+function coin(rx = 78) {
+  const ry = rx * 0.33, h = 13;
+  const ridges = Array.from({ length: 22 }, (_, k) => { const x = -rx + 4 + k * ((2 * rx - 8) / 21); return `<line x1="${x.toFixed(1)}" y1="${(ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2))).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(ry * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2)) + h).toFixed(1)}" stroke="#8C929A" stroke-width="1.4"/>`; }).join("");
+  return `<ellipse cy="${h}" rx="${rx}" ry="${ry}" fill="#9EA4AC"/><rect x="${-rx}" y="0" width="${2 * rx}" height="${h}" fill="#A9AFB7"/>${ridges}
+    <path d="M${-rx},0 A${rx},${ry} 0 0 0 ${rx},0" transform="translate(0,${h})" fill="none" stroke="#6F757E" stroke-width="2.5"/><ellipse rx="${rx}" ry="${ry}" fill="#D6D9DE" stroke="#7E848D" stroke-width="2.5"/><ellipse rx="${rx * 0.78}" ry="${ry * 0.78}" fill="none" stroke="#B5BAC1" stroke-width="3"/>
+    <ellipse cx="${-rx * 0.25}" cy="${-ry * 0.25}" rx="${rx * 0.32}" ry="${ry * 0.22}" fill="#E7E9EC"/>`;
+}
+const STACK = 18, BX = 540, BY = 1100, CH = 15;
+const coins = [];
+for (let k = 0; k < STACK; k++) {
+  const g = document.createElementNS(NS, "g");
+  g.innerHTML = coin(k === STACK - 2 ? 78 : 78);
+  $("#coins").append(g);
+  coins.push(g);
+  gsap.set(g, { x: BX + (rnd() - .5) * 9, y: BY - k * CH });
+}
+
+/* pile: four gateway payout reports in their brand colours + plain sheets */
+const GW = [["stripe", "#635BFF", "#fff"], ["tabby", "#3BE8B0", "#0B1533"], ["tamara", "#F2A7C3", "#3A1B2A"], ["COD courier", "#F2B33D", "#2B1D05"]];
+const pileEls = [];
+for (let k = 0; k < 12; k++) {
+  const el = document.createElement("div");
+  el.className = "ob paper rep";
+  const gw = GW[k % 4];
+  el.innerHTML = `<div class="hd" style="background:${k < 8 ? gw[1] : "#E9ECF1"};color:${k < 8 ? gw[2] : "#5B6478"}">${k < 8 ? gw[0] : "Bank export"}</div>` + Array.from({ length: 12 }, () => `<div class="ln" style="width:${55 + rnd() * 40}%"></div>`).join("");
+  el.style.left = (380 + (rnd() - .5) * 260) + "px";
+  el.style.top = (560 + (rnd() - .5) * 220) + "px";
+  $("#pile").append(el);
+  pileEls.push(el);
+}
+
+/* invoices: 12 tax invoices in a 3×4 grid */
+const invEls = ORD.map((v, k) => {
+  const el = document.createElement("div");
+  el.className = "ob paper inv";
+  el.innerHTML = `<b>TAX INVOICE</b><div class="no">INV-${4101 + k}</div><div class="ln" style="width:80%"></div><div class="ln" style="width:60%"></div><div class="ln" style="width:70%"></div><div class="am">${m2(v)}</div><div class="stamp">PAID</div>`;
+  el.style.left = (530 + (k % 3) * 168) + "px";
+  el.style.top = (455 + Math.floor(k / 3) * 212) + "px";
+  $("#invs").append(el);
+  return el;
+});
+
+/* ============ helpers ============ */
+const off = (el, t, v, d = 0.55) => tl.to(el, { ...v, duration: d, ease: "power3.in" }, t);
+const on = (el, t, { x = 0, y = 0, r = 0, opacity = 0 } = {}, d = 0.6) =>
+  tl.fromTo(el, { x, y, rotation: r, opacity }, { x: 0, y: 0, rotation: 0, opacity: 1, duration: d, ease: "expo.out" }, t);
+const hide = (el, t) => tl.set(el, { opacity: 0 }, t);
+const agTo = (t, x, y, s = 1, d = 0.6) => tl.to("#ag", { x: x - 820, y: y - 1110, scale: s, duration: d, ease: "power3.inOut" }, t);
+/* text centre of an element inside #cam, at its final (untransformed) layout */
+const at = (el, paperEl, dx = 0, dy = 0) => {
+  let x = 0, y = 0, n = el;
+  while (n && n !== paperEl.offsetParent) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+  return [x + dx, y + dy];
+};
+
+/* ============ initial desk state ============ */
+gsap.set("#stmt", { rotation: -2.5 });
+gsap.set("#slip", { rotation: 3.5 });
+gsap.set(["#note", "#coins", ".ptag", "#t_paid", "#calc", "#clock", "#rep", "#eq", "#jv", "#post", "#phone", "#ag", "#link"], { opacity: 0 });
+gsap.set("#note", { rotation: -7 });
+gsap.set(pileEls, { opacity: 0 });
+gsap.set(invEls, { opacity: 0 });
+
+RL.build();
+
+/* ===== 0 HOOK: frame 0 is the cover — the sticky note fills the centre ("−587.63, where did it go?"),
+   then macro on the slip total (10,000), whip to the bank line (9,412), pull back to the whole desk ===== */
+const camOn = (px, py, s) => ({ x: -(px - 540) * s, y: 820 - (880 + (py - 880) * s), scale: s });
+const mid = (el, paper) => { const [x, y] = at(el, paper); return [x + el.offsetWidth / 2, y + el.offsetHeight / 2]; };
+const [tx, ty] = mid($("#slip .tot"), $("#slip")), [rx0, ry0] = mid($("#srow"), $("#stmt"));
+tl.set("#cam", { scale: 1.12 }, 0);
+tl.from("#bignote", { scale: 1.12, rotation: -9, duration: 0.22, ease: "power3.in" }, 0.02);
+E.sfx("impact", 0.22);
+tl.from("#bnu", { scaleX: 0, duration: 0.3, ease: "power2.out" }, 0.35);
+tl.to("#film", { x: 5, duration: 0.04, repeat: 5, yoyo: true, ease: "none" }, 0.24);
+{ /* drop the cover note onto its desk spot (cam is at 1.12 around 540,880) */
+  const nx = 360 + 125, ny = 1020 + 115, t = W(0, "vanished") - 0.75;
+  tl.to("#bignote", { x: 540 + (nx - 540) * 1.12 - 540, y: 880 + (ny - 880) * 1.12 - 820, scale: 280 / 650, rotation: -7, duration: 0.38, ease: "power3.in" }, t);
+  tl.set("#bignote", { opacity: 0 }, t + 0.38);
+  tl.set("#note", { opacity: 1 }, t + 0.38);
+  E.sfx("pop", t + 0.38);
+}
+tl.to("#cam", { ...camOn(tx, ty + 120, 2.1), duration: 0.55, ease: "expo.inOut" }, W(0, "vanished") - 0.35);
+E.sfx("whoosh", W(0, "vanished") - 0.35);
+E.draw($("#ringp"), W(0, "vanished") + 0.1, 0.5);
+E.sfx("blip", W(0, "vanished") + 0.12);
+tl.to("#cam", { ...camOn(rx0, ry0 + 140, 2.1), duration: 0.42, ease: "power3.inOut" }, W(0, "payout.") - 0.3);
+E.sfx("swish", W(0, "payout.") - 0.3);
+tl.to("#hl", { scaleX: 1, duration: 0.4, ease: "power2.inOut" }, W(0, "payout.") + 0.08);
+E.sfx("blip", W(0, "payout.") + 0.1);
+tl.to("#cam", { x: 0, y: 0, scale: 1, duration: 0.6, ease: "expo.inOut" }, W(0, "Watch") - 0.25);
+KIT.punch($("#note"), W(0, "Watch") + 0.2, 1.1);
+E.sfx("rise", W(0, "Watch") - 0.25);
+KIT.dropIn($("#ag"), W(0, "agent") - 0.3);
+tl.set("#ag", { opacity: 1 }, W(0, "agent") - 0.3);
+
+/* ===== 1 SPLIT: what the gateway kept ===== */
+off("#stmt", S(1), { x: -760, rotation: -12 });
+off("#slip", S(1), { x: 520, rotation: 14 });
+off("#note", S(1), { y: -700, rotation: 10, opacity: 0 });
+agTo(S(1) + 0.1, 880, 1130, 0.85);
+tl.to("#coins", { opacity: 1, duration: 0.01 }, S(1) + 0.3);
+coins.forEach((c, k) => tl.fromTo(c, { y: BY - k * CH - 700 }, { y: BY - k * CH, duration: 0.42, ease: "bounce.out" }, S(1) + 0.3 + k * 0.035));
+E.sfx("swish", S(1) + 0.3);
+on("#t_sale", S(1) + 0.9, { y: 30, opacity: 0 }, 0.5);
+const fly = (c, t, x, y, scale = 1) => {
+  tl.to(c, { x, duration: 0.6, ease: "power2.inOut" }, t);
+  tl.to(c, { y: Math.min(y, 760) - 200, duration: 0.3, ease: "power2.out" }, t);
+  tl.to(c, { y, duration: 0.3, ease: "power2.in" }, t + 0.3);
+  if (scale !== 1) tl.to(c, { scale, transformOrigin: "50% 50%", duration: 0.6, ease: "power2.inOut" }, t);
+  E.sfx("pop", t + 0.6);
+};
+fly(coins[STACK - 1], W(1, "fee,") - 0.15, 850, 640);
+on("#t_fee", W(1, "fee,") + 0.45, { y: 20, opacity: 0 }, 0.4);
+fly(coins[STACK - 2], W(1, "VAT") - 0.15, 850, 900, 0.6);
+on("#t_vat", W(1, "VAT") + 0.45, { y: 20, opacity: 0 }, 0.4);
+fly(coins[STACK - 3], W(1, "refund") - 0.15, 230, 760);
+on("#t_ref", W(1, "refund") + 0.45, { y: 20, opacity: 0 }, 0.4);
+tl.set("#t_sale", { opacity: 0 }, W(1, "payout.") - 0.05);
+tl.set("#t_paid", { opacity: 1 }, W(1, "payout.") - 0.05);
+KIT.punch($("#t_paid"), W(1, "payout.") - 0.05, 1.08);
+E.sfx("chime", W(1, "payout."));
+
+/* ===== 2 BY HAND: every report, every order, every gateway ===== */
+tl.to(["#coins", ".ptag"], { opacity: 0, y: "+=60", duration: 0.35, ease: "power2.in" }, S(2));
+tl.to("#ag", { scale: 0, opacity: 0, duration: 0.3, ease: "back.in(2)" }, S(2));
+pileEls.forEach((el, k) => {
+  const t = k < 4 ? W(2, "report") - 0.3 + k * 0.12 : k < 8 ? W(2, "order") - 0.2 + (k - 4) * 0.1 : W(2, "gateway") - 0.35 + (k - 8) * 0.08;
+  const r = (rnd() - .5) * 40;
+  tl.fromTo(el, { opacity: 0, y: -900, rotation: r * 2.2 }, { opacity: 1, y: 0, rotation: r, duration: 0.5, ease: "power3.out" }, t);
+  if (k % 4 === 0) E.sfx("swish", t);
+});
+on("#calc", S(2) + 0.2, { x: -320, r: -14, opacity: 0 }, 0.6);
+on("#clock", S(2) + 0.3, { y: -320, opacity: 0 }, 0.6);
+tl.fromTo("#mh", { rotation: 0, svgOrigin: "0 0" }, { rotation: 360 * 6, svgOrigin: "0 0", duration: S(3) - S(2), ease: "none" }, S(2));
+tl.fromTo("#hh", { rotation: 0, svgOrigin: "0 0" }, { rotation: 180, svgOrigin: "0 0", duration: S(3) - S(2), ease: "none" }, S(2));
+["1250.", "1890.", "2870.5", "3285.5", "4405.5", "5165.75", "6064.75", "6595.5", "7940.5", "8396.", "9100.", "10000."].forEach((v, k) =>
+  tl.set("#lcd", { textContent: v }, S(2) + 0.6 + k * ((S(3) - S(2) - 1) / 12)));
+tl.fromTo("#cam", { x: 0 }, { x: 6, duration: 0.05, repeat: 7, yoyo: true, ease: "none" }, W(2, "gateway"));
+
+/* ===== 3 THE AGENT: bank line → the payout file that matches, to the fils ===== */
+tl.to(pileEls, { y: -1700, opacity: 0, rotation: "+=25", duration: 0.5, ease: "power3.in", stagger: 0.015 }, S(3));
+off("#calc", S(3), { x: -420, opacity: 0 }, 0.45);
+off("#clock", S(3), { y: -420, opacity: 0 }, 0.45);
+tl.set("#stmt", { x: -760, rotation: -12 }, S(3));
+tl.to("#stmt", { x: -20, y: 0, rotation: 0, duration: 0.7, ease: "expo.out" }, S(3) + 0.25);
+const [sx, sy] = at($("#samt"), $("#stmt"), -20, 0);          // statement amount (stmt moved x −20)
+tl.set("#ag", { x: 470 - 820, y: 1130 - 1110, opacity: 1 }, S(3) + 0.3);
+tl.to("#ag", { scale: 0.8, duration: 0.4, ease: "back.out(2)" }, S(3) + 0.3);
+agTo(W(3, "bank.") - 0.2, 330, sy + 40, 0.7, 0.6);
+E.sfx("blip", W(3, "line,"));
+KIT.punch($("#srow"), W(3, "line,"), 1.05);
+on("#rep", W(3, "finds") - 0.4, { x: 520, r: 6, opacity: 0 }, 0.7);
+E.sfx("swish", W(3, "finds") - 0.4);
+tl.to("#hl2", { scaleX: 1, duration: 0.45, ease: "power2.inOut" }, W(3, "matches") - 0.25);
+{
+  const sw = $("#samt").offsetWidth, rr = at($("#ramt"), $("#rep"), 0, 0);
+  const x0 = sx + sw + 10, y0 = sy + 16, x1 = rr[0] - 20, y1 = rr[1] + 16;
+  $("#linkp").setAttribute("d", `M${x0},${y0} C${x0 + 60},${y0 + 180} ${x1 - 160},${y1 - 120} ${x1},${y1}`);
+  tl.set("#link", { opacity: 1 }, W(3, "matches") - 0.1);
+  E.draw($("#linkp"), W(3, "matches") - 0.1, 0.55);
+  agTo(W(3, "matches") - 0.1, (x0 + x1) / 2 - 85, Math.max(y0, y1) + 120, 0.7, 0.55);
+}
+tl.fromTo("#eq", { opacity: 0, y: 30, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(2)" }, W(3, "fils.") - 0.1);
+E.sfx("chime", W(3, "fils."));
+
+/* ===== 4 ORDERS → INVOICES, each marked paid ===== */
+off("#stmt", S(4), { x: -800, rotation: -8 }, 0.5);
+tl.to(["#link", "#eq"], { opacity: 0, duration: 0.25 }, S(4));
+tl.to("#rep", { x: -560, duration: 0.7, ease: "expo.inOut" }, S(4) + 0.15);
+agTo(S(4) + 0.2, 440, 1170, 0.55);
+invEls.forEach((el, k) => {
+  const row = $(`#c${k}`), [rx, ry] = at(row, $("#rep"), -560, 0);
+  const t = W(4, "12") - 0.2 + k * 0.07;
+  tl.fromTo(el, { opacity: 0, x: rx - el.offsetLeft, y: ry - el.offsetTop - 80, scale: 0.4, rotation: -10 },
+    { opacity: 1, x: 0, y: 0, scale: 1, rotation: (rnd() - .5) * 4, duration: 0.55, ease: "expo.out" }, t);
+  tl.fromTo(row, { backgroundColor: "rgba(255,225,77,0)" }, { backgroundColor: "rgba(255,225,77,.55)", duration: 0.15 }, t);
+});
+E.sfx("swish", W(4, "12") - 0.2);
+invEls.forEach((el, k) => {
+  const t = W(4, "invoice") + k * 0.1;
+  tl.fromTo(el.querySelector(".stamp"), { opacity: 0, scale: 1.8 }, { opacity: 0.92, scale: 1, duration: 0.14, ease: "power3.in" }, t);
+  if (k % 2 === 0) E.sfx("pop", t + 0.12);
+});
+
+/* ===== 5 THE JOURNAL: bank, fee, VAT on the fee, refund — debits equal credits ===== */
+off("#rep", S(5), { x: -1200 }, 0.5);
+invEls.forEach((el, k) => tl.to(el, { x: 870 - el.offsetLeft + (k % 3) * 2, y: 440 - el.offsetTop - k * 3, rotation: (rnd() - .5) * 8, scale: 0.8, duration: 0.55, ease: "expo.inOut" }, S(5) + k * 0.02));
+on("#jv", W(5, "journal.") - 0.4, { y: 760, r: 3, opacity: 0 }, 0.7);
+E.sfx("swish", W(5, "journal.") - 0.4);
+agTo(W(5, "journal.") - 0.3, 640, 420, 0.6);
+[["#j1", "Bank."], ["#j2", "Fee."], ["#j3", "VAT"], ["#j4", "refund."], ["#j5", "Debits"], ["#j6", "credits."]].forEach(([id, w], k) => {
+  const t = W(5, w) - 0.1;
+  tl.to(id, { clipPath: "inset(0 0% 0 0)", duration: k > 3 ? 0.35 : 0.45, ease: "steps(14)" }, t);
+  E.sfx("typing", t, { dur: 0.4 });
+});
+tl.fromTo("#j6 span:nth-child(2), #j6 span:nth-child(3)", { color: "#1E2230" }, { color: "#1F7A4D", duration: 0.25 }, W(5, "credits.") + 0.35);
+E.sfx("chime", W(5, "credits.") + 0.35);
+
+/* ===== 6 APPROVE: one tap, posted to Zoho ===== */
+tl.to("#jv", { x: -40, y: -120, scale: 0.6, rotation: -3, transformOrigin: "0% 0%", duration: 0.7, ease: "expo.inOut" }, S(6));
+tl.to(invEls, { x: "-=760", y: "+=560", duration: 0.7, ease: "expo.inOut" }, S(6));
+on("#phone", S(6) + 0.2, { y: 900, r: 8, opacity: 0 }, 0.8);
+E.sfx("swish", S(6) + 0.2);
+agTo(S(6) + 0.2, 400, 1110, 0.6);
+tl.fromTo("#tap", { opacity: 0.9, scale: 0.3 }, { opacity: 0, scale: 1.6, duration: 0.5, ease: "power2.out" }, W(6, "approve."));
+KIT.punch($("#btn"), W(6, "approve."), 0.95);
+E.sfx("click", W(6, "approve."));
+tl.to("#btn2", { opacity: 1, duration: 0.2 }, W(6, "tap,"));
+tl.fromTo("#post", { opacity: 0, scale: 1.8 }, { opacity: 0.9, scale: 1, duration: 0.16, ease: "power3.in" }, W(6, "Zoho.") - 0.1);
+E.sfx("chime", W(6, "Zoho."));
+
+/* ===== 7 PROOF ===== */
+$("#p_e").textContent = `One Dubai e-commerce brand · ${F.close_month}`;
+$("#p_src").textContent = "The brand RAMZA was built inside. Figures from the live RAMZA app.";
+tl.fromTo("#p_e", { opacity: 0 }, { opacity: 1, duration: 0.4 }, S(7) + 0.3);
+E.lines(".scene.night .line > span", S(7) + 0.35);
+tl.fromTo(["#p_s1", "#p_s2"], { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.25, ease: "expo.out" }, S(7) + 0.5);
+E.count($("#p_v1"), W(7, "145") - 0.9, F.close_credits, { dur: 0.9 });
+E.count($("#p_v2"), W(7, "89%") - 0.9, F.close_matched_pct, { dur: 0.9, fmt: (v) => Math.round(v) + "%" });
+tl.fromTo("#p_src", { opacity: 0 }, { opacity: 1, duration: 0.4 }, W(7, "matched"));
+
+/* ===== 8 CTA ===== */
+KIT.dropIn($("#c_ag"), S(8) + 0.2);
+$("#c_sub").textContent = R.offer.free_trial.free_setup.headline;
+tl.fromTo("#c_kw", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, W(8, "CLOSE.") - 0.2);
+tl.fromTo("#c_sub", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5 }, W(8, "free") - 0.1);
+E.sfx("pop", W(8, "CLOSE."));
+
+window.BEATS = [
+  { tag: "HOOK", t: 0, open: "cover frame: giant sticky note −587.63 slams into the centre", reveal: "note flies to the desk · macro on slip total + red ring · whip to the bank line + highlighter · pull back, note punches on 587", camera: "macro 2.1× on slip → whip to statement → pull back to 1×" },
+  { tag: "OBSTACLE", t: S(1), open: "papers slide off, coin stack drops", reveal: "a coin flies off for the fee, a smaller one for VAT, one for the refund; the sales tag turns into 'Paid to the bank'", camera: "static" },
+  { tag: "OBSTACLE", t: S(2), open: "reports rain onto the desk", reveal: "Stripe/Tabby/Tamara/COD reports pile up, calculator runs, clock spins", camera: "shake on 'gateway'" },
+  { tag: "METHOD", t: S(3), open: "statement squared up, agent walks to the line", reveal: "payout report slides in; red pen line from bank amount to net payout; 9,412.37 = 9,412.37", camera: "static" },
+  { tag: "METHOD", t: S(4), open: "report slides left", reveal: "12 invoices fly out of the charge rows; blue PAID stamps one by one", camera: "static" },
+  { tag: "METHOD", t: S(5), open: "green columnar journal pad slides up", reveal: "each Dr/Cr line types on its word; totals turn green", camera: "static" },
+  { tag: "METHOD", t: S(6), open: "phone slides in", reveal: "tap Approve → Posted to Zoho; POSTED stamp on the journal", camera: "static" },
+  { tag: "PROOF", t: S(7), open: "wipe to navy", reveal: "counters 145 / 89%", camera: "-" },
+  { tag: "OFFER + CTA", t: S(8), open: "agent drops in", reveal: "Comment CLOSE, free-setup line", camera: "-" },
+];
+</script>
+</body></html>

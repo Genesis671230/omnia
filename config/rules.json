@@ -226,8 +226,58 @@
         "e-invoicing readiness check"
       ],
       "access": "read-only; revocable at any time",
+      "free_setup": {
+        "headline": "We set RAMZA up on your own transactions for free. You pay only once it is closing your month.",
+        "setup_fee_aed": 0,
+        "billing_starts": "after the first month is closed on the client's own bank and gateway data and they confirm it",
+        "skin_in_the_game": [
+          "upload last month's bank statement within 3 days",
+          "attend one 30-minute onboarding call"
+        ],
+        "_why": "founder decision 2026-10-24: win on quality, not on a lower price than competitors; conditions keep the client committed (no-guarantee lesson from the sales system)",
+        "VERIFY": "founder: confirm the conditions, what happens if the first close is not confirmed within 14 days, and that billing then follows pricing.tiers (still null = Get a quote)"
+      },
       "_decided": "founder decision 2026-10-20",
       "VERIFY": "founder: confirm day-8 behaviour (no auto-charge vs auto-convert), exact data scope (statement upload vs live read-only connections), and data deletion on cancel, before this runs in paid ads"
+    }
+  },
+  "market": {
+    "accountant_salary_aed_month": {
+      "qualified_low": 13000,
+      "qualified_high": 27000,
+      "junior_low": 5000,
+      "junior_high": 8000,
+      "source": "Michael Page UAE Salary Guide 2026 (qualified accountant), as quoted by learnsignal.com/blog/accountant-salary-dubai and mirchawala.com; junior band from learnsignal.com",
+      "verified_on": "2026-10-24",
+      "VERIFY": "secondary sources only; confirm against the Michael Page PDF before paid ads. Never call RAMZA an 'auditor' (regulated title)."
+    },
+    "aml_moet": {
+      "h1_2025": {
+        "violations": 1063,
+        "fines_aed": 42000000,
+        "real_estate_violations": 495,
+        "real_estate_fines_aed": 18500000,
+        "published": "2025-07-24",
+        "source": "https://www.moet.gov.ae/en/-/ministry-of-economy-and-tourism-announces-h1-2025-inspection-results-on-private-sector-compliance-with-anti-money-laundering-laws"
+      },
+      "q1_2023": {
+        "real_estate_share_of_violations": 0.25,
+        "source": "https://www.moet.gov.ae/en/-/ministry-of-economy-imposes-fines-worth-aed-65.9-million-on-137-dnfbp-companies-in-q1-2023-%C2%A0-840-companies-were-inspected-during-which-a-total-of-831-violations-were-found"
+      },
+      "high_risk": {
+        "quote": "classified as high-risk under the sectoral risk classification",
+        "published": "2022-12-21",
+        "source": "https://www.moet.gov.ae/en/-/ministry-of-economy-levies-fines-of-aed-3.2-million-on-six-dnfbp-companies"
+      },
+      "verified_on": "2026-10-24",
+      "note": "RAMZA is not an AML compliance service; goAML reporting stays with the client's compliance officer."
+    },
+    "personal_income_tax": {
+      "rate": 0,
+      "note": "The UAE levies no federal personal income tax on individuals' employment income",
+      "source": "https://u.ae/en/information-and-services/finance-and-investment/taxation",
+      "verified_on": "2026-10-24",
+      "VERIFY": "compliance-gate: confirm wording on u.ae before paid ads"
     }
   }
 }

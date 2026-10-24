@@ -32,7 +32,8 @@ mark in `public/ramza/brand/` (animate it by sliding the brackets shut).
   shown only with a "Coming soon" tag. See the Built column in `topics.md`.
 - No FTA / EmaraTax / MoF logos or colours. Meta-safe copy: never "Are you
   late?", say "UAE businesses with…".
-- Omnia figures are disclosed as RAMZA's founding company and first user.
+- Never mention Omnia, Omniastores or House of Omnia (founder rule 2026-10-24). Our own numbers are
+  "a Dubai e-commerce brand RAMZA was built inside"; no store names, logos or storefronts on screen.
 - Privacy: no customer or payee names, no full account numbers (capture.mjs
   masks long digit runs and skips owner transfers). Never film the Zoho books
   or Bank lines tabs for public video.

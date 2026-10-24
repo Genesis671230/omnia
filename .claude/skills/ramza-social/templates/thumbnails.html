@@ -1,0 +1,156 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Urbanist:wght@600;700;800;900&display=block">
+<style>
+/* Reel covers / thumbnails. One real desk object behind, one centre hook on a real paper card:
+   ink type, a yellow highlighter swipe on the key words, a red pen ring on the number.
+   Safe zone: everything readable sits in the centre 1080x1350, so the IG grid (3:4) and a 4:5 crop
+   keep it. Numbers come from RULES / FACTS (injected by render-thumbs.mjs). No gradients. */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#D8B78A}
+body{font-family:'IBM Plex Sans',sans-serif;color:#14131C;-webkit-font-smoothing:antialiased}
+#desk{position:absolute;inset:0}
+#objs{position:absolute;left:50%;top:50%;width:1080px;height:1920px;margin:-960px 0 0 -540px}
+.paper{position:absolute;background:#FBFAF6;box-shadow:0 2px 0 rgba(90,60,20,.10),0 24px 40px rgba(70,45,10,.32)}
+.mono{font-family:'IBM Plex Mono',monospace;font-weight:500}
+/* the hook card */
+#card{position:absolute;left:50%;top:50%;width:900px;transform:translate(-50%,-50%) rotate(-1.5deg);background:#FFFFFF;
+  padding:64px 60px 70px;box-shadow:0 3px 0 rgba(90,60,20,.12),0 40px 70px rgba(40,25,5,.45);z-index:10}
+#card.note{background:#FFE98A}
+#card .k{font-family:'IBM Plex Sans';font-weight:600;font-size:30px;letter-spacing:.16em;text-transform:uppercase;color:#5B6478;margin-bottom:26px}
+#card h1{font-family:'Urbanist';font-weight:900;font-size:122px;line-height:.96;letter-spacing:-.045em;color:#0B1533}
+#card h1 .hl{background:linear-gradient(#0000 0,#0000 0);position:relative;z-index:0;white-space:nowrap}
+#card h1 .hl:before{content:"";position:absolute;left:-10px;right:-10px;top:52%;bottom:2%;background:#FFE14D;z-index:-1;transform:rotate(-1deg);border-radius:4px}
+#card h1 .red{color:#C8321F}
+#card h1 .ring{position:relative;white-space:nowrap}
+#card h1 .ring svg{position:absolute;left:-30px;top:-22px;width:calc(100% + 60px);height:calc(100% + 40px);overflow:visible}
+#card .sub{font-size:36px;line-height:1.3;color:#2A2D35;margin-top:34px;font-weight:500}
+#card .src{font-size:22px;color:#6B7180;margin-top:26px;line-height:1.4}
+#brand{position:absolute;right:48px;bottom:-30px;z-index:11;display:flex;align-items:center;gap:12px;
+  background:#0B1533;color:#fff;font-family:'Urbanist';font-weight:800;font-size:34px;letter-spacing:-.02em;padding:12px 24px 12px 16px;border-radius:10px}
+#brand i{width:34px;height:34px;border-radius:9px;background:#4F35E8;display:inline-block}
+#ex{position:absolute;right:40px;top:-22px;z-index:11;background:#fff;border:1px solid #E3E7F0;color:#0B1533;font-weight:700;font-size:22px;letter-spacing:.12em;padding:9px 16px;border-radius:6px}
+/* objects */
+.r{display:grid;grid-template-columns:90px 1fr 170px;font-size:22px;padding:15px 0;border-bottom:1px solid #E6E3DA}
+.r span:last-child{text-align:right}
+.yl{background:#FFE14D88}
+.bars{position:absolute;display:flex;align-items:flex-end;gap:18px}
+.bars i{display:block;width:46px;background:#1F7A4D}
+.stamp{position:absolute;border:7px solid #C8321F;color:#C8321F;font-family:'Urbanist';font-weight:900;font-size:76px;letter-spacing:.08em;padding:0 22px;border-radius:10px;mix-blend-mode:multiply;opacity:.9}
+.badge{position:absolute;width:250px;height:340px;background:#fff;border-radius:16px;box-shadow:0 20px 34px rgba(70,45,10,.32);padding:0 0 20px;overflow:hidden;text-align:center}
+.badge .clip{height:56px;background:#2F333B}
+.badge .ph{width:120px;height:120px;border-radius:50%;background:#C9CED8;margin:26px auto 18px}
+.badge b{display:block;font-family:'Urbanist';font-weight:800;font-size:28px;color:#0B1533;padding:0 12px;line-height:1.1}
+.badge s{display:block;text-decoration:none;font-family:'IBM Plex Mono';font-size:20px;color:#8A3A2E;margin-top:12px}
+.tag{position:absolute;background:#F1E2BF;border:1px solid #CDB27D;border-radius:8px;padding:14px 22px;box-shadow:0 10px 16px rgba(70,45,10,.22);color:#3B2F12;font-size:22px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.tag b{display:block;font-family:'IBM Plex Mono';font-weight:500;font-size:32px;letter-spacing:0;text-transform:none}
+.sheet{font-family:'IBM Plex Mono';font-size:19px;color:#2A2D35}
+.sheet .g{display:grid;grid-template-columns:repeat(5,1fr);border-left:1px solid #C9D3C0}
+.sheet .g span{border-right:1px solid #C9D3C0;border-bottom:1px solid #C9D3C0;padding:8px 10px;height:40px;text-align:right}
+.sheet .g span.h{background:#E3EDDB;text-align:left;font-weight:500}
+.sheet .g span.e{background:#FDE2DE;color:#C8321F}
+</style></head>
+<body>
+<svg id="desk" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1080 1920"></svg>
+<div id="objs"></div>
+<div id="card"></div>
+<div id="brand"><i></i>ramza</div>
+<div id="ex" hidden>Example</div>
+<script>
+const R = window.RULES, F = window.FACTS, $ = (s) => document.querySelector(s);
+const id = new URLSearchParams(location.search).get("id");
+let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const n = (x) => Number(x).toLocaleString("en-US");
+const m2 = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const k = (x) => (x / 1000).toLocaleString("en-US") + "k";
+const M = (x) => (x / 1e6).toLocaleString("en-US", { maximumFractionDigits: 2 }) + "M";
+const fmtDate = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const ring = (t) => `<span class="ring">${t}<svg viewBox="0 0 316 60" preserveAspectRatio="none"><path d="M160,6 C60,2 8,12 8,32 C8,54 120,58 200,56 C280,54 310,44 308,28 C306,10 240,2 120,8" fill="none" stroke="#C8321F" stroke-width="3.2" stroke-linecap="round" vector-effect="non-scaling-stroke" style="stroke-width:6px"/></svg></span>`;
+
+/* oak desk */
+{
+  let g = "";
+  for (let p = 0; p < 5; p++) {
+    const x0 = p * 216;
+    g += `<rect x="${x0}" y="0" width="216" height="1920" fill="${["#D8B78A", "#D3B083", "#DBBC90", "#D5B386", "#D9B98C"][p]}"/>`;
+    for (let i = 0; i < 14; i++) {
+      const x = x0 + 8 + rnd() * 200, a = 4 + rnd() * 10;
+      let d = `M${x.toFixed(1)},0`;
+      for (let y = 0; y <= 1920; y += 120) d += ` Q${(x + (rnd() - .5) * a * 2).toFixed(1)},${y + 60} ${(x + (rnd() - .5) * a).toFixed(1)},${y + 120}`;
+      g += `<path d="${d}" fill="none" stroke="#B98F5C" stroke-opacity="${(0.12 + rnd() * 0.22).toFixed(2)}" stroke-width="${(1 + rnd() * 2.2).toFixed(1)}"/>`;
+    }
+    g += `<rect x="${x0 + 214}" y="0" width="2" height="1920" fill="#A97F4E" fill-opacity=".55"/>`;
+  }
+  $("#desk").innerHTML = g;
+}
+
+const obj = (html, css) => { const d = document.createElement("div"); d.innerHTML = html; const el = d.firstElementChild; Object.assign(el.style, css); $("#objs").append(el); return el; };
+const statement = (rows, css) => obj(`<div class="paper" style="width:760px;padding:40px 36px"><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1E2A4A;padding-bottom:16px"><b style="font-family:Urbanist;font-weight:800;font-size:40px;color:#1E2A4A">Bank statement</b><span class="mono" style="font-size:19px;color:#6B7180;text-align:right">Acct ****4821<br>Sep 2026</span></div>${rows.map(([d, t, a, y]) => `<div class="r mono ${y ? "yl" : ""}"><span>${d}</span><span>${t}</span><span style="color:${a.startsWith("-") ? "#8A3A2E" : "#1E2230"}">${a}</span></div>`).join("")}</div>`, css);
+const ROWS = [["02 SEP", "TABBY PAYOUT", "4,180.20", 1], ["03 SEP", "NETWORK CR 88213", "6,214.00", 1], ["04 SEP", "STRIPE PAYOUT", "9,412.37", 1], ["05 SEP", "SALARIES", "-18,500.00"], ["06 SEP", "TAMARA PAYOUT", "2,904.65", 1], ["07 SEP", "CARD POS SETTLE", "1,236.90", 1], ["08 SEP", "COURIER COD", "3,310.00", 1], ["09 SEP", "SHOP RENT", "-7,000.00"], ["10 SEP", "STRIPE PAYOUT", "7,880.12", 1], ["11 SEP", "TABBY PAYOUT", "3,092.45", 1], ["12 SEP", "TRANSFER IN", "12,000.00", 1], ["13 SEP", "DEWA BILL", "-612.40"], ["14 SEP", "TAMARA PAYOUT", "5,118.30", 1], ["15 SEP", "STRIPE PAYOUT", "6,402.88", 1], ["16 SEP", "COURIER COD", "2,240.00", 1], ["17 SEP", "NETWORK CR 88690", "4,995.10", 1], ["18 SEP", "TABBY PAYOUT", "3,770.00", 1], ["19 SEP", "STRIPE PAYOUT", "8,115.64", 1], ["20 SEP", "CARD POS SETTLE", "1,904.20", 1], ["21 SEP", "COURIER COD", "4,060.00", 1], ["22 SEP", "TAMARA PAYOUT", "2,311.75", 1], ["23 SEP", "STRIPE PAYOUT", "9,006.40", 1], ["24 SEP", "TABBY PAYOUT", "2,880.60", 1], ["25 SEP", "SUPPLIER", "-9,450.00"], ["26 SEP", "COURIER COD", "3,925.00", 1], ["27 SEP", "STRIPE PAYOUT", "7,231.19", 1], ["28 SEP", "TAMARA PAYOUT", "4,415.80", 1]];
+const payout = (css) => obj(`<div class="paper" style="width:560px;overflow:hidden"><div style="background:#635BFF;color:#fff;height:90px;display:flex;align-items:center;justify-content:space-between;padding:0 30px"><b style="font-family:Urbanist;font-weight:800;font-size:40px">stripe</b><span style="font-size:20px">Payout report</span></div><div class="mono" style="padding:20px 30px;font-size:24px;line-height:2.1">${[["Charges (12)", "10,000.00"], ["Fees", "-330.00"], ["VAT on fees", "-16.50", 1], ["Refunds (1)", "-241.13"], ["Net payout", "9,412.37"]].map(([a, b, y]) => `<div style="display:flex;justify-content:space-between;border-bottom:1px solid #E6E3DA;${y ? "background:#FFE14D99" : ""}"><span>${a}</span><span>${b}</span></div>`).join("")}${Array.from({ length: 10 }, (_, i) => `<div style="display:flex;justify-content:space-between;font-size:19px;line-height:1.9;color:#5B6478"><span>ch · #${4101 + i}</span><span>${m2(400 + rnd() * 900)}</span></div>`).join("")}</div></div>`, css);
+const coins = (cx, cy, nC) => { let s = ""; for (let i = 0; i < nC; i++) { const y = cy - i * 15, x = cx + (rnd() - .5) * 9; s += `<g transform="translate(${x},${y})"><ellipse cy="13" rx="78" ry="26" fill="#9EA4AC"/><rect x="-78" y="0" width="156" height="13" fill="#A9AFB7"/><ellipse rx="78" ry="26" fill="#D6D9DE" stroke="#7E848D" stroke-width="2.5"/><ellipse rx="61" ry="20" fill="none" stroke="#B5BAC1" stroke-width="3"/></g>`; } return s; };
+
+const T = {
+  "bank-not-books": () => {
+    statement(ROWS, { left: "160px", top: "180px", transform: "rotate(-3deg)" });
+    obj(`<div class="paper" style="width:260px;height:300px;background:#FFE98A;padding:26px;font-family:Urbanist;font-weight:700;font-size:34px;color:#3B2F12">not in<br>Zoho?<br>not in<br>Zoho?</div>`, { left: "760px", top: "1500px", transform: "rotate(8deg)" });
+    return { k: `One Dubai e-commerce brand · ${F.close_month}`, h: `${ring(`AED ${M(F.bank_lines_not_in_zoho_aed)}`)}<br>in the bank.<br><span class="hl">Not in the books.</span>`,
+      sub: `${n(F.bank_lines_not_in_zoho)} bank lines with no entry. An AI agent found every one.`, src: `Live RAMZA app, ${fmtDate(F.as_of)}. The brand RAMZA was built inside.` };
+  },
+  "587-vanished": () => {
+    statement(ROWS.slice(0, 12), { left: "60px", top: "220px", transform: "rotate(-4deg)" });
+    obj(`<div class="paper mono" style="width:340px;padding:30px;font-size:22px;line-height:1.7">STORE SALES<br>04 SEP 2026<br>- - - - - - - - - -<br>${Array.from({ length: 12 }, (_, i) => `#${4101 + i} &nbsp; ${m2(400 + rnd() * 900)}`).join("<br>")}<br>- - - - - - - - - -<br><b>TOTAL 10,000.00</b></div>`, { left: "690px", top: "1180px", transform: "rotate(5deg)" });
+    $("#card").className = "note"; $("#ex").hidden = false;
+    return { k: "One payout. One store.", h: `${ring('<span class="red">AED 587</span>')}<br>vanished.<br><span class="hl">Nobody noticed.</span>`, sub: "Sales 10,000. Bank 9,412. Watch an AI agent find every fils." };
+  },
+  "five-percent": () => {
+    payout({ left: "430px", top: "120px", transform: "rotate(4deg)" });
+    obj(`<div class="paper" style="width:520px;padding:34px;font-size:22px"><b style="font-family:Urbanist;font-size:34px;color:#1E2A4A">TAX INVOICE</b><div class="mono" style="color:#6B7180;margin-top:6px">Gateway fees · Sep 2026</div><div class="mono" style="margin-top:30px;line-height:2">Fee 330.00<br>VAT ${Math.round(R.vat.standard_rate * 100)}% 16.50</div></div>`, { left: "80px", top: "1350px", transform: "rotate(-6deg)" });
+    return { k: "UAE stores on Stripe, Tabby, Tamara", h: `The ${ring(`<span class="red">${Math.round(R.vat.standard_rate * 100)}%</span>`)}<br><span class="hl">nobody books.</span>`, sub: "VAT on every gateway fee. Booked, it's reclaimable input VAT. Unbooked, it's just gone." };
+  },
+  "four-hires": () => {
+    const S = R.market.accountant_salary_aed_month;
+    [["Bookkeeper", 70, 160, -8], ["Reviewer", 760, 220, 7], ["Month-end closer", 60, 1440, 6], ["Finance advisor", 770, 1400, -5]].forEach(([t, x, y, r]) =>
+      obj(`<div class="badge"><div class="clip"></div><div class="ph"></div><b>${t}</b><s>AED ${k(S.qualified_low)}+/mo</s></div>`, { left: x + "px", top: y + "px", transform: `rotate(${r}deg)` }));
+    return { k: "The finance team, rebuilt", h: `${ring('<span class="red">4</span>')} hires.<br><span class="hl">1 AI agent.</span>`, sub: "Bookkeeping, review, month-end close and advice. On your own transactions, set up free.",
+      src: `Qualified accountant in Dubai: AED ${k(S.qualified_low)}–${k(S.qualified_high)} a month (Michael Page UAE Salary Guide 2026).` };
+  },
+  "sales-up-bank-flat": () => {
+    obj(`<div class="paper" style="width:600px;height:520px;padding:34px"><b style="font-family:Urbanist;font-weight:800;font-size:34px;color:#1E2A4A">Sales report</b><div class="mono" style="color:#6B7180;font-size:19px">Jan – Sep 2026</div><div class="bars" style="left:50px;bottom:40px">${[90, 120, 140, 170, 210, 240, 280, 320, 370].map((h) => `<i style="height:${h}px"></i>`).join("")}</div></div>`, { left: "70px", top: "130px", transform: "rotate(-5deg)" });
+    obj(`<div class="paper" style="width:600px;height:520px;padding:34px"><b style="font-family:Urbanist;font-weight:800;font-size:34px;color:#1E2A4A">Bank balance</b><div class="mono" style="color:#6B7180;font-size:19px">Jan – Sep 2026</div><div class="bars" style="left:50px;bottom:40px">${[150, 160, 145, 158, 150, 162, 148, 155, 152].map((h) => `<i style="height:${h}px;background:#8A3A2E"></i>`).join("")}</div></div>`, { left: "420px", top: "1330px", transform: "rotate(5deg)" });
+    $("#ex").hidden = false;
+    return { k: "UAE e-commerce, read this twice", h: `Sales ${ring('<span class="red">up.</span>')}<br><span class="hl">Bank flat.</span>`, sub: "Fees, refunds, VAT and FX leak out between checkout and the bank. Here's where." };
+  },
+  "einvoice-100": () => {
+    const P = R.einvoicing.penalties;
+    obj(`<div class="paper" style="width:620px;padding:40px"><b style="font-family:Urbanist;font-weight:800;font-size:46px;color:#1E2A4A">TAX INVOICE</b><div class="mono" style="color:#6B7180;margin-top:8px;font-size:22px">INV-20417 · PDF by email</div>${Array.from({ length: 9 }, () => `<div style="height:12px;background:#E7E4DC;margin-top:24px;width:${50 + rnd() * 45}%"></div>`).join("")}<div class="stamp" style="left:120px;top:250px;transform:rotate(-14deg)">REJECTED</div></div>`, { left: "250px", top: "120px", transform: "rotate(-3deg)" });
+    return { k: `UAE e-invoicing · smaller businesses live ${fmtDate(R.einvoicing.sme.go_live)}`, h: `${ring(`<span class="red">AED ${n(P.invoice_not_issued_aed)}</span>`)}<br><span class="hl">per invoice.</span>`,
+      sub: `For each e-invoice not issued, capped at AED ${n(P.invoice_cap_aed_per_month)} a month. Check where yours are created.`, src: "Cabinet Decision No. 106 of 2025." };
+  },
+  "stop-excel": () => {
+    obj(`<div class="paper sheet" style="width:900px;padding:30px"><div class="g">${Array.from({ length: 60 }, (_, i) => i < 5 ? `<span class="h">${["Order", "Gateway", "Sale", "Payout", "Diff"][i]}</span>` : `<span class="${i % 5 === 4 && rnd() < .5 ? "e" : ""}">${i % 5 === 0 ? "#" + (4100 + i) : i % 5 === 1 ? ["stripe", "tabby", "tamara", "cod"][i % 4] : i % 5 === 4 ? (rnd() < .5 ? "#REF!" : "-" + m2(rnd() * 90)) : m2(300 + rnd() * 900)}</span>`).join("")}</div></div>`, { left: "90px", top: "110px", transform: "rotate(-3deg)" });
+    obj(`<div style="position:absolute;width:300px;height:400px;background:#2F333B;border-radius:28px;box-shadow:0 20px 30px rgba(40,25,5,.4);padding:28px"><div class="mono" style="height:90px;background:#B9C6A4;border-radius:8px;font-size:46px;text-align:right;padding:16px;color:#22281C">-587.63</div></div>`, { left: "690px", top: "1420px", transform: "rotate(9deg)" });
+    return { k: "Month-end, UAE e-commerce", h: `<span class="red">Stop</span> closing<br>the month<br><span class="hl">in Excel.</span>`, sub: "Payouts, fees, refunds, VAT. An AI agent matches them to the bank. You approve." };
+  },
+  "gateway-cut": () => {
+    obj(`<svg width="1080" height="1920" style="position:absolute;left:0;top:0">${coins(260, 460, 16)}${coins(830, 1700, 12)}</svg>`, {});
+    [["Gateway fee", "330.00", 560, 190, -6], ["VAT on the fee", "16.50", 80, 1480, 5], ["Refund", "241.13", 600, 1360, -4]].forEach(([a, b, x, y, r]) =>
+      obj(`<div class="tag">${a}<b>${b}</b></div>`, { left: x + "px", top: y + "px", transform: `rotate(${r}deg)` }));
+    $("#ex").hidden = false;
+    return { k: "Stripe · Tabby · Tamara · COD", h: `Every gateway<br>takes a ${ring('<span class="red">cut.</span>')}<br><span class="hl">Who books it?</span>`, sub: "Fee, VAT on the fee, refunds. Unbooked, the margin is a guess." };
+  },
+};
+T["brokers-aml"] = () => {
+  const A = R.market.aml_moet.h1_2025;
+  obj(`<div class="paper" style="width:700px;padding:44px"><b style="font-family:Urbanist;font-weight:800;font-size:40px;color:#1E2A4A">SALE AND PURCHASE AGREEMENT</b><div class="mono" style="color:#6B7180;margin-top:8px;font-size:22px">Unit 1204 · Dubai Marina</div>${Array.from({ length: 10 }, () => `<div style="height:12px;background:#E7E4DC;margin-top:24px;width:${50 + rnd() * 45}%"></div>`).join("")}<div class="stamp" style="left:150px;top:240px;transform:rotate(-12deg)">FINED</div></div>`, { left: "190px", top: "110px", transform: "rotate(-4deg)" });
+  obj(`<svg width="260" height="300" viewBox="0 0 260 300"><circle cx="90" cy="80" r="62" fill="none" stroke="#B9BEC6" stroke-width="22"/><rect x="80" y="130" width="22" height="150" rx="6" fill="#C9A548"/><rect x="100" y="210" width="40" height="18" fill="#C9A548"/><rect x="100" y="245" width="30" height="18" fill="#C9A548"/><circle cx="90" cy="80" r="30" fill="#D8B78A"/></svg>`, { left: "720px", top: "1440px", transform: "rotate(18deg)" });
+  return { k: "UAE real-estate brokerages · first half of 2025", h: `${ring(`<span class="red">${n(A.real_estate_violations)}</span>`)} AML<br>violations.<br><span class="hl">AED ${(A.real_estate_fines_aed / 1e6).toLocaleString("en-US")}M</span> fined.`,
+    sub: `Almost half of the ${n(A.violations)} the Ministry of Economy found in six months.`, src: `Ministry of Economy and Tourism, ${fmtDate(A.published)}.` };
+};
+const c = T[id]();
+const brand = $("#brand"), ex = $("#ex");
+$("#card").innerHTML = `<div class="k">${c.k}</div><h1>${c.h}</h1><div class="sub">${c.sub}</div>${c.src ? `<div class="src">${c.src}</div>` : ""}`;
+$("#card").append(brand, ex);
+window.THUMBS = Object.keys(T);
+</script>
+</body></html>

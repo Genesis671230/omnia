@@ -1,6 +1,6 @@
 ---
 name: ramza-social
-description: RAMZA's CMO kit for Instagram / LinkedIn / Meta organic content: HSM-style 4:5 static posts and carousels, "How to save AED X" reels presented by Noor (RAMZA's AI presenter, ElevenLabs voice, lip-sync), captions, hook bank and a content calendar, all reading figures from config/rules.json. Use whenever the founder asks for posts, carousels, a content calendar, social media content, Instagram posts "like HSM", a persona / AI presenter video, CMO work, viral hooks or captions for RAMZA, even if the skill isn't named. For long explainer videos use ramza-daily-video.
+description: RAMZA's CMO kit for Instagram / LinkedIn / Meta organic content: HSM-style 4:5 static posts and carousels, "How to save AED X" reels presented by Noor (RAMZA's AI presenter, ElevenLabs voice, lip-sync), captions, hook bank and a content calendar, all reading figures from config/rules.json. Use whenever the founder asks for posts, carousels, a content calendar, social media content, Instagram posts "like HSM", a persona / AI presenter video, CMO work, viral hooks or captions for RAMZA, even if the skill isn't named. For long explainer videos use ramza-daily-video; for direction, 3D, storyboards and formats use ramza-director; for offer and sales copy use ramza-sales-system.
 ---
 
 # RAMZA social
@@ -9,7 +9,7 @@ Read `playbook.md` (audience, pillars, compliant hook rewrites, calendar) and `p
 
 ## Hard rules
 Everything in `ramza-daily-video/SKILL.md` "Hard rules" applies (brand, truth, Meta, privacy). In particular:
-- Every date, penalty and price comes from `config/rules.json` (injected as `window.RULES` / `R`); Omnia figures from `templates/facts.json` (re-capture monthly with `ramza-daily-video/scripts/capture.mjs`, disclose "Omnia is RAMZA's founding company and first user").
+- Every date, penalty and price comes from `config/rules.json` (injected as `window.RULES` / `R`); real figures from `templates/facts.json` (re-capture monthly with `ramza-daily-video/scripts/capture.mjs`), shown as "a Dubai e-commerce brand RAMZA was built inside". **Never mention Omnia, Omniastores or House of Omnia in any post, reel, caption or video** (founder rule 2026-10-24).
 - Never invent studies, client results or savings ("we audited 40 stores"). Never "Are you late?". Never FTA / EmaraTax / MoF names-as-branding, logos or colours.
 - Every CTA slide carries "RAMZA is not a registered tax agent…" or "…not an accredited service provider" as relevant.
 - Noor is always labelled AI on screen and in the caption.
@@ -33,6 +33,7 @@ Everything in `ramza-daily-video/SKILL.md` "Hard rules" applies (brand, truth, M
 1. Script in `templates/explainers.mjs`: one segment per scene; `{shown|spoken}` for numbers/dates, `*keyword*` for accent words, `dark: true` for navy scenes.
 2. Scenes in `templates/explainers/<id>.html` (one `.scene` per segment, in order). `RL.build()` schedules wipes, progress bars, captions, disclaimer; sync visuals with `RL.w(i, "word")` / `RL.at(i, dt)`. Keep scene content between y 250–1330; captions own 1360–1640.
 3. `node scripts/build-explainer.mjs <id> <work> --check "2,6,10,…"` → look at `check-sheet.jpg`; then without `--check` for the MP4 (−14 LUFS, frames deleted after).
+4. Covers / thumbnails: `node scripts/render-thumbs.mjs <out> [id,…]` renders `templates/thumbnails.html` (centre hook card on a real desk object) at 9:16 and 4:5. Frame 0 of the reel should match the cover (see ramza-director hook-library, "Video opener rule").
 
 ## Noor photo posts (photoreal, 2026-10-18)
 `templates/posts-noor.html`, same renderer. Split layout: solid white header band with the headline, Noor photo below (`photo(file, headerHeight, objectPosition)` — aim the crop at her face so the fact panel never covers it), flat white fact panel with numbered hairline rows. No website on slides or captions. Photos live in `templates/photos/noor-*.jpg`.

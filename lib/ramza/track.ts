@@ -6,6 +6,7 @@
  *   NEXT_PUBLIC_META_PIXEL_ID        Meta Pixel (+ server CAPI in app/api/lead/*)
  *   NEXT_PUBLIC_TIKTOK_PIXEL_ID      TikTok Pixel
  *   NEXT_PUBLIC_GTM_ID               Google Tag Manager — every event also goes to dataLayer
+ *   NEXT_PUBLIC_GA4_ID               GA4 (defaults to G-R7CCE11LPC in production) — Lead → generate_lead
  *   NEXT_PUBLIC_GOOGLE_ADS_ID        Google Ads (AW-…) via gtag
  *   NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL  conversion label fired on "Lead"
  *
@@ -46,7 +47,12 @@ export function track(event: string, params: Params = {}): void {
     const ads = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
     const label = process.env.NEXT_PUBLIC_GOOGLE_ADS_LEAD_LABEL;
     if (window.gtag && ads && label && event === "Lead") window.gtag("event", "conversion", { send_to: `${ads}/${label}`, transaction_id: eventId });
-    // GTM / GA4: everything lands in dataLayer as ramza_<event>.
+    // GA4: Lead is the recommended generate_lead (mark it a key event in GA4); the rest snake_case.
+    if (window.gtag) {
+      const ga = event === "Lead" ? "generate_lead" : event === "Contact" ? "contact" : event.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+      window.gtag("event", ga, { ...rest, event_id: eventId });
+    }
+    // GTM: everything lands in dataLayer as ramza_<event>.
     (window.dataLayer ??= []).push({ event: `ramza_${event}`, event_id: eventId, ...rest });
   } catch {
     /* tracking must never break the page */

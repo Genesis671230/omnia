@@ -1,0 +1,221 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Your payout is not your sale</title>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="../../../ramza-daily-video/node_modules/three/build/three.min.js"></script>
+<script src="../../../ramza-daily-video/scripts/engine.js"></script>
+<script src="data.js"></script>
+<style>
+  :root { --navy:#0B1533; --night:#050B1F; --ink:#14131C; --line:#E3E7F0; --lilac:#B3A6FF; --white:#fff; }
+  html,body { margin:0; width:1080px; height:1920px; overflow:hidden; background:var(--night); }
+  body { font-family:"IBM Plex Sans",sans-serif; color:var(--white); }
+  #gl { position:absolute; inset:0; }
+  .layer { position:absolute; inset:0; pointer-events:none; }
+  /* kinetic captions own the band y 1000–1250 */
+  .cap { position:absolute; left:80px; right:80px; top:1010px; height:230px; display:flex; align-items:center; justify-content:center;
+         text-align:center; font:800 92px/1.02 Urbanist,sans-serif; letter-spacing:-1px; opacity:0; }
+  .cap b { color:var(--lilac); font-size:1.14em; font-weight:800; }
+  .tag { position:absolute; font:600 38px/1 "IBM Plex Sans"; color:var(--white); opacity:0; white-space:nowrap; transform:translate(-50%,0); }
+  .tag i { font-style:normal; color:var(--lilac); margin-right:10px; font-weight:500; }
+  .panel { position:absolute; left:120px; right:120px; top:330px; opacity:0; }
+  .panel .k { font:500 36px/1.3 "IBM Plex Sans"; color:#C9CFE0; }
+  .panel .n { font:800 190px/1 Urbanist; letter-spacing:-4px; margin-top:18px; }
+  .panel .u { font:600 40px/1.2 "IBM Plex Sans"; color:var(--lilac); margin-top:16px; }
+  .panel .row { border-top:2px solid rgba(227,231,240,.25); padding:26px 0 30px; }
+  .panel .src { font:400 28px/1.3 "IBM Plex Sans"; color:#8F98B3; margin-top:8px; }
+  .steps { position:absolute; left:120px; right:120px; top:330px; opacity:0; }
+  .steps h2 { font:800 110px/1 Urbanist; letter-spacing:-2px; margin:0 0 34px; }
+  .step { display:flex; align-items:center; gap:24px; font:600 46px/1 "IBM Plex Sans"; padding:20px 0; border-top:2px solid rgba(227,231,240,.22); opacity:0; }
+  .step span { font:500 30px/1 "IBM Plex Sans"; color:var(--lilac); width:54px; }
+  .offer { position:absolute; left:100px; right:100px; top:890px; text-align:center; opacity:0; }
+  .offer .h { font:800 120px/1 Urbanist; letter-spacing:-2px; }
+  .offer .s { font:500 50px/1.25 "IBM Plex Sans"; color:#DCE0EC; margin-top:30px; }
+  .cta { position:absolute; left:80px; right:80px; top:380px; text-align:center; opacity:0; }
+  .cta img { width:200px; height:200px; }
+  .cta .h { font:800 112px/1 Urbanist; margin-top:40px; }
+  .cta .h b { color:var(--lilac); }
+  .cta .d { font:400 30px/1.35 "IBM Plex Sans"; color:#AEB5CA; margin-top:40px; }
+  #focus { position:absolute; }
+</style></head>
+<body>
+<canvas id="gl" width="1080" height="1920"></canvas>
+<div class="layer">
+  <div id="focus" data-focus="liquid metal"></div>
+  <div class="cap" id="c1"><span>Your payout</span></div>
+  <div class="cap" id="c2"><span>is not</span></div>
+  <div class="cap" id="c3"><span>your&nbsp;<b>sale.</b></span></div>
+  <div class="cap" id="c4"><span>Before it lands,</span></div>
+  <div class="cap" id="c5"><span>four things <b>come out.</b></span></div>
+  <div class="tag" id="t0"><i>01</i>Gateway fees</div>
+  <div class="tag" id="t1"><i>02</i>VAT on fees</div>
+  <div class="tag" id="t2"><i>03</i>Refunds</div>
+  <div class="tag" id="t3"><i>04</i>FX</div>
+  <div class="panel" id="proof">
+    <div class="k">One Dubai e-commerce brand, one month</div>
+    <div class="row"><div class="n" id="n1">0</div><div class="u">bank credits to explain</div></div>
+    <div class="row" id="r2"><div class="n" id="n2">0%</div><div class="u">matched automatically</div></div>
+    <div class="src" id="src"></div>
+  </div>
+  <div class="cap" id="c6"><span>So we built a method.</span></div>
+  <div class="steps" id="steps">
+    <h2>Clean Close</h2>
+    <div class="step"><span>01</span>Bank line</div>
+    <div class="step"><span>02</span>Gateway payout</div>
+    <div class="step"><span>03</span>Order</div>
+    <div class="step"><span>04</span>Invoice</div>
+    <div class="step"><span>05</span>Booked, with fees and VAT</div>
+  </div>
+  <div class="offer" id="offer"><div class="h" id="oh"></div><div class="s" id="os"></div></div>
+  <div class="cta" id="cta">
+    <img src="../../../../../public/ramza/brand/ramza-agent-on-dark-1024.png" alt="">
+    <div class="h">Comment <b>CLOSE</b></div>
+    <div class="d">RAMZA is not a registered tax agent or an accredited service provider.</div>
+  </div>
+</div>
+<script>
+/* ---- beats: the storyboard reads these (scripts/storyboard.mjs) ---- */
+window.BEATS = [
+  { t: 0.0, dur: 2.6, beat: "HOOK", vo: "Your payout is not your sale.", onscreen: "Your payout / is not / your *sale.*",
+    open: "shadowed-opener", camera: "slow push-in 10→8.8", reveal: "light-sweep on 'sale'", exit: "pull-out", sfx: "riser → whoosh on sweep" },
+  { t: 2.6, dur: 5.6, beat: "OBSTACLE", vo: "Before it lands, four things come out: gateway fees, VAT on the fees, refunds, and FX.",
+    onscreen: "Before it lands, / 01 Gateway fees · 02 VAT on fees · 03 Refunds · 04 FX / four things come out.",
+    open: "match-in (same blob)", camera: "pull-out 8.8→10, 8° orbit", reveal: "droplet splits off on each spoken item, label pops", exit: "zoom-through blob", sfx: "pop per droplet" },
+  { t: 8.2, dur: 4.6, beat: "PROOF", vo: "One Dubai e-commerce brand, one month: this many bank credits, and this many matched automatically.",
+    onscreen: "counters from facts.json + source line", open: "text-first", camera: "blob sinks low, defocused (dimmed)",
+    reveal: "silent counters land on the spoken numbers", exit: "wipe up", sfx: "whoosh" },
+  { t: 12.8, dur: 5.0, beat: "METHOD", vo: "So we built a method. Clean Close. Bank line, payout, order, invoice, booked.",
+    onscreen: "Clean Close + 5 steps", open: "mask-rise title", camera: "blob re-centres behind the list",
+    reveal: "one step per spoken word; droplets merge back; blob flattens into a closed coin on 'booked'", exit: "hard cut on beat", sfx: "click per step, chime on booked" },
+  { t: 17.8, dur: 3.6, beat: "OFFER", vo: "rules.json offer.free_trial.free_setup.headline", onscreen: "Free setup headline (rules.json)",
+    open: "coin turns face-on", camera: "push-in 9.2→8.4, slow spin", reveal: "blur-to-sharp headline", exit: "whip", sfx: "whoosh" },
+  { t: 21.4, dur: 3.0, beat: "CTA", vo: "Comment CLOSE.", onscreen: "logo · Comment CLOSE · disclaimer",
+    open: "logo brackets close", camera: "metal goes dark, returns to the frame-0 pose (seamless loop)", reveal: "stamp", exit: "loop", sfx: "impact (logo)" },
+];
+window.__DUR = 24.4;
+
+/* ---- three.js: liquid chrome lit by a softbox room, no bloom, no glow ---- */
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x050B1F);
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+
+// environment: a dark room with three softboxes, so the chrome has something real to reflect
+const room = new THREE.Scene();
+room.add(new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({ color: 0x141d3d, side: THREE.BackSide })));
+const box = (w, h, x, y, z, ry, c) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(c === 0xb3a6ff ? 1.6 : 4), side: THREE.DoubleSide })); m.position.set(x, y, z); m.rotation.y = ry; room.add(m); };
+box(8, 3, 0, 7, -2, 0, 0xffffff); box(3, 10, -8, 0, 2, Math.PI / 2, 0xdfe4f2); box(1.4, 8, 8, 1, -1, -Math.PI / 2, 0xb3a6ff);
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffffff).multiplyScalar(1.4), side: THREE.DoubleSide })); ceil.position.y = 9.5; ceil.rotation.x = Math.PI / 2; room.add(ceil);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromScene(room, 0.03).texture;
+scene.environment = envMap;
+
+const chrome = new THREE.MeshPhysicalMaterial({ color: 0xe9ecf3, metalness: 1, roughness: 0.09, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.05 });
+const key = new THREE.SpotLight(0xffffff, 0, 30, 0.5, 0.6); key.position.set(-4, 5, 5); scene.add(key); scene.add(key.target);
+
+const blobGeo = new THREE.IcosahedronGeometry(1, 48);
+const base = blobGeo.attributes.position.array.slice();
+const blob = new THREE.Mesh(blobGeo, chrome); scene.add(blob);
+const DROPS = [[-0.85, 0.95, 0.2], [0.85, 0.95, -0.1], [-0.85, -0.7, 0.3], [0.85, -0.7, 0]];
+const drops = DROPS.map(() => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 20), chrome); m.scale.setScalar(0.001); scene.add(m); return m; });
+
+/* state the GSAP timeline animates; render(t) reads it, so every frame is deterministic */
+const S = { camZ: 10, camY: 0, orbit: 0, env: 0.05, sweep: -1, keyI: 0, split: [0, 0, 0, 0], flat: 0, amp: 0.075, blobY: 0.95, blobS: 1, dim: 1, spin: 0 };
+function liquid(t) {
+  const p = blobGeo.attributes.position.array, a = S.amp;
+  for (let i = 0; i < p.length; i += 3) {
+    const x = base[i], y = base[i + 1], z = base[i + 2];
+    const n = Math.sin(3.1 * x + t * 1.3) * Math.cos(2.7 * y - t * 1.1) + 0.6 * Math.sin(4.3 * z + 2.1 * x + t * 0.9) + 0.35 * Math.sin(6.2 * y + t * 1.7);
+    const r = 1 + a * n;
+    p[i] = x * r; p[i + 1] = y * r * (1 - 0.68 * S.flat); p[i + 2] = z * r;
+  }
+  blobGeo.attributes.position.needsUpdate = true; blobGeo.computeVertexNormals();
+}
+const focusEl = document.getElementById("focus");
+const tags = [0, 1, 2, 3].map((i) => document.getElementById("t" + i));
+function render(t) {
+  liquid(t);
+  camera.position.set(Math.sin(S.orbit) * S.camZ, S.camY, Math.cos(S.orbit) * S.camZ);
+  camera.lookAt(0, S.camY * 0.6, 0);
+  blob.position.y = S.blobY; blob.scale.setScalar(S.blobS); blob.rotation.set(0.25, S.spin + t * 0.15, 0);
+  chrome.envMapIntensity = S.env * S.dim;
+  key.intensity = S.keyI * S.dim * 60; key.position.x = S.sweep * 6; key.target.position.set(0, S.blobY, 0);
+  drops.forEach((d, i) => {
+    const k = S.split[i], [x, y, z] = DROPS[i];
+    d.position.set(x * k, S.blobY + y * k, z * k); d.scale.setScalar(Math.max(0.001, 0.26 * Math.sin(Math.min(1, k) * Math.PI / 2)));
+    const v = d.position.clone().project(camera);
+    const hw = tags[i].offsetWidth / 2 + 4; // keep labels inside the critical box (x 80–1000)
+    tags[i].style.left = Math.min(1000 - hw, Math.max(80 + hw, (v.x + 1) / 2 * W)) + "px"; tags[i].style.top = ((1 - v.y) / 2 * H + 62) + "px";
+  });
+  // the focus box the review script keeps captions off
+  const c = blob.position.clone().project(camera), e = new THREE.Vector3(0, S.blobY + S.blobS, 0).project(camera);
+  const r = Math.abs((e.y - c.y) / 2 * H) * 1.05, cx = (c.x + 1) / 2 * W, cy = (1 - c.y) / 2 * H;
+  Object.assign(focusEl.style, { left: cx - r + "px", top: cy - r + "px", width: 2 * r + "px", height: 2 * r * (1 - 0.6 * S.flat) + "px" });
+  focusEl.style.display = S.dim > 0.5 ? "block" : "none";
+  renderer.render(scene, camera);
+}
+
+/* ---- timeline: every change lands on its word ---- */
+const tl = E.tl, R = window.RULES, F = window.FACTS;
+const cap = (id, at, out) => { tl.fromTo("#" + id, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.2, ease: "back.out(1.4)" }, at); if (out) tl.to("#" + id, { opacity: 0, y: -20, duration: 0.14 }, out); };
+// HOOK — shadowed opener, light sweep on "sale"
+tl.to(S, { camZ: 8.8, duration: 2.6, ease: "none" }, 0);
+tl.to(S, { env: 0.25, keyI: 0.3, duration: 1.2, ease: "power1.in" }, 0.1);
+tl.to(S, { sweep: 1, keyI: 1, env: 1, duration: 0.9, ease: "power2.inOut" }, 1.35); E.sfx("rise", 0.2); E.sfx("whoosh", 1.4);
+cap("c1", 0.15, 0.85); cap("c2", 0.88, 1.38); cap("c3", 1.4, 2.5);
+// OBSTACLE — a droplet per spoken item
+tl.to(S, { camZ: 10, orbit: 0.14, duration: 1.4, ease: "expo.inOut" }, 2.6);
+cap("c4", 2.7, 3.5);
+[3.6, 4.6, 5.6, 6.6].forEach((at, i) => {
+  tl.to(S.split, { [i]: 1, duration: 0.55, ease: "back.out(1.6)" }, at);
+  tl.to(S, { blobS: 0.8 - 0.04 * (i + 1), duration: 0.5 }, at);
+  tl.fromTo(tags[i], { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2)" }, at + 0.12);
+  E.sfx("pop", at + 0.05);
+});
+cap("c5", 7.2, 8.05);
+tl.to(tags, { opacity: 0, duration: 0.2 }, 8.0);
+// PROOF — blob sinks and dims; counters land on the spoken numbers
+tl.to(S, { blobY: -2.2, blobS: 0.7, dim: 0.45, camZ: 10, orbit: 0, duration: 0.8, ease: "expo.inOut" }, 8.05);
+tl.to(S.split, { 0: 0.5, 1: 0.5, 2: 0.5, 3: 0.5, duration: 0.8 }, 8.05);
+tl.fromTo("#proof", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.4, ease: "expo.out" }, 8.3); E.sfx("whoosh", 8.2);
+document.getElementById("src").textContent = `The brand RAMZA was built inside · ${F.close_month}`;
+E.count(document.getElementById("n1"), 9.4, F.close_credits, { dur: 1.1 });
+tl.fromTo("#r2", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 10.8);
+E.count(document.getElementById("n2"), 10.9, F.close_matched_pct, { dur: 1.0, fmt: (v) => Math.round(v) + "%" });
+tl.to("#proof", { opacity: 0, y: -40, duration: 0.3, ease: "expo.in" }, 12.5);
+// METHOD — Clean Close, one step per word; the droplets merge back and the blob closes into a coin
+cap("c6", 12.85, 13.75);
+tl.to(S, { blobY: -1.75, blobS: 0.62, dim: 0.8, duration: 0.8, ease: "expo.inOut" }, 12.8);
+tl.fromTo("#steps", { opacity: 0 }, { opacity: 1, duration: 0.01 }, 13.8);
+tl.fromTo("#steps h2", { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 13.8);
+document.querySelectorAll(".step").forEach((s, i) => {
+  const at = 14.5 + i * 0.6;
+  tl.fromTo(s, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.25, ease: "expo.out" }, at); E.sfx("click", at);
+  if (i < 4) tl.to(S.split, { [i]: 0, duration: 0.5, ease: "power2.in" }, at);
+});
+tl.to(S, { flat: 1, amp: 0.012, blobS: 0.75, duration: 0.6, ease: "expo.out" }, 16.9); E.sfx("chime", 17.0);
+tl.to("#steps", { opacity: 0, duration: 0.25 }, 17.6);
+// OFFER — the closed coin turns face-on, headline from rules.json
+const [oh, ...rest] = R.offer.free_trial.free_setup.headline.split(". ");
+document.getElementById("oh").textContent = oh.includes("free") ? "Free setup." : oh + ".";
+document.getElementById("os").textContent = `${oh.replace(/^We set RAMZA up/, "We set it up")}. ${rest.join(". ")}`;
+tl.to(S, { blobY: 1.15, blobS: 0.85, dim: 1, camZ: 9.2, duration: 0.6, ease: "expo.out" }, 17.8);
+tl.fromTo("#offer", { opacity: 0, filter: "blur(14px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.out" }, 17.9); E.sfx("whoosh", 17.85);
+tl.to(S, { camZ: 8.4, spin: 0.8, duration: 3.4, ease: "none" }, 18.0);
+tl.to("#offer", { opacity: 0, x: -120, duration: 0.25, ease: "expo.in" }, 21.2); E.sfx("swish", 21.2);
+// CTA — logo stamp, then the metal goes back to shadow so the last frame loops into the first
+tl.fromTo("#cta", { opacity: 0, scale: 1.12 }, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out" }, 21.45); E.sfx("impact", 21.5);
+// the metal melts away under the CTA, resets while invisible, and ends exactly on the frame-0 pose (seamless loop)
+tl.to(S, { dim: 0, blobS: 0.02, duration: 0.3, ease: "power2.in" }, 21.45);
+tl.set(S, { env: 0.05, keyI: 0, sweep: -1, blobY: 0.95, flat: 0, amp: 0.075, camZ: 10, orbit: 0, spin: 0 }, 21.8);
+tl.to(S, { dim: 1, blobS: 1, duration: 0.5, ease: "power2.out" }, 23.9);
+tl.to("#cta", { opacity: 0, duration: 0.4 }, 23.9);
+
+const seekBase = window.__seek;
+window.__seek = (t) => { seekBase(t); render(t); };
+window.__seek(0);
+</script>
+</body></html>
