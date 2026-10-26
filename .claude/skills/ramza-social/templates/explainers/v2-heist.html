@@ -1,0 +1,213 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<link rel="stylesheet" href="v2.css">
+<style>
+  /* The 587 heist: true-crime grammar. Evidence board → CCTV → three mugshots → sum → CASE CLOSED stamp
+     → why (net payouts) → the investigator → back to the board (loop). Red = the crime, blue = RAMZA. */
+  .tw{font-family:'IBM Plex Mono';font-weight:600}
+  .board{position:absolute;left:90px;right:90px;top:330px;height:960px;border-radius:18px;background:#131B33;border:1.5px solid rgba(255,255,255,.12);overflow:hidden}
+  .board .hgt{position:absolute;left:0;right:0;height:1.5px;background:rgba(255,255,255,.12)}
+  .board .hgt em{position:absolute;left:24px;top:-34px;font-style:normal;font-family:'IBM Plex Mono';font-size:22px;color:rgba(255,255,255,.35)}
+  .mug{position:absolute;left:110px;right:110px;top:520px;height:520px;background:#fff;color:var(--ink);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+  .mug .no{position:absolute;left:44px;top:40px;font-family:'IBM Plex Mono';font-size:28px;letter-spacing:.14em;color:var(--red)}
+  .mug .nm{position:absolute;left:40px;top:96px;font-family:'Urbanist';font-weight:800;font-size:86px;letter-spacing:-.03em;line-height:1}
+  .mug .amt{position:absolute;left:40px;bottom:46px;font-family:'IBM Plex Mono';font-weight:600;font-size:110px;letter-spacing:-.02em}
+  .mug .ic{position:absolute;right:40px;top:40px;width:120px;height:120px;border-radius:24px;background:#F1F3F8;display:flex;align-items:center;justify-content:center}
+  .mug .ic img{max-width:92px;max-height:60px}
+  .chips{position:absolute;left:90px;right:90px;top:1140px;height:80px;display:flex;gap:16px;justify-content:center}
+  .chips div{font-family:'IBM Plex Mono';font-size:28px;padding:14px 20px;border-radius:10px;background:rgba(255,90,71,.16);border:1.5px solid rgba(255,90,71,.5);color:#FFB4AA}
+  .sum{position:absolute;right:150px;font-family:'IBM Plex Mono';font-weight:600;font-size:96px;text-align:right}
+  #stamp{position:absolute;left:150px;top:900px;width:780px;height:230px;border:12px solid var(--red);border-radius:22px;color:var(--red);font-family:'Urbanist';font-weight:800;font-size:112px;letter-spacing:.02em;white-space:nowrap;display:flex;align-items:center;justify-content:center;transform:rotate(-8deg);opacity:.92;mix-blend-mode:multiply}
+  .gw{position:absolute;left:90px;right:90px;height:150px}
+  .gw img{position:absolute;left:0;top:8px;height:52px;filter:brightness(0) invert(1)}
+  .gw .st{position:absolute;left:0;top:82px;height:30px;width:100%;border-radius:6px;background:rgba(255,255,255,.14)}
+  .gw .bk{position:absolute;left:0;top:82px;height:30px;border-radius:6px;background:var(--blue);transform-origin:left}
+  .gw .gap{position:absolute;top:82px;height:30px;right:0;border-radius:6px;background:repeating-linear-gradient(135deg,rgba(255,90,71,.85) 0 10px,rgba(255,90,71,.35) 10px 20px)}
+  .gw .lb{position:absolute;right:0;top:12px;font-family:'IBM Plex Mono';font-size:24px;color:#FFB4AA}
+  .line{position:absolute;left:90px;width:900px;height:92px;border-bottom:1.5px solid var(--line);display:flex;align-items:center;font-family:'IBM Plex Mono';font-size:30px;color:var(--ink)}
+  .line b{margin-left:auto;font-weight:500}
+  .line i{width:44px;height:44px;border-radius:50%;background:var(--blue);margin-right:22px;flex:none;display:flex;align-items:center;justify-content:center;transform:scale(0)}
+  .line i svg{width:24px;height:24px}
+  #lens{position:absolute;width:150px;height:150px;border-radius:50%;border:10px solid var(--blue);background:rgba(75,103,238,.08);z-index:4}
+  #lens:after{content:"";position:absolute;width:70px;height:14px;background:var(--blue);border-radius:7px;right:-62px;bottom:-14px;transform:rotate(45deg)}
+  .rec{position:absolute;left:90px;top:330px;font-family:'IBM Plex Mono';font-size:30px;color:#fff;display:flex;gap:16px;align-items:center}
+  .rec i{width:22px;height:22px;border-radius:50%;background:#FF3B30}
+  .file{position:absolute;left:250px;top:560px;width:580px;height:420px;background:#E9DFC9;border-radius:10px;box-shadow:0 30px 70px rgba(0,0,0,.6);transform:rotate(-3deg);color:#3A2E1C}
+  .file:before{content:"";position:absolute;left:0;top:-36px;width:220px;height:46px;background:#E9DFC9;border-radius:10px 10px 0 0}
+</style></head>
+<body>
+
+<!-- 0 · Case file: AED 587 -->
+<section class="sc black" id="s0"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-evidence.jpg)"></div><div class="shade top"></div>
+  <div class="pill" id="s0t" style="left:90px;top:330px;background:rgba(217,70,58,.9);border-color:transparent">CASE FILE</div>
+  <div class="d sh" id="s0a" style="left:84px;top:420px;font-size:250px;color:#FF6B5B">AED 587</div>
+  <div class="m sh" id="s0b" style="left:94px;top:690px;font-size:38px"><span id="typed0"></span></div>
+</div></section>
+
+<!-- 1 · No hacker. No thief. -->
+<section class="sc black" id="s1"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-cctv.jpg);filter:saturate(.6) hue-rotate(40deg)"></div><div class="shade"></div>
+  <div class="rec" id="rec"><i></i><span>REC · CAM 03 · <span id="clock">02:14:07</span></span></div>
+  <div class="d c sh" id="s1a" style="top:620px;font-size:150px">No hacker.</div>
+  <div class="d c sh" id="s1b" style="top:790px;font-size:150px">No thief.</div>
+</div></section>
+
+<!-- 2,3,4 · suspects -->
+<section class="sc ink" id="s2"><div class="in"><div class="board" id="bd2"></div>
+  <div class="mug" id="mug2"><div class="no">SUSPECT #1</div><div class="nm">The gateway<br>fee</div><div class="ic"><img src="LG/tabby.svg"></div><div class="amt">330.00</div></div>
+</div></section>
+<section class="sc ink" id="s3"><div class="in"><div class="board" id="bd3"></div>
+  <div class="mug" id="mug3"><div class="no">SUSPECT #2</div><div class="nm">VAT on<br>that fee</div><div class="ic"><span class="tw" style="font-size:40px;color:var(--red)">5%</span></div><div class="amt">16.50</div></div>
+  <div class="chips" id="ch3"><div>#1 330.00</div></div>
+</div></section>
+<section class="sc ink" id="s4"><div class="in"><div class="board" id="bd4"></div>
+  <div class="mug" id="mug4"><div class="no">SUSPECT #3</div><div class="nm">A refund<br>nobody logged</div><div class="ic"><span class="tw" style="font-size:44px;color:var(--red)">↩</span></div><div class="amt">241.13</div></div>
+  <div class="chips" id="ch4"><div>#1 330.00</div><div>#2 16.50</div></div>
+</div></section>
+
+<!-- 5 · Add them up -->
+<section class="sc ink" id="s5"><div class="in">
+  <div class="d" style="left:90px;top:340px;font-size:120px">Add them up.</div>
+  <div class="sum" id="a1" style="top:620px">330.00</div>
+  <div class="sum" id="a2" style="top:740px">+ 16.50</div>
+  <div class="sum" id="a3" style="top:860px">+ 241.13</div>
+  <div id="sumln" style="position:absolute;left:330px;right:150px;top:1000px;height:6px;background:#fff;transform:scaleX(0);transform-origin:right"></div>
+</div></section>
+
+<!-- 6 · 587.63 Case closed -->
+<section class="sc paper" id="s6"><div class="in">
+  <div class="m mute c" style="top:420px;font-size:30px;letter-spacing:.14em">FEE + VAT ON FEE + REFUND</div>
+  <div class="d c" id="s6a" style="top:500px;font-size:230px">587.63</div>
+  <div class="m c" id="s6b" style="top:760px;font-size:30px;color:var(--mute)">10,000.00 − 587.63 = 9,412.37 · the bank, to the fils</div>
+  <div id="stamp">CASE CLOSED</div>
+</div></section>
+
+<!-- 7 · net payouts -->
+<section class="sc ink" id="s7"><div class="in">
+  <div class="d" id="s7a" style="left:90px;top:330px;font-size:118px">They pay out</div>
+  <div class="d b" id="s7b" style="left:90px;top:460px;font-size:200px">net.</div>
+  <div class="gw" id="g1" style="top:720px"><img src="LG/tabby.svg"><div class="st"></div><div class="bk" style="width:91%"></div><div class="gap" style="width:9%"></div><div class="lb">fees + refunds</div></div>
+  <div class="gw" id="g2" style="top:880px"><img src="LG/tamara.svg"><div class="st"></div><div class="bk" style="width:88%"></div><div class="gap" style="width:12%"></div><div class="lb">fees + refunds</div></div>
+  <div class="gw" id="g3" style="top:1040px"><img src="LG/stripe.svg"><div class="st"></div><div class="bk" style="width:94%"></div><div class="gap" style="width:6%"></div><div class="lb">fees + refunds</div></div>
+  <div class="m mute" id="s7c" style="left:90px;top:1220px;font-size:26px;color:rgba(255,255,255,.55)">bar = store sales · blue = what reaches the bank (illustrative)</div>
+</div></section>
+
+<!-- 8 · RAMZA investigates, line by line -->
+<section class="sc paper" id="s8"><div class="in">
+  <div class="mk" id="s8m" style="left:90px;top:330px;width:120px;height:120px"></div>
+  <div class="d" id="s8a" style="left:240px;top:342px;font-size:96px">RAMZA</div>
+  <div class="m mute" id="s8b" style="left:244px;top:440px;font-size:28px;letter-spacing:.1em">AI AGENT · INVESTIGATING PAYOUT</div>
+  <div id="lines"></div>
+  <div id="lens"></div>
+  <div class="m c" id="s8c" style="top:1230px;font-size:30px;color:var(--blue)">Nothing posts to Zoho until you approve</div>
+</div></section>
+
+<!-- 9 · loop: a new case file -->
+<section class="sc black" id="s9"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-evidence.jpg)"></div><div class="shade top"></div>
+  <div class="file" id="file"><div class="m" style="left:50px;top:60px;font-size:30px;letter-spacing:.14em">CASE #002</div><div class="d" style="left:46px;top:130px;font-size:92px;color:#3A2E1C">Your store</div><div class="m" style="left:50px;top:300px;font-size:28px">one month · free</div></div>
+  <div class="d c sh" id="s9a" style="top:1120px;font-size:120px">Comment <span class="b" style="color:#8DA0FF">CASE</span></div>
+</div></section>
+
+<div id="flash"></div><div id="cap"></div><div id="disc"></div>
+
+<script src="v2.js"></script>
+<script>
+const { tl, $, w, on, off, pop, slam, hide, draw, punch, flash, typeIn } = V;
+V.scenes([2, 3, 4, 6]);
+E.sfx("drone", on(0)); E.sfx("drone", on(1) + 0.2);
+
+// 0 · case file
+gsap.set(["#s0t", "#s0a"], { autoAlpha: 0 });
+pop("#s0t", on(0) + 0.05, { y: 0, sfx: "shutter" });
+slam("#s0a", w(0, "aed587") - 0.02);
+typeIn($("#typed0"), "gone from one payout. nobody noticed.", w(0, "gone"), 1.6);
+punch(0, w(0, "noticed."));
+
+// 1 · cctv
+gsap.set(["#s1a", "#s1b"], { autoAlpha: 0 });
+pop("#s1a", w(1, "no"), { y: 0, s: 1.2, d: 0.2, sfx: "pop" });
+pop("#s1b", w(1, "no", 1), { y: 0, s: 1.2, d: 0.2, sfx: "pop" });
+tl.to("#rec i", { opacity: 0.15, duration: 0.4, repeat: 7, yoyo: true }, on(1));
+const ck = { s: 7 };
+tl.to(ck, { s: 7 + (off(1) - on(1)), duration: off(1) - on(1), ease: "none", onUpdate: () => { $("#clock").textContent = `02:14:${String(Math.floor(ck.s)).padStart(2, "0")}`; } }, on(1));
+punch(1, w(1, "plain"));
+
+// 2–4 · mugshots: height lines, card slams with a shutter flash
+[2, 3, 4].forEach((i) => {
+  const bd = $(`#bd${i}`);
+  for (let k = 0; k < 8; k++) { const h = document.createElement("div"); h.className = "hgt"; h.style.top = `${110 + k * 110}px`; h.innerHTML = `<em>${(200 - k * 10)}</em>`; bd.appendChild(h); }
+  gsap.set(`#mug${i}`, { autoAlpha: 0 });
+  const at = w(i, "suspect");
+  E.sfx("shutter", at);
+  tl.fromTo(`#mug${i}`, { autoAlpha: 0, y: 120, rotation: -4 }, { autoAlpha: 1, y: 0, rotation: i === 3 ? 1.5 : -1.5, duration: 0.4, ease: "expo.out" }, at + 0.05);
+  flash(at + 0.4, 0.25, null); E.sfx("flash", at + 0.4);
+  punch(i, w(i, i === 4 ? "logged." : "fee.") + 0.02, 0.08);
+  if (i > 2) pop(`#ch${i}`, on(i) + 0.05, { y: 30 });
+});
+
+// 5 · sum
+gsap.set(["#a1", "#a2", "#a3"], { autoAlpha: 0 });
+pop("#a1", on(5) + 0.1, { x: 200, y: 0, sfx: "swish" });
+pop("#a2", on(5) + 0.35, { x: 200, y: 0, sfx: "swish" });
+pop("#a3", on(5) + 0.6, { x: 200, y: 0, sfx: "swish" });
+tl.to("#sumln", { scaleX: 1, duration: 0.35, ease: "power2.out" }, on(5) + 0.95);
+E.sfx("rise", on(5) + 0.4);
+
+// 6 · case closed
+gsap.set(["#s6a", "#s6b", "#stamp"], { autoAlpha: 0 });
+slam("#s6a", w(6, "587.63."), "pop");
+E.count($("#s6a"), w(6, "587.63."), 587.63, { dur: 0.5, fmt: (v) => V.fmt2(v), from: 0 });
+pop("#s6b", w(6, "587.63.") + 0.5, { y: 20 });
+tl.fromTo("#stamp", { autoAlpha: 0, scale: 2.2 }, { autoAlpha: 0.92, scale: 1, duration: 0.16, ease: "power4.in" }, w(6, "closed."));
+E.sfx("stamp", w(6, "closed.") + 0.14);
+punch(6, w(6, "closed.") + 0.15, 0.12);
+
+// 7 · net
+gsap.set(["#s7a", "#s7b", "#g1", "#g2", "#g3", "#s7c"], { autoAlpha: 0 });
+pop("#s7a", on(7) + 0.05);
+slam("#s7b", w(7, "net,"), "impact");
+[["#g1", "tabby,"], ["#g2", "tamara"], ["#g3", "stripe"]].forEach(([g, wd]) => {
+  pop(g, w(7, wd), { y: 40, sfx: "pop" });
+  tl.from(`${g} .bk`, { scaleX: 0, duration: 0.6, ease: "power2.out" }, w(7, wd) + 0.1);
+});
+pop("#s7c", w(7, "so"), { y: 10 });
+punch(7, w(7, "never"));
+
+// 8 · investigator
+const L = [["Tabby payout", "9,412.37"], ["Gateway fee", "330.00"], ["VAT on the fee", "16.50"], ["Refund · order 1043", "241.13"], ["12 invoices", "marked paid"]];
+L.forEach(([a, b], k) => {
+  const d = document.createElement("div"); d.className = "line"; d.style.top = `${560 + k * 112}px`;
+  d.innerHTML = `<i><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>${a}</span><b>${b}</b>`;
+  $("#lines").appendChild(d);
+});
+gsap.set(["#s8m", "#s8a", "#s8b", ".line", "#lens", "#s8c"], { autoAlpha: 0 });
+pop("#s8m", w(8, "ramza"), { s: 0.6, y: 0, sfx: "impact" }); pop("#s8a", w(8, "ramza") + 0.1); pop("#s8b", w(8, "ai"), { y: 10 });
+const scan0 = w(8, "investigates");
+tl.set("#lens", { autoAlpha: 1, x: 760, y: 520 }, scan0);
+document.querySelectorAll(".line").forEach((el, k) => {
+  const at = scan0 + 0.15 + k * 0.42;
+  pop(el, at - 0.12, { y: 20 });
+  tl.to("#lens", { x: 760, y: 530 + k * 112, duration: 0.3, ease: "power2.inOut" }, at - 0.1);
+  tl.to(el.querySelector("i"), { scale: 1, duration: 0.25, ease: "back.out(2.4)" }, at + 0.15);
+  E.sfx("ding", at + 0.15);
+});
+hide("#lens", scan0 + 0.15 + L.length * 0.42);
+pop("#s8c", w(8, "before"), { y: 20, sfx: "chime" });
+
+// 9 · new case file (loops to the board in frame 0)
+gsap.set(["#file", "#s9a"], { autoAlpha: 0 });
+tl.fromTo("#file", { autoAlpha: 0, y: 200, rotation: 6 }, { autoAlpha: 1, y: 0, rotation: -3, duration: 0.5, ease: "expo.out" }, on(9) + 0.1);
+E.sfx("typing", on(9) + 0.3);
+pop("#s9a", w(9, "comment"), { sfx: "pop" });
+punch(9, w(9, "case."));
+flash(V.T.dur - 0.25, 0.25, "shutter");
+
+V.captions({ light: [6, 8] });
+V.disclaimer(2, [6, 8]);
+</script>
+</body></html>

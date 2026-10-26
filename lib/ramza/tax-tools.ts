@@ -34,6 +34,7 @@ export const TAX = {
   naturalPersonTurnoverAed: R.ct.natural_person.turnover_gt_aed,
   zeroBandAed: rules.ct.rate.zero_rate_up_to_aed,
   ctRate: rules.ct.rate.rate_above,
+  vatRate: R.vat.standard_rate,
   vatMandatoryAed: R.vat.registration.mandatory_over_aed,
   vatVoluntaryAed: R.vat.registration.voluntary_over_aed,
   vatLateRegistrationAed: R.vat.penalties.late_registration_aed,

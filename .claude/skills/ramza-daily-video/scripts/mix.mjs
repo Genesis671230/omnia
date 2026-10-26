@@ -27,6 +27,16 @@ const MAP = {
   impact: ["impact-bass-1.mp3", 0.22, null],
   typing: ["typing.mp3", 0.9, null],
   tick: null, // counters stay silent
+  // story cues for the v2 reels (synthesised, see sfx/CREDITS.md)
+  flash: ["flash.mp3", 0.5, null],
+  sms: ["sms.mp3", 0.6, null],
+  beep: ["beep.mp3", 0.5, null],
+  meter: ["tick.mp3", 0.5, null],
+  stamp: ["stamp.mp3", 0.8, null],
+  shutter: ["shutter.mp3", 0.5, null],
+  heart: ["heartbeat.mp3", 0.7, null],
+  drone: ["drone.mp3", 0.35, null],
+  ding: ["ding.mp3", 0.6, null],
 };
 
 // keep at most one cue per 150 ms, so staggered reveals don't machine-gun

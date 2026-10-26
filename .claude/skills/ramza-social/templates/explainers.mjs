@@ -27,6 +27,201 @@ export function explainers(R, F) {
   const EX = { sales: "10,000.00", fee: "330.00", vat: "16.50", refund: "241.13", payout: "9,412.37", orders: 12,
     saySales: "ten thousand", sayPayout: "nine thousand, four hundred and twelve", gap: "587" };
   return [
+    /* ── Reels v2 (agency playbook, 2026-10-25). Fact-locked rewrites: no figures outside rules.json /
+       facts.json, e-invoicing scoped to B2B/B2G, RAMZA never "makes you compliant". ── */
+    /* Real estate (2026-10-26): property managers, off-plan sellers, developers/contractors. Insight: one
+       bank balance hides three kinds of money (yours / held for others / earned, not collected). Opens and
+       loops on a full-colour search bar: buyers, investors and banks search the company before they pay.
+       Worked example, balances: 1,910,000 + 2,940,000 = 4,850,000; held = escrow 2,610,000 + deposits
+       330,000; to collect = retention 740,000 + overdue instalments 520,000. */
+    {
+      id: "v2-real-estate",
+      title: "Your buyers google you first",
+      voice: "nPczCjzI2devNBz1zQrb", // Brian
+      music: ["inspired-ambient-141686.mp3", 0.1],
+      tail: 1.6,
+      data: { bank: 4850000, yours: 1910000, held: 2940000, escrow: 2610000, deposits: 330000, collect: 1260000, retention: 740000, overdue: 520000 },
+      segments: [
+        { say: `Before anyone pays you a single dirham, they *google* you.` },
+        { say: `Buyers. Investors. Your bank. Even your *partners.*` },
+        { say: `But the real answer isn't on Google. It's in your *books.*` },
+        { dark: true, say: `In real estate, one bank balance hides three kinds of *money.*` },
+        { say: `Money that's *yours.* Money you're only *holding.* And money you've earned, but not yet *collected.*` },
+        { dark: true, say: `Manage properties? Rent cheques and deposits land in one account, and owners ask where their money *went.*` },
+        { dark: true, say: `Sell off-plan? Instalments sit in *escrow.* A unit sold isn't cash you can *spend.*` },
+        { dark: true, say: `Build? Retention, progress bills and variations hide your real *margin,* until the project *ends.*` },
+        { dark: true, say: `Mix them up, and the numbers you show people stop *adding up.*` },
+        { dark: true, say: `*RAMZA* is an AI agent that starts at the *bank.*` },
+        { say: `Every line, matched to the *cheque,* the *instalment,* or the *invoice* behind it. Then booked where it *belongs.*` },
+        { say: `Nothing posts to Zoho until you *approve.*` },
+        { say: `So when someone asks how the business is doing, you open one *page.* Per project. Per property. To the *fils.*` },
+        { say: `We'll set it up on your own bank statement, *free.* Comment *CLEAN.*` },
+      ],
+      disclaimer: `Worked example, illustrative figures. RAMZA reconciles and books; it is not an auditor, a tax agent or an escrow agent. Nothing posts to Zoho without your approval. AI voiceover.`,
+      caption: `Before anyone pays you a dirham, they google you. Buyers, investors, your bank, your partners.
+
+The real answer is in your books. And in real estate, one bank balance hides three kinds of money:
+1. Money that's yours
+2. Money you're only holding (escrow, security deposits, owners' rent)
+3. Money you've earned but not collected (retention, overdue instalments)
+
+Property managers: rent cheques and deposits land in one account.
+Off-plan: a unit sold isn't cash you can spend.
+Developers and contractors: retention and variations hide the real margin until handover.
+
+RAMZA is an AI agent that starts at the bank: every line matched to the cheque, instalment or invoice behind it, booked where it belongs, and posted to Zoho only when you approve. One clean page per project and per property.
+
+Comment CLEAN. We set it up on your own bank statement for free, and you pay only once it's closing your month.
+
+Worked example, illustrative figures. AI voiceover.
+
+#DubaiRealEstate #UAERealEstate #OffPlan #PropertyManagement #Developers #Bookkeeping`,
+    },
+    {
+      id: "v2-heist",
+      title: "The 587 heist",
+      voice: "nPczCjzI2devNBz1zQrb", // Brian
+      music: ["inspired-ambient-141686.mp3", 0.1],
+      data: EX,
+      segments: [
+        { dark: true, say: `{*AED 587.*|Five hundred and eighty-seven dirhams.} Gone from one payout. Nobody *noticed.*` },
+        { dark: true, say: `No hacker. No thief. It disappeared in *plain sight.*` },
+        { dark: true, say: `Suspect one. The gateway *fee.*` },
+        { dark: true, say: `Suspect two. VAT on that *fee.*` },
+        { dark: true, say: `Suspect three. A refund nobody *logged.*` },
+        { dark: true, say: `Add them up.`, hold: 0.5 },
+        { say: `{*587.63.*|Five eighty-seven, sixty-three.} Case *closed.*` },
+        { dark: true, say: `Tabby, Tamara and Stripe all pay out *net,* after fees and refunds. So the bank never matches the store.` },
+        { say: `*RAMZA* is an AI agent that investigates every payout, line by line, before anything posts to Zoho.` },
+        { dark: true, say: `Want a case file on your store? Comment *CASE.*` },
+      ],
+      disclaimer: `Worked example, illustrative figures. Nothing posts to Zoho without your approval. AI voiceover.`,
+      caption: `Case file: AED 587. Gone from one payout. No hacker, no thief.
+
+Suspect 1: the gateway fee (330.00)
+Suspect 2: VAT on that fee (16.50)
+Suspect 3: a refund nobody logged (241.13)
+Total: 587.63. Case closed.
+
+Tabby, Tamara and Stripe pay out net, after fees and refunds, so the bank never matches the store's sales report. RAMZA is an AI agent that investigates every payout line by line, and posts to Zoho only when you approve.
+
+Comment CASE and we'll open a case file on your store: one month, free.
+
+Worked example, illustrative figures. AI voiceover.
+
+#DubaiBusiness #UAEEcommerce #Tabby #Tamara #Bookkeeping #MonthEndClose`,
+    },
+    {
+      id: "v2-green-light",
+      title: "The green light",
+      voice: "nPczCjzI2devNBz1zQrb",
+      music: ["inspired-ambient-141686.mp3", 0.14],
+      tail: 1.4,
+      data: { close_month: F.close_month, close_credits: F.close_credits, close_matched_pct: F.close_matched_pct },
+      segments: [
+        { dark: true, say: `The most satisfying thing a business owner can *watch.*` },
+        { dark: true, say: `{*${n(F.close_credits)}*|${upper(words(F.close_credits))}} bank credits.`, hold: 6 },
+        { dark: true, say: `${F.close_month.split(" ")[0]}. {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched by the agent.` },
+        { say: `The rest wait for *one click* from you.` },
+        { dark: true, say: `Want this every month? Comment *GREEN.*` },
+      ],
+      disclaimer: `A Dubai e-commerce brand RAMZA was built inside, ${F.close_month}, live RAMZA app ${F.as_of}. Rows recreated for privacy. AI voiceover.`,
+      caption: `${n(F.close_credits)} bank credits turning green, one by one.
+
+One Dubai e-commerce brand, ${F.close_month}: ${F.close_matched_pct}% of bank credits matched to their payouts by the RAMZA agent. The rest wait for one click from the owner. Nothing posts to Zoho without approval.
+
+Comment GREEN and we'll run it on one month of yours. Free setup, pay once it closes your month.
+
+AI voiceover. Rows recreated for privacy.
+
+#OddlySatisfying #DubaiBusiness #UAEEcommerce #Bookkeeping #AIAgent`,
+    },
+    {
+      id: "v2-radar",
+      title: "The radar",
+      voice: "nPczCjzI2devNBz1zQrb",
+      music: ["inspired-ambient-141686.mp3", 0.1],
+      data: { asp_late: P.asp_late_aed_per_month, large_go: E.large.go_live, sme_go: E.sme.go_live, large_rev: E.large.revenue_gte_aed },
+      segments: [
+        { dark: true, say: `*Flash.*` },
+        { dark: true, say: `You didn't even feel it. But the fine is *already* issued.` },
+        { dark: true, say: `Now imagine that, for every *invoice* a business sends.` },
+        { dark: true, say: `Because that's what the UAE is *building.*` },
+        { dark: true, say: `E-invoicing. Every B2B invoice goes through an accredited provider, and on to the tax authority. In *real time.*` },
+        { dark: true, say: `No provider appointed by the deadline? {*${aed(P.asp_late_aed_per_month)}.*|${sayAED(P.asp_late_aed_per_month)}.} Every *month.*` },
+        { dark: true, say: `Over {${aedM(E.large.revenue_gte_aed).replace(/m$/, "M")}|${words(E.large.revenue_gte_aed / 1e6)} million dirhams} in revenue, live {*${showDate(E.large.go_live).replace(/^1 /, "")}.*|in ${sayDate(E.large.go_live).replace(/^the first of /i, "")}, ${sayYear(E.large.go_live)}.} Everyone else in scope, {*${showDate(E.sme.go_live).replace(/^1 /, "")}.*|${sayDate(E.sme.go_live).replace(/^the first of /i, "")}, ${sayYear(E.sme.go_live)}.}` },
+        { say: `So here's the move. Get the books *clean* now. RAMZA reconciles every payout, and checks your e-invoicing *readiness.*` },
+        { dark: true, say: `Drive clean. Comment *READY,* and we'll check where you stand. Free.` },
+      ],
+      disclaimer: `E-invoicing applies to B2B and B2G invoices in scope; dates and penalties per the UAE e-invoicing rules, checked ${E.verified_on}. RAMZA is not an accredited service provider: it reconciles your books and checks readiness. AI voiceover.`,
+      caption: `The radar is being installed.
+
+UAE e-invoicing: every B2B invoice goes through an accredited provider and on to the tax authority.
+• Revenue ${aedM(E.large.revenue_gte_aed)}+: appoint a provider by ${showDate(E.large.asp_by)}, live ${showDate(E.large.go_live)}
+• Everyone else in scope: appoint by ${showDate(E.sme.asp_by)}, live ${showDate(E.sme.go_live)}
+• No provider appointed in time: ${aed(P.asp_late_aed_per_month)} per month
+
+Clean books first. RAMZA reconciles every payout and checks your e-invoicing readiness. Comment READY and we'll check where you stand, free.
+
+RAMZA is not an accredited service provider. AI voiceover.
+
+#UAEeInvoicing #DubaiBusiness #UAEVAT #SME #Ecommerce`,
+    },
+    {
+      id: "v2-taxi-meter",
+      title: "The taxi meter",
+      voice: "nPczCjzI2devNBz1zQrb",
+      music: ["inspired-ambient-141686.mp3", 0.1],
+      data: { lines: F.bank_lines_not_in_zoho, lines_aed: F.bank_lines_not_in_zoho_aed, close_month: F.close_month, close_credits: F.close_credits, close_matched_pct: F.close_matched_pct },
+      segments: [
+        { dark: true, say: `This meter *never* stops.` },
+        { dark: true, say: `Every payout that doesn't match the bank adds to the *fare.*` },
+        { dark: true, say: `It's called month-end. Payouts matched to the bank, by *hand,* line by line.` },
+        { dark: true, say: `One Dubai brand had {*${F.bank_lines_not_in_zoho}*|${words(F.bank_lines_not_in_zoho)}} bank lines not yet in the books. {*${aedM(F.bank_lines_not_in_zoho_aed).replace(/m$/, "M")}.*|${(F.bank_lines_not_in_zoho_aed / 1e6).toFixed(2).replace(/0$/, "").split(".").map((x, k) => (k ? x.split("").map((d) => words(+d)).join(" ") : words(+x))).join(" point ")} million dirhams.}` },
+        { dark: true, say: `Then an AI agent switched the meter *off.*`, hold: 0.4 },
+        { say: `${F.close_month.split(" ")[0]}: {${n(F.close_credits)}|${words(F.close_credits)}} bank credits, {*${F.close_matched_pct}%*|${words(F.close_matched_pct)} percent} matched by the agent. Nothing posts without *approval.*` },
+        { dark: true, say: `How many lines are waiting in your bank? Comment *METER.*` },
+      ],
+      disclaimer: `A Dubai e-commerce brand RAMZA was built inside, live RAMZA app ${F.as_of}. Bank lines not yet booked, not money lost. AI voiceover.`,
+      caption: `Month-end by hand is a meter that never stops.
+
+One Dubai brand had ${F.bank_lines_not_in_zoho} bank lines (${aedM(F.bank_lines_not_in_zoho_aed)}) not yet in its books. Then the RAMZA agent took over: ${F.close_month}, ${n(F.close_credits)} bank credits, ${F.close_matched_pct}% matched by the agent, and nothing posted to Zoho without approval.
+
+Comment METER and we'll count the lines waiting in yours. Free setup, pay once it closes your month.
+
+AI voiceover.
+
+#DubaiBusiness #UAEEcommerce #MonthEndClose #Bookkeeping #AIAgent`,
+    },
+    {
+      id: "v2-two-shops",
+      title: "Two shops, same street",
+      voice: "nPczCjzI2devNBz1zQrb",
+      music: ["motivational-day-112790.mp3", 0.09],
+      segments: [
+        { dark: true, say: `Two shops. Same street. Same sales. One of them is about to pull *ahead.*` },
+        { dark: true, say: `Shop A closes the month by *hand.* Shop B has an *AI agent.*` },
+        { dark: true, say: `Day one. Shop A starts matching payouts. Shop B already knows last month's *profit.*` },
+        { dark: true, say: `Day three. Shop A finds a mistake, and starts *again.* Shop B launches a new *collection.*` },
+        { dark: true, say: `Day ten. Shop A still hasn't closed. Shop B puts its ad money behind what *sells.*` },
+        { dark: true, say: `Same street. Same sales. A different *future.*` },
+        { say: `AI isn't coming for your business. Your *competitor* using AI is.` },
+        { dark: true, say: `Which shop are you? Comment *A* or *B.*` },
+      ],
+      disclaimer: `Illustrative story. AI voiceover.`,
+      caption: `Two shops. Same street. Same sales.
+
+Shop A closes the month by hand: matching payouts on day 1, starting again on day 3, still open on day 10.
+Shop B has an AI agent: it knows last month's profit on day 1 and puts its ad money behind what sells.
+
+AI isn't coming for your business. Your competitor using AI is.
+
+Which shop are you? Comment A or B.
+
+Illustrative story. AI voiceover.
+
+#DubaiBusiness #UAEEcommerce #AIAgent #SmallBusiness #Founders`,
+    },
     {
       id: "einvoicing-days-left",
       title: `${left} days to appoint your e-invoicing provider`,
@@ -346,7 +541,7 @@ General information from ${SBR.legal_basis}. RAMZA is not a registered tax agent
       disclaimer: `Worked example, illustrative figures. Proof: a Dubai e-commerce brand RAMZA was built inside, live RAMZA app, ${F.as_of}. Nothing posts to Zoho without your approval. AI voiceover.`,
       caption: `Your store runs on AI. Your books still run like it's 1920.
 
-Meet RAMZA, an AI accountant that closes your month starting from the bank:
+Meet RAMZA, an AI agent that closes your month starting from the bank:
 1. Reads every bank line
 2. Matches it to the gateway payout, to the fils
 3. Books the fee, the VAT on the fee and the refunds

@@ -58,6 +58,26 @@ export const HUBS: Hub[] = [
     h1: "Markets we work in",
     lead: "The gateways, currencies, VAT treatment and settlement timing that shape a month-end close in each market.",
   },
+  {
+    family: "tool",
+    path: "tools",
+    crumb: "Free tools",
+    title: "Free UAE tax calculators — VAT, Corporate Tax, e-invoicing — RAMZA",
+    description:
+      "Free UAE calculators with no sign-up: add or remove 5% VAT, VAT registration check, Corporate Tax and Small Business Relief, CT penalties and your e-invoicing deadline.",
+    h1: "Free UAE tax and accounting tools",
+    lead: "Instant answers from the published UAE rules, no sign-up. Every threshold, rate and penalty is read from one rules file and carries the date we last checked it.",
+  },
+  {
+    family: "zoho",
+    path: "zoho",
+    crumb: "Zoho Books",
+    title: "Zoho Books in the UAE — features, integrations, Claude and comparisons — RAMZA",
+    description:
+      "Independent guides to Zoho Books for UAE businesses: plans and VAT features, integrations for Tabby, Tamara, Telr and Shopify, connecting Claude, and Zoho Books vs QuickBooks.",
+    h1: "Zoho Books for UAE businesses",
+    lead: "RAMZA runs on top of Zoho Books every day, so these guides are written from the books outward: what Zoho does well, what it leaves to you, and how to close the gaps. RAMZA is independent and not affiliated with Zoho.",
+  },
 ];
 
 const BY_FAMILY = new Map(HUBS.map((h) => [h.family, h]));

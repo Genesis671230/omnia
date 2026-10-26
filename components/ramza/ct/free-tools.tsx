@@ -182,6 +182,39 @@ function VatTool() {
   );
 }
 
+function VatCalcTool() {
+  const [amount, setAmount] = useState("");
+  const [mode, setMode] = useState<"add" | "remove">("add");
+  const rate = TAX.vatRate;
+  const pctLabel = `${+(rate * 100).toFixed(2)}%`;
+  const a = num(amount);
+  const fils = (n: number) => `AED ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const r = a > 0 ? (mode === "add"
+    ? { net: a, vat: Math.round(a * rate * 100) / 100, gross: Math.round(a * (1 + rate) * 100) / 100 }
+    : { gross: a, net: Math.round((a / (1 + rate)) * 100) / 100, vat: Math.round((a - a / (1 + rate)) * 100) / 100 }) : null;
+  return (
+    <ToolLayout
+      form={<>
+        <Field label="Amount (AED)"><input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className={ct.input} placeholder="e.g. 1,050" /></Field>
+        <Field label="The amount is"><Toggle value={mode} onChange={(v) => setMode(v as "add" | "remove")} options={[["add", "Before VAT"], ["remove", "Including VAT"]]} /></Field>
+      </>}
+      result={r && {
+        big: fils(mode === "add" ? r.gross : r.net),
+        bigLabel: mode === "add" ? "Total including VAT" : "Amount before VAT",
+        bad: false,
+        chips: [`VAT ${fils(r.vat)}`, `Standard rate ${pctLabel}`],
+        lines: [
+          { tone: "info", title: `Net ${fils(r.net)} + VAT ${fils(r.vat)} = ${fils(r.gross)}`, detail: mode === "add" ? `VAT = net × ${pctLabel}.` : `Net = total ÷ ${1 + rate}; VAT = total − net. Rounded to the fils.` },
+          { tone: "warn", title: "Standard rate only", detail: "Zero-rated supplies (most exports, some education and healthcare, the first supply of new residential property) and exempt supplies (bare land, local passenger transport, some financial services) carry no 5% VAT." },
+        ],
+      }}
+      empty={`Type an amount — we add or remove ${pctLabel} UAE VAT and show the split to the fils.`}
+      situation="vat"
+      cta="Get my VAT and books checked"
+    />
+  );
+}
+
 function EinvTool() {
   const today = dubaiToday();
   const [rev, setRev] = useState("");
@@ -252,6 +285,15 @@ function ToolLayout({ form, result, empty, situation, cta }: { form: React.React
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+/* One calculator on its own page (/ramza/tools/*), no tab strip. */
+export function FreeTool({ tool }: { tool: ToolKey | "vatcalc" }) {
+  return (
+    <div className="rounded-[28px] bg-white/70 p-4 shadow-[0_30px_70px_-45px_rgba(20,19,28,0.5)] ring-1 ring-[#E6E4EC] sm:p-6">
+      {tool === "vatcalc" ? <VatCalcTool /> : tool === "ct" ? <CtTool /> : tool === "relief" ? <ReliefTool /> : tool === "vat" ? <VatTool /> : <EinvTool />}
     </div>
   );
 }

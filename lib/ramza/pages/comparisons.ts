@@ -133,7 +133,7 @@ export const COMPARISONS: RamzaPage[] = [
         checked: CHECKED,
       },
     ],
-    related: ["vs/a2x", "vs/spreadsheets", "reconciliation/stripe"],
+    related: ["vs/a2x", "vs/spreadsheets", "reconciliation/stripe", "zoho/zoho-books-vs-quickbooks-uae"],
     updated: UPDATED,
   },
 
@@ -195,7 +195,7 @@ export const COMPARISONS: RamzaPage[] = [
         checked: CHECKED,
       },
     ],
-    related: ["vs/synder", "vs/spreadsheets", "reconciliation/cod"],
+    related: ["vs/synder", "vs/spreadsheets", "reconciliation/cod", "zoho/zoho-books-integrations-uae"],
     updated: UPDATED,
   },
 ];

@@ -5,6 +5,7 @@ import { Nav } from "./nav";
 import { Footer } from "./footer";
 import { CtaLink } from "./ui/cta-button";
 import { PageSections } from "./page-sections";
+import { FreeTool } from "./ct/free-tools";
 import { hubFor, pagesInFamily, relatedPages, type Hub } from "@/lib/ramza/pages";
 import type { RamzaPage } from "@/lib/ramza/pages/types";
 import { ramzaPath, RAMZA_EMAIL, RAMZA_LEGAL_LINE } from "@/lib/ramza/site";
@@ -50,6 +51,12 @@ export function ContentPage({
             {page.lead}
           </p>
         </header>
+
+        {page.tool && (
+          <div className="mt-10">
+            <FreeTool tool={page.tool} />
+          </div>
+        )}
 
         <PageSections sections={page.sections} />
 

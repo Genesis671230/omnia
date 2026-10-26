@@ -83,10 +83,12 @@ for (const [i, s] of ex.segments.entries()) {
     ? (end ? al.character_end_times_seconds[c - 1] : al.character_start_times_seconds[c])
     : (c / spoken.length) * len;
   const tokens = toks.map((k) => ({ w: k.w, hl: k.hl, t0: +(t + at(k.c0, false)).toFixed(3), t1: +(t + at(k.c1, true)).toFixed(3) }));
-  segs.push({ start: +(t - (i ? GAP / 2 : LEAD)).toFixed(3), voice: +t.toFixed(3), end: +(t + len + GAP / 2).toFixed(3), dark: !!s.dark, mp3, tokens });
-  t += len + GAP;
+  // hold: seconds of picture with no voice after the line (sound-only beats, ASMR runs)
+  const hold = s.hold ?? 0;
+  segs.push({ start: +(t - (i ? GAP / 2 : LEAD)).toFixed(3), voice: +t.toFixed(3), end: +(t + len + hold + GAP / 2).toFixed(3), dark: !!s.dark, mp3, tokens });
+  t += len + hold + GAP;
 }
-const total = +(t + TAIL).toFixed(2);
+const total = +(t + (ex.tail ?? TAIL)).toFixed(2);
 segs[segs.length - 1].end = total;
 
 // 2. work page: template + engine + data

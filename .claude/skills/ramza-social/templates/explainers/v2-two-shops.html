@@ -1,0 +1,133 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<link rel="stylesheet" href="v2.css">
+<style>
+  /* Two shops, same street: one symmetric photo split down the middle. Shop A (left) drains to grey and
+     red, shop B (right) warms to blue. Day counter + one status card per side. Ends on the A/B split (loop). */
+  .hf{position:absolute;inset:0;background:url(HD/v2-shops.jpg) center/cover}
+  .hf.a{clip-path:inset(0 50% 0 0)}.hf.b{clip-path:inset(0 0 0 50%)}
+  .div{position:absolute;left:539px;top:0;bottom:0;width:2px;background:rgba(255,255,255,.65);z-index:2}
+  .lab{position:absolute;top:640px;width:120px;height:120px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-family:'Urbanist';font-weight:800;font-size:80px;color:#fff;z-index:3}
+  .lab.a{left:210px;background:rgba(217,70,58,.92)}.lab.b{left:750px;background:rgba(75,103,238,.95)}
+  .st{position:absolute;top:600px;width:450px;height:250px;border-radius:20px;background:rgba(255,255,255,.95);color:var(--ink);z-index:3;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+  .st.a{left:45px}.st.b{left:585px}
+  .st .k{position:absolute;left:28px;top:24px;font-family:'IBM Plex Mono';font-size:22px;letter-spacing:.12em}
+  .st.a .k{color:var(--red)}.st.b .k{color:var(--blue)}
+  .st .v{position:absolute;left:26px;right:20px;top:66px;font-family:'Urbanist';font-weight:800;font-size:50px;line-height:1.02;letter-spacing:-.02em;white-space:normal}
+  .st .p{position:absolute;left:28px;right:28px;bottom:30px;height:16px;border-radius:8px;background:#E6E9F1;overflow:hidden}
+  .st .p i{position:absolute;left:0;top:0;bottom:0;width:100%;transform-origin:left;transform:scaleX(0)}
+  .st.a .p i{background:var(--red)}.st.b .p i{background:var(--green)}
+  #day{position:absolute;left:0;right:0;top:420px;text-align:center;font-family:'IBM Plex Mono';font-weight:600;font-size:56px;letter-spacing:.14em;z-index:3;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.6)}
+</style></head>
+<body>
+
+<section class="sc black" id="s0"><div class="in">
+  <div class="ph" style="inset:-40px"><div class="hf a"></div><div class="hf b"></div></div><div class="shade" style="background:rgba(5,8,18,.28)"></div><div class="div"></div>
+  <div class="d c sh" id="s0t" style="top:300px;font-size:130px">Two shops.</div>
+  <div class="d c sh" id="s0a" style="top:300px;font-size:110px">Same street.</div>
+  <div class="d c sh" id="s0b" style="top:420px;font-size:110px">Same sales.</div>
+  <div class="lab a" id="la0">A</div><div class="lab b" id="lb0">B</div>
+</div></section>
+
+<section class="sc black" id="s1"><div class="in">
+  <div class="ph"><div class="hf a" id="h1a"></div><div class="hf b" id="h1b"></div></div><div class="shade" style="background:rgba(5,8,18,.3)"></div><div class="div"></div>
+  <div class="st a" id="c1a"><div class="k">SHOP A</div><div class="v">Closes the month by hand</div></div>
+  <div class="st b" id="c1b"><div class="k">SHOP B</div><div class="v">Has an AI agent</div><div class="mk" style="right:26px;bottom:26px;width:64px;height:64px"></div></div>
+</div></section>
+
+<section class="sc black" id="s2"><div class="in">
+  <div class="ph"><div class="hf a" style="filter:grayscale(.6) brightness(.8)"></div><div class="hf b"></div></div><div class="shade" style="background:rgba(5,8,18,.34)"></div><div class="div"></div>
+  <div id="day">DAY 1</div>
+  <div class="st a" id="c2a"><div class="k">SHOP A</div><div class="v">Matching payouts…</div><div class="p"><i id="p2a"></i></div></div>
+  <div class="st b" id="c2b"><div class="k">SHOP B</div><div class="v">Last month's profit: known ✓</div><div class="p"><i id="p2b"></i></div></div>
+</div></section>
+
+<section class="sc black" id="s3"><div class="in">
+  <div class="ph"><div class="hf a" style="filter:grayscale(.8) brightness(.7)"></div><div class="hf b"></div></div><div class="shade" style="background:rgba(5,8,18,.34)"></div><div class="div"></div>
+  <div id="day" class="d3" style="position:absolute;left:0;right:0;top:420px;text-align:center;font-family:'IBM Plex Mono';font-weight:600;font-size:56px;letter-spacing:.14em;color:#fff">DAY 3</div>
+  <div class="st a" id="c3a"><div class="k">SHOP A</div><div class="v">Mistake found. Starting again.</div><div class="p"><i id="p3a"></i></div></div>
+  <div class="st b" id="c3b"><div class="k">SHOP B</div><div class="v">New collection: live</div><div class="p"><i id="p3b"></i></div></div>
+</div></section>
+
+<section class="sc black" id="s4"><div class="in">
+  <div class="ph"><div class="hf a" style="filter:grayscale(1) brightness(.55)"></div><div class="hf b" style="filter:saturate(1.15)"></div></div><div class="shade" style="background:rgba(5,8,18,.34)"></div><div class="div"></div>
+  <div style="position:absolute;left:0;right:0;top:420px;text-align:center;font-family:'IBM Plex Mono';font-weight:600;font-size:56px;letter-spacing:.14em;color:#fff">DAY 10</div>
+  <div class="st a" id="c4a"><div class="k">SHOP A</div><div class="v" style="color:var(--red)">Still not closed</div><div class="p"><i id="p4a"></i></div></div>
+  <div class="st b" id="c4b"><div class="k">SHOP B</div><div class="v">Ad money on what sells ↑</div><div class="p"><i id="p4b"></i></div></div>
+</div></section>
+
+<section class="sc black" id="s5"><div class="in">
+  <div class="ph"><div class="hf a" style="filter:grayscale(1) brightness(.28)"></div><div class="hf b" style="filter:saturate(1.2) brightness(1.08)"></div></div><div class="shade" style="background:rgba(5,8,18,.2)"></div><div class="div"></div>
+  <div class="d c sh" id="s5a" style="top:330px;font-size:110px">A different</div>
+  <div class="d c sh" id="s5b" style="top:450px;font-size:150px;color:#9DB0FF">future.</div>
+</div></section>
+
+<section class="sc ink" id="s6"><div class="in">
+  <div class="d" id="s6a" style="left:90px;top:400px;font-size:96px;color:rgba(255,255,255,.55)">AI isn't coming</div>
+  <div class="d" id="s6b" style="left:90px;top:510px;font-size:96px;color:rgba(255,255,255,.55)">for your business.</div>
+  <div class="d" id="s6c" style="left:90px;top:720px;font-size:130px">Your <span class="b">competitor</span></div>
+  <div class="d" id="s6d" style="left:90px;top:860px;font-size:130px">using AI is.</div>
+  <svg class="sk"><path id="s6p" d="M370,858 C560,844 780,866 990,848"/></svg>
+</div></section>
+
+<section class="sc black" id="s7"><div class="in">
+  <div class="ph"><div class="hf a"></div><div class="hf b"></div></div><div class="shade" style="background:rgba(5,8,18,.28)"></div><div class="div"></div>
+  <div class="d c sh" id="s7a" style="top:300px;font-size:110px">Which shop</div>
+  <div class="d c sh" id="s7b" style="top:420px;font-size:110px">are you?</div>
+  <div class="lab a" id="la7">A</div><div class="lab b" id="lb7">B</div>
+</div></section>
+
+<div id="flash"></div><div id="cap"></div><div id="disc"></div>
+
+<script src="v2.js"></script>
+<script>
+const { tl, $, w, on, off, pop, slam, hide, draw, punch } = V;
+V.scenes();
+for (let k = 0; k < 4; k++) E.sfx("heart", on(0) + 0.1 + k * 0.9);
+
+// 0
+gsap.set(["#s0t", "#s0a", "#s0b", "#la0", "#lb0"], { autoAlpha: 0 });
+pop("#s0t", w(0, "two") - 0.05); hide("#s0t", w(0, "same") - 0.15, 0.12);
+pop("#s0a", w(0, "same")); pop("#s0b", w(0, "same", 1));
+pop("#la0", w(0, "one"), { s: 0.5, y: 0, sfx: "pop" }); pop("#lb0", w(0, "one") + 0.15, { s: 0.5, y: 0, sfx: "pop" });
+punch(0, w(0, "ahead."));
+// 1 · A greys, B warms
+tl.fromTo("#h1a", { filter: "grayscale(0) brightness(1)" }, { filter: "grayscale(.6) brightness(.8)", duration: 1, immediateRender: false }, w(1, "hand."));
+gsap.set(["#c1a", "#c1b"], { autoAlpha: 0 });
+pop("#c1a", w(1, "shop"), { x: -80, y: 0, sfx: "swish" });
+pop("#c1b", w(1, "shop", 1), { x: 80, y: 0, sfx: "swish" });
+punch(1, w(1, "agent."));
+// 2–4 · days
+const tick = (i) => { for (let k = 0; k < 4; k++) E.sfx("meter", on(i) + 0.1 + k * 0.18); };
+[[2, 0.18, 1], [3, 0, 1], [4, 0.46, 1]].forEach(([i, a, b]) => {
+  tick(i);
+  gsap.set([`#c${i}a`, `#c${i}b`], { autoAlpha: 0 });
+  pop(`#c${i}a`, w(i, "shop"), { x: -80, y: 0, sfx: "swish" });
+  pop(`#c${i}b`, w(i, "shop", 1), { x: 80, y: 0, sfx: "swish" });
+  tl.to(`#p${i}a`, { scaleX: i === 3 ? 0.62 : a, duration: 1.2, ease: "power1.inOut" }, w(i, "shop") + 0.2);
+  tl.to(`#p${i}b`, { scaleX: b, duration: 0.5, ease: "power3.out" }, w(i, "shop", 1) + 0.15);
+  E.sfx("chime", w(i, "shop", 1) + 0.3);
+});
+tl.to("#p3a", { scaleX: 0, duration: 0.3, ease: "power2.in" }, w(3, "again.")); // starts again
+E.sfx("impact", w(3, "again."));
+// 5 · different future
+gsap.set(["#s5a", "#s5b"], { autoAlpha: 0 });
+pop("#s5a", w(5, "a")); slam("#s5b", w(5, "future."), "impact");
+// 6 · the line
+gsap.set(["#s6a", "#s6b", "#s6c", "#s6d"], { autoAlpha: 0 });
+pop("#s6a", w(6, "ai")); pop("#s6b", w(6, "for"));
+slam("#s6c", w(6, "your"), "impact"); pop("#s6d", w(6, "using"));
+draw("#s6p", w(6, "competitor") + 0.2, 0.45);
+// 7 · A or B (loops to frame 0)
+gsap.set(["#s7a", "#s7b", "#la7", "#lb7"], { autoAlpha: 0 });
+pop("#s7a", w(7, "which")); pop("#s7b", w(7, "are"));
+pop("#la7", w(7, "a"), { s: 0.5, y: 0, sfx: "pop" }); pop("#lb7", w(7, "b."), { s: 0.5, y: 0, sfx: "pop" });
+for (let k = 0; k < 2; k++) E.sfx("heart", off(7) - 1.6 + k * 0.9);
+
+V.captions();
+V.disclaimer(1);
+</script>
+</body></html>

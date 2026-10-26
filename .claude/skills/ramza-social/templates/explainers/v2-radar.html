@@ -1,0 +1,192 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<link rel="stylesheet" href="v2.css">
+<style>
+  /* The radar: Dubai speed-camera flash as the metaphor for e-invoicing (B2B/B2G, in scope only).
+     Night road flash → fine SMS → every invoice → the radar going up → invoice through the gates →
+     AED 5,000/month (red) → the dates → clean books (blue) → daylight road, no flash → loop flash. */
+  #sms{position:absolute;left:120px;right:120px;top:560px;height:200px;border-radius:30px;background:rgba(245,247,252,.96);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.55)}
+  #sms .ic{position:absolute;left:34px;top:40px;width:84px;height:84px;border-radius:20px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Urbanist';font-weight:800;font-size:48px}
+  #sms .t{position:absolute;left:146px;top:44px;font-family:'Urbanist';font-weight:800;font-size:44px}
+  #sms .s{position:absolute;left:146px;top:104px;font-size:30px;color:#4A5268}
+  #sms .tm{position:absolute;right:34px;top:48px;font-size:24px;color:#8A92A6}
+  .inv{position:absolute;width:420px;height:270px;background:#fff;color:var(--ink);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+  .inv .h{position:absolute;left:28px;top:26px;font-family:'IBM Plex Mono';font-size:22px;letter-spacing:.12em;color:var(--mute)}
+  .inv .n{position:absolute;left:26px;top:62px;font-family:'Urbanist';font-weight:800;font-size:52px}
+  .inv .l{position:absolute;left:28px;right:28px;height:10px;border-radius:5px;background:#E6E9F1}
+  .gate{position:absolute;top:640px;width:230px;height:420px}
+  .gate .arch{position:absolute;left:0;right:0;top:0;bottom:0;border:10px solid rgba(255,255,255,.25);border-bottom:none;border-radius:115px 115px 0 0}
+  .gate .lt{position:absolute;left:95px;top:-58px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18)}
+  .gate .lb{position:absolute;left:-40px;right:-40px;top:445px;text-align:center;font-family:'IBM Plex Mono';font-size:22px;letter-spacing:.08em;color:rgba(255,255,255,.7)}
+  #tok{position:absolute;left:-200px;top:780px;width:150px;height:110px;background:#fff;border-radius:12px;box-shadow:0 0 0 0 rgba(75,103,238,0)}
+  #tok:after{content:"";position:absolute;left:22px;right:22px;top:30px;height:10px;border-radius:5px;background:#D6DBE7;box-shadow:0 22px 0 #D6DBE7,0 44px 0 #D6DBE7}
+  .cal{position:absolute;top:560px;width:420px;height:470px;background:#fff;color:var(--ink);border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.45)}
+  .cal .top{height:110px;background:var(--red);color:#fff;font-family:'IBM Plex Mono';font-size:26px;letter-spacing:.12em;display:flex;align-items:center;justify-content:center}
+  .cal .mo{position:absolute;left:0;right:0;top:150px;text-align:center;font-family:'Urbanist';font-weight:800;font-size:110px;letter-spacing:-.03em}
+  .cal .yr{position:absolute;left:0;right:0;top:290px;text-align:center;font-family:'IBM Plex Mono';font-size:44px}
+  .cal .who{position:absolute;left:0;right:0;top:380px;text-align:center;font-size:26px;color:var(--mute)}
+  .ok{position:absolute;left:90px;width:900px;height:92px;border-bottom:1.5px solid var(--line);display:flex;align-items:center;font-size:34px;font-weight:500;color:var(--ink)}
+  .ok i{width:46px;height:46px;border-radius:50%;background:var(--blue);margin-right:24px;flex:none;display:flex;align-items:center;justify-content:center;transform:scale(0)}
+  .ok i svg{width:26px;height:26px}
+  .ok b{margin-left:auto;font-family:'IBM Plex Mono';font-weight:500;font-size:28px;color:var(--mute)}
+  #pole{position:absolute;left:0;top:0}
+</style></head>
+<body>
+
+<section class="sc black" id="s0"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-road-flash.jpg)"></div><div class="shade"></div>
+  <div class="d c sh" id="s0a" style="top:360px;font-size:260px">Flash.</div>
+</div></section>
+
+<section class="sc black" id="s1"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-phone-car.jpg)"></div><div class="shade top"></div>
+  <div class="d c sh" id="s1a" style="top:330px;font-size:120px">Fine issued.</div>
+  <div class="d c sh r" id="s1b" style="top:460px;font-size:120px">Instantly.</div>
+  <div id="sms"><div class="ic">!</div><div class="t">Traffic fine issued</div><div class="s">Speeding · camera 4 · just now</div><div class="tm">now</div></div>
+</div></section>
+
+<section class="sc ink" id="s2"><div class="in">
+  <div class="d" id="s2a" style="left:90px;top:330px;font-size:150px">Every.</div>
+  <div class="d b" id="s2b" style="left:90px;top:480px;font-size:150px">Invoice.</div>
+  <div id="invs"></div>
+</div></section>
+
+<section class="sc ink" id="s3"><div class="in">
+  <div class="d" id="s3a" style="left:90px;top:330px;font-size:118px">The radar is</div>
+  <div class="d b" id="s3b" style="left:90px;top:460px;font-size:118px">being installed.</div>
+  <svg id="pole" width="1080" height="1920"><g id="pg"><rect x="520" y="760" width="40" height="560" fill="#C9CFDB"/><rect x="430" y="640" width="220" height="150" rx="16" fill="#E6E9F1"/><circle cx="500" cy="715" r="38" fill="#0B1533"/><circle cx="500" cy="715" r="18" fill="#4B67EE"/><rect x="570" y="690" width="56" height="48" rx="8" fill="#0B1533"/></g>
+    <path id="beam" d="M470,715 L120,600 L120,830 Z" fill="rgba(75,103,238,.22)"/></svg>
+</div></section>
+
+<section class="sc ink" id="s4"><div class="in">
+  <div class="pill" id="s4p" style="left:90px;top:330px">E-INVOICING · B2B</div>
+  <div class="d" id="s4a" style="left:90px;top:410px;font-size:130px">In <span class="b">real time.</span></div>
+  <div class="gate" id="g1" style="left:60px"><div class="lt"></div><div class="arch"></div><div class="lb">THE BUSINESS</div></div>
+  <div class="gate" id="g2" style="left:425px"><div class="lt"></div><div class="arch"></div><div class="lb">ACCREDITED PROVIDER</div></div>
+  <div class="gate" id="g3" style="left:790px"><div class="lt"></div><div class="arch"></div><div class="lb">TAX AUTHORITY</div></div>
+  <div id="tok"></div>
+</div></section>
+
+<section class="sc black" id="s5"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-owner-letter.jpg)"></div><div class="tint red" id="t5"></div><div class="shade"></div>
+  <div class="m sh" id="s5l" style="left:90px;top:340px;font-size:30px;letter-spacing:.12em">NO PROVIDER APPOINTED IN TIME</div>
+  <div class="d sh" id="s5a" style="left:84px;top:400px;font-size:210px;color:#FF6B5B"></div>
+  <div class="d sh" id="s5b" style="left:90px;top:610px;font-size:110px">every month.</div>
+</div></section>
+
+<section class="sc ink" id="s6"><div class="in">
+  <div class="d" id="s6a" style="left:90px;top:330px;font-size:110px">The camera's</div>
+  <div class="d b" id="s6b" style="left:90px;top:450px;font-size:110px">on the pole.</div>
+  <div class="cal" id="c1" style="left:90px"><div class="top">GO-LIVE</div><div class="mo" id="c1m"></div><div class="yr" id="c1y"></div><div class="who" id="c1w"></div></div>
+  <div class="cal" id="c2" style="left:570px"><div class="top">GO-LIVE</div><div class="mo" id="c2m"></div><div class="yr" id="c2y"></div><div class="who">everyone else in scope</div></div>
+</div></section>
+
+<section class="sc paper" id="s7"><div class="in">
+  <div class="d" id="s7a" style="left:90px;top:330px;font-size:118px">Clean books.</div>
+  <div class="d b" id="s7b" style="left:90px;top:460px;font-size:118px">Before the flash.</div>
+  <div id="oks"></div>
+</div></section>
+
+<section class="sc black" id="s8"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-road-day.jpg)"></div><div class="shade top"></div>
+  <div class="d c sh" id="s8a" style="top:360px;font-size:150px">Drive clean.</div>
+  <div class="d c sh" id="s8b" style="top:530px;font-size:110px">Comment <span style="color:#9DB0FF">READY</span></div>
+  <div class="mk" id="s8m" style="left:470px;top:700px;width:140px;height:140px"></div>
+</div></section>
+
+<div id="flash"></div><div id="cap"></div><div id="disc"></div>
+
+<script src="v2.js"></script>
+<script>
+const { tl, $, w, on, off, pop, slam, hide, punch, flash, tint, D } = V;
+V.scenes([1]);
+const mon = (iso) => new Date(iso + "T00:00:00Z").toLocaleString("en-US", { month: "short", timeZone: "UTC" }).toUpperCase();
+
+// 0 · flash
+gsap.set("#s0a", { autoAlpha: 0 });
+flash(w(0, "flash.") - 0.05, 0.45);
+E.sfx("impact", w(0, "flash.") - 0.05);
+slam("#s0a", w(0, "flash.") + 0.05, null);
+// 1 · SMS fine
+gsap.set(["#s1a", "#s1b", "#sms"], { autoAlpha: 0 });
+tl.fromTo("#sms", { autoAlpha: 0, y: -160 }, { autoAlpha: 1, y: 0, duration: 0.45, ease: "back.out(1.6)", immediateRender: false }, on(1) + 0.15);
+E.sfx("sms", on(1) + 0.15);
+pop("#s1a", w(1, "fine"));
+slam("#s1b", w(1, "already"), "impact");
+punch(1, w(1, "already"));
+// 2 · every invoice multiplies
+gsap.set(["#s2a", "#s2b"], { autoAlpha: 0 });
+pop("#s2a", w(2, "every"), { sfx: "pop" });
+slam("#s2b", w(2, "invoice"), "impact");
+for (let k = 0; k < 9; k++) {
+  const d = document.createElement("div"); d.className = "inv";
+  d.style.left = `${330 + ((k * 137) % 3 - 1) * 210}px`; d.style.top = `${760 + (k % 3) * 70}px`;
+  d.innerHTML = `<div class="h">TAX INVOICE</div><div class="n">#${1041 + k}</div><div class="l" style="top:160px"></div><div class="l" style="top:190px;right:140px"></div><div class="l" style="top:220px;right:220px"></div>`;
+  $("#invs").appendChild(d);
+  tl.fromTo(d, { autoAlpha: 0, y: 260, rotation: 0 }, { autoAlpha: 1, y: 0, rotation: (k % 5 - 2) * 4, duration: 0.4, ease: "expo.out", immediateRender: false }, w(2, "invoice") + 0.05 + k * 0.12);
+  E.sfx("swish", w(2, "invoice") + 0.05 + k * 0.12, { vol: 0.6 });
+}
+// 3 · the radar goes up
+gsap.set(["#s3a", "#s3b"], { autoAlpha: 0 });
+pop("#s3a", on(3) + 0.05);
+pop("#s3b", w(3, "building."), { sfx: "impact" });
+tl.fromTo("#pg", { y: 700 }, { y: 0, duration: 1.1, ease: "expo.out", immediateRender: false }, on(3) + 0.1);
+tl.fromTo("#beam", { opacity: 0 }, { opacity: 1, duration: 0.2, repeat: 3, yoyo: true, immediateRender: false }, w(3, "building.") + 0.2);
+E.sfx("drone", on(3));
+// 4 · through the gates, beeps faster each time
+gsap.set(["#s4p", "#s4a"], { autoAlpha: 0 });
+pop("#s4p", on(4) + 0.05, { y: 20 });
+pop("#s4a", w(4, "real"), { sfx: "pop" });
+const g0 = w(4, "every"), gates = [[175, g0 + 0.5], [540, w(4, "provider,") + 0.1], [905, w(4, "authority.") + 0.1]];
+tl.set("#tok", { x: 0 }, on(4));
+gates.forEach(([x, at], k) => {
+  tl.to("#tok", { x: x + 200 - 75, duration: k ? 0.5 : 0.7, ease: "power2.inOut" }, at - (k ? 0.5 : 0.7));
+  tl.to(`#g${k + 1} .lt`, { backgroundColor: "#1F9D61", duration: 0.05 }, at);
+  tl.to(`#g${k + 1} .arch`, { borderColor: "rgba(75,103,238,.9)", duration: 0.1 }, at);
+  E.sfx("beep", at);
+});
+tl.to("#tok", { x: 1300, duration: 0.4, ease: "power2.in" }, w(4, "real") + 0.2);
+// 5 · AED 5,000 a month, red
+$("#s5a").textContent = `AED ${D.asp_late.toLocaleString("en-US")}`;
+gsap.set(["#s5l", "#s5a", "#s5b"], { autoAlpha: 0 });
+tint("#t5", on(5) + 0.1, 0.6);
+pop("#s5l", on(5) + 0.1, { y: 20 });
+slam("#s5a", w(5, "aed5,000.") - 0.03, "impact");
+pop("#s5b", w(5, "month."), { sfx: "stamp" });
+punch(5, w(5, "month."));
+// 6 · dates
+$("#c1m").textContent = mon(D.large_go); $("#c1y").textContent = D.large_go.slice(0, 4);
+$("#c1w").textContent = `revenue AED ${D.large_rev / 1e6}M+`;
+$("#c2m").textContent = mon(D.sme_go); $("#c2y").textContent = D.sme_go.slice(0, 4);
+gsap.set(["#s6a", "#s6b", "#c1", "#c2"], { autoAlpha: 0 });
+pop("#s6a", on(6) + 0.05);
+pop("#c1", w(6, "over"), { y: 120, sfx: "pop" });
+pop("#c2", w(6, "everyone"), { y: 120, sfx: "pop" });
+pop("#s6b", w(6, "in", 1), { y: 20 });
+for (let k = 0; k < 10; k++) E.sfx("meter", on(6) + 0.2 + k * 0.5, { vol: 0.6 });
+// 7 · clean books (blue)
+const OK = [["Tabby payout matched", "9,412.37"], ["Fee + VAT on the fee booked", "346.50"], ["Refund booked", "241.13"], ["Invoices marked paid", "12"], ["E-invoicing readiness checked", "✓"]];
+OK.forEach(([a, b], k) => { const d = document.createElement("div"); d.className = "ok"; d.style.top = `${640 + k * 110}px`; d.innerHTML = `<i><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>${a}</span><b>${b}</b>`; $("#oks").appendChild(d); });
+gsap.set(["#s7a", "#s7b", ".ok"], { autoAlpha: 0 });
+pop("#s7a", on(7) + 0.05, { sfx: "chime" });
+pop("#s7b", w(7, "now."));
+document.querySelectorAll(".ok").forEach((el, k) => {
+  const at = (k < 4 ? w(7, "reconciles") : w(7, "readiness.")) + (k < 4 ? k * 0.32 : 0);
+  pop(el, at, { y: 20 });
+  tl.to(el.querySelector("i"), { scale: 1, duration: 0.25, ease: "back.out(2.4)" }, at + 0.15);
+  E.sfx("ding", at + 0.15);
+});
+// 8 · daylight, no flash; the last frame flashes into frame 1
+gsap.set(["#s8a", "#s8b", "#s8m"], { autoAlpha: 0 });
+pop("#s8a", w(8, "drive"));
+pop("#s8b", w(8, "comment"), { sfx: "pop" });
+pop("#s8m", w(8, "free."), { s: 0.6, y: 0, sfx: "impact" });
+tl.to("#flash", { opacity: 1, duration: 0.3, ease: "power2.in" }, V.T.dur - 0.32); E.sfx("flash", V.T.dur - 0.3);
+
+V.captions({ light: [7] });
+V.disclaimer(4, [7]);
+</script>
+</body></html>

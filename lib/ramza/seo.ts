@@ -214,7 +214,23 @@ export function pageJsonLd(page: RamzaPage) {
   if (page.faq.length) graph.push(faqNode(page.faq));
 
   const url = absoluteUrl(ramzaPath(page.path));
-  if (page.family === "guide") {
+  if (page.tool) {
+    /* Free calculators: WebApplication with a zero-price offer is the type
+       Google documents for free online tools. */
+    graph.push({
+      "@type": "WebApplication",
+      "@id": `${url}#app`,
+      name: page.h1,
+      url,
+      description: page.description,
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "AED" },
+      publisher: { "@id": ORG_ID },
+    });
+  }
+  if (page.family === "guide" || page.family === "zoho") {
     graph.push({
       "@type": "Article",
       "@id": `${url}#article`,

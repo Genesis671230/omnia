@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<link rel="stylesheet" href="v2.css">
+<style>
+  /* The taxi meter: month-end by hand is a fare that never stops. The LED digits live inside the photo
+     layer (.ph) so they ride the Ken Burns with the meter's blank red display. Facts: bank lines not yet
+     booked (not money lost), September close. Ends with the meter ticking again (loop). */
+  .led{position:absolute;left:250px;top:1022px;width:660px;height:170px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-weight:600;font-size:96px;color:#FFE1DA;text-shadow:0 0 18px rgba(255,70,50,.95),0 0 40px rgba(255,40,20,.6);letter-spacing:.02em}
+  .big{position:absolute;left:90px;right:90px;top:560px;height:330px;border-radius:24px;background:#160806;border:2px solid #3A1410;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-weight:600;font-size:200px;color:#FFE1DA;text-shadow:0 0 22px rgba(255,70,50,.95),0 0 60px rgba(255,40,20,.6)}
+  .bar{position:absolute;left:90px;width:900px;height:96px}
+  .bar .t{position:absolute;left:0;top:0;font-size:30px;color:var(--mute)}
+  .bar .v{position:absolute;right:0;top:-6px;font-family:'IBM Plex Mono';font-size:38px;color:var(--ink)}
+  .bar .tr{position:absolute;left:0;right:0;top:50px;height:34px;background:#E6E9F1;border-radius:6px;overflow:hidden}
+  .bar .f{height:100%;border-radius:6px;transform:scaleX(0);transform-origin:left}
+  #appr{position:absolute;left:90px;top:1180px;font-family:'IBM Plex Mono';font-size:30px;color:var(--blue);display:flex;gap:14px;align-items:center}
+</style></head>
+<body>
+
+<section class="sc black" id="s0"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-taxi-meter.jpg)"><div class="led" id="led0">0.00</div></div><div class="shade" style="background:rgba(5,8,18,.18)"></div>
+  <div class="d c sh" id="s0a" style="top:340px;font-size:150px">This meter</div>
+  <div class="d c sh r" id="s0b" style="top:500px;font-size:150px">never stops.</div>
+</div></section>
+
+<section class="sc black" id="s1"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-taxi-meter.jpg)"><div class="led" id="led1"></div></div><div class="shade" style="background:rgba(5,8,18,.18)"></div>
+  <div class="d sh" id="s1a" style="left:90px;top:340px;font-size:96px">Every payout that</div>
+  <div class="d sh" id="s1b" style="left:90px;top:450px;font-size:96px">doesn't match</div>
+  <div class="d sh r" id="s1c" style="left:90px;top:560px;font-size:96px">adds to the fare.</div>
+</div></section>
+
+<section class="sc black" id="s2"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-finance-late.jpg)"></div><div class="tint red" id="t2"></div><div class="shade top"></div>
+  <div class="pill" id="s2p" style="left:90px;top:330px">MONTH-END</div>
+  <div class="d sh" id="s2a" style="left:90px;top:410px;font-size:150px">By hand.</div>
+  <div class="d sh" id="s2b" style="left:90px;top:560px;font-size:96px;color:rgba(255,255,255,.85)">Line by line.</div>
+</div></section>
+
+<section class="sc ink" id="s3"><div class="in">
+  <div class="m" id="s3l" style="left:90px;top:360px;font-size:28px;letter-spacing:.12em;color:rgba(255,255,255,.6)">ONE DUBAI BRAND · BANK LINES NOT YET IN THE BOOKS</div>
+  <div class="big" id="s3n">0</div>
+  <div class="d" id="s3a" style="left:90px;top:960px;font-size:150px;color:#FF6B5B"></div>
+  <div class="m" id="s3b" style="left:94px;top:1140px;font-size:28px;color:rgba(255,255,255,.55)">not booked yet · not money lost</div>
+</div></section>
+
+<section class="sc black" id="s4"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-taxi-meter.jpg)"><div class="led" id="led4"></div></div><div class="tint blue" id="t4"></div><div class="shade" style="background:rgba(5,8,18,.2)"></div>
+  <div class="d c sh" id="s4a" style="top:340px;font-size:120px">An AI agent</div>
+  <div class="d c sh" id="s4b" style="top:470px;font-size:120px">switched it <span style="color:#9DB0FF">off.</span></div>
+</div></section>
+
+<section class="sc paper" id="s5"><div class="in">
+  <div class="m mute" id="s5l" style="left:90px;top:350px;font-size:28px;letter-spacing:.12em"></div>
+  <div class="d" id="s5n" style="left:80px;top:400px;font-size:300px;color:var(--ink)">0</div>
+  <div class="d" id="s5u" style="left:90px;top:700px;font-size:80px;font-weight:700;color:var(--mute)">bank credits</div>
+  <div class="bar" id="bar1" style="top:900px"><div class="t">Matched by the agent</div><div class="v" id="b1v">0%</div><div class="tr"><div class="f" style="background:var(--blue)"></div></div></div>
+  <div class="bar" id="bar2" style="top:1030px"><div class="t">Waiting for approval</div><div class="v" id="b2v">0%</div><div class="tr"><div class="f" style="background:#C3CAD9"></div></div></div>
+  <div id="appr"><div class="mk" style="position:relative;width:44px;height:44px"></div>Nothing posts to Zoho without approval</div>
+</div></section>
+
+<section class="sc black" id="s6"><div class="in">
+  <div class="ph" style="background-image:url(HD/v2-taxi-meter.jpg)"><div class="led" id="led6">0.00</div></div><div class="shade" style="background:rgba(5,8,18,.25)"></div>
+  <div class="d c sh" id="s6a" style="top:340px;font-size:110px">How many lines</div>
+  <div class="d c sh" id="s6b" style="top:460px;font-size:110px">are waiting?</div>
+  <div class="d c sh" id="s6c" style="top:640px;font-size:110px">Comment <span style="color:#FF8A7A">METER</span></div>
+</div></section>
+
+<div id="flash"></div><div id="cap"></div><div id="disc"></div>
+
+<script src="v2.js"></script>
+<script>
+const { tl, $, w, on, off, pop, slam, hide, punch, tint, D } = V;
+V.scenes([1, 4]);
+const fare = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// meter: one running fare across scenes 0–1, a tick every 0.25 s
+const M = { v: 0 }, mEnd = off(1);
+tl.to(M, { v: 4870.5, duration: mEnd - on(0), ease: "power1.in", onUpdate: () => { $("#led0").textContent = $("#led1").textContent = fare(M.v); } }, on(0));
+for (let t = on(0) + 0.2; t < mEnd; t += 0.25) E.sfx("meter", t, { vol: 0.8 });
+
+// 0
+gsap.set(["#s0a", "#s0b"], { autoAlpha: 0 });
+pop("#s0a", w(0, "this") - 0.05);
+slam("#s0b", w(0, "never"), "impact");
+// 1
+gsap.set(["#s1a", "#s1b", "#s1c"], { autoAlpha: 0 });
+pop("#s1a", w(1, "every")); pop("#s1b", w(1, "doesn't")); pop("#s1c", w(1, "adds"), { sfx: "pop" });
+punch(1, w(1, "fare."));
+// 2 · month-end by hand
+gsap.set(["#s2p", "#s2a", "#s2b"], { autoAlpha: 0 });
+tint("#t2", on(2), 0.45);
+pop("#s2p", w(2, "month-end."), { y: 20 });
+slam("#s2a", w(2, "hand,"), "impact");
+pop("#s2b", w(2, "line"), { y: 30 });
+E.sfx("typing", w(2, "payouts"));
+// 3 · 157 lines, AED 1.55M
+$("#s3a").textContent = `AED ${(D.lines_aed / 1e6).toFixed(2)}M`;
+gsap.set(["#s3l", "#s3n", "#s3a", "#s3b"], { autoAlpha: 0 });
+pop("#s3l", on(3) + 0.05, { y: 20 });
+pop("#s3n", w(3, `${D.lines}`) - 0.6, { y: 0, s: 0.9 });
+E.count($("#s3n"), w(3, `${D.lines}`) - 0.5, D.lines, { dur: 0.6, fmt: (v) => String(Math.round(v)) });
+for (let k = 0; k < 6; k++) E.sfx("meter", w(3, `${D.lines}`) - 0.5 + k * 0.1);
+slam("#s3a", w(3, `aed${(D.lines_aed / 1e6).toFixed(2)}m.`), "impact");
+pop("#s3b", w(3, `aed${(D.lines_aed / 1e6).toFixed(2)}m.`) + 0.6, { y: 10 });
+punch(3, w(3, `aed${(D.lines_aed / 1e6).toFixed(2)}m.`));
+// 4 · meter off: digits drop to OFF, silence, then relief
+tl.set("#led4", { textContent: fare(4870.5) }, on(4));
+gsap.set(["#s4a", "#s4b"], { autoAlpha: 0 });
+pop("#s4a", w(4, "an"));
+const offAt = w(4, "off.");
+pop("#s4b", offAt - 0.4);
+tl.set("#led4", { textContent: "— OFF —" }, offAt);
+tl.to("#led4", { opacity: 0.35, duration: 0.25 }, offAt + 0.05);
+E.sfx("click", offAt); E.sfx("chime", offAt + 0.45);
+tint("#t4", offAt + 0.1, 0.35, 0.6);
+// 5 · the September close (facts)
+$("#s5l").textContent = `${D.close_month.toUpperCase()} · A DUBAI E-COMMERCE BRAND`;
+gsap.set(["#s5l", "#s5n", "#s5u", "#bar1", "#bar2", "#appr"], { autoAlpha: 0 });
+pop("#s5l", on(5) + 0.05, { y: 20 });
+pop("#s5n", w(5, `${D.close_credits}`), { y: 0, s: 0.9 }); pop("#s5u", w(5, `${D.close_credits}`) + 0.15, { y: 20 });
+E.count($("#s5n"), w(5, `${D.close_credits}`), D.close_credits, { dur: 0.7 });
+const pAt = w(5, `${D.close_matched_pct}%`);
+pop("#bar1", pAt - 0.2, { y: 20 }); pop("#bar2", pAt, { y: 20 });
+tl.to("#bar1 .f", { scaleX: D.close_matched_pct / 100, duration: 0.9, ease: "power3.out" }, pAt);
+tl.to("#bar2 .f", { scaleX: 1 - D.close_matched_pct / 100, duration: 0.9, ease: "power3.out" }, pAt + 0.2);
+E.count($("#b1v"), pAt, D.close_matched_pct, { dur: 0.9, fmt: (v) => `${Math.round(v)}%` });
+E.count($("#b2v"), pAt + 0.2, 100 - D.close_matched_pct, { dur: 0.9, fmt: (v) => `${Math.round(v)}%` });
+pop("#appr", w(5, "nothing"), { y: 20, sfx: "chime" });
+// 6 · the meter starts again (loop)
+gsap.set(["#s6a", "#s6b", "#s6c"], { autoAlpha: 0 });
+pop("#s6a", w(6, "how")); pop("#s6b", w(6, "waiting")); pop("#s6c", w(6, "comment"), { sfx: "pop" });
+const M6 = { v: 0 };
+tl.to(M6, { v: 38.5, duration: off(6) - on(6), ease: "none", onUpdate: () => { $("#led6").textContent = fare(M6.v); } }, on(6));
+for (let t = on(6) + 0.3; t < off(6); t += 0.25) E.sfx("meter", t, { vol: 0.8 });
+
+V.captions({ light: [5] });
+V.disclaimer(3, [5]);
+</script>
+</body></html>

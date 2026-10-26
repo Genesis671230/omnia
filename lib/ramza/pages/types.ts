@@ -8,7 +8,12 @@
    for its page. There is no template interpolation, because thin templated
    pages rank worse than no pages at all on a site with no domain authority. */
 
-export type PageFamily = "reconciliation" | "vs" | "market" | "guide";
+export type PageFamily = "reconciliation" | "vs" | "market" | "guide" | "zoho" | "tool";
+
+/* The free calculators in components/ramza/ct/free-tools.tsx. A page with a
+   `tool` renders that calculator above its prose, so each one ranks on its own
+   URL ("uae vat calculator") instead of hiding in a tab on the home page. */
+export type FreeToolKey = "vatcalc" | "vat" | "ct" | "relief" | "einv";
 
 /* A claim that came from outside RAMZA's own product — a competitor's feature
    list, a regulator's rule, a gateway's published fee schedule.
@@ -92,6 +97,9 @@ export type RamzaPage = {
   related: string[];
 
   citations?: Citation[];
+
+  /* Free calculator rendered under the lead (tool family). */
+  tool?: FreeToolKey;
 
   /* ISO date, surfaced as dateModified in JSON-LD and shown on the page. */
   updated: string;

@@ -5,11 +5,13 @@ import { MARKETS } from "./markets";
 import { GUIDES } from "./guides";
 import { TAX_GUIDES } from "./tax-guides";
 import { HUBS } from "./hubs";
+import { TOOL_PAGES } from "./tools";
+import { ZOHO_PAGES } from "./zoho";
 import type { PageFamily, RamzaPage } from "./types";
 
 export { HUBS, getHub, hubFor, type Hub } from "./hubs";
 
-export type { RamzaPage, PageFamily, PageSection, Citation } from "./types";
+export type { RamzaPage, PageFamily, PageSection, Citation, FreeToolKey } from "./types";
 
 /* The registry. Everything downstream — routing, sitemap, breadcrumbs,
    JSON-LD, related links — reads from this one array, so a page is either
@@ -20,6 +22,8 @@ export const ALL_PAGES: RamzaPage[] = [
   ...MARKETS,
   ...GUIDES,
   ...TAX_GUIDES,
+  ...TOOL_PAGES,
+  ...ZOHO_PAGES,
 ];
 
 const BY_PATH = new Map(ALL_PAGES.map((p) => [p.path, p]));

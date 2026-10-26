@@ -76,7 +76,7 @@ export const GATEWAYS: RamzaPage[] = [
         a: "Yes. Tabby, Tamara, Telr, Stripe, Checkout.com and cash on delivery are reconciled against the same bank account and closed into the same Zoho Books file.",
       },
     ],
-    related: ["reconciliation/tamara", "reconciliation/telr", "vs/spreadsheets"],
+    related: ["reconciliation/tamara", "reconciliation/telr", "vs/spreadsheets", "zoho/zoho-books-integrations-uae"],
     updated: UPDATED,
   },
 
@@ -136,7 +136,7 @@ export const GATEWAYS: RamzaPage[] = [
         a: "Yes. Every payout opens to the orders it settles, so a variance can be traced to the order that caused it.",
       },
     ],
-    related: ["reconciliation/tabby", "reconciliation/telr", "markets/ksa"],
+    related: ["reconciliation/tabby", "reconciliation/telr", "markets/ksa", "zoho/zoho-books-integrations-uae"],
     updated: UPDATED,
   },
 

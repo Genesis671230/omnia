@@ -1,0 +1,367 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<link rel="stylesheet" href="v2.css">
+<style>
+  /* Real estate: "your buyers google you first". Opens and loops on a full-colour search bar (a dot
+     grows into a pill, the four-colour ring spins, the query types). No search-engine logo: the four
+     dots and the ring carry it. Middle: one bank balance splits into yours / held / to collect, then the
+     three lanes (property management, off-plan, construction), the agent's matching and the monthly pack.
+     Worked-example figures come from DATA (explainers.mjs) and balance. */
+  .white{background:#fff;color:var(--ink)}
+  .dots{position:absolute;left:0;right:0;top:420px;display:flex;justify-content:center;gap:22px}
+  .dots i{width:34px;height:34px;border-radius:50%;display:block}
+  .sbw{position:absolute;left:70px;top:560px;width:940px;height:150px}
+  .sbw .glow{position:absolute;inset:0;border-radius:75px;box-shadow:-34px 0 60px rgba(66,133,244,.45),34px 0 60px rgba(52,168,83,.4),0 -22px 56px rgba(234,67,53,.32),0 24px 56px rgba(251,188,5,.4)}
+  .sbw .clip{position:absolute;inset:0;border-radius:75px;overflow:hidden}
+  .sbw .ring{position:absolute;left:50%;top:50%;width:1400px;height:1400px;margin:-700px 0 0 -700px;background:conic-gradient(from 0deg,#4285F4,#EA4335,#FBBC05,#34A853,#4285F4)}
+  .sbw .inner{position:absolute;inset:9px;border-radius:66px;background:#fff;display:flex;align-items:center;padding:0 40px 0 36px;gap:26px;overflow:hidden}
+  .sbw svg.mag{width:52px;height:52px;flex:none}
+  .sbw .q{font-family:'IBM Plex Sans';font-size:44px;color:#202124;white-space:nowrap;flex:1;overflow:hidden}
+  .sbw .caret{display:inline-block;width:3px;height:50px;background:#4285F4;vertical-align:-8px;margin-left:2px}
+  .sbw .mic{display:flex;gap:7px;flex:none}.sbw .mic i{width:12px;height:30px;border-radius:6px;display:block}
+  .sug{position:absolute;left:100px;width:880px;height:104px;display:flex;align-items:center;gap:26px;border-bottom:1.5px solid #EEF0F4}
+  .sug .t{font-family:'IBM Plex Sans';font-size:38px;color:#202124;flex:1;white-space:nowrap}
+  .sug .tag{font-family:'IBM Plex Mono';font-size:24px;letter-spacing:.1em;padding:8px 14px;border-radius:8px;color:#fff}
+  .res{position:absolute;left:100px;width:880px}
+  .res .u{font-family:'IBM Plex Sans';font-size:26px;color:#5F6368}
+  .res .h{font-family:'IBM Plex Sans';font-size:40px;color:#1A0DAB;margin-top:6px;white-space:nowrap}
+  .res .l{height:18px;border-radius:9px;background:#ECEEF2;margin-top:16px}
+  .stmt{position:absolute;left:90px;width:900px;background:#fff;color:var(--ink);border-radius:22px;border:1.5px solid var(--line);box-shadow:0 24px 60px rgba(0,0,0,.3)}
+  .row{display:flex;align-items:center;height:92px;padding:0 34px;border-top:1.5px solid #EEF0F4;font-family:'IBM Plex Mono';font-size:28px;gap:18px;position:relative}
+  .row .a{margin-left:auto}
+  .chip{font-family:'IBM Plex Mono';font-size:24px;padding:7px 12px;border-radius:8px;white-space:nowrap}
+  .seg{position:absolute;height:120px;top:0;display:flex;align-items:flex-end;padding:0 0 14px 18px;font-family:'IBM Plex Mono';font-size:26px;color:#fff;transform-origin:left}
+  .lab{position:absolute;font-family:'IBM Plex Sans';font-weight:600;font-size:34px}
+  .lab small{display:block;font-family:'IBM Plex Mono';font-weight:500;font-size:28px;color:var(--mute);margin-top:6px}
+  .photo{position:absolute;left:90px;top:300px;width:900px;height:500px;border-radius:22px;background-size:cover;background-position:center;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+  .bubble{position:absolute;background:#fff;color:var(--ink);font-family:'IBM Plex Sans';font-weight:600;font-size:38px;padding:22px 30px;border-radius:26px 26px 26px 6px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+  .plan{position:absolute;left:90px;top:900px;width:900px;height:110px;display:flex;gap:8px}
+  .plan div{flex:1;border-radius:12px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:26px;color:#fff}
+  .big10 .row{height:132px;font-size:30px}.big10 .chip{font-size:26px}
+  .tbl{position:absolute;left:100px;width:880px}
+  .tbl .tr{display:grid;grid-template-columns:1.15fr 1fr 1fr 1fr;column-gap:12px;height:104px;align-items:center;border-top:1.5px solid var(--line);font-family:'IBM Plex Mono';font-size:22px;padding:0 6px;text-align:right}
+  .tbl .tr > :first-child{text-align:left;font-family:'IBM Plex Sans';font-weight:600;font-size:28px;white-space:nowrap}
+  .tbl .hd{font-size:22px;letter-spacing:.1em;color:var(--mute);height:64px;border-top:none}
+  .tbl .tot{border-top:3px solid var(--ink);font-weight:600}
+  .btn{position:absolute;left:190px;top:820px;width:700px;height:130px;border-radius:20px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Urbanist';font-weight:800;font-size:54px}
+  .stampx{position:absolute;font-family:'Urbanist';font-weight:800;font-size:44px;letter-spacing:.06em;padding:10px 22px;border:5px solid;border-radius:10px;transform:rotate(-8deg)}
+</style></head>
+<body>
+
+<!-- 0 · the search bar appears and types the buyer's question -->
+<section class="sc white" id="s0"><div class="in">
+  <div class="dots" id="d0"><i style="background:#4285F4"></i><i style="background:#EA4335"></i><i style="background:#FBBC05"></i><i style="background:#34A853"></i></div>
+  <div class="sbw" id="b0" data-focus></div>
+  <div class="d c" id="s0a" style="top:860px;font-size:110px;color:var(--ink)">They <span style="color:#4285F4">google</span> you.</div>
+</div></section>
+
+<!-- 1 · who is searching -->
+<section class="sc white" id="s1"><div class="in">
+  <div class="sbw" id="b1" style="top:300px"></div>
+  <div class="sug" id="g1" style="top:500px"><svg width="34" height="34" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15 15l5 5" stroke="#9AA0A6" stroke-width="2.4" stroke-linecap="round"/></svg><div class="t">developer handover delays</div><div class="tag" style="background:#4285F4">BUYER</div></div>
+  <div class="sug" id="g2" style="top:614px"><svg width="34" height="34" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15 15l5 5" stroke="#9AA0A6" stroke-width="2.4" stroke-linecap="round"/></svg><div class="t">project cash flow statement</div><div class="tag" style="background:#EA4335">INVESTOR</div></div>
+  <div class="sug" id="g3" style="top:728px"><svg width="34" height="34" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15 15l5 5" stroke="#9AA0A6" stroke-width="2.4" stroke-linecap="round"/></svg><div class="t">audited accounts for a loan</div><div class="tag" style="background:#E8A100">BANK</div></div>
+  <div class="sug" id="g4" style="top:842px"><svg width="34" height="34" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15 15l5 5" stroke="#9AA0A6" stroke-width="2.4" stroke-linecap="round"/></svg><div class="t">partner profit share report</div><div class="tag" style="background:#34A853">PARTNER</div></div>
+</div></section>
+
+<!-- 2 · results blur, the answer is in the books -->
+<section class="sc white" id="s2"><div class="in">
+  <div id="rs">
+    <div class="sbw" id="b2" style="top:300px"></div>
+    <div class="res" style="top:510px"><div class="u">forum · property</div><div class="h">Is this developer financially safe?</div><div class="l" style="width:92%"></div><div class="l" style="width:70%"></div></div>
+    <div class="res" style="top:740px"><div class="u">reviews · buyers</div><div class="h">Handover delays and refunds</div><div class="l" style="width:86%"></div><div class="l" style="width:60%"></div></div>
+    <div class="res" style="top:970px"><div class="u">news · market</div><div class="h">Developers under pressure</div><div class="l" style="width:90%"></div><div class="l" style="width:52%"></div></div>
+  </div>
+  <div class="card" id="s2c" style="left:140px;top:520px;width:800px;height:420px;background:var(--navy);border:none;display:flex;flex-direction:column;align-items:center;justify-content:center" data-focus>
+    <div class="m" style="position:static;font-size:26px;letter-spacing:.14em;color:rgba(255,255,255,.6)">THE REAL ANSWER</div>
+    <div class="d" style="position:static;margin-top:26px;font-size:130px;color:#fff">Your books.</div>
+  </div>
+</div></section>
+
+<!-- 3 · one bank balance -->
+<section class="sc ink" id="s3"><div class="in">
+  <div class="stmt" id="s3s" style="top:320px" data-focus>
+    <div style="padding:34px 34px 26px"><div class="m mute" style="position:static;font-size:24px;letter-spacing:.12em">BANK BALANCE · 31 OCT · EXAMPLE</div>
+      <div class="d" id="s3n" style="position:static;margin-top:16px;font-size:112px;color:var(--ink)">AED 0</div></div>
+    <div class="row" id="r31"><span>CHQ DEP 004512</span><span class="mute">rent</span><span class="a">+ 42,500.00</span></div>
+    <div class="row" id="r32"><span>TRF UNIT 1204</span><span class="mute">instalment</span><span class="a">+ 186,000.00</span></div>
+    <div class="row" id="r33"><span>DEP 0807</span><span class="mute">security deposit</span><span class="a">+ 9,500.00</span></div>
+    <div class="row" id="r34"><span>RCPT IPC 07</span><span class="mute">progress bill</span><span class="a">+ 1,665,000.00</span></div>
+  </div>
+  <div class="d c" id="s3a" style="top:1010px;font-size:82px">Three kinds of <span style="color:#9DB0FF">money.</span></div>
+</div></section>
+
+<!-- 4 · the balance splits -->
+<section class="sc paper" id="s4"><div class="in">
+  <div class="m mute" style="left:104px;top:340px;font-size:26px;letter-spacing:.12em">ONE BALANCE · EXAMPLE</div>
+  <div class="d" id="s4n" style="left:100px;top:385px;font-size:96px;color:var(--ink)">AED 4,850,000</div>
+  <div id="track" style="position:absolute;left:90px;top:540px;width:900px;height:120px" data-focus>
+    <div class="seg" id="sgA" style="left:0;background:#C9CFDC;width:900px;color:var(--ink)">in the bank</div>
+    <div class="seg" id="sgY" style="left:0;background:var(--blue)">yours</div>
+    <div class="seg" id="sgH" style="background:#E0A030">held</div>
+  </div>
+  <div id="sgC" style="position:absolute;left:90px;top:690px;height:120px;border:4px dashed var(--red);border-radius:6px;display:flex;align-items:flex-end;padding:0 0 12px 18px;font-family:'IBM Plex Mono';font-size:26px;color:var(--red)">not in the bank</div>
+  <div class="lab" id="lY" style="left:104px;top:880px;color:var(--blue)">Yours<small id="lYv">1,910,000</small></div>
+  <div class="lab" id="lH" style="left:400px;top:880px;color:#B87A0C">Holding for others<small>2,940,000</small></div>
+  <div class="lab" id="lC" style="left:104px;top:1040px;color:var(--red)">Earned, not collected<small>+ 1,260,000</small></div>
+</div></section>
+
+<!-- 5 · property management -->
+<section class="sc black" id="s5"><div class="in">
+  <div class="photo" style="background-image:url(PHOTO/in-realestate-keys.jpg)"></div>
+  <div class="pill" id="s5p" style="left:120px;top:340px;background:rgba(5,8,18,.6)">PROPERTY MANAGEMENT</div>
+  <div class="card" id="s5c" style="left:90px;top:850px;width:900px;height:360px" data-focus>
+    <div class="m mute" style="left:34px;top:28px;font-size:24px;letter-spacing:.12em">ONE ACCOUNT</div>
+    <div class="row" id="r51" style="position:absolute;left:0;right:0;top:80px"><span class="chip" style="background:#E8EDFF;color:var(--blue)">Rent cheque</span><span>Unit 1204</span><span class="a">42,500.00</span></div>
+    <div class="row" id="r52" style="position:absolute;left:0;right:0;top:172px"><span class="chip" style="background:#FFF2DC;color:#B87A0C">Deposit</span><span>Unit 0807</span><span class="a">9,500.00</span></div>
+    <div class="row" id="r53" style="position:absolute;left:0;right:0;top:264px"><span class="chip" style="background:#FFF2DC;color:#B87A0C">Owner's share</span><span>Villa 12</span><span class="a">31,000.00</span></div>
+  </div>
+  <div class="bubble" id="s5b" style="left:430px;top:690px">Where is my rent?</div>
+</div></section>
+
+<!-- 6 · off-plan -->
+<section class="sc black" id="s6"><div class="in">
+  <div class="photo" style="background-image:url(PHOTO/in-realestate-towers.jpg)"></div>
+  <div class="pill" id="s6p" style="left:120px;top:340px;background:rgba(5,8,18,.6)">OFF-PLAN SALES</div>
+  <div class="m" style="left:104px;top:850px;font-size:26px;letter-spacing:.12em;color:rgba(255,255,255,.6)">BUYER PAYMENT PLAN</div>
+  <div class="plan" id="s6plan"><div id="p1">Booking</div><div id="p2">Construction</div><div id="p3">Handover</div></div>
+  <div class="card" id="s6e" style="left:90px;top:1050px;width:900px;height:150px;display:flex;align-items:center;gap:28px;padding:0 36px" data-focus>
+    <svg width="64" height="64" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2" fill="#E0A030"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="#E0A030" stroke-width="2.4"/></svg>
+    <div><div style="font-family:'Urbanist';font-weight:800;font-size:56px">Escrow</div><div class="mute" style="font-size:28px">held for the project</div></div>
+    <div id="s6x" style="margin-left:auto;font-family:'Urbanist';font-weight:800;font-size:44px;color:var(--red);position:relative">cash to spend<svg style="position:absolute;left:-10px;top:24px;width:300px;height:20px;overflow:visible"><path id="s6l" d="M0 10 L300 6" stroke="#D9463A" stroke-width="7" stroke-linecap="round" fill="none"/></svg></div>
+  </div>
+</div></section>
+
+<!-- 7 · construction -->
+<section class="sc black" id="s7"><div class="in">
+  <div class="photo" style="background-image:url(PHOTO/in-construction-dubai.jpg)"></div>
+  <div class="pill" id="s7p" style="left:120px;top:340px;background:rgba(5,8,18,.6)">DEVELOPERS · CONTRACTORS</div>
+  <div class="card" id="s7c" style="left:90px;top:850px;width:900px;height:380px" data-focus>
+    <div class="row" id="r71" style="position:absolute;left:0;right:0;top:0;border-top:none"><span>Progress bill IPC 07</span><span class="a">billed</span></div>
+    <div class="row" id="r72" style="position:absolute;left:0;right:0;top:92px"><span>Retention</span><span class="a" style="color:#B87A0C">held back</span></div>
+    <div class="row" id="r73" style="position:absolute;left:0;right:0;top:184px"><span>Variation order 3</span><span class="a" style="color:var(--red)">not agreed</span></div>
+    <div class="row" id="r74" style="position:absolute;left:0;right:0;top:276px;font-family:'Urbanist';font-weight:800;font-size:48px"><span>Real margin</span><span class="a" id="s7m" style="color:var(--red)">?</span></div>
+  </div>
+</div></section>
+
+<!-- 8 · it stops adding up -->
+<section class="sc ink" id="s8"><div class="in">
+  <div class="tint red" id="t8"></div>
+  <div class="lab" id="s8a" style="left:120px;top:380px;color:#fff;font-size:44px">What the bank shows<small style="color:rgba(255,255,255,.6);font-size:34px">AED 4,850,000</small></div>
+  <div class="d c" id="s8x" style="top:560px;font-size:260px;color:#FF6B5B" data-focus>≠</div>
+  <div class="lab" id="s8b" style="left:120px;top:900px;color:#fff;font-size:44px">What you can show<small style="color:rgba(255,255,255,.6);font-size:34px">profit · cash · what you owe</small></div>
+</div></section>
+
+<!-- 9 · RAMZA slam -->
+<section class="sc slam" id="s9"><div class="in">
+  <div class="mk w" id="s9m" style="left:430px;top:420px;width:220px;height:220px" data-focus></div>
+  <div class="d c" id="s9a" style="top:720px;font-size:170px">RAMZA</div>
+  <div class="d c" id="s9b" style="top:920px;font-size:74px;color:rgba(255,255,255,.85)">starts at the bank.</div>
+</div></section>
+
+<!-- 10 · matching every line -->
+<section class="sc paper" id="s10"><div class="in">
+  <div class="m mute" style="left:104px;top:340px;font-size:26px;letter-spacing:.12em">BANK LINES · MATCHED BY THE AGENT</div>
+  <div class="stmt big10" id="s10s" style="top:390px" data-focus>
+    <div class="row" id="r101" style="border-top:none"><span>CHQ DEP 004512</span><span class="chip" id="c101" style="background:#E8EDFF;color:var(--blue)">cheque · unit 1204</span><span class="chip a" id="k101" style="background:#FFF2DC;color:#B87A0C">held</span></div>
+    <div class="row" id="r102"><span>TRF UNIT 1204</span><span class="chip" id="c102" style="background:#E8EDFF;color:var(--blue)">instalment 3</span><span class="chip a" id="k102" style="background:#FFF2DC;color:#B87A0C">escrow</span></div>
+    <div class="row" id="r103"><span>RCPT IPC 07</span><span class="chip" id="c103" style="background:#E8EDFF;color:var(--blue)">invoice INV-0412</span><span class="chip a" id="k103" style="background:#E3F4EA;color:var(--green)">yours</span></div>
+    <div class="row" id="r104"><span>MGMT FEE OCT</span><span class="chip" id="c104" style="background:#E8EDFF;color:var(--blue)">invoice INV-0418</span><span class="chip a" id="k104" style="background:#E3F4EA;color:var(--green)">yours</span></div>
+  </div>
+</div></section>
+
+<!-- 11 · approval -->
+<section class="sc paper" id="s11"><div class="in">
+  <div class="card" style="left:90px;top:400px;width:900px;height:330px;padding:40px">
+    <div class="m mute" style="position:static;font-size:24px;letter-spacing:.12em">READY TO POST · ZOHO</div>
+    <div style="font-family:'Urbanist';font-weight:800;font-size:76px;margin-top:20px">4 entries</div>
+    <div class="mute" style="font-size:32px;margin-top:14px">matched to the fils · nothing posted yet</div>
+  </div>
+  <div class="btn" id="s11b" data-focus>Approve</div>
+  <svg class="cur" id="s11c" viewBox="0 0 24 24" style="left:620px;top:1010px"><path d="M5 3l14 8-6 1.5L10 19z" fill="#14131C" stroke="#fff" stroke-width="1.4"/></svg>
+</div></section>
+
+<!-- 12 · the monthly pack -->
+<section class="sc paper" id="s12"><div class="in">
+  <div class="m mute" style="left:104px;top:330px;font-size:24px;letter-spacing:.12em">OCTOBER PACK · EXAMPLE · AED</div>
+  <div class="d" id="s12t" style="left:100px;top:370px;font-size:84px;color:var(--ink)">One page.</div>
+  <div class="tbl" id="s12g" style="top:500px" data-focus>
+    <div class="tr hd"><div></div><div>YOURS</div><div>HELD</div><div>COLLECT</div></div>
+    <div class="tr" id="t1"><div>Marina off-plan</div><div>420,000.00</div><div>2,610,000.00</div><div>520,000.00</div></div>
+    <div class="tr" id="t2"><div>Tower B build</div><div>1,150,000.00</div><div>0.00</div><div>740,000.00</div></div>
+    <div class="tr" id="t3"><div>Managed units</div><div>340,000.00</div><div>330,000.00</div><div>0.00</div></div>
+    <div class="tr tot" id="t4"><div>Total</div><div>1,910,000.00</div><div>2,940,000.00</div><div>1,260,000.00</div></div>
+  </div>
+  <div class="stampx" id="s12s" style="left:560px;top:1060px;color:var(--green);border-color:var(--green)">BALANCED</div>
+</div></section>
+
+<!-- 13 · loop back to the search bar -->
+<section class="sc white" id="s13"><div class="in">
+  <div class="dots"><i style="background:#4285F4"></i><i style="background:#EA4335"></i><i style="background:#FBBC05"></i><i style="background:#34A853"></i></div>
+  <div class="sbw" id="b13"></div>
+  <div class="d c" id="s13a" style="top:830px;font-size:50px;color:var(--mute)">Free setup on your own bank statement</div>
+  <div class="d c" id="s13b" style="top:950px;font-size:120px;color:var(--ink)">Comment <span style="color:#4285F4">CLEAN</span></div>
+</div></section>
+
+<div id="flash"></div><div id="cap"></div><div id="disc"></div>
+
+<script src="v2.js"></script>
+<script>
+const { tl, $, w, on, off, pop, slam, hide, punch, flash, tint, typeIn, D } = V;
+V.scenes([1, 2, 4, 11, 12]);
+const money = (v) => "AED " + Math.round(v).toLocaleString("en-US");
+
+/* search bar: ring spins for the whole scene; optional grow-in from a dot */
+const Q0 = "is this developer financially safe?";
+function bar(id, text) {
+  const el = $(id);
+  el.innerHTML = `<div class="glow"></div><div class="clip"><div class="ring"></div><div class="inner">
+    <svg class="mag" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5F6368" stroke-width="2.4"/><path d="M15 15l5 5" stroke="#5F6368" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <div class="q"><span class="tx">${text ?? ""}</span><span class="caret"></span></div>
+    <div class="mic"><i style="background:#4285F4"></i><i style="background:#EA4335"></i><i style="background:#FBBC05"></i><i style="background:#34A853"></i></div></div></div>`;
+  return el;
+}
+function spin(id, i) {
+  const len = off(i) - on(i);
+  tl.fromTo(`${id} .ring`, { rotation: 0 }, { rotation: 140 * len, duration: len, ease: "none" }, on(i));
+  // caret blink
+  for (let t = on(i); t < off(i); t += 1.06) { tl.set(`${id} .caret`, { opacity: 0 }, t + 0.53); tl.set(`${id} .caret`, { opacity: 1 }, t + 1.06); }
+}
+function grow(id, at) {
+  // dot → pill: width 150 → 940 from the centre, contents fade in after
+  tl.fromTo(id, { width: 150, left: 465, scale: 0.2, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.3, ease: "back.out(2)", immediateRender: false }, at);
+  tl.to(id, { width: 940, left: 70, duration: 0.55, ease: "expo.inOut" }, at + 0.3);
+  tl.fromTo(`${id} .q, ${id} .mic`, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, immediateRender: false }, at + 0.7);
+  E.sfx("pop", at); E.sfx("swish", at + 0.32);
+}
+
+// 0 · bar grows in, the buyer's question types
+bar("#b0"); spin("#b0", 0);
+gsap.set(["#d0 i", "#s0a"], { autoAlpha: 0 });
+tl.fromTo("#d0 i", { autoAlpha: 0, y: 30 }, { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.06, ease: "back.out(2)", immediateRender: false }, on(0) + 0.02);
+grow("#b0", on(0) + 0.15);
+typeIn($("#b0 .tx"), Q0, on(0) + 0.95, Math.max(0.8, w(0, "google") - on(0) - 1.2));
+pop("#s0a", w(0, "they", 0) - 0.05, { y: 40 });
+punch(0, w(0, "google"));
+
+// 1 · who searches: one suggestion per spoken word
+bar("#b1", Q0); spin("#b1", 1);
+gsap.set(["#g1", "#g2", "#g3", "#g4"], { autoAlpha: 0 });
+pop("#g1", w(1, "buyers."), { y: -20, sfx: "click" });
+pop("#g2", w(1, "investors."), { y: -20, sfx: "click" });
+pop("#g3", w(1, "bank."), { y: -20, sfx: "click" });
+pop("#g4", w(1, "partners."), { y: -20, sfx: "click" });
+
+// 2 · results blur, a navy card lands on "books"
+bar("#b2", Q0); spin("#b2", 2);
+gsap.set("#s2c", { autoAlpha: 0 });
+tl.fromTo("#rs", { filter: "blur(0px)" }, { filter: "blur(14px)", opacity: 0.45, duration: 0.6, ease: "power2.out", immediateRender: false }, w(2, "isn't"));
+slam("#s2c", w(2, "books."), "impact");
+hide("#rs .res", w(2, "books.") - 0.05, 0.08);
+
+// 3 · deposits stack into one balance
+gsap.set(["#s3s", "#r31", "#r32", "#r33", "#r34", "#s3a"], { autoAlpha: 0 });
+pop("#s3s", on(3) + 0.05, { y: 40 });
+["#r31", "#r32", "#r33", "#r34"].forEach((r, k) => pop(r, on(3) + 0.35 + k * 0.28, { y: 20, sfx: "blip" }));
+E.count($("#s3n"), on(3) + 0.35, D.bank, { dur: 1.3, fmt: money });
+pop("#s3a", w(3, "three"), { y: 40 });
+punch(3, w(3, "money."));
+
+// 4 · split: yours → held → not collected
+const SC = 900 / D.bank, wy = D.yours * SC, wh = D.held * SC;
+gsap.set("#sgY", { width: wy }); gsap.set("#sgH", { left: wy + 6, width: wh - 6 }); gsap.set("#sgC", { width: D.collect * SC });
+$("#lH").style.left = `${104 + wy + 20}px`;
+gsap.set(["#sgY", "#sgH", "#sgC", "#lY", "#lH", "#lC"], { autoAlpha: 0 });
+tl.fromTo("#sgY", { autoAlpha: 1, scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, w(4, "yours."));
+pop("#lY", w(4, "yours.") + 0.1, { y: 20, sfx: "click" });
+tl.set("#sgA", { textContent: "" }, w(4, "yours."));
+tl.fromTo("#sgH", { autoAlpha: 1, scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "expo.out", immediateRender: false }, w(4, "holding."));
+pop("#lH", w(4, "holding.") + 0.1, { y: 20, sfx: "click" });
+pop("#sgC", w(4, "collected."), { y: -60, sfx: "pop" });
+pop("#lC", w(4, "collected.") + 0.15, { y: 20 });
+
+// 5 · property management: three kinds of money in one account, the owner asks
+gsap.set(["#s5p", "#s5c", "#r51", "#r52", "#r53", "#s5b"], { autoAlpha: 0 });
+pop("#s5p", on(5) + 0.05, { y: 20 });
+pop("#s5c", w(5, "rent"), { y: 40 });
+pop("#r51", w(5, "cheques"), { y: 15, sfx: "blip" }); pop("#r52", w(5, "deposits"), { y: 15, sfx: "blip" }); pop("#r53", w(5, "account,"), { y: 15, sfx: "blip" });
+pop("#s5b", w(5, "owners"), { y: 30, s: 0.8, sfx: "sms" });
+punch(5, w(5, "went."));
+
+// 6 · off-plan: payment plan → escrow; "cash to spend" struck out
+gsap.set(["#s6p", "#s6plan", "#s6e", "#s6x"], { autoAlpha: 0 });
+pop("#s6p", on(6) + 0.05, { y: 20 });
+pop("#s6plan", w(6, "instalments"), { y: 30 });
+["#p1", "#p2", "#p3"].forEach((p, k) => tl.to(p, { background: "rgba(224,160,48,.55)", borderColor: "#E0A030", duration: 0.2 }, w(6, "instalments") + 0.2 + k * 0.18));
+slam("#s6e", w(6, "escrow."), "stamp");
+pop("#s6x", w(6, "cash"), { y: 20 });
+gsap.set("#s6l", { opacity: 0 }); tl.set("#s6l", { opacity: 1 }, w(6, "spend.")); E.draw($("#s6l"), w(6, "spend."), 0.3); E.sfx("swish", w(6, "spend."));
+
+// 7 · construction: margin unknown until the end
+gsap.set(["#s7p", "#s7c", "#r71", "#r72", "#r73", "#r74"], { autoAlpha: 0 });
+pop("#s7p", on(7) + 0.05, { y: 20 });
+pop("#s7c", w(7, "retention,"), { y: 40 });
+pop("#r72", w(7, "retention,"), { y: 15, sfx: "blip" }); pop("#r71", w(7, "progress"), { y: 15, sfx: "blip" }); pop("#r73", w(7, "variations"), { y: 15, sfx: "blip" });
+pop("#r74", w(7, "margin,"), { y: 15 });
+tl.to("#s7m", { scale: 1.5, duration: 0.12, yoyo: true, repeat: 1 }, w(7, "ends."));
+tl.set("#s7m", { textContent: "at the end?" }, w(7, "ends."));
+E.sfx("heart", w(7, "margin,"));
+
+// 8 · the numbers stop adding up
+gsap.set(["#s8a", "#s8x", "#s8b"], { autoAlpha: 0 });
+tint("#t8", on(8), 0.4);
+pop("#s8a", w(8, "mix"), { y: 30 });
+pop("#s8b", w(8, "show"), { y: 30 });
+slam("#s8x", w(8, "adding"), "impact");
+punch(8, w(8, "adding"), 0.12);
+
+// 9 · RAMZA
+gsap.set(["#s9m", "#s9a", "#s9b"], { autoAlpha: 0 });
+flash(on(9), 0.3, null);
+slam("#s9m", w(9, "ramza"), "impact");
+pop("#s9a", w(9, "ramza") + 0.12, { y: 30 });
+pop("#s9b", w(9, "bank."), { y: 30, sfx: "chime" });
+
+// 10 · each line → its source document → its bucket
+gsap.set(["#s10s", "#c101", "#c102", "#c103", "#c104", "#k101", "#k102", "#k103", "#k104"], { autoAlpha: 0 });
+pop("#s10s", on(10) + 0.05, { y: 40 });
+pop("#c101", w(10, "cheque,"), { x: -30, y: 0, sfx: "click" });
+pop("#c102", w(10, "instalment,"), { x: -30, y: 0, sfx: "click" });
+pop("#c103", w(10, "invoice"), { x: -30, y: 0, sfx: "click" }); pop("#c104", w(10, "invoice") + 0.2, { x: -30, y: 0 });
+["#k101", "#k102", "#k103", "#k104"].forEach((k, j) => pop(k, w(10, "booked") + j * 0.16, { y: 0, s: 0.6, sfx: j ? null : "ding" }));
+punch(10, w(10, "belongs."), 0.06);
+
+// 11 · approve
+gsap.set("#s11c", { autoAlpha: 0 });
+tl.fromTo("#s11c", { autoAlpha: 0, x: 200, y: 200 }, { autoAlpha: 1, x: 0, y: -110, duration: 0.6, ease: "power3.out", immediateRender: false }, on(11) + 0.2);
+const ap = w(11, "approve.");
+tl.to("#s11b", { scale: 0.94, duration: 0.08 }, ap); tl.to("#s11b", { scale: 1, duration: 0.2 }, ap + 0.08);
+tl.set("#s11b", { background: "#1F9D61", textContent: "Posted to Zoho" }, ap + 0.1);
+E.sfx("click", ap); E.sfx("chime", ap + 0.2);
+
+// 12 · the monthly pack, balanced
+gsap.set(["#s12t", "#s12g", "#t1", "#t2", "#t3", "#t4", "#s12s"], { autoAlpha: 0 });
+pop("#s12g", on(12) + 0.1, { y: 30 });
+pop("#s12t", w(12, "page."), { y: 30 });
+["#t1", "#t2", "#t3"].forEach((r, k) => pop(r, on(12) + 0.3 + k * 0.18, { y: 15, sfx: "blip" }));
+tl.to(["#t1", "#t2"], { background: "#E8EDFF", duration: 0.2 }, w(12, "project."));
+tl.to(["#t1", "#t2"], { background: "#F6F7FA", duration: 0.3 }, w(12, "property."));
+tl.to("#t3", { background: "#E8EDFF", duration: 0.2 }, w(12, "property."));
+pop("#t4", w(12, "fils."), { y: 15 });
+tl.fromTo("#s12s", { autoAlpha: 0, scale: 1.6 }, { autoAlpha: 1, scale: 1, duration: 0.2, ease: "power4.out", immediateRender: false }, w(12, "fils.") + 0.2);
+E.sfx("stamp", w(12, "fils.") + 0.2);
+
+// 13 · back to the search bar (same position as scene 0, so the loop is seamless)
+bar("#b13"); spin("#b13", 13);
+gsap.set(["#s13a", "#s13b"], { autoAlpha: 0 });
+typeIn($("#b13 .tx"), "clean books for real estate", on(13) + 0.2, 1.3);
+pop("#s13a", w(13, "set"), { y: 30 });
+pop("#s13b", w(13, "comment"), { y: 30, sfx: "pop" });
+
+V.captions({ light: [0, 1, 2, 4, 10, 11, 12, 13] });
+V.disclaimer(3, [4, 10, 11, 12, 13]);
+</script>
+</body></html>

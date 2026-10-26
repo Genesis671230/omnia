@@ -85,7 +85,7 @@ export const TAX_GUIDES: RamzaPage[] = [
       { q: "Is a PDF invoice still valid?", a: "Not as the tax invoice once your phase is live. The invoice becomes the structured file sent through your accredited provider; a PDF can still be sent as a readable copy." },
       { q: "What happens if we appoint a provider late?", a: `A penalty of ${aed(P.asp_late_aed_per_month)} for each month or part of a month after the deadline, under ${P.legal_basis}.` },
     ],
-    related: ["guides/uae-vat-registration-threshold", "guides/overdue-invoices", "guides/gateway-settlement-reports"],
+    related: ["guides/uae-vat-registration-threshold", "guides/overdue-invoices", "guides/gateway-settlement-reports", "tools/e-invoicing-deadline-check"],
     citations: [
       { claim: "Phase dates and provider deadlines", source: "Deloitte Middle East, UAE e-invoicing update", url: E.source, checked: E.verified_on },
       { claim: "E-invoicing penalties", source: P.legal_basis, url: P.source, checked: P.verified_on },
@@ -132,7 +132,7 @@ export const TAX_GUIDES: RamzaPage[] = [
       { q: "Can a free zone company claim Small Business Relief?", a: "A free zone company that is a Qualifying Free Zone Person cannot. A free zone company that is not one may be able to, if it meets the revenue test." },
       { q: `When does Small Business Relief end?`, a: `It now applies to tax periods ending on or before ${day(SBR.periods_end_on_or_before)}, under ${SBR.legal_basis}.` },
     ],
-    related: ["guides/uae-corporate-tax-rate", "guides/bookkeeping-habits", "guides/uae-vat-registration-threshold"],
+    related: ["guides/uae-corporate-tax-rate", "guides/bookkeeping-habits", "guides/uae-vat-registration-threshold", "tools/corporate-tax-calculator-uae"],
     citations: [
       { claim: `Relief extended to periods ending on or before ${day(SBR.periods_end_on_or_before)}`, source: "UAE Ministry of Finance", url: SBR.source, checked: SBR.verified_on },
       { claim: "Exclusions for Qualifying Free Zone Persons and MNE group members", source: "FTA Small Business Relief guide", url: SBR.source_exclusions, checked: SBR.verified_on },
@@ -182,7 +182,7 @@ export const TAX_GUIDES: RamzaPage[] = [
       { q: "Do zero-rated sales count towards the VAT threshold?", a: "Yes. Taxable supplies include zero-rated supplies; exempt supplies are excluded." },
       { q: "Should a small business register voluntarily?", a: "It can make sense when most customers are VAT-registered businesses or when there is significant input VAT to recover. It also brings filing obligations, so it is worth weighing both." },
     ],
-    related: ["guides/uae-e-invoicing-deadlines", "guides/small-business-relief-uae", "guides/bookkeeping-habits"],
+    related: ["guides/uae-e-invoicing-deadlines", "guides/small-business-relief-uae", "guides/bookkeeping-habits", "tools/vat-calculator-uae"],
     citations: [
       { claim: "VAT registration thresholds and tests", source: "UAE Federal Tax Authority", url: VAT.registration.source, checked: VAT.registration.verified_on },
     ],
@@ -226,7 +226,7 @@ export const TAX_GUIDES: RamzaPage[] = [
       { q: "Is the first AED 375,000 tax-free for every company?", a: `The 0% band applies to the first ${aed(CT.rate.zero_rate_up_to_aed)} of taxable income for resident businesses. Qualifying Free Zone Persons and large multinational groups follow different rules.` },
       { q: "When is the corporate tax return due?", a: `Within ${CT.filing_months_after_period_end} months of the end of the tax period, together with any tax payable.` },
     ],
-    related: ["guides/small-business-relief-uae", "guides/overdue-invoices", "guides/uae-vat-registration-threshold"],
+    related: ["guides/small-business-relief-uae", "guides/overdue-invoices", "guides/uae-vat-registration-threshold", "tools/corporate-tax-calculator-uae"],
     citations: [
       { claim: "Natural person turnover threshold", source: CT.natural_person.legal_basis, url: CT.natural_person.source, checked: CT.natural_person.verified_on },
     ],

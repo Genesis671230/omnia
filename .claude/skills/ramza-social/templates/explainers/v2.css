@@ -1,0 +1,42 @@
+/* Reels v2 (agency playbook, 2026-10-25): photo scenes with Ken Burns, kinetic headline, word-by-word
+   caption (current word blue), red = pain / blue = relief tints, flash frames. Critical content in
+   y 300–1500 so the 4:5 (y 285–1635) and 1:1 (y 240–1320 for headlines) crops keep it. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Urbanist:wght@600;700;800&display=block');
+:root{--blue:#4B67EE;--navy:#0B1533;--paper:#F6F7FA;--ink:#14131C;--mute:#8A92A6;--line:#DCE1EB;--red:#D9463A;--green:#1F9D61}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:var(--navy)}
+body{font-family:'IBM Plex Sans',sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+.sc{position:absolute;inset:0;visibility:hidden;overflow:hidden}
+.paper{background:var(--paper);color:var(--ink)}
+.ink{background:var(--navy);color:#fff}
+.slam{background:var(--blue);color:#fff}
+.black{background:#05070D;color:#fff}
+.in{position:absolute;inset:0;transform-origin:540px 860px}
+.ph{position:absolute;inset:-40px;background-size:cover;background-position:center}
+.shade{position:absolute;inset:0;background:rgba(5,8,18,.38)}
+.shade.top{background:rgba(5,8,18,.5)}
+.tint{position:absolute;inset:0;mix-blend-mode:multiply;opacity:0}
+.tint.red{background:#C2412F}.tint.blue{background:#3A55E6}
+.d{position:absolute;font-family:'Urbanist';font-weight:800;letter-spacing:-.04em;line-height:.95;white-space:nowrap}
+.m{position:absolute;font-family:'IBM Plex Mono';font-weight:500;white-space:nowrap}
+.c{left:0;right:0;text-align:center}
+.b{color:var(--blue)}.r{color:#FF6B5B}.mute{color:var(--mute)}
+.sh{text-shadow:0 6px 30px rgba(0,0,0,.55)}
+svg.sk{position:absolute;inset:0;width:1080px;height:1920px;overflow:visible;pointer-events:none}
+svg.sk path{fill:none;stroke:var(--blue);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+svg.sk path.red{stroke:#FF5A47}
+.card{position:absolute;background:#fff;color:var(--ink);border:1.5px solid var(--line);border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.mk{position:absolute;border-radius:28%;background:var(--blue)}
+.mk:before,.mk:after{content:"";position:absolute;top:31%;width:13.5%;height:38%;border-radius:99px;background:#fff}
+.mk:before{left:31.5%}.mk:after{right:31.5%}
+.mk.w{background:#fff}.mk.w:before,.mk.w:after{background:var(--blue)}
+.cur{position:absolute;width:64px;height:64px;z-index:5}
+.pill{position:absolute;font-family:'IBM Plex Mono';font-size:26px;letter-spacing:.12em;padding:10px 18px;border-radius:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;white-space:nowrap}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:30;pointer-events:none}
+/* caption: one phrase at a time, the spoken word turns blue */
+#cap{position:absolute;left:70px;right:70px;top:1360px;height:150px;z-index:25;text-align:center;font-family:'Urbanist';font-weight:800;font-size:66px;line-height:1.08;letter-spacing:-.02em}
+#cap span{display:inline-block;margin:0 .13em;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.6)}
+#cap span.on{color:#7F95FF}
+#cap.lt span{color:var(--ink);text-shadow:none}#cap.lt span.on{color:var(--blue)}
+#disc{position:absolute;left:80px;right:80px;top:1545px;text-align:center;font-size:21px;line-height:1.4;color:rgba(255,255,255,.62);z-index:20;visibility:hidden}
+#disc.lt{color:#8A92A6}
