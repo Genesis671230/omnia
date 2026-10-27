@@ -13,7 +13,7 @@ const PUBLIC_PATHS = ["/login", "/api/login", "/confirm", "/api/confirm","/api/i
   // Crawler files. These MUST be listed: config.matcher below only exempts
   // _next assets and image extensions, so without an entry here both get the
   // session check and 302 to /login — invisible to every search engine.
-  "/robots.txt", "/sitemap.xml", "/llms.txt",
+  "/robots.txt", "/sitemap.xml", "/llms.txt","/f5b84153f56e44db8ce81b9e5e3cd6a8.txt"
 ];
 
 export async function middleware(req: NextRequest) {
