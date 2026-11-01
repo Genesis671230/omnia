@@ -64,7 +64,7 @@
     "unpdf": "^1.6.2",
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
-    "zod": "3.25.76"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
